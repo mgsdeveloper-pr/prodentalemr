@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Filament\Saas\Resources\InsuranceCarriers\Pages;
+
+use App\Filament\Admin\Pages\VerificationQuestionArrangement;
+use App\Filament\Admin\Pages\VerificationReadiness;
+use App\Filament\Admin\Pages\VerificationSettings;
+use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
+use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
+use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
+use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
+use Filament\Resources\Pages\ListRecords;
+
+class ListInsuranceCarriers extends ListRecords
+{
+    protected static string $resource = InsuranceCarrierResource::class;
+
+    protected string $view = 'filament.saas.resources.insurance-carriers.pages.list-insurance-carriers';
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            CreateAction::make()
+                ->label('Add Insurance')
+                ->icon('heroicon-o-plus')
+                ->color('warning'),
+            Action::make('manageQuestions')
+                ->label('Verification Questions')
+                ->icon('heroicon-o-rectangle-stack')
+                ->color('gray')
+                ->url(VerificationFormQuestionResource::getUrl('index')),
+        ];
+    }
+
+    public function getVerificationNavItems(): array
+    {
+        return [
+            [
+                'key' => 'settings',
+                'label' => 'PDF Settings',
+                'description' => 'Control PDF output and default verification template rules.',
+                'url' => VerificationSettings::getUrl(),
+            ],
+            [
+                'key' => 'insurance',
+                'label' => 'Insurance Directory',
+                'description' => 'Manage the global insurance carrier master used across clinics.',
+                'url' => InsuranceCarrierResource::getUrl('index'),
+            ],
+            [
+                'key' => 'credentials',
+                'label' => 'Portal Credentials',
+                'description' => 'Maintain the shared portal credential vault clinics can inherit from.',
+                'url' => PortalCredentialResource::getUrl('index'),
+            ],
+            [
+                'key' => 'questions',
+                'label' => 'Verification Questions',
+                'description' => 'Manage prompts and section-specific question content.',
+                'url' => VerificationFormQuestionResource::getUrl('index'),
+            ],
+            [
+                'key' => 'arrangement',
+                'label' => 'Question Arrangement',
+                'description' => 'Reorder questions inside each verification section.',
+                'url' => VerificationQuestionArrangement::getUrl(),
+            ],
+            [
+                'key' => 'readiness',
+                'label' => 'Verification Readiness',
+                'description' => 'Review launch blockers, polish items, and readiness gaps.',
+                'url' => VerificationReadiness::getUrl(),
+            ],
+        ];
+    }
+}
