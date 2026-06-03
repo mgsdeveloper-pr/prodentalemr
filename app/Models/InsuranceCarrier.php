@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -30,6 +31,11 @@ class InsuranceCarrier extends Model
     public function overrides(): HasMany
     {
         return $this->hasMany(ClinicInsuranceCarrierOverride::class);
+    }
+
+    public function networkProfile(): HasOne
+    {
+        return $this->hasOne(InsuranceCarrierNetworkProfile::class);
     }
 
     public function overrideForClinic(?int $clinicId): ?ClinicInsuranceCarrierOverride

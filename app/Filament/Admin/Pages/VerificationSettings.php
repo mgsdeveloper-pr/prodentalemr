@@ -5,7 +5,6 @@ namespace App\Filament\Admin\Pages;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
-use App\Models\SaasSetting;
 use App\Models\VerificationFormQuestion;
 use App\Support\AdminClinicScope;
 use App\Support\VerificationResultPdf;
@@ -14,7 +13,6 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -56,20 +54,15 @@ class VerificationSettings extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return (bool) (
-            auth()->user()?->canPerformVerificationModuleAction('settings', 'update')
-            || auth()->user()?->canManageSaasRevenueOperations()
-        );
+        return auth()->user()?->canManageVerificationSettings() ?? false;
     }
 
     public function mount(): void
     {
         $this->clinicRecord = $this->resolveClinic();
-        $settings = SaasSetting::current();
         $selectedQuestionIds = $this->clinicRecord?->getVerificationPdfOutputQuestionIds() ?? [];
 
         $this->form->fill([
-            'verification_round_robin_enabled' => (bool) $settings->verification_round_robin_enabled,
             'verification_pdf_output_mode' => $this->clinicRecord?->getVerificationPdfOutputMode() ?? 'standard',
             'verification_pdf_output_sections' => $this->clinicRecord?->getVerificationPdfOutputSections() ?? [],
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
@@ -82,15 +75,6 @@ class VerificationSettings extends Page implements HasForms
         return $schema
             ->statePath('data')
             ->components([
-                Section::make('Assignment Management')
-                    ->description('Control how new managed-service verification requests are assigned when no user is selected manually.')
-                    ->schema([
-                        Toggle::make('verification_round_robin_enabled')
-                            ->label('Enable round-robin auto assignment')
-                            ->helperText('When enabled, new verification requests rotate evenly across eligible verification users. When disabled, the system falls back to the current lightest-workload assignment logic.')
-                            ->default(false),
-                    ])
-                    ->columns(1),
                 Section::make('PDF Output Template')
                     ->description('Choose the verification PDF format once for this clinic. Every Clinic and Admin user will use the same output for this clinic.')
                     ->schema([
@@ -146,24 +130,19 @@ class VerificationSettings extends Page implements HasForms
                 ->color('gray'),
             Action::make('save')
                 ->label('Save settings')
-                ->submit('save'),
+                ->action('save'),
         ];
     }
 
     public function save(): void
     {
-        $settings = SaasSetting::current();
-        $settings->update([
-            'verification_round_robin_enabled' => (bool) ($this->data['verification_round_robin_enabled'] ?? false),
-        ]);
-
         $clinic = $this->resolveClinic();
 
         if (! $clinic) {
             Notification::make()
-                ->title('Assignment settings saved')
-                ->body('Round-robin assignment was updated. Select a clinic from the Workspace menu when you want to save clinic-specific PDF settings too.')
-                ->success()
+                ->title('Select a clinic')
+                ->body('Choose a clinic from the Workspace menu before saving PDF output settings.')
+                ->danger()
                 ->send();
 
             return;
@@ -204,7 +183,6 @@ class VerificationSettings extends Page implements HasForms
         $this->clinicRecord = $clinic->fresh('organization');
         $selectedQuestionIds = $this->clinicRecord->getVerificationPdfOutputQuestionIds();
         $this->form->fill([
-            'verification_round_robin_enabled' => (bool) $settings->fresh()->verification_round_robin_enabled,
             'verification_pdf_output_mode' => $this->clinicRecord->getVerificationPdfOutputMode(),
             'verification_pdf_output_sections' => $this->clinicRecord->getVerificationPdfOutputSections(),
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
@@ -213,7 +191,7 @@ class VerificationSettings extends Page implements HasForms
 
         Notification::make()
             ->title('Verification settings saved')
-            ->body('The assignment rule and clinic PDF output template have been updated successfully.')
+            ->body('The clinic PDF output template has been updated successfully.')
             ->success()
             ->send();
     }

@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
 use App\Models\ClientServiceEnrollment;
+use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\Location;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
@@ -25,6 +26,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class VerificationWorkItemForm
 {
@@ -296,6 +298,7 @@ class VerificationWorkItemForm
                                     ->columnSpan(2),
                                 TextInput::make('vf_insurance_provider_name')
                                     ->label('Insurance name')
+                                    ->live(onBlur: true)
                                     ->columnSpan(4),
                                 TextInput::make('vf_insurance_company_phone_number')
                                     ->label('Insurance phone')
@@ -305,7 +308,16 @@ class VerificationWorkItemForm
                                     ->columnSpan(4),
                                 TextInput::make('vf_payer_id')
                                     ->label('Electronic payer ID')
+                                    ->live(onBlur: true)
                                     ->columnSpan(2),
+                                Placeholder::make('provider_participation_guidance')
+                                    ->label('Provider Participation Guidance')
+                                    ->content(fn (Get $get): HtmlString => static::networkParticipationGuidance(
+                                        (string) ($get('vf_insurance_provider_name') ?? ''),
+                                        (string) ($get('vf_payer_id') ?? '')
+                                    ))
+                                    ->visible(fn (Get $get): bool => filled($get('vf_insurance_provider_name')) || filled($get('vf_payer_id')))
+                                    ->columnSpan(12),
                                 DatePicker::make('vf_effective_date')
                                     ->label('Effective date')
                                     ->native(false)
@@ -318,7 +330,15 @@ class VerificationWorkItemForm
                                     ->columnSpan(2),
                                 TextInput::make('vf_fee_schedule')
                                     ->label('Fee schedule')
-                                    ->columnSpan(3),
+                                    ->columnSpan(2),
+                                Placeholder::make('vf_fee_schedule_reference')
+                                    ->label('Current fee schedule reference')
+                                    ->content(fn (Get $get): HtmlString => static::feeScheduleReferenceGuidance(
+                                        (string) ($get('vf_insurance_provider_name') ?? ''),
+                                        (string) ($get('vf_payer_id') ?? '')
+                                    ))
+                                    ->visible(fn (Get $get): bool => filled($get('vf_insurance_provider_name')) || filled($get('vf_payer_id')))
+                                    ->columnSpan(2),
                                 TextInput::make('vf_network_status')
                                     ->label('Network status')
                                     ->columnSpan(3),
@@ -541,5 +561,71 @@ class VerificationWorkItemForm
             '1' => 'Yes',
             '0' => 'No',
         ];
+    }
+
+    protected static function networkParticipationGuidance(?string $carrierName, ?string $payerId = null): HtmlString
+    {
+        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
+
+        if (! $profile) {
+            return new HtmlString(
+                '<div style="border: 1px dashed #cbd5e1; border-radius: 16px; background: #f8fafc; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: #64748b;">'
+                . 'No saved participating / non-participating guidance exists for this payer yet. Add it from <strong>Verification &gt; Provider Participation</strong> if this carrier should have reusable network guidance.'
+                . '</div>'
+            );
+        }
+
+        $rows = collect($profile->summaryRows())
+            ->map(fn (array $row): string => '<div style="padding: 10px 0; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 12px; align-items: start;">'
+                . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">' . e($row['label']) . '</div>'
+                . '<div style="font-size: 13px; line-height: 1.65; color: #334155;">' . nl2br(e((string) $row['value'])) . '</div>'
+                . '</div>')
+            ->implode('');
+
+        return new HtmlString(
+            '<div style="border: 1px solid #c7d2fe; border-radius: 18px; background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%); padding: 16px 18px;">'
+            . '<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #4338ca;">Managed Participation Guidance</div>'
+            . '<div style="margin-top: 6px; font-size: 16px; font-weight: 800; color: #0f172a;">' . e($profile->insuranceCarrier?->insurance_name ?? 'Matched Payer') . '</div>'
+            . '</div>'
+            . '<span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 11px; font-weight: 800;">'
+            . e($profile->insuranceCarrier?->payer_id ?: 'No payer ID')
+            . '</span>'
+            . '</div>'
+            . '<div style="font-size: 12px; line-height: 1.7; color: #475569;">Use this as a reusable payer baseline, then confirm the actual plan-specific network behavior during the verification call or portal review.</div>'
+            . $rows
+            . '</div>'
+        );
+    }
+
+    protected static function feeScheduleReferenceGuidance(?string $carrierName, ?string $payerId = null): HtmlString
+    {
+        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
+
+        if (! $profile || ! $profile->hasFeeScheduleReference()) {
+            return new HtmlString(
+                '<div style="border: 1px dashed #cbd5e1; border-radius: 16px; background: #f8fafc; padding: 12px 14px; font-size: 12px; line-height: 1.7; color: #64748b;">'
+                . 'No current fee schedule reference is saved for this payer yet.'
+                . '</div>'
+            );
+        }
+
+        $name = e($profile->feeScheduleReferenceName() ?: 'Saved fee schedule reference');
+        $url = $profile->feeScheduleReferenceUrl();
+
+        $action = filled($url)
+            ? '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">View current schedule</a>'
+            : '<span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800;">Reference name only</span>';
+
+        return new HtmlString(
+            '<div style="border: 1px solid #dbe4ee; border-radius: 16px; background: #f8fafc; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Saved reference</div>'
+            . '<div style="margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.5; color: #0f172a;">' . $name . '</div>'
+            . '</div>'
+            . $action
+            . '</div>'
+        );
     }
 }

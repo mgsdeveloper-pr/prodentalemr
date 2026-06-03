@@ -34,6 +34,17 @@ class SaasMailSettings
         static::apply(($settings ?? SaasSetting::current())->toArray());
     }
 
+    public static function applyRuntimeDefaultsFromSettings(?SaasSetting $settings = null): void
+    {
+        $state = ($settings ?? SaasSetting::current())->toArray();
+
+        if (! static::canSend($state)) {
+            return;
+        }
+
+        static::apply($state);
+    }
+
     public static function canSend(array $state): bool
     {
         if (! ($state['email_enabled'] ?? false)) {

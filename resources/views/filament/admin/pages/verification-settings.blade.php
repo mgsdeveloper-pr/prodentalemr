@@ -15,10 +15,22 @@
                 'url' => \App\Filament\Admin\Pages\VerificationSettings::getUrl(),
             ],
             [
+                'key' => 'assignment',
+                'label' => 'Assignment Management',
+                'description' => 'Control how verification work is auto-assigned across the team.',
+                'url' => \App\Filament\Admin\Pages\VerificationAssignmentManagement::getUrl(),
+            ],
+            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
                 'url' => \App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource::getUrl('index'),
+            ],
+            [
+                'key' => 'participation',
+                'label' => 'Provider Participation',
+                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
+                'url' => \App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource::getUrl('index'),
             ],
             [
                 'key' => 'credentials',
@@ -37,6 +49,12 @@
                 'label' => 'Question Arrangement',
                 'description' => 'Reorder questions inside each verification section.',
                 'url' => \App\Filament\Admin\Pages\VerificationQuestionArrangement::getUrl(),
+            ],
+            [
+                'key' => 'notifications',
+                'label' => 'Notification Control',
+                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
+                'url' => \App\Filament\Admin\Pages\VerificationNotificationControl::getUrl(),
             ],
             [
                 'key' => 'readiness',

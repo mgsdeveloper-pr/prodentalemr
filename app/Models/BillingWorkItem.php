@@ -413,11 +413,11 @@ class BillingWorkItem extends Model
             return false;
         }
 
-        if (! $user->canAccessSaasRevenueOperations()) {
+        if (! $user->canAccessVerificationPanel()) {
             return false;
         }
 
-        if ($user->canManageSaasRevenueOperations()) {
+        if ($user->canManageVerificationQueue()) {
             return true;
         }
 
@@ -473,8 +473,8 @@ class BillingWorkItem extends Model
             return false;
         }
 
-        $isVerificationManager = $user->canManageSaasRevenueOperations();
-        $isVerificationUser = $user->canAccessSaasRevenueOperations();
+        $isVerificationManager = $user->canManageVerificationQueue();
+        $isVerificationUser = $user->canAccessVerificationPanel();
         $isClinicUser = $user->canEditClinicVerificationRequests();
 
         if ($isVerificationUser) {

@@ -86,11 +86,11 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Take Ownership')
                         ->icon('heroicon-o-hand-raised')
                         ->color('info')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageSaasRevenueOperations()
+                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
                             && $record->normalized_status !== BillingWorkItem::STATUS_DONE
                             && $record->assigned_to !== auth()->id())
                         ->action(function (BillingWorkItem $record): void {
-                            abort_unless(auth()->user()?->canManageSaasRevenueOperations(), 403);
+                            abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
                             $record->assigned_to = auth()->id();
 
@@ -110,7 +110,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Reassign')
                         ->icon('heroicon-o-arrow-path')
                         ->color('gray')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageSaasRevenueOperations()
+                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
                             && $record->normalized_status !== BillingWorkItem::STATUS_DONE)
                         ->form(fn (BillingWorkItem $record): array => [
                             Select::make('assigned_to')
@@ -125,7 +125,7 @@ class VerificationAttentionQueue extends TableWidget
                             'assigned_to' => $record->assigned_to,
                         ])
                         ->action(function (BillingWorkItem $record, array $data): void {
-                            abort_unless(auth()->user()?->canManageSaasRevenueOperations(), 403);
+                            abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
                             $record->assigned_to = $data['assigned_to'];
                             $record->save();
@@ -140,7 +140,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Return for Rework')
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->color('danger')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageSaasRevenueOperations()
+                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
                             && in_array($record->normalized_status, [
                                 BillingWorkItem::STATUS_REVIEW,
                                 BillingWorkItem::STATUS_DONE,
@@ -153,7 +153,7 @@ class VerificationAttentionQueue extends TableWidget
                                 ->required(),
                         ])
                         ->action(function (BillingWorkItem $record, array $data): void {
-                            abort_unless(auth()->user()?->canManageSaasRevenueOperations(), 403);
+                            abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
                             $record->return_reason = $data['return_reason'];
                             $record->transitionStatus(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
@@ -168,14 +168,14 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Reopen')
                         ->icon('heroicon-o-arrow-path-rounded-square')
                         ->color('warning')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageSaasRevenueOperations()
+                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
                             && in_array($record->normalized_status, [
                                 BillingWorkItem::STATUS_DONE,
                                 BillingWorkItem::STATUS_INCOMPLETE,
                             ], true)
                             && $record->canUserTransitionTo(auth()->user(), BillingWorkItem::STATUS_IN_PROGRESS))
                         ->action(function (BillingWorkItem $record): void {
-                            abort_unless(auth()->user()?->canManageSaasRevenueOperations(), 403);
+                            abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
                             $record->transitionStatus(BillingWorkItem::STATUS_IN_PROGRESS);
 
@@ -189,7 +189,7 @@ class VerificationAttentionQueue extends TableWidget
                     ->label('Manager')
                     ->icon('heroicon-o-adjustments-horizontal')
                     ->button()
-                    ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageSaasRevenueOperations() ?? false),
+                    ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue() ?? false),
             ])
             ->headerActions([
                 HeaderActionGroup::make([

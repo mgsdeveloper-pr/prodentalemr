@@ -26,9 +26,9 @@
         $statusButtons = collect($this->getStatusActionButtons())->filter(fn (array $button): bool => $button['visible'])->values()->all();
         $canSubmitForm = method_exists($this, 'canSubmitForm') ? $this->canSubmitForm() : true;
         $showStatusButtons = count($statusButtons) > 0;
-        $showInfoRequestField = collect($statusButtons)->contains(fn (array $button): bool => $button['target'] === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
+        $showInfoRequestField = collect($statusButtons)->contains(fn (array $button): bool => ($button['target'] ?? null) === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
             || $record->normalized_status === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
-        $showReworkReasonField = collect($statusButtons)->contains(fn (array $button): bool => $button['target'] === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        $showReworkReasonField = collect($statusButtons)->contains(fn (array $button): bool => ($button['target'] ?? null) === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
             || $record->normalized_status === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
         $showClinicResponseCard = ! $canManageQueueControl
             && $canSubmitForm
@@ -77,10 +77,90 @@
         $sectionBarStyle = 'background: linear-gradient(90deg, #eff6ff 0%, #f8fafc 100%); color: #0f172a; border-bottom: 1px solid #dbeafe;';
         $sectionBarTitleStyle = 'padding: 10px 18px; font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; text-align: center;';
         $sectionHeaderCellStyle = 'padding: 12px 16px; border-bottom: 1px solid #dbeafe; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;';
+        $quickReferenceCopyText = implode("\n", array_filter([
+            'Patient: ' . ($quickReference['patient'] ?? ''),
+            'DOB: ' . ($quickReference['dob'] ?? ''),
+            'Member ID: ' . ($quickReference['member_id'] ?? ''),
+            'Insurance: ' . ($quickReference['insurance_name'] ?? ''),
+            'Coverage Status: ' . ($quickReference['coverage_role'] ?? ''),
+            'Insurance Phone: ' . ($quickReference['phone'] ?? ''),
+            'Provider NPI: ' . ($quickReference['provider_npi'] ?? ''),
+            'Practice NPI: ' . ($quickReference['practice_npi'] ?? ''),
+        ]));
     @endphp
 
+    <style>
+        .verification-workbench-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 8px 0 2px;
+        }
+
+        .verification-workbench-header__actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .verification-workbench-layout {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .verification-workbench-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            position: sticky;
+            top: 24px;
+        }
+
+        .verification-workbench-copy {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ee;
+            background: #ffffff;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        @media (max-width: 1280px) {
+            .verification-workbench-layout {
+                grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 1120px) {
+            .verification-workbench-header {
+                flex-direction: column;
+            }
+
+            .verification-workbench-header__actions {
+                justify-content: flex-start;
+            }
+
+            .verification-workbench-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .verification-workbench-sidebar {
+                position: static;
+            }
+        }
+    </style>
+
     <div style="display: flex; flex-direction: column; gap: 22px;">
-        <section style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 8px 0 2px;">
+        <section class="verification-workbench-header">
             <div>
                 <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px;">
                     <span style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ffffff; border: 1px solid #dbe4ee; color: #334155; font-size: 12px; font-weight: 700;">
@@ -95,12 +175,12 @@
                 </p>
             </div>
 
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end;">
+            <div class="verification-workbench-header__actions">
                 @if ($showStatusButtons)
                     @foreach ($statusButtons as $button)
                         <button
                             type="button"
-                            wire:click="{{ $button['action'] ?? "saveAndTransition('{$button['target']}')" }}"
+                            wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
                             style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
                         >
                             {{ $button['label'] }}
@@ -141,14 +221,14 @@
         @endif
 
         <form wire:submit="save">
-            <div style="display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 24px; align-items: start;">
-                <aside style="display: flex; flex-direction: column; gap: 18px; position: sticky; top: 24px;">
+            <div class="verification-workbench-layout">
+                <aside class="verification-workbench-sidebar">
                     <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
                         <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
                             <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">
                                 Quick Reference
                             </h3>
-                            <span style="font-size: 11px; color: #94a3b8;">Copy all</span>
+                            <button type="button" class="verification-workbench-copy" onclick="copyVerificationQuickReference(@js($quickReferenceCopyText), this)">Copy all</button>
                         </div>
                         <div style="padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px;">
                             <div style="grid-column: 1 / -1;">
@@ -887,15 +967,15 @@
                             {{ $this->getCancelButtonLabel() }}
                         </a>
                         @if ($showStatusButtons)
-                            @foreach ($statusButtons as $button)
-                                <button
-                                    type="button"
-                                    wire:click="saveAndTransition('{{ $button['target'] }}')"
-                                    style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
-                                >
-                                    {{ $button['label'] }}
-                                </button>
-                            @endforeach
+                        @foreach ($statusButtons as $button)
+                            <button
+                                type="button"
+                                wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
+                                style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
+                            >
+                                {{ $button['label'] }}
+                            </button>
+                        @endforeach
                         @endif
                         @if ($canSubmitForm)
                             <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
@@ -919,8 +999,8 @@
                             Review the exact form data that was saved at this point in the workflow, including the work item state, verification profile, and captured answers.
                         </p>
                     </div>
-                    <button type="button" wire:click="closeSubmissionSnapshot" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">
-                        ×
+                    <button type="button" wire:click="closeSubmissionSnapshot" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+                </div>
                     </button>
                 </div>
 
@@ -1029,4 +1109,21 @@
             </div>
         </div>
     @endif
+
+    <script>
+        async function copyVerificationQuickReference(text, button) {
+            if (!text) return;
+
+            await navigator.clipboard.writeText(text);
+
+            if (!button) return;
+
+            const original = button.textContent;
+            button.textContent = 'Copied';
+
+            setTimeout(() => {
+                button.textContent = original;
+            }, 1200);
+        }
+    </script>
 </x-filament-panels::page>

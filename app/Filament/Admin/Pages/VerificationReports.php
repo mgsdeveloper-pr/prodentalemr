@@ -42,10 +42,7 @@ class VerificationReports extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return (bool) (
-            auth()->user()?->canAccessVerificationModule('reports')
-            || auth()->user()?->canAccessSaasRevenueOperations()
-        );
+        return auth()->user()?->canAccessVerificationModule('reports') ?? false;
     }
 
     public function mount(): void
@@ -224,6 +221,11 @@ class VerificationReports extends Page implements HasForms
     public function getAssigneeVisualization(): array
     {
         return VerificationReport::barVisualization(VerificationReport::assigneeBreakdown($this->baseQuery()));
+    }
+
+    public function getSlaAnalytics(): array
+    {
+        return VerificationReport::slaAnalytics($this->baseQuery());
     }
 
     public function getRecentRows(): array

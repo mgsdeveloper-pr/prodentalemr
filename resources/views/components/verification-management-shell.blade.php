@@ -24,59 +24,6 @@
         top: 24px;
     }
 
-    .verification-shell__tabs {
-        border: 1px solid #dbe4ee;
-        border-radius: 22px;
-        background: #ffffff;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-        overflow: hidden;
-    }
-
-    .verification-shell__tab-wrap {
-        padding: 12px 14px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .verification-shell__tab {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 10px 14px;
-        border-radius: 999px;
-        text-decoration: none;
-        border: 1px solid #dbe4ee;
-        background: #ffffff;
-        color: #475569;
-        font-size: 13px;
-        font-weight: 800;
-        transition: all 140ms ease;
-    }
-
-    .verification-shell__tab:hover {
-        border-color: #cbd5e1;
-        background: #f8fafc;
-    }
-
-    .verification-shell__tab.is-active {
-        border-color: #93c5fd;
-        background: #eff6ff;
-        color: #1d4ed8;
-        box-shadow: inset 0 -2px 0 #3b82f6;
-    }
-
-    .verification-shell__tab-dot {
-        display: inline-flex;
-        width: 8px;
-        height: 8px;
-        border-radius: 999px;
-        background: currentColor;
-        opacity: 0.7;
-    }
-
     .verification-shell__menu-link {
         display: flex;
         align-items: center;
@@ -204,24 +151,6 @@
     </aside>
 
     <div class="verification-shell__content">
-        <section class="verification-shell__tabs">
-            <div class="verification-shell__tab-wrap">
-                @foreach ($items as $item)
-                    @php
-                        $isActive = ($active !== null && ($item['key'] ?? null) === $active)
-                            || (($item['active'] ?? false) === true);
-                    @endphp
-                    <a
-                        href="{{ $item['url'] }}"
-                        class="verification-shell__tab{{ $isActive ? ' is-active' : '' }}"
-                    >
-                        <span class="verification-shell__tab-dot"></span>
-                            {{ $item['label'] }}
-                    </a>
-                @endforeach
-            </div>
-        </section>
-
         {{ $slot }}
     </div>
 </div>

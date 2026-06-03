@@ -36,8 +36,9 @@ class PortalCredentialSettings extends Page
     public static function canAccess(): bool
     {
         return (bool) (
-            auth()->user()?->canAccessVerificationModule('settings')
-            || auth()->user()?->canManageSaasRevenueOperations()
+            auth()->user()?->canManageVerificationSettings()
+            || auth()->user()?->canAccessVerificationModule('portal_credentials')
+            || auth()->user()?->canAccessSaasModule('portal_credentials')
         );
     }
 

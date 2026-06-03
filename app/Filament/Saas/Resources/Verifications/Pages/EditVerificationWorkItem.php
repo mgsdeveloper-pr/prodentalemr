@@ -97,7 +97,7 @@ class EditVerificationWorkItem extends EditRecord
     {
         $status = $this->record->normalized_status;
         $user = auth()->user();
-        $isManager = $user?->canManageSaasRevenueOperations() ?? false;
+        $isManager = $user?->canManageVerificationQueue() ?? false;
 
         return [
             [
@@ -186,7 +186,7 @@ class EditVerificationWorkItem extends EditRecord
 
     public function canManageQueueControl(): bool
     {
-        return auth()->user()?->canManageSaasRevenueOperations() ?? false;
+        return auth()->user()?->canManageVerificationQueue() ?? false;
     }
 
     public function canSubmitForm(): bool

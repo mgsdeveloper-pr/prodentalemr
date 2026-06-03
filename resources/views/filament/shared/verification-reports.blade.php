@@ -10,6 +10,7 @@
         $outcomeVisualization = $this->getOutcomeVisualization();
         $sourceVisualization = $this->getSourceVisualization();
         $assigneeVisualization = $this->getAssigneeVisualization();
+        $slaAnalytics = $this->getSlaAnalytics();
         $recentRows = $this->getRecentRows();
         $activityFocusChips = $this->getActivityFocusChips();
     @endphp
@@ -30,6 +31,47 @@
             display: grid;
             gap: 20px;
             grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+        }
+
+        .verification-reports-sla {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr);
+        }
+
+        .verification-reports-sla-cards {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .verification-reports-snapshot {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 18px;
+        }
+
+        .verification-reports-snapshot-box {
+            border-radius: 16px;
+            border: 1px solid #e8eef5;
+            background: #f8fafc;
+            padding: 14px;
+        }
+
+        .verification-reports-snapshot-label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .verification-reports-snapshot-value {
+            margin-top: 6px;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
         }
 
         .verification-reports-breakdowns {
@@ -106,11 +148,15 @@
 
         .verification-reports-table-wrap {
             overflow-x: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
         }
 
         .verification-reports-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             min-width: 920px;
         }
 
@@ -141,6 +187,11 @@
             color: #1d4ed8;
         }
 
+        .verification-reports-chip--clear {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+
         .verification-reports-chip--active {
             background: #eff6ff;
             border-color: #93c5fd;
@@ -149,7 +200,7 @@
 
         .verification-reports-table th,
         .verification-reports-table td {
-            padding: 12px 14px;
+            padding: 13px 14px;
             border-top: 1px solid #e8eef5;
             text-align: left;
             font-size: 13px;
@@ -157,9 +208,24 @@
 
         .verification-reports-table th {
             color: #64748b;
-            font-weight: 700;
-            background: #fbfdff;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            background: #f8fafc;
             border-top: none;
+            white-space: nowrap;
+        }
+
+        .verification-reports-table tbody tr:nth-child(even) {
+            background: #fbfdff;
+        }
+
+        .verification-reports-table tbody tr:hover {
+            background: #f8fbff;
+        }
+
+        .verification-reports-table tbody td:first-child {
+            font-weight: 800;
+            color: #0f172a;
         }
 
         @media (max-width: 1200px) {
@@ -170,14 +236,17 @@
         }
 
         @media (max-width: 1024px) {
-            .verification-reports-main {
+            .verification-reports-main,
+            .verification-reports-sla {
                 grid-template-columns: minmax(0, 1fr);
             }
         }
 
         @media (max-width: 768px) {
             .verification-reports-summary,
-            .verification-reports-breakdowns {
+            .verification-reports-breakdowns,
+            .verification-reports-sla-cards,
+            .verification-reports-snapshot {
                 grid-template-columns: minmax(0, 1fr);
             }
         }
@@ -216,6 +285,99 @@
                     </div>
                 </div>
             @endforeach
+        </section>
+
+        <section class="verification-reports-sla">
+            <div class="verification-reports-sla-cards">
+                @foreach ($slaAnalytics['cards'] ?? [] as $card)
+                    @php
+                        $accent = match ($card['accent'] ?? 'slate') {
+                            'emerald' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'text' => '#15803d'],
+                            'sky' => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'text' => '#2563eb'],
+                            'amber' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'text' => '#d97706'],
+                            'indigo' => ['bg' => '#eef2ff', 'border' => '#c7d2fe', 'text' => '#4338ca'],
+                            default => ['bg' => '#f8fafc', 'border' => '#dbe4ee', 'text' => '#475569'],
+                        };
+                    @endphp
+                    <div class="verification-reports-card">
+                        <div class="verification-reports-card__body">
+                            <div class="verification-reports-kpi">
+                                <div>
+                                    <div style="font-size: 13px; font-weight: 700; color: #64748b;">{{ $card['label'] }}</div>
+                                    <div class="verification-reports-kpi__value">{{ $card['value'] }}</div>
+                                </div>
+                                <span
+                                    class="verification-reports-pill"
+                                    style="background: {{ $accent['bg'] }}; border-color: {{ $accent['border'] }}; color: {{ $accent['text'] }};"
+                                >
+                                    {{ $card['label'] }}
+                                </span>
+                            </div>
+                            <div style="margin-top: 14px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                {{ $card['description'] }}
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+            <div class="verification-reports-card">
+                <div class="verification-reports-card__body">
+                    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+                        <div>
+                            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Operational Snapshot</div>
+                            <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                Current queue pressure across SLA-sensitive exception states.
+                            </div>
+                        </div>
+                        <div style="text-align: right; font-size: 13px; color: #64748b;">
+                            <div>Scope</div>
+                            <div style="margin-top: 4px; font-weight: 700; color: #0f172a;">{{ $this->getAppliedScopeLabel() }}</div>
+                        </div>
+                    </div>
+
+                    <div class="verification-reports-snapshot">
+                        <div class="verification-reports-snapshot-box">
+                            <div class="verification-reports-snapshot-label">Due Today</div>
+                            <div class="verification-reports-snapshot-value">{{ number_format($slaAnalytics['snapshot']['due_today'] ?? 0) }}</div>
+                        </div>
+                        <div class="verification-reports-snapshot-box">
+                            <div class="verification-reports-snapshot-label">Overdue</div>
+                            <div class="verification-reports-snapshot-value">{{ number_format($slaAnalytics['snapshot']['overdue'] ?? 0) }}</div>
+                        </div>
+                        <div class="verification-reports-snapshot-box">
+                            <div class="verification-reports-snapshot-label">Waiting on Clinic</div>
+                            <div class="verification-reports-snapshot-value">{{ number_format($slaAnalytics['snapshot']['waiting_on_clinic'] ?? 0) }}</div>
+                        </div>
+                        <div class="verification-reports-snapshot-box">
+                            <div class="verification-reports-snapshot-label">Review Queue</div>
+                            <div class="verification-reports-snapshot-value">{{ number_format($slaAnalytics['snapshot']['review'] ?? 0) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="verification-reports-bars">
+                        @foreach ($slaAnalytics['bars'] ?? [] as $row)
+                            <div>
+                                <div class="verification-reports-bar__meta">
+                                    <span>{{ $row['label'] }}</span>
+                                    <span>{{ number_format($row['value']) }}</span>
+                                </div>
+                                <div class="verification-reports-bar__track">
+                                    <div
+                                        class="verification-reports-bar__fill"
+                                        style="width: {{ $row['width'] }}%; background: {{ match ($row['key'] ?? null) {
+                                            \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE => '#4f46e5',
+                                            \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK => '#f59e0b',
+                                            \App\Models\BillingWorkItem::STATUS_REVIEW => '#0ea5e9',
+                                            default => '#e11d48',
+                                        } }};"
+                                    ></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
         </section>
 
         {{-- Reporting dashboard visualizations are intentionally hidden for now.
@@ -376,7 +538,7 @@
                                 <button
                                     type="button"
                                     wire:click="clearActivityFocus"
-                                    class="verification-reports-chip"
+                                    class="verification-reports-chip verification-reports-chip--clear"
                                 >
                                     Clear
                                 </button>
@@ -405,7 +567,7 @@
                         <tbody>
                             @forelse ($recentRows as $row)
                                 <tr>
-                                    <td style="font-weight: 700; color: #0f172a;">{{ $row['Reference'] }}</td>
+                                    <td>{{ $row['Reference'] }}</td>
                                     <td>{{ $row['Patient'] }}</td>
                                     <td>{{ $row['Clinic'] }}</td>
                                     <td>{{ $row['Status'] }}</td>

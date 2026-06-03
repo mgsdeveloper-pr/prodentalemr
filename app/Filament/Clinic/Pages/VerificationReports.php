@@ -234,6 +234,11 @@ class VerificationReports extends Page implements HasForms
         return VerificationReport::barVisualization(VerificationReport::assigneeBreakdown($this->baseQuery()));
     }
 
+    public function getSlaAnalytics(): array
+    {
+        return VerificationReport::slaAnalytics($this->baseQuery());
+    }
+
     public function getRecentRows(): array
     {
         return VerificationReport::recentRows($this->baseQuery(), 12);

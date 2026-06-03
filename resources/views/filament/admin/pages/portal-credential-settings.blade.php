@@ -9,10 +9,22 @@
                 'url' => \App\Filament\Admin\Pages\VerificationSettings::getUrl(),
             ],
             [
+                'key' => 'assignment',
+                'label' => 'Assignment Management',
+                'description' => 'Control how verification work is auto-assigned across the team.',
+                'url' => \App\Filament\Admin\Pages\VerificationAssignmentManagement::getUrl(),
+            ],
+            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
                 'url' => \App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource::getUrl('index'),
+            ],
+            [
+                'key' => 'participation',
+                'label' => 'Provider Participation',
+                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
+                'url' => \App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource::getUrl('index'),
             ],
             [
                 'key' => 'credentials',
@@ -33,6 +45,12 @@
                 'url' => \App\Filament\Admin\Pages\VerificationQuestionArrangement::getUrl(),
             ],
             [
+                'key' => 'notifications',
+                'label' => 'Notification Control',
+                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
+                'url' => \App\Filament\Admin\Pages\VerificationNotificationControl::getUrl(),
+            ],
+            [
                 'key' => 'readiness',
                 'label' => 'Verification Readiness',
                 'description' => 'Review launch blockers, polish items, and readiness gaps.',
@@ -40,6 +58,97 @@
             ],
         ];
     @endphp
+
+    <style>
+        .verification-credentials-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border-radius: 14px;
+            border: 1px solid #dbe4ee;
+            background: #ffffff;
+            color: #0f172a;
+            font-size: 12px;
+            font-weight: 800;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+        }
+
+        .verification-credentials-action:hover {
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .verification-credentials-action--primary {
+            border-color: #f59e0b;
+            background: #f59e0b;
+            color: #ffffff;
+        }
+
+        .verification-credentials-action--primary:hover {
+            border-color: #d97706;
+            background: #d97706;
+            color: #ffffff;
+        }
+
+        .verification-credentials-action--danger {
+            border-color: #fecaca;
+            background: #fff1f2;
+            color: #dc2626;
+        }
+
+        .verification-credentials-action--danger:hover {
+            border-color: #fda4af;
+            background: #ffe4e6;
+            color: #be123c;
+        }
+
+        .verification-credentials-action--icon {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 10px;
+        }
+
+        .verification-credentials-table-wrap {
+            overflow-x: auto;
+            background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+        }
+
+        .verification-credentials-table {
+            width: 100%;
+            min-width: 1120px;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .verification-credentials-table thead th {
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            color: #475569;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .verification-credentials-table tbody tr:nth-child(even) {
+            background: #fbfdff;
+        }
+
+        .verification-credentials-table tbody tr:hover {
+            background: #f8fbff;
+        }
+
+        .verification-credentials-table tbody td {
+            padding: 16px;
+            vertical-align: middle;
+            border-bottom: 1px solid #edf2f7;
+        }
+    </style>
 
     <x-verification-management-shell
         :items="$verificationNavItems"
@@ -67,7 +176,7 @@
                             <button
                                 type="button"
                                 wire:click="createPortalCredential"
-                                style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #f59e0b; background: #f59e0b; color: #ffffff; font-size: 13px; font-weight: 800;"
+                                class="verification-credentials-action verification-credentials-action--primary"
                             >
                                 Add Credential
                             </button>
@@ -96,29 +205,29 @@
                             </div>
                         @else
                             <div style="border: 1px solid #dbe4ee; border-radius: 20px; overflow: hidden;">
-                                <div style="overflow-x: auto;">
-                                    <table style="width: 100%; min-width: 1180px; border-collapse: collapse;">
-                                        <thead style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                                <div class="verification-credentials-table-wrap">
+                                    <table class="verification-credentials-table">
+                                        <thead>
                                             <tr>
-                                                <th style="padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 800; color: #0f172a;">Portal</th>
-                                                <th style="padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 800; color: #0f172a;">Category</th>
-                                                <th style="padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 800; color: #0f172a;">Portal Link</th>
-                                                <th style="padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 800; color: #0f172a;">Username</th>
-                                                <th style="padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 800; color: #0f172a;">Password</th>
-                                                <th style="padding: 14px 16px; text-align: center; font-size: 13px; font-weight: 800; color: #0f172a;">Active</th>
-                                                <th style="padding: 14px 16px; text-align: center; font-size: 13px; font-weight: 800; color: #0f172a;">Actions</th>
+                                                <th>Portal</th>
+                                                <th>Category</th>
+                                                <th>Portal Link</th>
+                                                <th>Username</th>
+                                                <th>Password</th>
+                                                <th style="text-align: center;">Active</th>
+                                                <th style="text-align: center;">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @foreach ($credentials as $credential)
-                                                <tr style="border-bottom: 1px solid #edf2f7;">
-                                                    <td style="padding: 16px; font-size: 14px; font-weight: 800; color: #0f172a; vertical-align: middle;">{{ $credential->portal_name }}</td>
-                                                    <td style="padding: 16px; vertical-align: middle;">
+                                                <tr>
+                                                    <td style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $credential->portal_name }}</td>
+                                                    <td>
                                                         <span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 11px; font-weight: 700; white-space: nowrap;">
                                                             {{ \App\Models\PortalCredential::CATEGORY_OPTIONS[$credential->portal_category ?: 'other'] ?? 'Other' }}
                                                         </span>
                                                     </td>
-                                                    <td style="padding: 16px; vertical-align: middle;">
+                                                    <td>
                                                         @if (filled($credential->login_url))
                                                             <a href="{{ $credential->login_url }}" target="_blank" rel="noopener noreferrer" style="font-size: 13px; font-weight: 700; color: #2563eb; text-decoration: none; word-break: break-all;">
                                                                 {{ $credential->login_url }}
@@ -127,7 +236,7 @@
                                                             <span style="font-size: 13px; color: #94a3b8;">-</span>
                                                         @endif
                                                     </td>
-                                                    <td style="padding: 16px; vertical-align: middle;">
+                                                    <td>
                                                         <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
                                                             <span id="portal-username-admin-{{ $credential->getKey() }}" data-masked="{{ \App\Models\PortalCredential::maskSecret($credential->username) }}" data-visible="0" style="font-size: 13px; color: #64748b; font-weight: 700;">
                                                                 {{ \App\Models\PortalCredential::maskSecret($credential->username) }}
@@ -136,7 +245,7 @@
                                                                 type="button"
                                                                 onclick="togglePortalSecret('portal-username-admin-{{ $credential->getKey() }}', @js($credential->username), this)"
                                                                 title="View username"
-                                                                style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a;"
+                                                                class="verification-credentials-action verification-credentials-action--icon"
                                                             >
                                                                 <x-heroicon-o-eye style="width: 16px; height: 16px;" />
                                                             </button>
@@ -144,13 +253,13 @@
                                                                 type="button"
                                                                 onclick="copyPortalSecret(@js($credential->username), this)"
                                                                 title="Copy username"
-                                                                style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a;"
+                                                                class="verification-credentials-action verification-credentials-action--icon"
                                                             >
                                                                 <x-heroicon-o-clipboard style="width: 16px; height: 16px;" />
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td style="padding: 16px; vertical-align: middle;">
+                                                    <td>
                                                         <div style="display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;">
                                                             <span id="portal-password-admin-{{ $credential->getKey() }}" data-masked="{{ \App\Models\PortalCredential::maskSecret($credential->password) }}" data-visible="0" style="font-size: 13px; color: #64748b; font-weight: 700;">
                                                                 {{ \App\Models\PortalCredential::maskSecret($credential->password) }}
@@ -159,7 +268,7 @@
                                                                 type="button"
                                                                 onclick="togglePortalSecret('portal-password-admin-{{ $credential->getKey() }}', @js($credential->password), this)"
                                                                 title="View password"
-                                                                style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a;"
+                                                                class="verification-credentials-action verification-credentials-action--icon"
                                                             >
                                                                 <x-heroicon-o-eye style="width: 16px; height: 16px;" />
                                                             </button>
@@ -167,24 +276,24 @@
                                                                 type="button"
                                                                 onclick="copyPortalSecret(@js($credential->password), this)"
                                                                 title="Copy password"
-                                                                style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a;"
+                                                                class="verification-credentials-action verification-credentials-action--icon"
                                                             >
                                                                 <x-heroicon-o-clipboard style="width: 16px; height: 16px;" />
                                                             </button>
                                                         </div>
                                                     </td>
-                                                    <td style="padding: 16px; text-align: center; vertical-align: middle;">
+                                                    <td style="text-align: center;">
                                                         <span style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 999px; border: 1px solid {{ $credential->is_active ? '#86efac' : '#d1d5db' }}; background: {{ $credential->is_active ? '#f0fdf4' : '#f8fafc' }}; color: {{ $credential->is_active ? '#15803d' : '#64748b' }}; font-size: 11px; font-weight: 700; white-space: nowrap;">
                                                             {{ $credential->is_active ? 'Active' : 'Inactive' }}
                                                         </span>
                                                     </td>
-                                                    <td style="padding: 16px; text-align: center; vertical-align: middle;">
+                                                    <td style="text-align: center;">
                                                         <div style="display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;">
                                                             @if ($this->canEditPortalCredentials())
                                                                 <button
                                                                     type="button"
                                                                     wire:click="editPortalCredential({{ $credential->getKey() }})"
-                                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 12px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 12px; font-weight: 800;"
+                                                                    class="verification-credentials-action"
                                                                 >
                                                                     Edit
                                                                 </button>
@@ -194,7 +303,7 @@
                                                                     type="button"
                                                                     wire:click="deletePortalCredential({{ $credential->getKey() }})"
                                                                     wire:confirm="Remove this portal credential from the shared verification vault?"
-                                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 12px; border: 1px solid #fecaca; background: #fff1f2; color: #dc2626; font-size: 12px; font-weight: 800;"
+                                                                    class="verification-credentials-action verification-credentials-action--danger"
                                                                 >
                                                                     Delete
                                                                 </button>

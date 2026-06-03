@@ -10,6 +10,7 @@ use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
+use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\VerificationPlanSnapshot;
 use App\Models\VerificationProfile;
 use App\Models\User;
@@ -27,6 +28,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class VerificationRequestForm
 {
@@ -290,6 +292,7 @@ class VerificationRequestForm
                                             ->required(),
                                         TextInput::make('payer_name')
                                             ->label('Insurance Provider')
+                                            ->live(onBlur: true)
                                             ->required()
                                             ->maxLength(255),
                                         TextInput::make('member_id')
@@ -304,6 +307,13 @@ class VerificationRequestForm
                                         DatePicker::make('subscriber_dob')
                                             ->label('Subscriber DOB')
                                             ->native(false),
+                                        Placeholder::make('provider_participation_guidance')
+                                            ->label('Provider Participation Guidance')
+                                            ->content(fn (Get $get): HtmlString => static::networkParticipationGuidance(
+                                                (string) ($get('payer_name') ?? '')
+                                            ))
+                                            ->visible(fn (Get $get): bool => filled($get('payer_name')))
+                                            ->columnSpanFull(),
                                     ]),
                             ]),
                     ]),
@@ -578,5 +588,41 @@ class VerificationRequestForm
 
         $set('managed_billing_service_id', $enrollment->managed_billing_service_id);
         $set('client_service_enrollment_id', $enrollment->id);
+    }
+
+    protected static function networkParticipationGuidance(?string $carrierName, ?string $payerId = null): HtmlString
+    {
+        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
+
+        if (! $profile) {
+            return new HtmlString(
+                '<div style="border: 1px dashed #cbd5e1; border-radius: 16px; background: #f8fafc; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: #64748b;">'
+                . 'No saved participating / non-participating guidance exists for this payer yet. Add it from <strong>Verification &gt; Provider Participation</strong> to help verifiers see network behavior at intake.'
+                . '</div>'
+            );
+        }
+
+        $rows = collect($profile->summaryRows())
+            ->map(fn (array $row): string => '<div style="padding: 10px 0; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 5px;">'
+                . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">' . e($row['label']) . '</div>'
+                . '<div style="font-size: 13px; line-height: 1.65; color: #334155;">' . nl2br(e((string) $row['value'])) . '</div>'
+                . '</div>')
+            ->implode('');
+
+        return new HtmlString(
+            '<div style="border: 1px solid #c7d2fe; border-radius: 18px; background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%); padding: 16px;">'
+            . '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #4338ca;">Managed Participation Guidance</div>'
+            . '<div style="margin-top: 6px; font-size: 16px; font-weight: 800; color: #0f172a;">' . e($profile->insuranceCarrier?->insurance_name ?? 'Matched Payer') . '</div>'
+            . '</div>'
+            . '<span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 11px; font-weight: 800;">'
+            . e($profile->insuranceCarrier?->payer_id ?: 'No payer ID')
+            . '</span>'
+            . '</div>'
+            . '<div style="font-size: 12px; line-height: 1.7; color: #475569;">Use this as guidance while confirming actual plan-level network behavior with the payer.</div>'
+            . $rows
+            . '</div>'
+        );
     }
 }

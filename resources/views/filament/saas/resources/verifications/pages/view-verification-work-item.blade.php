@@ -12,6 +12,14 @@
         $quickReference = $this->getQuickReferenceCard();
         $canViewSubmissionSnapshots = $this->canViewSubmissionSnapshots();
         $selectedSubmissionSnapshot = $this->selectedSubmissionSnapshot;
+        $quickReferenceCopyText = implode("\n", array_filter([
+            'Patient: ' . ($quickReference['patient'] ?? ''),
+            'DOB: ' . ($quickReference['dob'] ?? ''),
+            'Member ID: ' . ($quickReference['member_id'] ?? ''),
+            'Provider NPI: ' . ($quickReference['provider_npi'] ?? ''),
+            'Practice NPI: ' . ($quickReference['practice_npi'] ?? ''),
+            'Phone: ' . ($quickReference['phone'] ?? ''),
+        ]));
 
         $toneStyles = [
             'slate' => 'border: 1px solid #cbd5e1; background: #f8fafc; color: #334155;',
@@ -25,9 +33,210 @@
         ];
     @endphp
 
+    <style>
+        .verification-view-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+            gap: 22px;
+            padding: 28px;
+        }
+
+        .verification-view-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .verification-view-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.9fr);
+            gap: 24px;
+            align-items: start;
+        }
+
+        .verification-view-copy {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ee;
+            background: #ffffff;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .verification-view-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .verification-view-sidebar-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 22px;
+            background: #ffffff;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .verification-view-sidebar-card__header {
+            padding: 16px 18px;
+            border-bottom: 1px solid #edf2f7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .verification-view-sidebar-card__body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .verification-view-sidebar-card__title {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .verification-view-sidebar-card__title--eyebrow {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: #10b981;
+        }
+
+        .verification-view-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe4ee;
+            background: #ffffff;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .verification-view-button:hover {
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .verification-view-button--soft {
+            border-color: #c7d2fe;
+            background: #eef2ff;
+            color: #4338ca;
+        }
+
+        .verification-view-button--soft:hover {
+            border-color: #a5b4fc;
+            color: #3730a3;
+        }
+
+        .verification-view-quick-reference {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 12px;
+        }
+
+        .verification-view-quick-reference__item {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #f8fafc;
+            padding: 12px;
+        }
+
+        .verification-view-context-group {
+            border: 1px solid #e5e7eb;
+            border-radius: 16px;
+            background: #f8fafc;
+            padding: 12px 14px;
+        }
+
+        .verification-view-context-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .verification-view-context-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            padding-top: 8px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .verification-view-context-row:first-child {
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .verification-view-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .verification-view-timeline__item {
+            position: relative;
+            padding-left: 18px;
+        }
+
+        .verification-view-timeline__dot {
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #06b6d4;
+        }
+
+        @media (max-width: 1280px) {
+            .verification-view-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 1120px) {
+            .verification-view-hero,
+            .verification-view-layout {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .verification-view-summary-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .verification-view-quick-reference {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .verification-view-context-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+
     <div style="display: flex; flex-direction: column; gap: 24px;">
         <section style="border: 1px solid #dbe4ee; border-radius: 26px; overflow: hidden; background: linear-gradient(135deg, #0f172a 0%, #12263a 56%, #0f3a4a 100%); color: #ffffff; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);">
-            <div style="display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr); gap: 22px; padding: 28px;">
+            <div class="verification-view-hero">
                 <div style="display: flex; flex-direction: column; gap: 18px;">
                     <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                         <span style="display: inline-flex; align-items: center; padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(34,211,238,0.28); background: rgba(34,211,238,0.12); color: #a5f3fc; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;">
@@ -47,7 +256,7 @@
                         </p>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+                    <div class="verification-view-summary-grid">
                         @foreach ($summaryCards as $card)
                             <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; background: rgba(255,255,255,0.06); padding: 16px;">
                                 <div style="margin-bottom: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #cbd5e1;">
@@ -101,7 +310,7 @@
             </div>
         </section>
 
-        <div style="display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.9fr); gap: 24px; align-items: start;">
+        <div class="verification-view-layout">
             <div style="display: flex; flex-direction: column; gap: 20px;">
                 @foreach ($verificationPanels as $panel)
                     <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
@@ -189,18 +398,18 @@
                 </section>
             </div>
 
-            <aside style="display: flex; flex-direction: column; gap: 20px;">
-                <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
-                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Verification Progress</h3>
+            <aside class="verification-view-sidebar">
+                <section class="verification-view-sidebar-card">
+                    <div class="verification-view-sidebar-card__header">
+                        <h3 class="verification-view-sidebar-card__title">Verification Progress</h3>
                         <span style="font-size: 12px; font-weight: 600; color: #64748b;">{{ collect($sectionProgress)->sum('completed') }}/{{ collect($sectionProgress)->sum('total') }}</span>
                     </div>
-                    <div style="padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+                    <div class="verification-view-sidebar-card__body">
                         @foreach ($sectionProgress as $section)
                             @php
                                 $percent = $section['total'] > 0 ? min(100, (int) round(($section['completed'] / $section['total']) * 100)) : 0;
                             @endphp
-                            <div style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px;">
+                            <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 12px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
                                     <div style="font-size: 14px; font-weight: 600; color: #111827;">{{ $section['label'] }}</div>
                                     <div style="font-size: 12px; font-weight: 700; color: #64748b;">{{ $section['completed'] }}/{{ $section['total'] }}</div>
@@ -213,50 +422,50 @@
                     </div>
                 </section>
 
-                <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px;">
-                        <h3 style="margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #10b981;">Quick Reference</h3>
-                        <span style="font-size: 12px; color: #94a3b8;">Copy all</span>
+                <section class="verification-view-sidebar-card">
+                    <div class="verification-view-sidebar-card__header">
+                        <h3 class="verification-view-sidebar-card__title verification-view-sidebar-card__title--eyebrow">Quick Reference</h3>
+                        <button type="button" class="verification-view-copy" onclick="copyVerificationQuickReference(@js($quickReferenceCopyText), this)">Copy all</button>
                     </div>
-                    <div style="padding: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-                        <div>
+                    <div class="verification-view-sidebar-card__body verification-view-quick-reference">
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Patient</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['patient'] }}</div>
                         </div>
-                        <div>
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">DOB</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['dob'] }}</div>
                         </div>
-                        <div>
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Member ID</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['member_id'] }}</div>
                         </div>
-                        <div>
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Provider NPI</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['provider_npi'] }}</div>
                         </div>
-                        <div>
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Practice NPI</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['practice_npi'] }}</div>
                         </div>
-                        <div>
+                        <div class="verification-view-quick-reference__item">
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Phone</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['phone'] }}</div>
                         </div>
                     </div>
                 </section>
 
-                <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Operational Context</h3>
+                <section class="verification-view-sidebar-card">
+                    <div class="verification-view-sidebar-card__header">
+                        <h3 class="verification-view-sidebar-card__title">Operational Context</h3>
                     </div>
-                    <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+                    <div class="verification-view-sidebar-card__body">
                         @foreach ($contextRows as $groupLabel => $rows)
-                            <div style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px;">
+                            <div class="verification-view-context-group">
                                 <div style="margin-bottom: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">{{ str($groupLabel)->replace('_', ' ')->title() }}</div>
-                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="verification-view-context-rows">
                                     @foreach ($rows as $row)
-                                        <div style="display: flex; justify-content: space-between; gap: 14px;">
+                                        <div class="verification-view-context-row">
                                             <div style="font-size: 13px; color: #64748b;">{{ $row['label'] }}</div>
                                             <div style="max-width: 60%; text-align: right; font-size: 13px; font-weight: 600; color: #111827;">{{ $row['value'] }}</div>
                                         </div>
@@ -289,18 +498,18 @@
                     </div>
                 </section>
 
-                <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Attachments</h3>
+                <section class="verification-view-sidebar-card">
+                    <div class="verification-view-sidebar-card__header">
+                        <h3 class="verification-view-sidebar-card__title">Attachments</h3>
                     </div>
-                    <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+                    <div class="verification-view-sidebar-card__body">
                         @forelse ($attachments as $attachment)
-                            <article style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px;">
+                            <article style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 12px 14px;">
                                 <div style="margin-bottom: 4px; font-size: 14px; font-weight: 700; color: #111827;">{{ $attachment['title'] }}</div>
                                 <div style="margin-bottom: 12px; font-size: 12px; color: #64748b;">{{ $attachment['subtitle'] }}</div>
                                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px;">
                                     <span style="font-size: 12px; color: #94a3b8;">{{ $attachment['uploaded_at'] }}</span>
-                                    <a href="{{ $attachment['download_url'] }}" style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #cbd5e1; background: #ffffff; color: #334155; font-size: 12px; font-weight: 700; text-decoration: none;">
+                                    <a href="{{ $attachment['download_url'] }}" class="verification-view-button">
                                         Download
                                     </a>
                                 </div>
@@ -311,15 +520,15 @@
                     </div>
                 </section>
 
-                <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Full Workflow Timeline</h3>
+                <section class="verification-view-sidebar-card">
+                    <div class="verification-view-sidebar-card__header">
+                        <h3 class="verification-view-sidebar-card__title">Full Workflow Timeline</h3>
                     </div>
-                    <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+                    <div class="verification-view-sidebar-card__body verification-view-timeline">
                         @forelse ($activities as $activity)
-                            <article style="position: relative; padding-left: 20px;">
-                                <span style="position: absolute; left: 0; top: 9px; width: 9px; height: 9px; border-radius: 999px; background: #06b6d4;"></span>
-                                <div style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px;">
+                            <article class="verification-view-timeline__item">
+                                <span class="verification-view-timeline__dot"></span>
+                                <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 12px 14px;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
                                         <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $activity['type'] }}</div>
                                         <div style="font-size: 12px; color: #94a3b8;">{{ $activity['created_at'] }}</div>
@@ -335,7 +544,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="openSubmissionSnapshot({{ (int) $activity['submission_id'] }})"
-                                                style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #eef2ff; color: #4338ca; font-size: 12px; font-weight: 700; cursor: pointer;"
+                                                class="verification-view-button verification-view-button--soft"
                                             >
                                                 View Snapshot
                                             </button>
@@ -364,9 +573,7 @@
                             Review the exact form data that was saved at this point in the workflow, including the work item state, verification profile, and captured answers.
                         </p>
                     </div>
-                    <button type="button" wire:click="closeSubmissionSnapshot" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">
-                        ×
-                    </button>
+                    <button type="button" wire:click="closeSubmissionSnapshot" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
                 </div>
 
                 <div style="padding: 22px 24px; display: flex; flex-direction: column; gap: 20px;">
@@ -474,4 +681,21 @@
             </div>
         </div>
     @endif
+
+    <script>
+        async function copyVerificationQuickReference(text, button) {
+            if (!text) return;
+
+            await navigator.clipboard.writeText(text);
+
+            if (!button) return;
+
+            const original = button.textContent;
+            button.textContent = 'Copied';
+
+            setTimeout(() => {
+                button.textContent = original;
+            }, 1200);
+        }
+    </script>
 </x-filament-panels::page>

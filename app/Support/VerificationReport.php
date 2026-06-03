@@ -113,6 +113,166 @@ class VerificationReport
         ];
     }
 
+    public static function slaAnalytics(Builder $query): array
+    {
+        $completedRows = (clone $query)
+            ->whereNotNull('completed_at')
+            ->get([
+                'id',
+                'created_at',
+                'started_at',
+                'completed_at',
+                'sla_paused_seconds',
+            ]);
+
+        $awaitingRows = (clone $query)
+            ->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
+            ->get([
+                'id',
+                'created_at',
+                'updated_at',
+                'sla_pause_started_at',
+                'sla_paused_seconds',
+                'due_at',
+            ]);
+
+        $reworkRows = (clone $query)
+            ->where('status', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+            ->get([
+                'id',
+                'created_at',
+                'updated_at',
+            ]);
+
+        $reviewRows = (clone $query)
+            ->where('status', BillingWorkItem::STATUS_REVIEW)
+            ->get([
+                'id',
+                'created_at',
+                'updated_at',
+                'due_at',
+            ]);
+
+        $avgTurnaroundSeconds = static::averageSeconds(
+            $completedRows->map(function (BillingWorkItem $item): int {
+                $startedAt = $item->started_at ?: $item->created_at;
+
+                if (! $startedAt || ! $item->completed_at) {
+                    return 0;
+                }
+
+                $rawSeconds = max(0, $startedAt->diffInSeconds($item->completed_at));
+
+                return max(0, $rawSeconds - (int) ($item->sla_paused_seconds ?? 0));
+            })->all()
+        );
+
+        $avgWaitingOnClinicSeconds = static::averageSeconds(
+            $awaitingRows->map(function (BillingWorkItem $item): int {
+                $currentPauseSeconds = filled($item->sla_pause_started_at)
+                    ? max(0, $item->sla_pause_started_at->diffInSeconds(now()))
+                    : 0;
+
+                return (int) ($item->sla_paused_seconds ?? 0) + $currentPauseSeconds;
+            })->all()
+        );
+
+        $avgReworkAgeSeconds = static::averageSeconds(
+            $reworkRows->map(function (BillingWorkItem $item): int {
+                $anchor = $item->updated_at ?: $item->created_at;
+
+                return $anchor ? max(0, $anchor->diffInSeconds(now())) : 0;
+            })->all()
+        );
+
+        $avgReviewAgeSeconds = static::averageSeconds(
+            $reviewRows->map(function (BillingWorkItem $item): int {
+                $anchor = $item->updated_at ?: $item->created_at;
+
+                return $anchor ? max(0, $anchor->diffInSeconds(now())) : 0;
+            })->all()
+        );
+
+        $overdueCount = (clone $query)
+            ->whereNotNull('due_at')
+            ->where('due_at', '<', now())
+            ->whereNotIn('status', [
+                BillingWorkItem::STATUS_DONE,
+                BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+                'completed',
+            ])
+            ->count();
+
+        $dueTodayCount = (clone $query)
+            ->whereDate('due_at', today())
+            ->whereNotIn('status', [
+                BillingWorkItem::STATUS_DONE,
+                BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+                'completed',
+            ])
+            ->count();
+
+        $bars = static::barVisualization([
+            [
+                'label' => 'Waiting on Clinic',
+                'value' => $awaitingRows->count(),
+                'key' => BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+            ],
+            [
+                'label' => 'Returned for Rework',
+                'value' => $reworkRows->count(),
+                'key' => BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
+            ],
+            [
+                'label' => 'Review Queue',
+                'value' => $reviewRows->count(),
+                'key' => BillingWorkItem::STATUS_REVIEW,
+            ],
+            [
+                'label' => 'Overdue',
+                'value' => $overdueCount,
+                'key' => 'overdue',
+            ],
+        ]);
+
+        return [
+            'cards' => [
+                [
+                    'label' => 'Avg Active Turnaround',
+                    'value' => static::formatDurationShort($avgTurnaroundSeconds),
+                    'description' => 'Average working time from start to completion, excluding clinic-wait pause time.',
+                    'accent' => 'emerald',
+                ],
+                [
+                    'label' => 'Avg Waiting on Clinic',
+                    'value' => static::formatDurationShort($avgWaitingOnClinicSeconds),
+                    'description' => 'Average current clinic-response wait time for requests paused on missing information.',
+                    'accent' => 'indigo',
+                ],
+                [
+                    'label' => 'Avg Rework Aging',
+                    'value' => static::formatDurationShort($avgReworkAgeSeconds),
+                    'description' => 'Average time requests have spent sitting in Returned for Rework.',
+                    'accent' => 'amber',
+                ],
+                [
+                    'label' => 'Avg Review Aging',
+                    'value' => static::formatDurationShort($avgReviewAgeSeconds),
+                    'description' => 'Average age of requests currently waiting in Review.',
+                    'accent' => 'sky',
+                ],
+            ],
+            'snapshot' => [
+                'due_today' => $dueTodayCount,
+                'overdue' => $overdueCount,
+                'waiting_on_clinic' => $awaitingRows->count(),
+                'returned_for_rework' => $reworkRows->count(),
+                'review' => $reviewRows->count(),
+            ],
+            'bars' => $bars,
+        ];
+    }
+
     public static function trendChart(Builder $query, array $filters): array
     {
         $from = filled($filters['from_date'] ?? null)
@@ -496,5 +656,38 @@ class VerificationReport
                 return round($x, 2) . ',' . round($y, 2);
             })
             ->implode(' ');
+    }
+
+    protected static function averageSeconds(array $values): int
+    {
+        $filtered = array_values(array_filter($values, fn ($value): bool => (int) $value > 0));
+
+        if ($filtered === []) {
+            return 0;
+        }
+
+        return (int) round(array_sum($filtered) / count($filtered));
+    }
+
+    protected static function formatDurationShort(int $seconds): string
+    {
+        if ($seconds <= 0) {
+            return '0h';
+        }
+
+        $hours = round($seconds / 3600, 1);
+
+        if ($hours < 24) {
+            return rtrim(rtrim(number_format($hours, 1, '.', ''), '0'), '.') . 'h';
+        }
+
+        $days = floor($hours / 24);
+        $remainingHours = round($hours - ($days * 24));
+
+        if ($remainingHours <= 0) {
+            return $days . 'd';
+        }
+
+        return $days . 'd ' . $remainingHours . 'h';
     }
 }

@@ -7,14 +7,17 @@ use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationNotificationCentre;
+use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationSettings;
 use App\Filament\Admin\Pages\VerificationReadiness;
 use App\Filament\Admin\Pages\PortalCredentialSettings;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Filament\Admin\Widgets\ManagedServicesQuickLinks;
 use App\Filament\Admin\Widgets\VerificationAttentionQueue;
+use App\Filament\Admin\Widgets\VerificationSlaAnalytics;
 use App\Http\Middleware\PanelAuthenticateRedirect;
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
+use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
 use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
 use App\Filament\Saas\Resources\BillingWorkItems\BillingWorkItemResource;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
@@ -90,6 +93,7 @@ class AdminPanelProvider extends PanelProvider
                 VerificationWorkItemResource::class,
                 VerificationFormQuestionResource::class,
                 InsuranceCarrierResource::class,
+                InsuranceCarrierNetworkProfileResource::class,
                 PortalCredentialResource::class,
                 UserResource::class,
             ])
@@ -100,6 +104,7 @@ class AdminPanelProvider extends PanelProvider
                 VerificationNotificationCentre::class,
                 VerificationReports::class,
                 VerificationReadiness::class,
+                VerificationAssignmentManagement::class,
                 VerificationSettings::class,
                 PortalCredentialSettings::class,
                 VerificationQuestionArrangement::class,
@@ -108,6 +113,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 ManagedServicesQuickLinks::class,
+                VerificationSlaAnalytics::class,
                 VerificationAttentionQueue::class,
             ])
             ->middleware([

@@ -2,6 +2,9 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
+use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
+use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Models\SaasSetting;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -40,10 +43,7 @@ class VerificationNotificationControl extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return (bool) (
-            auth()->user()?->canPerformVerificationModuleAction('settings', 'update')
-            || auth()->user()?->canAccessSaasModule('settings')
-        );
+        return auth()->user()?->canManageVerificationNotifications() ?? false;
     }
 
     public function mount(): void
@@ -112,7 +112,7 @@ class VerificationNotificationControl extends Page implements HasForms
         return [
             Action::make('save')
                 ->label('Save notification control')
-                ->submit('save'),
+                ->action('save'),
         ];
     }
 
@@ -163,6 +163,66 @@ class VerificationNotificationControl extends Page implements HasForms
             'verification_notify_on_urgent_flagged',
             'verification_notify_on_urgent_assigned',
             'verification_notify_on_sla_alert',
+        ];
+    }
+
+    public function getVerificationNavItems(): array
+    {
+        return [
+            [
+                'key' => 'settings',
+                'label' => 'PDF Settings',
+                'description' => 'Control PDF output and default verification template rules.',
+                'url' => VerificationSettings::getUrl(),
+            ],
+            [
+                'key' => 'assignment',
+                'label' => 'Assignment Management',
+                'description' => 'Control how verification work is auto-assigned across the team.',
+                'url' => VerificationAssignmentManagement::getUrl(),
+            ],
+            [
+                'key' => 'insurance',
+                'label' => 'Insurance Directory',
+                'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
+                'url' => InsuranceCarrierResource::getUrl('index'),
+            ],
+            [
+                'key' => 'participation',
+                'label' => 'Provider Participation',
+                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
+                'url' => InsuranceCarrierNetworkProfileResource::getUrl('index'),
+            ],
+            [
+                'key' => 'credentials',
+                'label' => 'Portal Credentials',
+                'description' => 'Maintain the shared portal credential vault clinics can inherit from.',
+                'url' => PortalCredentialSettings::getUrl(),
+            ],
+            [
+                'key' => 'questions',
+                'label' => 'Verification Questions',
+                'description' => 'Manage prompts and section-specific question content.',
+                'url' => VerificationFormQuestionResource::getUrl('index'),
+            ],
+            [
+                'key' => 'arrangement',
+                'label' => 'Question Arrangement',
+                'description' => 'Reorder questions inside each verification section.',
+                'url' => VerificationQuestionArrangement::getUrl(),
+            ],
+            [
+                'key' => 'notifications',
+                'label' => 'Notification Control',
+                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
+                'url' => static::getUrl(),
+            ],
+            [
+                'key' => 'readiness',
+                'label' => 'Verification Readiness',
+                'description' => 'Review launch blockers, polish items, and readiness gaps.',
+                'url' => VerificationReadiness::getUrl(),
+            ],
         ];
     }
 }

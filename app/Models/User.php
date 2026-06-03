@@ -949,6 +949,26 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return $this->canAccessVerificationPanel();
     }
 
+    public function canManageVerificationQueue(): bool
+    {
+        return $this->canAccessVerificationPanel()
+            && $this->hasAnyRole(['saas_admin', 'saas_manager', 'verification_admin', 'verification_manager']);
+    }
+
+    public function canManageVerificationSettings(): bool
+    {
+        return $this->status
+            && (
+                $this->canPerformVerificationModuleAction('settings', 'update')
+                || $this->isSaasAdmin()
+            );
+    }
+
+    public function canManageVerificationNotifications(): bool
+    {
+        return $this->canManageVerificationSettings();
+    }
+
     public function canAccessVerificationPanel(): bool
     {
         return $this->canAccessSaasModule('verification')
@@ -985,8 +1005,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function canManageSaasRevenueOperations(): bool
     {
-        return $this->canAccessVerificationPanel()
-            && $this->hasAnyRole(['saas_admin', 'saas_manager', 'verification_admin', 'verification_manager']);
+        return $this->canManageVerificationQueue();
     }
 
     public function canAccessPanel(Panel $panel): bool

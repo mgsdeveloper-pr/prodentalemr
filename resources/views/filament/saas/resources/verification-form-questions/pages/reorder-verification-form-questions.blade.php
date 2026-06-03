@@ -11,10 +11,22 @@
                 'url' => \App\Filament\Admin\Pages\VerificationSettings::getUrl(),
             ],
             [
+                'key' => 'assignment',
+                'label' => 'Assignment Management',
+                'description' => 'Control how verification work is auto-assigned across the team.',
+                'url' => \App\Filament\Admin\Pages\VerificationAssignmentManagement::getUrl(),
+            ],
+            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
                 'url' => \App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource::getUrl('index'),
+            ],
+            [
+                'key' => 'participation',
+                'label' => 'Provider Participation',
+                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
+                'url' => \App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource::getUrl('index'),
             ],
             [
                 'key' => 'credentials',
@@ -33,6 +45,12 @@
                 'label' => 'Question Arrangement',
                 'description' => 'Reorder questions inside each verification section.',
                 'url' => \App\Filament\Admin\Pages\VerificationQuestionArrangement::getUrl(),
+            ],
+            [
+                'key' => 'notifications',
+                'label' => 'Notification Control',
+                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
+                'url' => \App\Filament\Admin\Pages\VerificationNotificationControl::getUrl(),
             ],
             [
                 'key' => 'readiness',
@@ -88,7 +106,7 @@
                         <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);">
                             <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Verification Workspace</div>
                             <div style="margin-top: 8px; font-size: 15px; line-height: 1.6; color: #475569;">
-                                Choose one verification section first. Only that section’s questions will load below so reordering stays quick and focused.
+                                Choose one verification section first. Only that section's questions will load below so reordering stays quick and focused.
                             </div>
                         </div>
                         <div style="padding: 18px;">
