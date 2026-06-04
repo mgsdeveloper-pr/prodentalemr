@@ -132,12 +132,7 @@ class EditVerificationWorkItem extends EditRecord
                 'label' => 'Send to Review',
                 'target' => BillingWorkItem::STATUS_REVIEW,
                 'tone' => 'info',
-                'visible' => in_array($status, [
-                    BillingWorkItem::STATUS_IN_PROGRESS,
-                    BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
-                    BillingWorkItem::STATUS_INCOMPLETE,
-                ], true)
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_REVIEW),
+                'visible' => false,
             ],
             [
                 'label' => 'Request Clinic Info',
@@ -153,18 +148,13 @@ class EditVerificationWorkItem extends EditRecord
                 'label' => 'Mark Done',
                 'target' => BillingWorkItem::STATUS_DONE,
                 'tone' => 'success',
-                'visible' => $status === BillingWorkItem::STATUS_REVIEW
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_DONE),
+                'visible' => false,
             ],
             [
                 'label' => 'Return for Rework',
                 'target' => BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
                 'tone' => 'danger',
-                'visible' => in_array($status, [
-                    BillingWorkItem::STATUS_REVIEW,
-                    BillingWorkItem::STATUS_DONE,
-                ], true)
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_RETURNED_FOR_REWORK),
+                'visible' => false,
             ],
             [
                 'label' => in_array($status, [
@@ -503,6 +493,7 @@ class EditVerificationWorkItem extends EditRecord
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->syncVerificationFormAnswers();
         $this->persistClinicResponseAttachments();
+        $this->syncWorkflowStatusFromForm();
         $submission = $this->captureFormSubmissionSnapshot();
 
         if ($submission) {
@@ -517,6 +508,135 @@ class EditVerificationWorkItem extends EditRecord
                 'answered_questions' => data_get($submission->payload, 'summary.answered_questions', 0),
             ]);
         }
+    }
+
+    protected function syncWorkflowStatusFromForm(): void
+    {
+        $targetStatus = $this->deriveWorkflowStatusFromForm();
+
+        if (! filled($targetStatus)) {
+            return;
+        }
+
+        if ($this->record->isDirty('outcome_status')) {
+            $this->record->save();
+            $this->record->refresh();
+        }
+
+        if ($this->record->normalized_status === $targetStatus) {
+            return;
+        }
+
+        if ($this->record->normalized_status === BillingWorkItem::STATUS_PENDING && $targetStatus === BillingWorkItem::STATUS_IN_PROGRESS) {
+            $this->record->startWork(auth()->id());
+            $this->record->refresh();
+
+            return;
+        }
+
+        $this->record->transitionStatus($targetStatus);
+        $this->record->refresh();
+    }
+
+    protected function deriveWorkflowStatusFromForm(): string
+    {
+        $outcomeStatus = (string) ($this->record->outcome_status ?? 'pending');
+
+        if ($this->shouldForceAwaitingClinicResponse($outcomeStatus)) {
+            if ($outcomeStatus !== 'info_requested') {
+                $this->record->outcome_status = 'info_requested';
+            }
+
+            return BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
+        }
+
+        if ($outcomeStatus === 'audit_required') {
+            return BillingWorkItem::STATUS_REVIEW;
+        }
+
+        if ($outcomeStatus === 'unable_to_verify' || $this->hasMissingRequiredVerificationData()) {
+            if (! in_array($outcomeStatus, ['unable_to_verify', 'info_requested', 'audit_required'], true)) {
+                $this->record->outcome_status = 'unable_to_verify';
+            }
+
+            return BillingWorkItem::STATUS_INCOMPLETE;
+        }
+
+        if ($outcomeStatus === 'pending') {
+            $this->record->outcome_status = 'verified';
+        }
+
+        return BillingWorkItem::STATUS_DONE;
+    }
+
+    protected function shouldForceAwaitingClinicResponse(string $outcomeStatus): bool
+    {
+        return $outcomeStatus === 'info_requested';
+    }
+
+    protected function hasMissingRequiredVerificationData(): bool
+    {
+        return $this->missingRequiredVerificationFields() !== [];
+    }
+
+    protected function missingRequiredVerificationFields(): array
+    {
+        $clinicId = $this->record->clinic_id;
+
+        if (! filled($clinicId)) {
+            return [];
+        }
+
+        $formType = data_get($this->data, 'vf_form_type', 'full_form');
+        $ignoredFields = [
+            'notes',
+            'internal_summary',
+            'vf_quick_reference',
+        ];
+
+        $missingFields = [];
+
+        $questions = VerificationFormQuestion::query()
+            ->where('is_active', true)
+            ->where('clinic_id', $clinicId)
+            ->whereIn('form_type', ['both', $formType])
+            ->orderBy('section_key')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($questions as $question) {
+            $requiredFields = [];
+
+            if ($question->is_builtin && $question->section_key === 'coverage_matrix') {
+                $requiredFields = array_filter([
+                    $this->resolveBuiltInField($question),
+                    $question->secondary_field_key,
+                ]);
+            } else {
+                $requiredFields = [
+                    $question->is_builtin && filled($this->resolveBuiltInField($question))
+                        ? $this->resolveBuiltInField($question)
+                        : $this->customQuestionFieldName($question->id),
+                ];
+            }
+
+            foreach ($requiredFields as $fieldKey) {
+                if (in_array($fieldKey, $ignoredFields, true)) {
+                    continue;
+                }
+
+                if ($fieldKey === 'vf_verified_by' && ! $this->canViewVerifiedByField()) {
+                    continue;
+                }
+
+                if (blank(data_get($this->data, $fieldKey))) {
+                    $missingFields[$fieldKey] = $question->prompt;
+                }
+            }
+        }
+
+        return $missingFields;
     }
 
     protected function persistClinicResponseAttachments(): void
@@ -561,6 +681,11 @@ class EditVerificationWorkItem extends EditRecord
 
         if (! $this->validateWorkflowTransitionReason($targetStatus)) {
             return;
+        }
+
+        if ($targetStatus === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE) {
+            $this->data['outcome_status'] = 'info_requested';
+            $this->record->outcome_status = 'info_requested';
         }
 
         $this->save();

@@ -2,13 +2,11 @@
     @php
         $record = $this->getRecord();
         $summaryCards = $this->getWorkbenchSummary();
-        $contextRows = $this->getContextRows();
         $verificationPanels = $this->getVerificationPanels();
         $planSnapshots = $this->getPlanSnapshots();
         $notes = $this->getClientVisibleNotes();
         $attachments = $this->getAttachmentCards();
         $activities = $this->getActivityTimeline();
-        $sectionProgress = $this->getVerificationSectionProgress();
         $quickReference = $this->getQuickReferenceCard();
         $canViewSubmissionSnapshots = $this->canViewSubmissionSnapshots();
         $selectedSubmissionSnapshot = $this->selectedSubmissionSnapshot;
@@ -401,29 +399,6 @@
             <aside class="verification-view-sidebar">
                 <section class="verification-view-sidebar-card">
                     <div class="verification-view-sidebar-card__header">
-                        <h3 class="verification-view-sidebar-card__title">Verification Progress</h3>
-                        <span style="font-size: 12px; font-weight: 600; color: #64748b;">{{ collect($sectionProgress)->sum('completed') }}/{{ collect($sectionProgress)->sum('total') }}</span>
-                    </div>
-                    <div class="verification-view-sidebar-card__body">
-                        @foreach ($sectionProgress as $section)
-                            @php
-                                $percent = $section['total'] > 0 ? min(100, (int) round(($section['completed'] / $section['total']) * 100)) : 0;
-                            @endphp
-                            <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 12px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
-                                    <div style="font-size: 14px; font-weight: 600; color: #111827;">{{ $section['label'] }}</div>
-                                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">{{ $section['completed'] }}/{{ $section['total'] }}</div>
-                                </div>
-                                <div style="height: 8px; border-radius: 999px; overflow: hidden; background: #e2e8f0;">
-                                    <div style="height: 100%; width: {{ $percent }}%; border-radius: 999px; background: linear-gradient(90deg, #10b981 0%, #14b8a6 100%);"></div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-
-                <section class="verification-view-sidebar-card">
-                    <div class="verification-view-sidebar-card__header">
                         <h3 class="verification-view-sidebar-card__title verification-view-sidebar-card__title--eyebrow">Quick Reference</h3>
                         <button type="button" class="verification-view-copy" onclick="copyVerificationQuickReference(@js($quickReferenceCopyText), this)">Copy all</button>
                     </div>
@@ -452,27 +427,6 @@
                             <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">Phone</div>
                             <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $quickReference['phone'] }}</div>
                         </div>
-                    </div>
-                </section>
-
-                <section class="verification-view-sidebar-card">
-                    <div class="verification-view-sidebar-card__header">
-                        <h3 class="verification-view-sidebar-card__title">Operational Context</h3>
-                    </div>
-                    <div class="verification-view-sidebar-card__body">
-                        @foreach ($contextRows as $groupLabel => $rows)
-                            <div class="verification-view-context-group">
-                                <div style="margin-bottom: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">{{ str($groupLabel)->replace('_', ' ')->title() }}</div>
-                                <div class="verification-view-context-rows">
-                                    @foreach ($rows as $row)
-                                        <div class="verification-view-context-row">
-                                            <div style="font-size: 13px; color: #64748b;">{{ $row['label'] }}</div>
-                                            <div style="max-width: 60%; text-align: right; font-size: 13px; font-weight: 600; color: #111827;">{{ $row['value'] }}</div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
                     </div>
                 </section>
 

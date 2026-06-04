@@ -33,12 +33,12 @@ class BillingWorkItem extends Model
     ];
 
     public const STATUS_TRANSITIONS = [
-        self::STATUS_PENDING => [self::STATUS_IN_PROGRESS, self::STATUS_INCOMPLETE],
-        self::STATUS_IN_PROGRESS => [self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE],
+        self::STATUS_PENDING => [self::STATUS_IN_PROGRESS, self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE, self::STATUS_DONE],
+        self::STATUS_IN_PROGRESS => [self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE, self::STATUS_DONE],
         self::STATUS_REVIEW => [self::STATUS_DONE, self::STATUS_RETURNED_FOR_REWORK, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE],
         self::STATUS_AWAITING_CLINIC_RESPONSE => [self::STATUS_IN_PROGRESS, self::STATUS_INCOMPLETE],
-        self::STATUS_RETURNED_FOR_REWORK => [self::STATUS_IN_PROGRESS, self::STATUS_REVIEW, self::STATUS_INCOMPLETE],
-        self::STATUS_INCOMPLETE => [self::STATUS_IN_PROGRESS, self::STATUS_REVIEW],
+        self::STATUS_RETURNED_FOR_REWORK => [self::STATUS_IN_PROGRESS, self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE, self::STATUS_DONE],
+        self::STATUS_INCOMPLETE => [self::STATUS_IN_PROGRESS, self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_DONE],
         self::STATUS_DONE => [self::STATUS_RETURNED_FOR_REWORK, self::STATUS_IN_PROGRESS],
     ];
 
@@ -710,6 +710,10 @@ class BillingWorkItem extends Model
             }
 
             $this->sla_pause_started_at = null;
+
+            if ($this->outcome_status === 'info_requested') {
+                $this->outcome_status = 'pending';
+            }
         }
 
         if ($currentStatus === self::STATUS_AWAITING_CLINIC_RESPONSE && $normalizedTarget === self::STATUS_IN_PROGRESS) {

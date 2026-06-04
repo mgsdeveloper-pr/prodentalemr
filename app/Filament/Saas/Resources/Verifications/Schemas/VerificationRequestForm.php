@@ -609,6 +609,8 @@ class VerificationRequestForm
                 . '</div>')
             ->implode('');
 
+        $feeScheduleReference = static::feeScheduleReferenceAction($profile);
+
         return new HtmlString(
             '<div style="border: 1px solid #c7d2fe; border-radius: 18px; background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%); padding: 16px;">'
             . '<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;">'
@@ -621,8 +623,58 @@ class VerificationRequestForm
             . '</span>'
             . '</div>'
             . '<div style="font-size: 12px; line-height: 1.7; color: #475569;">Use this as guidance while confirming actual plan-level network behavior with the payer.</div>'
+            . $feeScheduleReference
             . $rows
             . '</div>'
         );
+    }
+
+    protected static function feeScheduleReferenceAction(InsuranceCarrierNetworkProfile $profile): string
+    {
+        if (! $profile->hasFeeScheduleReference()) {
+            return '';
+        }
+
+        $name = e($profile->feeScheduleReferenceName() ?: 'Saved fee schedule reference');
+        $url = $profile->feeScheduleReferenceUrl();
+        $action = filled($url)
+            ? static::feeScheduleReferenceButton($name, $url)
+            : '<span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800;">Reference name only</span>';
+
+        return '<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Current Fee Schedule</div>'
+            . '<div style="margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.5; color: #0f172a;">' . $name . '</div>'
+            . '</div>'
+            . $action
+            . '</div>';
+    }
+
+    protected static function feeScheduleReferenceButton(string $name, string $url): string
+    {
+        $viewerId = 'fee-schedule-viewer-' . substr(md5($name . '|' . $url), 0, 12);
+
+        return '<div x-data="{ open: false }" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
+            . '<button type="button" @click="open = true" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; cursor: pointer;">&#128065; View current schedule</button>'
+            . '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800; text-decoration: none;">Open in new tab</a>'
+            . '<div x-cloak x-show="open" x-transition.opacity style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">'
+            . '<div id="' . e($viewerId) . '" @click.away="open = false" style="width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">'
+            . '<div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Fee Schedule Reference</div>'
+            . '<div style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">' . $name . '</div>'
+            . '</div>'
+            . '<button type="button" @click="open = false" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>'
+            . '</div>'
+            . '<div style="padding: 16px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8fafc;">'
+            . '<div style="font-size: 13px; line-height: 1.7; color: #64748b;">Review the current fee schedule reference without leaving the intake workflow.</div>'
+            . '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">Download / open separately</a>'
+            . '</div>'
+            . '<div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">'
+            . '<iframe src="' . e($url) . '" title="' . $name . '" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>'
+            . '</div>'
+            . '</div>'
+            . '</div>'
+            . '</div>';
     }
 }

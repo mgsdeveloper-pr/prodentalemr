@@ -2,8 +2,6 @@
     @php
         $record = $this->getRecord();
         $summaryCards = $this->getWorkbenchSummary();
-        $contextRows = $this->getContextRows();
-        $sectionProgress = $this->getVerificationSectionProgress();
         $quickReference = $this->getQuickReferenceCard();
         $coreDetails = $this->getCoreDetailRows();
         $coverageMatrix = $this->getCoverageMatrix();
@@ -178,9 +176,20 @@
             <div class="verification-workbench-header__actions">
                 @if ($showStatusButtons)
                     @foreach ($statusButtons as $button)
+                        @php
+                            $buttonTarget = $button['target'] ?? null;
+                            $isInfoRequestAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
+                            $isReworkAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
+                        @endphp
                         <button
                             type="button"
-                            wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
+                            @if ($isInfoRequestAction)
+                                onclick="openWorkflowModal('info-request-modal')"
+                            @elseif ($isReworkAction)
+                                onclick="openWorkflowModal('rework-reason-modal')"
+                            @else
+                                wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
+                            @endif
                             style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
                         >
                             {{ $button['label'] }}
@@ -192,12 +201,6 @@
                         {{ $this->getSaveButtonLabel() }}
                     </button>
                 @endif
-                <a href="{{ $this->getPdfDownloadUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                    Download PDF
-                </a>
-                <a href="{{ $this->getPdfPreviewUrl() }}" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                    View PDF
-                </a>
                 <a href="{{ $this->getViewUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
                     {{ $this->getViewButtonLabel() }}
                 </a>
@@ -285,100 +288,6 @@
                             @endforeach
                         </div>
                     </section>
-
-                    <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                        <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
-                            <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #10b981;">
-                                Verification Progress
-                            </h3>
-                        </div>
-                        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                            @foreach ($sectionProgress as $section)
-                                @php
-                                    $percent = $section['total'] > 0 ? min(100, (int) round(($section['completed'] / $section['total']) * 100)) : 0;
-                                @endphp
-                                <div>
-                                    <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px;">
-                                        <div style="font-size: 13px; font-weight: 600; color: #0f172a;">{{ $section['label'] }}</div>
-                                        <div style="font-size: 12px; font-weight: 700; color: #64748b;">{{ $section['completed'] }}/{{ $section['total'] }}</div>
-                                    </div>
-                                    <div style="height: 8px; border-radius: 999px; overflow: hidden; background: #e2e8f0;">
-                                        <div style="height: 100%; width: {{ $percent }}%; background: linear-gradient(90deg, #14b8a6 0%, #22c55e 100%); border-radius: 999px;"></div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                        <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
-                            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Context</h3>
-                        </div>
-                        <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-                            @foreach ($contextRows as $groupLabel => $rows)
-                                <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 14px;">
-                                    <div style="margin-bottom: 10px; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #6b7280;">{{ str($groupLabel)->replace('_', ' ')->title() }}</div>
-                                    <div style="display: flex; flex-direction: column; gap: 9px;">
-                                        @foreach ($rows as $row)
-                                            <div style="display: flex; justify-content: space-between; gap: 12px;">
-                                                <div style="font-size: 12px; color: #64748b;">{{ $row['label'] }}</div>
-                                                <div style="max-width: 58%; text-align: right; font-size: 12px; font-weight: 700; color: #111827;">{{ $row['value'] }}</div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    @if ($showInfoRequestField || $showReworkReasonField)
-                        <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                            <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
-                                <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #10b981;">
-                                    Workflow Notes
-                                </h3>
-                            </div>
-                            <div style="padding: 16px; display: flex; flex-direction: column; gap: 16px;">
-                                @if ($showInfoRequestField)
-                                    <div>
-                                        <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b;">
-                                            Information Request
-                                        </label>
-                                        <textarea
-                                            wire:model.blur="data.info_request_reason"
-                                            placeholder="Example: Please upload the updated insurance card and confirm the subscriber date of birth before verification can continue."
-                                            style="{{ $textareaStyle }}"
-                                        ></textarea>
-                                        <div style="margin-top: 8px; font-size: 12px; line-height: 1.6; color: #64748b;">
-                                            Use this when the clinic must provide missing information before verification can continue.
-                                        </div>
-                                        @error('data.info_request_reason')
-                                            <div style="margin-top: 8px; font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                @endif
-
-                                @if ($showReworkReasonField)
-                                    <div>
-                                        <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b;">
-                                            Rework Reason
-                                        </label>
-                                        <textarea
-                                            wire:model.blur="data.return_reason"
-                                            placeholder="Example: Coverage percentage was applied to the wrong service category and needs to be corrected before closure."
-                                            style="{{ $textareaStyle }}"
-                                        ></textarea>
-                                        <div style="margin-top: 8px; font-size: 12px; line-height: 1.6; color: #64748b;">
-                                            Use this when the request is being returned for correction or quality rework.
-                                        </div>
-                                        @error('data.return_reason')
-                                            <div style="margin-top: 8px; font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                @endif
-                            </div>
-                        </section>
-                    @endif
 
                     @if ($showClinicResponseCard)
                         <section style="border: 1px solid #fde68a; border-radius: 24px; background: linear-gradient(180deg, #fffef7 0%, #fffbeb 100%); overflow: hidden; box-shadow: 0 8px 24px rgba(180, 83, 9, 0.08);">
@@ -470,46 +379,6 @@
                         </section>
                     @endif
 
-                    <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                        <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
-                            <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #10b981;">
-                                Workflow Timeline
-                            </h3>
-                        </div>
-                        <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                            @forelse ($activityTimeline as $activity)
-                                <article style="position: relative; padding-left: 18px;">
-                                    <span style="position: absolute; left: 0; top: 8px; width: 9px; height: 9px; border-radius: 999px; background: {{ $timelineDotColors[$activity['tone']] ?? $timelineDotColors['cyan'] }};"></span>
-                                    <div style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px;">
-                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
-                                            <div style="font-size: 13px; font-weight: 800; color: #0f172a;">{{ $activity['type'] }}</div>
-                                            <div style="font-size: 11px; color: #94a3b8;">{{ $activity['created_at'] }}</div>
-                                        </div>
-                                        <div style="font-size: 13px; line-height: 1.7; color: #334155;">{{ $activity['description'] }}</div>
-                                        @if (filled($activity['details']))
-                                            <div style="margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 14px; background: #ffffff; padding: 12px; font-size: 12px; line-height: 1.7; color: #475569; white-space: pre-line;">
-                                                {{ $activity['details'] }}
-                                            </div>
-                                        @endif
-                                        @if ($canViewSubmissionSnapshots && filled($activity['submission_id']))
-                                            <div style="margin-top: 10px;">
-                                                <button
-                                                    type="button"
-                                                    wire:click="openSubmissionSnapshot({{ (int) $activity['submission_id'] }})"
-                                                    style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #eef2ff; color: #4338ca; font-size: 12px; font-weight: 700; cursor: pointer;"
-                                                >
-                                                    View Snapshot
-                                                </button>
-                                            </div>
-                                        @endif
-                                        <div style="margin-top: 8px; font-size: 11px; font-weight: 700; color: #64748b;">{{ $activity['author'] }}</div>
-                                    </div>
-                                </article>
-                            @empty
-                                <div style="font-size: 13px; color: #64748b;">No workflow history has been logged yet.</div>
-                            @endforelse
-                        </div>
-                    </section>
                 </aside>
 
                 <section style="display: flex; flex-direction: column; gap: 18px;">
@@ -968,9 +837,20 @@
                         </a>
                         @if ($showStatusButtons)
                         @foreach ($statusButtons as $button)
+                            @php
+                                $buttonTarget = $button['target'] ?? null;
+                                $isInfoRequestAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
+                                $isReworkAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
+                            @endphp
                             <button
                                 type="button"
-                                wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
+                                @if ($isInfoRequestAction)
+                                    onclick="openWorkflowModal('info-request-modal')"
+                                @elseif ($isReworkAction)
+                                    onclick="openWorkflowModal('rework-reason-modal')"
+                                @else
+                                    wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
+                                @endif
                                 style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
                             >
                                 {{ $button['label'] }}
@@ -987,6 +867,82 @@
             </div>
         </form>
     </div>
+
+    @if ($showInfoRequestField)
+        <div id="info-request-modal" style="position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.62);">
+            <div style="width: min(720px, 100%); border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28); overflow: hidden;">
+                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
+                    <div>
+                        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">Workflow Notes</div>
+                        <h3 style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a;">Send Request to Clinic</h3>
+                        <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
+                            Explain exactly what the clinic must provide before verification can continue.
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+                </div>
+                <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+                    <textarea
+                        wire:model.live="data.info_request_reason"
+                        placeholder="Example: Please upload the updated insurance card and confirm the subscriber date of birth before verification can continue."
+                        style="{{ $textareaStyle }} min-height: 150px;"
+                    ></textarea>
+                    <div style="font-size: 12px; line-height: 1.6; color: #64748b;">
+                        Use this when the clinic must provide missing information before verification can continue.
+                    </div>
+                    @error('data.info_request_reason')
+                        <div style="font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" onclick="closeWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE }}')" onclick="closeWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 180px; padding: 11px 16px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Send Request to Clinic
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($showReworkReasonField)
+        <div id="rework-reason-modal" style="position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.62);">
+            <div style="width: min(720px, 100%); border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28); overflow: hidden;">
+                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
+                    <div>
+                        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">Workflow Notes</div>
+                        <h3 style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a;">Return Request for Rework</h3>
+                        <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
+                            Describe the correction or quality issue before returning this request for rework.
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+                </div>
+                <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+                    <textarea
+                        wire:model.live="data.return_reason"
+                        placeholder="Example: Coverage percentage was applied to the wrong service category and needs to be corrected before closure."
+                        style="{{ $textareaStyle }} min-height: 150px;"
+                    ></textarea>
+                    <div style="font-size: 12px; line-height: 1.6; color: #64748b;">
+                        Use this when the request is being returned for correction or quality rework.
+                    </div>
+                    @error('data.return_reason')
+                        <div style="font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 12px;">
+                    <button type="button" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK }}')" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 172px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Return Request for Rework
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if ($showSubmissionSnapshotModal && filled($selectedSubmissionSnapshot))
         <div style="position: fixed; inset: 0; z-index: 90; background: rgba(15, 23, 42, 0.56); display: flex; align-items: center; justify-content: center; padding: 28px;">
@@ -1111,6 +1067,35 @@
     @endif
 
     <script>
+        function openWorkflowModal(modalId) {
+            const modal = document.getElementById(modalId);
+
+            if (!modal) return;
+
+            modal.style.display = 'flex';
+        }
+
+        function closeWorkflowModal(modalId) {
+            const modal = document.getElementById(modalId);
+
+            if (!modal) return;
+
+            modal.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (event) {
+            const infoModal = document.getElementById('info-request-modal');
+            const reworkModal = document.getElementById('rework-reason-modal');
+
+            if (infoModal && event.target === infoModal) {
+                closeWorkflowModal('info-request-modal');
+            }
+
+            if (reworkModal && event.target === reworkModal) {
+                closeWorkflowModal('rework-reason-modal');
+            }
+        });
+
         async function copyVerificationQuickReference(text, button) {
             if (!text) return;
 

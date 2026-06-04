@@ -117,7 +117,7 @@ class VerificationAutoAssigner
     {
         return User::query()
             ->where('status', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', array_keys(User::verificationPanelAccessRoleOptions())))
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', array_keys(User::verificationRoleOptions())))
             ->with(['roles', 'permissions', 'verificationClinics'])
             ->get()
             ->filter(fn (User $user): bool => $user->canAccessVerificationPanel()
