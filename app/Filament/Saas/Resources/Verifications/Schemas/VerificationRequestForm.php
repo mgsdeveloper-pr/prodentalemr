@@ -609,6 +609,7 @@ class VerificationRequestForm
                 . '</div>')
             ->implode('');
 
+        $sourceDocumentReference = static::sourceDocumentAction($profile);
         $feeScheduleReference = static::feeScheduleReferenceAction($profile);
 
         return new HtmlString(
@@ -623,6 +624,7 @@ class VerificationRequestForm
             . '</span>'
             . '</div>'
             . '<div style="font-size: 12px; line-height: 1.7; color: #475569;">Use this as guidance while confirming actual plan-level network behavior with the payer.</div>'
+            . $sourceDocumentReference
             . $feeScheduleReference
             . $rows
             . '</div>'
@@ -650,28 +652,77 @@ class VerificationRequestForm
             . '</div>';
     }
 
+    protected static function sourceDocumentAction(InsuranceCarrierNetworkProfile $profile): string
+    {
+        if (! $profile->hasSourceDocument()) {
+            return '';
+        }
+
+        $name = e($profile->sourceDocumentName() ?: 'Saved source document');
+        $url = $profile->sourceDocumentUrl();
+        $typeLabel = e($profile->sourceDocumentTypeLabel() ?: 'Reference Document');
+        $effectiveDate = $profile->source_document_effective_date?->format('M d, Y');
+        $meta = $effectiveDate
+            ? '<div style="margin-top: 4px; font-size: 12px; line-height: 1.6; color: #64748b;">' . $typeLabel . ' &middot; Effective ' . e($effectiveDate) . '</div>'
+            : '<div style="margin-top: 4px; font-size: 12px; line-height: 1.6; color: #64748b;">' . $typeLabel . '</div>';
+
+        $action = filled($url)
+            ? static::documentViewerButton('View source PDF', 'Source Document', $name, $url, false, 'Review the source participation document without leaving the intake workflow.')
+            : '<span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800;">Name only</span>';
+
+        return '<div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Source Document</div>'
+            . '<div style="margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.5; color: #0f172a;">' . $name . '</div>'
+            . $meta
+            . '</div>'
+            . $action
+            . '</div>';
+    }
+
     protected static function feeScheduleReferenceButton(string $name, string $url): string
     {
-        $viewerId = 'fee-schedule-viewer-' . substr(md5($name . '|' . $url), 0, 12);
+        return static::documentViewerButton(
+            'View current schedule',
+            'Fee Schedule Reference',
+            $name,
+            $url,
+            false,
+            'Review the current fee schedule reference without leaving the intake workflow.'
+        );
+    }
+
+    protected static function documentViewerButton(
+        string $triggerLabel,
+        string $viewerLabel,
+        string $documentName,
+        string $url,
+        bool $customTrigger = false,
+        ?string $description = null
+    ): string {
+        $viewerId = 'document-viewer-' . substr(md5($viewerLabel . '|' . $documentName . '|' . $url), 0, 12);
+        $trigger = $customTrigger
+            ? $triggerLabel
+            : '<button type="button" @click="open = true" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; cursor: pointer;">&#128065; ' . e($triggerLabel) . '</button>';
 
         return '<div x-data="{ open: false }" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
-            . '<button type="button" @click="open = true" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; cursor: pointer;">&#128065; View current schedule</button>'
-            . '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800; text-decoration: none;">Open in new tab</a>'
+            . $trigger
+            . ($customTrigger ? '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800; text-decoration: none;">Open in new tab</a>' : '')
             . '<div x-cloak x-show="open" x-transition.opacity style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">'
             . '<div id="' . e($viewerId) . '" @click.away="open = false" style="width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">'
             . '<div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">'
             . '<div>'
-            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Fee Schedule Reference</div>'
-            . '<div style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">' . $name . '</div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">' . e($viewerLabel) . '</div>'
+            . '<div style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">' . $documentName . '</div>'
             . '</div>'
             . '<button type="button" @click="open = false" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>'
             . '</div>'
             . '<div style="padding: 16px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8fafc;">'
-            . '<div style="font-size: 13px; line-height: 1.7; color: #64748b;">Review the current fee schedule reference without leaving the intake workflow.</div>'
+            . '<div style="font-size: 13px; line-height: 1.7; color: #64748b;">' . e($description ?: 'Review the saved document without leaving the intake workflow.') . '</div>'
             . '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">Download / open separately</a>'
             . '</div>'
             . '<div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">'
-            . '<iframe src="' . e($url) . '" title="' . $name . '" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>'
+            . '<iframe src="' . e($url) . '" title="' . $documentName . '" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>'
             . '</div>'
             . '</div>'
             . '</div>'

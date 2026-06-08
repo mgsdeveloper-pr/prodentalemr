@@ -10,6 +10,7 @@ use App\Models\InsuranceCarrierNetworkProfile;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -145,6 +146,28 @@ class InsuranceCarrierNetworkProfileResource extends Resource
                                     ->url()
                                     ->placeholder('https://...')
                                     ->columnSpan(4),
+                                TextInput::make('source_document_name')
+                                    ->label('Source Document Name')
+                                    ->placeholder('Example: Aetna provider participation guide')
+                                    ->maxLength(255)
+                                    ->columnSpan(4),
+                                Select::make('source_document_type')
+                                    ->label('Source Document Type')
+                                    ->options(InsuranceCarrierNetworkProfile::SOURCE_DOCUMENT_TYPE_OPTIONS)
+                                    ->native(false)
+                                    ->columnSpan(4),
+                                DatePicker::make('source_document_effective_date')
+                                    ->label('Source Document Effective Date')
+                                    ->native(false)
+                                    ->columnSpan(4),
+                                FileUpload::make('source_document_file_path')
+                                    ->label('Source PDF Upload')
+                                    ->disk('public')
+                                    ->directory('verification/participation-source-documents')
+                                    ->acceptedFileTypes(['application/pdf'])
+                                    ->downloadable()
+                                    ->openable()
+                                    ->columnSpan(12),
                                 Textarea::make('verification_tips')
                                     ->label('Verification Tips')
                                     ->placeholder('Example: Always verify plan-level network, reimbursement basis, and whether payment is sent to provider or patient.')
@@ -192,6 +215,11 @@ class InsuranceCarrierNetworkProfileResource extends Resource
                     ->wrap(),
                 TextColumn::make('fee_schedule_reference_name')
                     ->label('Fee Schedule Ref')
+                    ->placeholder('-')
+                    ->wrap()
+                    ->toggleable(),
+                TextColumn::make('source_document_name')
+                    ->label('Source Document')
                     ->placeholder('-')
                     ->wrap()
                     ->toggleable(),

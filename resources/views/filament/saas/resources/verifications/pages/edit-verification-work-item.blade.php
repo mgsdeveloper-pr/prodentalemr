@@ -21,6 +21,7 @@
         $verificationDynamicRows = $this->getDynamicQuestionsForSection('verification_information');
         $activityTimeline = $this->getActivityTimeline(6);
         $attachments = $this->getAttachmentCards();
+        $feeScheduleReference = $this->getFeeScheduleReference();
         $statusButtons = collect($this->getStatusActionButtons())->filter(fn (array $button): bool => $button['visible'])->values()->all();
         $canSubmitForm = method_exists($this, 'canSubmitForm') ? $this->canSubmitForm() : true;
         $showStatusButtons = count($statusButtons) > 0;
@@ -402,6 +403,37 @@
                                                     <div style="display: flex; align-items: center; gap: 8px;">
                                                         <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
                                                         <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
+                                                    </div>
+                                                @elseif ($field === 'vf_fee_schedule')
+                                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                                        <input type="text" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
+                                                        @if (filled($feeScheduleReference['url'] ?? null))
+                                                            @php
+                                                                $feeScheduleReferencePayload = json_encode([
+                                                                    'url' => $feeScheduleReference['url'],
+                                                                    'name' => $feeScheduleReference['name'],
+                                                                    'label' => 'Fee Schedule Reference',
+                                                                    'description' => 'Review the current fee schedule reference without leaving the verification workflow.',
+                                                                ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                                                            @endphp
+                                                            <button
+                                                                type="button"
+                                                                onclick='openReferenceViewerModal({!! $feeScheduleReferencePayload !!})'
+                                                                title="{{ $feeScheduleReference['name'] }}"
+                                                                style="display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 14px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 18px; cursor: pointer;"
+                                                            >
+                                                                &#9432;
+                                                            </button>
+                                                        @else
+                                                            <button
+                                                                type="button"
+                                                                title="No fee schedule reference added"
+                                                                disabled
+                                                                style="display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #94a3b8; font-size: 18px; cursor: not-allowed; opacity: 0.9;"
+                                                            >
+                                                                &#9432;
+                                                            </button>
+                                                        @endif
                                                     </div>
                                                 @else
                                                     <input type="text" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
@@ -944,6 +976,27 @@
         </div>
     @endif
 
+    <div id="reference-viewer-modal" style="position: fixed; inset: 0; z-index: 85; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">
+        <div style="position: relative; width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">
+                <div>
+                    <div id="reference-viewer-label" style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Reference</div>
+                    <div id="reference-viewer-name" style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">Document</div>
+                </div>
+                <button type="button" onclick="closeReferenceViewerModal()" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+            </div>
+            <div style="padding: 16px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8fafc;">
+                <div id="reference-viewer-description" style="font-size: 13px; line-height: 1.7; color: #64748b;">Review the saved document without leaving the verification workflow.</div>
+                <a id="reference-viewer-link" href="#" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">
+                    Open in new tab
+                </a>
+            </div>
+            <div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">
+                <iframe id="reference-viewer-frame" src="about:blank" title="Reference Viewer" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>
+            </div>
+        </div>
+    </div>
+
     @if ($showSubmissionSnapshotModal && filled($selectedSubmissionSnapshot))
         <div style="position: fixed; inset: 0; z-index: 90; background: rgba(15, 23, 42, 0.56); display: flex; align-items: center; justify-content: center; padding: 28px;">
             <div style="width: min(1080px, 100%); max-height: 88vh; overflow: auto; border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28);">
@@ -1083,9 +1136,38 @@
             modal.style.display = 'none';
         }
 
+        function openReferenceViewerModal(payload) {
+            const modal = document.getElementById('reference-viewer-modal');
+            const frame = document.getElementById('reference-viewer-frame');
+            const link = document.getElementById('reference-viewer-link');
+            const name = document.getElementById('reference-viewer-name');
+            const label = document.getElementById('reference-viewer-label');
+            const description = document.getElementById('reference-viewer-description');
+
+            if (!modal || !frame || !link || !name || !label || !description || !payload || !payload.url) return;
+
+            frame.src = payload.url;
+            link.href = payload.url;
+            name.textContent = payload.name || 'Document';
+            label.textContent = payload.label || 'Reference';
+            description.textContent = payload.description || 'Review the saved document without leaving the verification workflow.';
+            modal.style.display = 'flex';
+        }
+
+        function closeReferenceViewerModal() {
+            const modal = document.getElementById('reference-viewer-modal');
+            const frame = document.getElementById('reference-viewer-frame');
+
+            if (!modal || !frame) return;
+
+            modal.style.display = 'none';
+            frame.src = 'about:blank';
+        }
+
         document.addEventListener('click', function (event) {
             const infoModal = document.getElementById('info-request-modal');
             const reworkModal = document.getElementById('rework-reason-modal');
+            const referenceModal = document.getElementById('reference-viewer-modal');
 
             if (infoModal && event.target === infoModal) {
                 closeWorkflowModal('info-request-modal');
@@ -1093,6 +1175,10 @@
 
             if (reworkModal && event.target === reworkModal) {
                 closeWorkflowModal('rework-reason-modal');
+            }
+
+            if (referenceModal && event.target === referenceModal) {
+                closeReferenceViewerModal();
             }
         });
 
@@ -1110,5 +1196,13 @@
                 button.textContent = original;
             }, 1200);
         }
+
+        document.addEventListener('keydown', function (event) {
+            const referenceModal = document.getElementById('reference-viewer-modal');
+
+            if (event.key === 'Escape' && referenceModal && referenceModal.style.display === 'flex') {
+                closeReferenceViewerModal();
+            }
+        });
     </script>
 </x-filament-panels::page>

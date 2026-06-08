@@ -15,6 +15,7 @@ use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
 use App\Models\User;
 use App\Models\VerificationProfile;
+use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
@@ -26,6 +27,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Support\HtmlString;
 
 class VerificationWorkItemForm
@@ -330,14 +332,10 @@ class VerificationWorkItemForm
                                     ->columnSpan(2),
                                 TextInput::make('vf_fee_schedule')
                                     ->label('Fee schedule')
-                                    ->columnSpan(2),
-                                Placeholder::make('vf_fee_schedule_reference')
-                                    ->label('View schedule')
-                                    ->content(fn (Get $get): HtmlString => static::feeScheduleReferenceGuidance(
+                                    ->suffixAction(fn (Get $get): ?Action => static::feeScheduleReferenceSuffixAction(
                                         (string) ($get('vf_insurance_provider_name') ?? ''),
                                         (string) ($get('vf_payer_id') ?? '')
-                                    ))
-                                    ->visible(fn (Get $get): bool => filled($get('vf_insurance_provider_name')) || filled($get('vf_payer_id')))
+                                    ), true)
                                     ->columnSpan(2),
                                 TextInput::make('vf_network_status')
                                     ->label('Network status')
@@ -582,6 +580,7 @@ class VerificationWorkItemForm
                 . '</div>')
             ->implode('');
 
+        $sourceDocumentReference = static::sourceDocumentAction($profile, true);
         $feeScheduleReference = static::feeScheduleReferenceAction($profile, true);
 
         return new HtmlString(
@@ -596,34 +595,9 @@ class VerificationWorkItemForm
             . '</span>'
             . '</div>'
             . '<div style="font-size: 12px; line-height: 1.7; color: #475569;">Use this as a reusable payer baseline, then confirm the actual plan-specific network behavior during the verification call or portal review.</div>'
+            . $sourceDocumentReference
             . $feeScheduleReference
             . $rows
-            . '</div>'
-        );
-    }
-
-    protected static function feeScheduleReferenceGuidance(?string $carrierName, ?string $payerId = null): HtmlString
-    {
-        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
-
-        if (! $profile || ! $profile->hasFeeScheduleReference()) {
-            return new HtmlString(
-                '<div style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; width: 100%; border: 1px dashed #cbd5e1; border-radius: 14px; background: #f8fafc; padding: 8px 10px; font-size: 12px; line-height: 1.6; color: #94a3b8; text-align: center;">'
-                . 'No file'
-                . '</div>'
-            );
-        }
-
-        $name = e($profile->feeScheduleReferenceName() ?: 'Saved fee schedule reference');
-        $url = $profile->feeScheduleReferenceUrl();
-
-        $action = filled($url)
-            ? static::feeScheduleReferenceButton($name, $url, true)
-            : '<span title="' . $name . '" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 18px; font-weight: 800;">&#128196;</span>';
-
-        return new HtmlString(
-            '<div style="display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px;">'
-            . $action
             . '</div>'
         );
     }
@@ -653,31 +627,135 @@ class VerificationWorkItemForm
             . '</div>';
     }
 
+    protected static function feeScheduleReferenceSuffixAction(?string $carrierName, ?string $payerId = null): ?Action
+    {
+        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
+
+        if (! $profile || ! $profile->hasFeeScheduleReference()) {
+            return null;
+        }
+
+        $url = $profile->feeScheduleReferenceUrl();
+
+        if (! filled($url)) {
+            return null;
+        }
+
+        $name = $profile->feeScheduleReferenceName() ?: 'Saved fee schedule reference';
+
+        return Action::make('viewFeeScheduleReference')
+            ->label('View fee schedule reference')
+            ->icon('heroicon-m-information-circle')
+            ->color('gray')
+            ->tooltip($name)
+            ->modalHeading('Fee Schedule Reference')
+            ->modalDescription('Review the current fee schedule reference without leaving the verification workflow.')
+            ->modalWidth(Width::SevenExtraLarge)
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->extraModalFooterActions([
+                Action::make('openFeeScheduleReferenceInNewTab')
+                    ->label('Open in new tab')
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->url($url, true),
+            ])
+            ->modalContent(fn (): HtmlString => static::documentViewerModalContent($name, $url));
+    }
+
+    protected static function sourceDocumentAction(InsuranceCarrierNetworkProfile $profile, bool $compact = false): string
+    {
+        if (! $profile->hasSourceDocument()) {
+            return '';
+        }
+
+        $name = e($profile->sourceDocumentName() ?: 'Saved source document');
+        $url = $profile->sourceDocumentUrl();
+        $typeLabel = e($profile->sourceDocumentTypeLabel() ?: 'Reference Document');
+        $effectiveDate = $profile->source_document_effective_date?->format('M d, Y');
+        $wrapperStyle = $compact
+            ? 'margin-top: 12px; padding-top: 12px; border-top: 1px solid #c7d2fe; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;'
+            : 'margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;';
+
+        $meta = $effectiveDate
+            ? '<div style="margin-top: 4px; font-size: 12px; line-height: 1.6; color: #64748b;">' . $typeLabel . ' &middot; Effective ' . e($effectiveDate) . '</div>'
+            : '<div style="margin-top: 4px; font-size: 12px; line-height: 1.6; color: #64748b;">' . $typeLabel . '</div>';
+
+        $action = filled($url)
+            ? static::documentViewerButton('View source PDF', 'Source Document', $name, $url)
+            : '<span style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800;">Name only</span>';
+
+        return '<div style="' . $wrapperStyle . '">'
+            . '<div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Source Document</div>'
+            . '<div style="margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.5; color: #0f172a;">' . $name . '</div>'
+            . $meta
+            . '</div>'
+            . $action
+            . '</div>';
+    }
+
+    protected static function documentViewerModalContent(string $documentName, string $url): HtmlString
+    {
+        return new HtmlString(
+            '<div style="display: flex; flex-direction: column; gap: 16px;">'
+            . '<div style="border: 1px solid #e2e8f0; border-radius: 18px; background: #f8fafc; padding: 14px 16px;">'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Reference</div>'
+            . '<div style="margin-top: 6px; font-size: 16px; font-weight: 800; line-height: 1.5; color: #0f172a;">' . e($documentName) . '</div>'
+            . '</div>'
+            . '<div style="border: 1px solid #dbe4ee; border-radius: 22px; overflow: hidden; background: #0f172a;">'
+            . '<iframe src="' . e($url) . '" title="' . e($documentName) . '" style="width: 100%; height: 72vh; border: 0; background: #ffffff;"></iframe>'
+            . '</div>'
+            . '</div>'
+        );
+    }
+
     protected static function feeScheduleReferenceButton(string $name, string $url, bool $iconOnly = false): string
     {
-        $viewerId = 'fee-schedule-viewer-' . substr(md5($name . '|' . $url), 0, 12);
         $trigger = $iconOnly
             ? '<button type="button" @click="open = true" title="' . $name . '" style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 14px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 18px; cursor: pointer;">&#128065;</button>'
             : '<button type="button" @click="open = true" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; cursor: pointer;">&#128065; View current schedule</button>';
 
+        return static::documentViewerButton(
+            $trigger,
+            'Fee Schedule Reference',
+            $name,
+            $url,
+            $iconOnly,
+            'Review the current fee schedule reference without leaving the verification workflow.'
+        );
+    }
+
+    protected static function documentViewerButton(
+        string $triggerLabel,
+        string $viewerLabel,
+        string $documentName,
+        string $url,
+        bool $customTrigger = false,
+        ?string $description = null
+    ): string {
+        $viewerId = 'document-viewer-' . substr(md5($viewerLabel . '|' . $documentName . '|' . $url), 0, 12);
+        $trigger = $customTrigger
+            ? $triggerLabel
+            : '<button type="button" @click="open = true" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; cursor: pointer;">&#128065; ' . e($triggerLabel) . '</button>';
+
         return '<div x-data="{ open: false }" style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
             . $trigger
-            . ($iconOnly ? '' : '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800; text-decoration: none;">Open in new tab</a>')
+            . ($customTrigger ? '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 800; text-decoration: none;">Open in new tab</a>' : '')
             . '<div x-cloak x-show="open" x-transition.opacity style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">'
             . '<div id="' . e($viewerId) . '" @click.away="open = false" style="width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">'
             . '<div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">'
             . '<div>'
-            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Fee Schedule Reference</div>'
-            . '<div style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">' . $name . '</div>'
+            . '<div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">' . e($viewerLabel) . '</div>'
+            . '<div style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">' . $documentName . '</div>'
             . '</div>'
             . '<button type="button" @click="open = false" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>'
             . '</div>'
             . '<div style="padding: 16px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8fafc;">'
-            . '<div style="font-size: 13px; line-height: 1.7; color: #64748b;">Review the current fee schedule reference without leaving the verification workflow.</div>'
+            . '<div style="font-size: 13px; line-height: 1.7; color: #64748b;">' . e($description ?: 'Review the saved document without leaving the verification workflow.') . '</div>'
             . '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">Download / open separately</a>'
             . '</div>'
             . '<div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">'
-            . '<iframe src="' . e($url) . '" title="' . $name . '" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>'
+            . '<iframe src="' . e($url) . '" title="' . $documentName . '" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>'
             . '</div>'
             . '</div>'
             . '</div>'

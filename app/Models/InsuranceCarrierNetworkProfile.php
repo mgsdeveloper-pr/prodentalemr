@@ -22,6 +22,13 @@ class InsuranceCarrierNetworkProfile extends Model
         'unknown' => 'Unknown',
     ];
 
+    public const SOURCE_DOCUMENT_TYPE_OPTIONS = [
+        'participation_guide' => 'Participation Guide',
+        'fee_schedule' => 'Fee Schedule',
+        'portal_reference' => 'Portal Reference',
+        'other' => 'Other',
+    ];
+
     protected $fillable = [
         'insurance_carrier_id',
         'participating_provider_summary',
@@ -36,6 +43,10 @@ class InsuranceCarrierNetworkProfile extends Model
         'fee_schedule_reference_name',
         'fee_schedule_reference_file_path',
         'fee_schedule_reference_external_url',
+        'source_document_name',
+        'source_document_file_path',
+        'source_document_effective_date',
+        'source_document_type',
         'verification_tips',
         'is_active',
     ];
@@ -44,6 +55,7 @@ class InsuranceCarrierNetworkProfile extends Model
     {
         return [
             'is_active' => 'boolean',
+            'source_document_effective_date' => 'date',
         ];
     }
 
@@ -133,6 +145,10 @@ class InsuranceCarrierNetworkProfile extends Model
                 'value' => $this->feeScheduleReferenceName(),
             ],
             [
+                'label' => 'Source Document',
+                'value' => $this->sourceDocumentSummary(),
+            ],
+            [
                 'label' => 'Verification Tips',
                 'value' => $this->verification_tips,
             ],
@@ -162,5 +178,50 @@ class InsuranceCarrierNetworkProfile extends Model
     public function hasFeeScheduleReference(): bool
     {
         return filled($this->feeScheduleReferenceName()) || filled($this->feeScheduleReferenceUrl());
+    }
+
+    public function sourceDocumentName(): ?string
+    {
+        return filled($this->source_document_name)
+            ? $this->source_document_name
+            : null;
+    }
+
+    public function sourceDocumentUrl(): ?string
+    {
+        if (filled($this->source_document_file_path)) {
+            return Storage::disk('public')->url($this->source_document_file_path);
+        }
+
+        return null;
+    }
+
+    public function hasSourceDocument(): bool
+    {
+        return filled($this->sourceDocumentName()) || filled($this->sourceDocumentUrl());
+    }
+
+    public function sourceDocumentTypeLabel(): ?string
+    {
+        if (! filled($this->source_document_type)) {
+            return null;
+        }
+
+        return static::SOURCE_DOCUMENT_TYPE_OPTIONS[$this->source_document_type] ?? $this->source_document_type;
+    }
+
+    public function sourceDocumentSummary(): ?string
+    {
+        if (! $this->hasSourceDocument()) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $this->sourceDocumentName(),
+            $this->sourceDocumentTypeLabel(),
+            $this->source_document_effective_date?->format('M d, Y'),
+        ]);
+
+        return $parts === [] ? null : implode(' | ', $parts);
     }
 }

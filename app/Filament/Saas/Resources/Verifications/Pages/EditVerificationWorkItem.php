@@ -5,6 +5,7 @@ namespace App\Filament\Saas\Resources\Verifications\Pages;
 use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
 use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
 use App\Models\BillingWorkItem;
+use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\User;
 use App\Models\VerificationFormSubmission;
 use App\Models\VerificationFormQuestion;
@@ -1038,6 +1039,23 @@ class EditVerificationWorkItem extends EditRecord
     protected function canViewVerifiedByField(): bool
     {
         return $this->canManageQueueControl();
+    }
+
+    public function getFeeScheduleReference(): ?array
+    {
+        $carrierName = (string) (data_get($this->data, 'vf_insurance_provider_name') ?: '');
+        $payerId = (string) (data_get($this->data, 'vf_payer_id') ?: '');
+
+        $profile = InsuranceCarrierNetworkProfile::resolveFor($carrierName, $payerId);
+
+        if (! $profile || ! $profile->hasFeeScheduleReference() || blank($profile->feeScheduleReferenceUrl())) {
+            return null;
+        }
+
+        return [
+            'name' => $profile->feeScheduleReferenceName() ?: 'Saved fee schedule reference',
+            'url' => $profile->feeScheduleReferenceUrl(),
+        ];
     }
 
     protected function buildQuickReference(BillingWorkItem $record, $patient, $policy, $primaryPlan, $provider): ?string
