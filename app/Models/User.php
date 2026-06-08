@@ -134,7 +134,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public static function verificationPanelAccessRoleOptions(): array
     {
         return [
-            ...self::saasRoleOptions(),
+            'saas_admin' => self::SAAS_ROLE_LABELS['saas_admin'],
             ...self::verificationRoleOptions(),
         ];
     }
@@ -184,6 +184,18 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             && $this->hasAnyRole(['saas_admin', 'clinic_admin', 'clinic_manager']);
     }
 
+    public function hasVerificationWorkspaceRole(): bool
+    {
+        return $this->status
+            && $this->hasAnyRole(array_keys(self::verificationRoleOptions()));
+    }
+
+    public function hasSaasWorkspaceRole(): bool
+    {
+        return $this->status
+            && $this->hasAnyRole(array_keys(self::saasRoleOptions()));
+    }
+
     public function isVerificationAdmin(): bool
     {
         return $this->status
@@ -216,7 +228,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function verificationAccessibleClinicIds(): array
     {
-        if (! $this->status || ! $this->canAccessVerificationPanel()) {
+        if (! $this->status || ! $this->canAccessVerificationWorkspace()) {
             return [];
         }
 
@@ -946,13 +958,13 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function canAccessSaasRevenueOperations(): bool
     {
-        return $this->canAccessVerificationPanel();
+        return $this->canAccessVerificationWorkspace();
     }
 
     public function canManageVerificationQueue(): bool
     {
-        return $this->canAccessVerificationPanel()
-            && $this->hasAnyRole(['saas_admin', 'saas_manager', 'verification_admin', 'verification_manager']);
+        return $this->canAccessVerificationWorkspace()
+            && $this->hasAnyRole(['saas_admin', 'verification_admin', 'verification_manager']);
     }
 
     public function canManageVerificationSettings(): bool
@@ -971,8 +983,33 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function canAccessVerificationPanel(): bool
     {
-        return $this->canAccessSaasModule('verification')
-            || $this->canAccessVerificationModule('verification');
+        return $this->canAccessVerificationModule('verification');
+    }
+
+    public function shouldLandInVerificationWorkspace(): bool
+    {
+        return $this->hasVerificationWorkspaceRole()
+            && $this->canAccessVerificationPanel();
+    }
+
+    public function canSwitchToSaasWorkspace(): bool
+    {
+        return $this->canAccessPanel(app(\Filament\PanelRegistry::class)->get('saas'));
+    }
+
+    public function hasVerificationWorkspaceOverride(): bool
+    {
+        return $this->isSaasAdmin();
+    }
+
+    public function canAccessVerificationWorkspace(): bool
+    {
+        return $this->canAccessVerificationPanel();
+    }
+
+    public function canWorkVerificationQueue(): bool
+    {
+        return $this->canAccessVerificationWorkspace();
     }
 
     public function canAccessVerificationModule(string $module): bool
@@ -1015,7 +1052,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         }
 
         return match ($panel->getId()) {
-            'admin' => $this->canAccessVerificationPanel(),
+            'admin' => $this->canAccessVerificationWorkspace(),
             'saas' => $this->hasAnyRole(['saas_admin', 'saas_manager', 'saas_user'])
                 && $this->hasAnyStandardSaasModuleAccess(),
             'clinic' => $this->hasAnyRole([

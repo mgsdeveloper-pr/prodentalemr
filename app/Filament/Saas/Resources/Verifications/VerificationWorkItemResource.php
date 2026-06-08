@@ -31,9 +31,9 @@ class VerificationWorkItemResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static ?string $navigationLabel = 'Verification';
+    protected static ?string $navigationLabel = 'Verification Queue';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
 
     protected static ?int $navigationSort = 1;
 

@@ -120,7 +120,7 @@ class VerificationAutoAssigner
             ->whereHas('roles', fn ($query) => $query->whereIn('name', array_keys(User::verificationRoleOptions())))
             ->with(['roles', 'permissions', 'verificationClinics'])
             ->get()
-            ->filter(fn (User $user): bool => $user->canAccessVerificationPanel()
+            ->filter(fn (User $user): bool => $user->canAccessVerificationWorkspace()
                 && (! filled($clinicId) || $user->canAccessVerificationClinic($clinicId)))
             ->values();
     }

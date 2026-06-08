@@ -25,13 +25,13 @@ class VerificationNotificationControl extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Alerts & Notifications';
 
-    protected static ?string $navigationLabel = 'Notification Control';
+    protected static ?string $navigationLabel = 'Notification Settings';
 
     protected static ?int $navigationSort = 3;
 
-    protected static ?string $title = 'Verification Notification Control';
+    protected static ?string $title = 'Notification Settings';
 
     protected static ?string $slug = 'verification-notification-control';
 

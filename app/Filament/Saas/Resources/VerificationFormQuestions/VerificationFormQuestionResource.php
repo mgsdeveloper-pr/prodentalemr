@@ -44,7 +44,7 @@ class VerificationFormQuestionResource extends Resource
 
     protected static ?string $navigationLabel = 'Verification Questions';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
 
     protected static ?int $navigationSort = 4;
 

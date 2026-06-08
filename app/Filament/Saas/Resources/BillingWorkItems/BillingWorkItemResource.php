@@ -85,17 +85,17 @@ class BillingWorkItemResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canAccessVerificationPanel() ?? false;
+        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canAccessVerificationPanel() ?? false;
+        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
     }
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()?->canAccessVerificationPanel() ?? false;
+        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
     }
 
     public static function canDelete(Model $record): bool

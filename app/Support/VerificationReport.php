@@ -504,11 +504,11 @@ class VerificationReport
         $viewerClinicIds = $viewer?->hasFullVerificationClinicAccess() ? [] : ($viewer?->verificationAccessibleClinicIds() ?? []);
 
         return User::query()
-            ->whereHas('roles', fn (Builder $query) => $query->whereIn('name', array_keys(User::verificationPanelAccessRoleOptions())))
+            ->whereHas('roles', fn (Builder $query) => $query->whereIn('name', array_keys(User::verificationRoleOptions())))
             ->with(['roles', 'permissions', 'verificationClinics'])
             ->orderBy('name')
             ->get()
-            ->filter(fn (User $user): bool => $user->canAccessVerificationPanel()
+            ->filter(fn (User $user): bool => $user->canAccessVerificationWorkspace()
                 && (
                     filled($clinicId)
                         ? $user->canAccessVerificationClinic((int) $clinicId)
@@ -546,6 +546,7 @@ class VerificationReport
 
         return User::query()
             ->whereIn('id', $userIds)
+            ->whereHas('roles', fn (Builder $query) => $query->whereIn('name', array_keys(User::verificationRoleOptions())))
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();

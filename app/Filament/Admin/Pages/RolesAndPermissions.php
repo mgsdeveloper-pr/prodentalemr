@@ -11,7 +11,7 @@ class RolesAndPermissions extends RolePermissionsPage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Access Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Team Access';
 
     protected static ?string $navigationLabel = 'Roles & Permissions';
 

@@ -35,7 +35,7 @@ class PortalCredentialResource extends Resource
 
     protected static ?string $navigationLabel = 'Portal Credentials';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
 
     protected static ?int $navigationSort = 2;
 

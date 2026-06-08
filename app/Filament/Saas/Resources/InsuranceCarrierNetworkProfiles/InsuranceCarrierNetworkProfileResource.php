@@ -37,7 +37,17 @@ class InsuranceCarrierNetworkProfileResource extends Resource
 
     protected static ?string $navigationLabel = 'Provider Participation';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
+
+    public static function getModelLabel(): string
+    {
+        return 'provider participation profile';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'provider participation';
+    }
 
     public static function form(Schema $schema): Schema
     {

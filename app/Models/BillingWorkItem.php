@@ -413,7 +413,7 @@ class BillingWorkItem extends Model
             return false;
         }
 
-        if (! $user->canAccessVerificationPanel()) {
+        if (! $user->canWorkVerificationQueue()) {
             return false;
         }
 
@@ -474,7 +474,7 @@ class BillingWorkItem extends Model
         }
 
         $isVerificationManager = $user->canManageVerificationQueue();
-        $isVerificationUser = $user->canAccessVerificationPanel();
+        $isVerificationUser = $user->canWorkVerificationQueue();
         $isClinicUser = $user->canEditClinicVerificationRequests();
 
         if ($isVerificationUser) {

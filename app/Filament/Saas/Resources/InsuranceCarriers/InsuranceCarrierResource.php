@@ -34,7 +34,17 @@ class InsuranceCarrierResource extends Resource
 
     protected static ?string $navigationLabel = 'Insurance Directory';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
+
+    public static function getModelLabel(): string
+    {
+        return 'insurance directory entry';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'insurance directory';
+    }
 
     public static function form(Schema $schema): Schema
     {

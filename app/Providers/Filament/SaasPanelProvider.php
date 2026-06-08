@@ -57,7 +57,7 @@ class SaasPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->userMenuItems([
                 'managed_services_console' => MenuItem::make()
-                    ->label('Managed Services Console')
+                    ->label('Open Verification Workspace')
                     ->icon(\Filament\Support\Icons\Heroicon::OutlinedArrowTopRightOnSquare)
                     ->url(fn (): string => url('/verification'))
                     ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(\Filament\PanelRegistry::class)->get('admin')))

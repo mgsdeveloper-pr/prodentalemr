@@ -16,7 +16,7 @@ class VerificationNotificationCentre extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Alerts & Notifications';
 
     protected static ?string $navigationLabel = 'Notification Centre';
 

@@ -26,7 +26,7 @@ class VerificationReports extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartBar;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
 
     protected static ?string $navigationLabel = 'Reports';
 

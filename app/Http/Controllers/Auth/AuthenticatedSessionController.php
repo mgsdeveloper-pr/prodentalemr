@@ -29,11 +29,11 @@ class AuthenticatedSessionController extends Controller
 
         $user = auth()->user();
 
-        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('saas'))) {
-            if ($user->canAccessVerificationPanel() && ! $user->hasAnyStandardSaasModuleAccess()) {
-                return redirect()->intended('/verification');
-            }
+        if ($user?->shouldLandInVerificationWorkspace() && ! $user->isSaasAdmin()) {
+            return redirect()->intended('/verification');
+        }
 
+        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('saas'))) {
             return redirect()->intended('/saas');
         }
 

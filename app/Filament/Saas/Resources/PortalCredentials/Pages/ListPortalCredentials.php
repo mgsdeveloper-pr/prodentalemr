@@ -49,7 +49,10 @@ class ListPortalCredentials extends ListRecords
     public function canUpdatePasswords(): bool
     {
         return filled(AdminClinicScope::selectedClinicId())
-            && (auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update') ?? false);
+            && (
+                (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update') ?? false)
+                || (auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update') ?? false)
+            );
     }
 
     public function openPasswordEditor(int $credentialId): void

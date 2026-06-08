@@ -241,7 +241,7 @@ class VerificationNotificationCenter
     {
         return User::query()
             ->where('status', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['saas_admin', 'saas_manager', 'verification_admin', 'verification_manager']))
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['saas_admin', 'verification_admin', 'verification_manager']))
             ->get();
     }
 
@@ -253,7 +253,7 @@ class VerificationNotificationCenter
             return [];
         }
 
-        $panel = $recipient->canAccessVerificationPanel() && ! $recipient->hasAnyRole(array_keys(User::clinicRoleOptions()))
+        $panel = $recipient->canAccessVerificationWorkspace() && ! $recipient->hasAnyRole(array_keys(User::clinicRoleOptions()))
             ? 'verification'
             : 'clinic';
 

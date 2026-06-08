@@ -51,10 +51,10 @@ class AdminPanelProvider extends PanelProvider
             ->userMenu()
             ->userMenuItems([
                 'saas_console' => MenuItem::make()
-                    ->label('SaaS Console')
+                    ->label('Open SaaS Workspace')
                     ->icon(\Filament\Support\Icons\Heroicon::OutlinedArrowTopRightOnSquare)
                     ->url(fn (): string => url('/saas'))
-                    ->visible(fn (): bool => auth()->check() && auth()->user()->hasAnyRole(['saas_admin', 'saas_manager', 'saas_user']))
+                    ->visible(fn (): bool => auth()->check() && auth()->user()->canSwitchToSaasWorkspace())
                     ->sort(900),
                 'logout' => MenuItem::make()->hidden(),
                 'sign_out' => MenuItem::make()
@@ -67,9 +67,9 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->navigationGroups([
-                NavigationGroup::make()->label('Insurance Verification'),
-                NavigationGroup::make()->label('Notifications'),
-                NavigationGroup::make()->label('Access Management'),
+                NavigationGroup::make()->label('Verification Workspace'),
+                NavigationGroup::make()->label('Alerts & Notifications'),
+                NavigationGroup::make()->label('Team Access'),
             ])
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
