@@ -5,14 +5,26 @@
         <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06); overflow: hidden;">
             <div style="padding: 22px 24px; border-bottom: 1px solid #edf2f7;">
                 <div style="display: flex; flex-direction: column; gap: 18px;">
-                    <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ecfeff; border: 1px solid #99f6e4; color: #0f766e; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; width: fit-content;">
-                        Verification Workspace
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+                        <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ecfeff; border: 1px solid #99f6e4; color: #0f766e; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; width: fit-content;">
+                            Verification Workspace
+                        </div>
+                        @if ($this->canCreatePortalCredentials())
+                            <button
+                                type="button"
+                                wire:click="openCreatePortalCredentialModal"
+                                style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 14px; border: 1px solid #0f766e; background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%); color: #ffffff; font-size: 13px; font-weight: 700; box-shadow: 0 10px 20px rgba(15, 118, 110, 0.16);"
+                            >
+                                <x-heroicon-o-plus style="width: 16px; height: 16px;" />
+                                <span>Create Portal</span>
+                            </button>
+                        @endif
                     </div>
                     <h2 style="margin: 0; font-size: 30px; line-height: 1.08; font-weight: 800; color: #0f172a;">
                         Portal Credentials
                     </h2>
                     <p style="margin: 0; max-width: 920px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                        Review the clinic-specific portal link, username, and password in one place. Credential additions, removals, and maintenance are handled from the Verification Settings section only.
+                        Review the clinic-specific portal link, username, and password in one place. Verification users can create and maintain portal records here without leaving the workspace.
                     </p>
                     <div class="portal-credential-header-grid" style="display: grid; grid-template-columns: minmax(260px, 340px) minmax(320px, 1fr); gap: 14px; align-items: stretch;">
                         <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); display: flex; flex-direction: column; justify-content: center; min-height: 78px;">
@@ -58,15 +70,25 @@
                                             </span>
                                         </div>
                                     </div>
-                                    @if ($this->canUpdatePasswords())
+                                    <div style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                                         <button
                                             type="button"
-                                            wire:click="openPasswordEditor({{ $credential->getKey() }})"
-                                            style="display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 12px; font-weight: 700; white-space: nowrap;"
+                                            wire:click="openCredentialInfo({{ $credential->getKey() }})"
+                                            style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 12px; font-weight: 700; white-space: nowrap;"
                                         >
-                                            Edit
+                                            <x-heroicon-o-information-circle style="width: 16px; height: 16px;" />
+                                            <span>Info</span>
                                         </button>
-                                    @endif
+                                        @if ($this->canUpdatePasswords())
+                                            <button
+                                                type="button"
+                                                wire:click="openPasswordEditor({{ $credential->getKey() }})"
+                                                style="display: inline-flex; align-items: center; justify-content: center; padding: 8px 14px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 12px; font-weight: 700; white-space: nowrap;"
+                                            >
+                                                Edit
+                                            </button>
+                                        @endif
+                                    </div>
                                 </div>
 
                                 <div style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
@@ -122,6 +144,170 @@
             </div>
         </section>
     </div>
+
+    @if ($this->createModalOpen)
+        <div wire:keydown.escape.window="closeCreatePortalCredentialModal" style="position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.48); display: flex; align-items: center; justify-content: center; padding: 24px;">
+            <div style="width: min(100%, 760px); max-height: calc(100vh - 48px); overflow: auto; border-radius: 24px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);">
+                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7;">
+                    <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ecfeff; border: 1px solid #99f6e4; color: #0f766e; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;">Verification Workspace</div>
+                    <h3 style="margin: 14px 0 0; font-size: 24px; font-weight: 800; color: #0f172a;">Create Portal Credential</h3>
+                    <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
+                        Add a new portal registration for <strong style="color: #0f172a;">{{ $this->getSelectedClinicName() ?: 'the selected clinic' }}</strong> without leaving this workspace.
+                    </p>
+                </div>
+
+                <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 18px;">
+                    <div class="portal-create-modal-grid" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Portal Name</label>
+                            <input type="text" wire:model.defer="createPortalName" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createPortalName')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Category</label>
+                            <select wire:model.defer="createPortalCategory" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                                @foreach (\App\Models\PortalCredential::CATEGORY_OPTIONS as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('createPortalCategory')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Login URL</label>
+                            <input type="url" wire:model.defer="createLoginUrl" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createLoginUrl')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Support Contact</label>
+                            <input type="text" wire:model.defer="createSupportContact" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createSupportContact')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Username</label>
+                            <input type="text" wire:model.defer="createUsername" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createUsername')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Password</label>
+                            <input type="password" wire:model.defer="createPassword" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createPassword')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Account / Payer ID</label>
+                            <input type="text" wire:model.defer="createAccountReference" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                            @error('createAccountReference')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">MFA Method</label>
+                            <select wire:model.defer="createMfaMethod" @disabled(! $this->createMfaRequired) style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
+                                @foreach (\App\Models\PortalCredential::MFA_METHOD_OPTIONS as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('createMfaMethod')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+                        <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; font-size: 14px; font-weight: 700; color: #334155;">
+                            <input type="checkbox" wire:model.live="createMfaRequired">
+                            <span>MFA Required</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; font-size: 14px; font-weight: 700; color: #334155;">
+                            <input type="checkbox" wire:model.defer="createIsActive">
+                            <span>Active</span>
+                        </label>
+                    </div>
+
+                    <div style="padding: 14px 16px; border-radius: 16px; border: 1px solid #dbe4ee; background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);">
+                        <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                            <input type="checkbox" wire:model.defer="createVisibleToClinic" style="margin-top: 3px;">
+                            <span style="display: flex; flex-direction: column; gap: 4px;">
+                                <span style="font-size: 14px; font-weight: 800; color: #9a3412;">Visible in clinic panel</span>
+                                <span style="font-size: 12px; line-height: 1.65; color: #7c2d12;">
+                                    Leave this unchecked to keep the credential private to the Verification workspace. Check it only when clinic users should be able to see and use this portal credential from their panel.
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">Registration Q&amp;A</label>
+                        <p style="margin: 0 0 8px; font-size: 12px; line-height: 1.6; color: #64748b;">
+                            Add the registration questions asked by the portal and the answers used during credential setup. This content will show under the card’s <strong style="color: #334155;">Info</strong> popup.
+                        </p>
+                        <textarea wire:model.defer="createRegistrationQaNotes" rows="4" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;"></textarea>
+                        @error('createRegistrationQaNotes')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div>
+                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: #334155;">General Notes</label>
+                        <p style="margin: 0 0 8px; font-size: 12px; line-height: 1.6; color: #64748b;">
+                            Add extra notes like MFA reminders, browser quirks, recovery tips, support guidance, or any operational detail that should stay separate from the registration Q&amp;A.
+                        </p>
+                        <textarea wire:model.defer="createGeneralNotes" rows="4" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;"></textarea>
+                        @error('createGeneralNotes')<div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>@enderror
+                    </div>
+                </div>
+
+                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                    <button type="button" wire:click="closeCreatePortalCredentialModal" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700;">
+                        Cancel
+                    </button>
+                    <button type="button" wire:click="createPortalCredential" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #0f766e; background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%); color: #ffffff; font-size: 13px; font-weight: 700;">
+                        Create Portal
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if ($this->infoModalOpen)
+        <div wire:keydown.escape.window="closeCredentialInfo" style="position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.48); display: flex; align-items: center; justify-content: center; padding: 24px;">
+            <div style="width: min(100%, 680px); max-height: calc(100vh - 48px); overflow: auto; border-radius: 24px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 30px 60px rgba(15, 23, 42, 0.24);">
+                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7;">
+                    <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;">Credential Info</div>
+                    <h3 style="margin: 14px 0 0; font-size: 24px; font-weight: 800; color: #0f172a;">{{ $this->infoCredentialName }}</h3>
+                    <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
+                        Review the registration questions, answers, and any extra operating notes saved for this portal credential.
+                    </p>
+                </div>
+
+                <div style="padding: 20px 22px;">
+                    @if (filled($this->infoCredentialRegistrationQaNotes) || filled($this->infoCredentialGeneralNotes))
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <div style="padding: 16px 18px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                                <div style="margin-bottom: 10px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Registration Q&amp;A</div>
+                                @if (filled($this->infoCredentialRegistrationQaNotes))
+                                    <div style="color: #334155; font-size: 14px; line-height: 1.75; white-space: pre-wrap;">{{ $this->infoCredentialRegistrationQaNotes }}</div>
+                                @else
+                                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.75;">No registration questions or answers have been added yet.</div>
+                                @endif
+                            </div>
+                            <div style="padding: 16px 18px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                                <div style="margin-bottom: 10px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #475569;">General Notes</div>
+                                @if (filled($this->infoCredentialGeneralNotes))
+                                    <div style="color: #334155; font-size: 14px; line-height: 1.75; white-space: pre-wrap;">{{ $this->infoCredentialGeneralNotes }}</div>
+                                @else
+                                    <div style="color: #94a3b8; font-size: 14px; line-height: 1.75;">No general notes have been added for this portal yet.</div>
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <div style="padding: 16px 18px; border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 14px; line-height: 1.75;">
+                            No registration Q&amp;A or general notes have been added for this portal yet.
+                        </div>
+                    @endif
+                </div>
+
+                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; align-items: center; justify-content: flex-end;">
+                    <button type="button" wire:click="closeCredentialInfo" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if ($this->passwordModalOpen)
         <div wire:keydown.escape.window="closePasswordEditor" style="position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 42, 0.48); display: flex; align-items: center; justify-content: center; padding: 24px;">
@@ -223,6 +409,12 @@
 
         @media (max-width: 700px) {
             .portal-password-modal-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .portal-create-modal-grid {
                 grid-template-columns: minmax(0, 1fr) !important;
             }
         }

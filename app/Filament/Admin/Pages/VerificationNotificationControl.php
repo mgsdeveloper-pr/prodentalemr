@@ -176,12 +176,6 @@ class VerificationNotificationControl extends Page implements HasForms
                 'url' => VerificationSettings::getUrl(),
             ],
             [
-                'key' => 'assignment',
-                'label' => 'Assignment Management',
-                'description' => 'Control how verification work is auto-assigned across the team.',
-                'url' => VerificationAssignmentManagement::getUrl(),
-            ],
-            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',

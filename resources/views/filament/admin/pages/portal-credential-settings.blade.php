@@ -9,12 +9,6 @@
                 'url' => \App\Filament\Admin\Pages\VerificationSettings::getUrl(),
             ],
             [
-                'key' => 'assignment',
-                'label' => 'Assignment Management',
-                'description' => 'Control how verification work is auto-assigned across the team.',
-                'url' => \App\Filament\Admin\Pages\VerificationAssignmentManagement::getUrl(),
-            ],
-            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',

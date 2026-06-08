@@ -42,10 +42,13 @@ class PortalCredential extends Model
         'password',
         'account_reference',
         'support_contact',
+        'registration_qa_notes',
+        'general_notes',
         'notes',
         'mfa_required',
         'mfa_method',
         'is_active',
+        'visible_to_clinic',
     ];
 
     protected function casts(): array
@@ -55,6 +58,7 @@ class PortalCredential extends Model
             'password' => 'encrypted',
             'mfa_required' => 'boolean',
             'is_active' => 'boolean',
+            'visible_to_clinic' => 'boolean',
         ];
     }
 
@@ -107,12 +111,20 @@ class PortalCredential extends Model
             'password' => $override?->password ?: $this->password,
             'account_reference' => $override?->account_reference ?: $this->account_reference,
             'support_contact' => $override?->support_contact ?: $this->support_contact,
+            'registration_qa_notes' => $override?->registration_qa_notes ?: $this->registration_qa_notes,
+            'general_notes' => $override?->general_notes ?: $this->general_notes,
             'notes' => $override?->notes ?: $this->notes,
             'mfa_required' => $override?->mfa_required ?? $this->mfa_required,
             'mfa_method' => $override?->mfa_method ?: $this->mfa_method,
             'is_active' => $override?->is_active ?? $this->is_active,
+            'visible_to_clinic' => (bool) $this->visible_to_clinic,
             'has_override' => (bool) $override,
         ];
+    }
+
+    public function isVisibleToClinicPanel(): bool
+    {
+        return (bool) $this->visible_to_clinic;
     }
 
     public static function maskSecret(?string $value): string

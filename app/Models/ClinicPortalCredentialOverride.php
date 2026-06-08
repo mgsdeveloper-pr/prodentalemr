@@ -18,6 +18,8 @@ class ClinicPortalCredentialOverride extends Model
         'password',
         'account_reference',
         'support_contact',
+        'registration_qa_notes',
+        'general_notes',
         'notes',
         'mfa_required',
         'mfa_method',

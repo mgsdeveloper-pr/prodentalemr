@@ -49,7 +49,9 @@ class PortalCredentialSettings extends Page
         return PortalCredential::query()
             ->when(
                 filled(ClinicPanelScope::selectedClinicId()),
-                fn ($query) => $query->where('clinic_id', ClinicPanelScope::selectedClinicId()),
+                fn ($query) => $query
+                    ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+                    ->where('visible_to_clinic', true),
                 fn ($query) => $query->whereRaw('1 = 0')
             )
             ->when(filled($this->search), function ($query): void {

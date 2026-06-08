@@ -46,12 +46,6 @@ class ListInsuranceCarriers extends ListRecords
                 'url' => VerificationSettings::getUrl(),
             ],
             [
-                'key' => 'assignment',
-                'label' => 'Assignment Management',
-                'description' => 'Control how verification work is auto-assigned across the team.',
-                'url' => VerificationAssignmentManagement::getUrl(),
-            ],
-            [
                 'key' => 'insurance',
                 'label' => 'Insurance Directory',
                 'description' => 'Manage the global insurance carrier master used across clinics.',

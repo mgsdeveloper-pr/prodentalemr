@@ -156,7 +156,9 @@ class PortalCredentialResource extends Resource
         return parent::getEloquentQuery()
             ->when(
                 filled($selectedClinicId),
-                fn (Builder $query) => $query->where('clinic_id', $selectedClinicId),
+                fn (Builder $query) => $query
+                    ->where('clinic_id', $selectedClinicId)
+                    ->where('visible_to_clinic', true),
                 fn (Builder $query) => $query->whereRaw('1 = 0')
             );
     }

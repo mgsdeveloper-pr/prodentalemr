@@ -19,6 +19,8 @@ class VerificationAssignmentManagement extends Page implements HasForms
 {
     use InteractsWithForms;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
 
     protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
@@ -96,12 +98,6 @@ class VerificationAssignmentManagement extends Page implements HasForms
                 'label' => 'PDF Settings',
                 'description' => 'Control PDF output and default verification template rules.',
                 'url' => VerificationSettings::getUrl(),
-            ],
-            [
-                'key' => 'assignment',
-                'label' => 'Assignment Management',
-                'description' => 'Control how verification work is auto-assigned across the team.',
-                'url' => static::getUrl(),
             ],
             [
                 'key' => 'insurance',

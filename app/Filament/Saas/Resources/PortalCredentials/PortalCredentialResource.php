@@ -104,6 +104,12 @@ class PortalCredentialResource extends Resource
                                     ->default(true)
                                     ->inline(false)
                                     ->columnSpan(3),
+                                Toggle::make('visible_to_clinic')
+                                    ->label('Visible in clinic panel')
+                                    ->helperText('Enable this only when clinic users should be able to see this credential in their portal workspace.')
+                                    ->default(false)
+                                    ->inline(false)
+                                    ->columnSpan(6),
                                 Textarea::make('notes')
                                     ->label('Notes')
                                     ->rows(4)
