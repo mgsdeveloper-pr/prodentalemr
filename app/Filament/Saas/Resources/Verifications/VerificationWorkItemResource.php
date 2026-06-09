@@ -33,7 +33,7 @@ class VerificationWorkItemResource extends Resource
 
     protected static ?string $navigationLabel = 'Verification Queue';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
+    protected static string|UnitEnum|null $navigationGroup = 'Operations';
 
     protected static ?int $navigationSort = 1;
 

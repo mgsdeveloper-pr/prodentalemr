@@ -26,7 +26,7 @@ class VerificationNotificationControl extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Alerts & Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Notification Settings';
 
@@ -37,6 +37,11 @@ class VerificationNotificationControl extends Page implements HasForms
     protected static ?string $slug = 'verification-notification-control';
 
     protected string $view = 'filament.admin.pages.verification-notification-control';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public ?array $data = [];
 

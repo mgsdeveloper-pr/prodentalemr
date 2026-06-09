@@ -16,7 +16,7 @@ class VerificationNotificationCentre extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Alerts & Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Operations';
 
     protected static ?string $navigationLabel = 'Notification Centre';
 
@@ -27,6 +27,11 @@ class VerificationNotificationCentre extends Page
     protected static ?string $slug = 'verification-notifications';
 
     protected string $view = 'filament.shared.verification-notification-centre';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public string $search = '';
     public string $readFilter = 'all';

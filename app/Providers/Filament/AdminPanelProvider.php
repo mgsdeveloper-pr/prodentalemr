@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\VerificationClinicAssignments;
 use App\Filament\Admin\Pages\RolesAndPermissions;
 use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
@@ -29,7 +31,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -69,9 +70,11 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->navigationGroups([
-                NavigationGroup::make()->label('Verification Workspace'),
-                NavigationGroup::make()->label('Alerts & Notifications'),
-                NavigationGroup::make()->label('Team Access'),
+                NavigationGroup::make()->label('Dashboard'),
+                NavigationGroup::make()->label('Operations'),
+                NavigationGroup::make()->label('Reports'),
+                NavigationGroup::make()->label('Access Management'),
+                NavigationGroup::make()->label('Settings'),
             ])
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
@@ -107,6 +110,7 @@ class AdminPanelProvider extends PanelProvider
                 VerificationInboxSettings::class,
                 VerificationNotificationCentre::class,
                 VerificationReports::class,
+                VerificationClinicAssignments::class,
                 VerificationReadiness::class,
                 VerificationAssignmentManagement::class,
                 VerificationSettings::class,

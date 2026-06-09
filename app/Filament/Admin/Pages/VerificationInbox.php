@@ -16,11 +16,11 @@ class VerificationInbox extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-inbox-stack';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Alerts & Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Operations';
 
     protected static ?string $navigationLabel = 'Inbox';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $title = '';
 
