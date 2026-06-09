@@ -421,6 +421,10 @@ class BillingWorkItem extends Model
             return true;
         }
 
+        if ((int) $this->assigned_to !== (int) $user->getAuthIdentifier()) {
+            return false;
+        }
+
         return in_array($this->normalized_status, [
             self::STATUS_PENDING,
             self::STATUS_IN_PROGRESS,

@@ -4,6 +4,7 @@
     </form>
 
     @php
+        $isVerificationUserReportMode = method_exists($this, 'isVerificationUserReportMode') && $this->isVerificationUserReportMode();
         $summaryCards = $this->getSummaryCards();
         $trendChart = $this->getTrendChart();
         $statusVisualization = $this->getStatusVisualization();
@@ -13,6 +14,9 @@
         $slaAnalytics = $this->getSlaAnalytics();
         $recentRows = $this->getRecentRows();
         $activityFocusChips = $this->getActivityFocusChips();
+        $monthWiseVisualization = $isVerificationUserReportMode ? $this->getMonthWiseVisualization() : [];
+        $clinicWiseVisualization = $isVerificationUserReportMode ? $this->getClinicWiseVisualization() : [];
+        $priorityWiseVisualization = $isVerificationUserReportMode ? $this->getPriorityWiseVisualization() : [];
     @endphp
 
     <style>
@@ -22,6 +26,12 @@
         }
 
         .verification-reports-summary {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .verification-reports-simple {
             display: grid;
             gap: 20px;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -230,6 +240,7 @@
 
         @media (max-width: 1200px) {
             .verification-reports-summary,
+            .verification-reports-simple,
             .verification-reports-breakdowns {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
@@ -244,6 +255,7 @@
 
         @media (max-width: 768px) {
             .verification-reports-summary,
+            .verification-reports-simple,
             .verification-reports-breakdowns,
             .verification-reports-sla-cards,
             .verification-reports-snapshot {
@@ -253,6 +265,108 @@
     </style>
 
     <div class="verification-reports-grid">
+        @if ($isVerificationUserReportMode)
+            <section class="verification-reports-simple">
+                <div class="verification-reports-card">
+                    <div class="verification-reports-card__body">
+                        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Month Wise Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                    Verification requests grouped by created month.
+                                </div>
+                            </div>
+                            <span class="verification-reports-pill" style="background: #eff6ff; border-color: #bfdbfe; color: #2563eb;">
+                                Monthly
+                            </span>
+                        </div>
+
+                        <div class="verification-reports-bars">
+                            @forelse ($monthWiseVisualization as $row)
+                                <div>
+                                    <div class="verification-reports-bar__meta">
+                                        <span>{{ $row['label'] }}</span>
+                                        <span>{{ number_format($row['value']) }}</span>
+                                    </div>
+                                    <div class="verification-reports-bar__track">
+                                        <div class="verification-reports-bar__fill" style="width: {{ $row['width'] }}%; background: #2563eb;"></div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div style="font-size: 13px; color: #64748b;">No month-wise data matches the current filters.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <div class="verification-reports-card">
+                    <div class="verification-reports-card__body">
+                        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Clinic Wise Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                    Verification requests grouped by clinic.
+                                </div>
+                            </div>
+                            <span class="verification-reports-pill" style="background: #ecfdf5; border-color: #bbf7d0; color: #15803d;">
+                                Clinic
+                            </span>
+                        </div>
+
+                        <div class="verification-reports-bars">
+                            @forelse ($clinicWiseVisualization as $row)
+                                <div>
+                                    <div class="verification-reports-bar__meta">
+                                        <span>{{ $row['label'] }}</span>
+                                        <span>{{ number_format($row['value']) }}</span>
+                                    </div>
+                                    <div class="verification-reports-bar__track">
+                                        <div class="verification-reports-bar__fill" style="width: {{ $row['width'] }}%; background: #15803d;"></div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div style="font-size: 13px; color: #64748b;">No clinic-wise data matches the current filters.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <div class="verification-reports-card">
+                    <div class="verification-reports-card__body">
+                        <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
+                            <div>
+                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Urgent / Normal Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                    Verification requests grouped by form priority.
+                                </div>
+                            </div>
+                            <span class="verification-reports-pill" style="background: #fffbeb; border-color: #fde68a; color: #d97706;">
+                                Priority
+                            </span>
+                        </div>
+
+                        <div class="verification-reports-bars">
+                            @forelse ($priorityWiseVisualization as $row)
+                                <div>
+                                    <div class="verification-reports-bar__meta">
+                                        <span>{{ $row['label'] }}</span>
+                                        <span>{{ number_format($row['value']) }}</span>
+                                    </div>
+                                    <div class="verification-reports-bar__track">
+                                        <div
+                                            class="verification-reports-bar__fill"
+                                            style="width: {{ $row['width'] }}%; background: {{ $row['key'] === 'urgent' ? '#d97706' : '#64748b' }};"
+                                        ></div>
+                                    </div>
+                                </div>
+                            @empty
+                                <div style="font-size: 13px; color: #64748b;">No urgent or normal data matches the current filters.</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+            </section>
+        @else
         <section class="verification-reports-summary">
             @foreach ($summaryCards as $card)
                 @php
@@ -586,5 +700,6 @@
                 </div>
             </div>
         </section>
+        @endif
     </div>
 </x-filament-panels::page>

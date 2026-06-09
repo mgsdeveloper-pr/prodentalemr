@@ -1,5 +1,17 @@
 @php
     $selectedClinicId = \App\Support\AdminClinicScope::selectedClinicId();
+    $viewer = auth()->user();
+    $showAllClinicsOption = count($clinicOptions) > 1;
+    $scopeHint = $showAllClinicsOption
+        ? (($viewer?->hasFullVerificationClinicAccess() || $viewer?->canManageVerificationQueue())
+            ? 'Choose one clinic or keep <strong>All Clinics</strong> selected to work the full verification queue.'
+            : 'Choose one clinic or keep <strong>All Clinics</strong> selected to work across your assigned clinics only.')
+        : 'Choose from your assigned clinics only to work verification requests in your scope.';
+    $activeScopeLabel = $selectedClinicId
+        ? ($clinicOptions[$selectedClinicId] ?? 'Selected clinic')
+        : ($showAllClinicsOption
+            ? (($viewer?->hasFullVerificationClinicAccess() || $viewer?->canManageVerificationQueue()) ? 'All Clinics' : 'All Assigned Clinics')
+            : 'Assigned clinics');
 @endphp
 
 <style>
@@ -144,14 +156,14 @@
     <form method="GET" action="{{ route('admin.clinic-scope') }}" class="admin-workspace-scope">
         <div class="admin-workspace-scope__eyebrow">Workspace</div>
         <h3 class="admin-workspace-scope__title">Clinic Scope</h3>
-        <p class="admin-workspace-scope__hint">
-            Choose one clinic or keep <strong>All Clinics</strong> selected to work the full verification queue.
-        </p>
+        <p class="admin-workspace-scope__hint">{!! $scopeHint !!}</p>
 
         <input type="hidden" name="redirect" value="{{ url()->full() }}">
 
         <select name="clinic_id" class="admin-workspace-scope__select" onchange="this.form.submit()">
-            <option value="">All Clinics</option>
+            @if ($showAllClinicsOption)
+                <option value="">All Clinics</option>
+            @endif
 
             @foreach ($clinicOptions as $clinicId => $clinicLabel)
                 <option value="{{ $clinicId }}" @selected((int) $selectedClinicId === (int) $clinicId)>
@@ -162,9 +174,7 @@
 
         <div class="admin-workspace-scope__status">
             Active scope:
-            <strong>
-                {{ $selectedClinicId ? ($clinicOptions[$selectedClinicId] ?? 'Selected clinic') : 'All Clinics' }}
-            </strong>
+            <strong>{{ $activeScopeLabel }}</strong>
         </div>
     </form>
 </div>

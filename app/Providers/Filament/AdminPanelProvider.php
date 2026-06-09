@@ -18,7 +18,6 @@ use App\Filament\Admin\Pages\PortalCredentialSettings;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Filament\Admin\Widgets\ManagedServicesQuickLinks;
 use App\Filament\Admin\Widgets\VerificationAttentionQueue;
-use App\Filament\Admin\Widgets\VerificationSlaAnalytics;
 use App\Http\Middleware\PanelAuthenticateRedirect;
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
 use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
@@ -121,7 +120,6 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 ManagedServicesQuickLinks::class,
-                VerificationSlaAnalytics::class,
                 VerificationAttentionQueue::class,
             ])
             ->middleware([

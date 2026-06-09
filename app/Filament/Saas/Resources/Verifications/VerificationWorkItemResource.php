@@ -77,7 +77,7 @@ class VerificationWorkItemResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return AdminClinicScope::apply(parent::getEloquentQuery(), 'clinic_id')
+        $query = AdminClinicScope::apply(parent::getEloquentQuery(), 'clinic_id')
             ->withoutGlobalScopes([SoftDeletingScope::class])
             ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))
             ->where('source', '!=', 'clinic_self_service')
@@ -99,6 +99,14 @@ class VerificationWorkItemResource extends Resource
                 'attachments',
                 'activities.user',
             ]);
+
+        $user = auth()->user();
+
+        if ($user?->hasRole('verification_user') && ! $user->canManageVerificationQueue()) {
+            $query->where('assigned_to', $user->getAuthIdentifier());
+        }
+
+        return $query;
     }
 
     public static function canViewAny(): bool

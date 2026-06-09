@@ -20,6 +20,7 @@ use Filament\Widgets\TableWidget;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use Livewire\Attributes\On;
 
 class VerificationAttentionQueue extends TableWidget
 {
@@ -30,6 +31,21 @@ class VerificationAttentionQueue extends TableWidget
     protected string $view = 'filament.admin.widgets.verification-attention-queue';
 
     protected int|string|array $columnSpan = 'full';
+
+    public ?string $activeFilter = null;
+
+    public function mount(): void
+    {
+        $filter = request()->query('attention_filter');
+        $this->activeFilter = filled($filter) ? (string) $filter : null;
+    }
+
+    #[On('verification-attention-filter-changed')]
+    public function setAttentionFilter(?string $filter = null): void
+    {
+        $this->activeFilter = filled($filter) ? (string) $filter : null;
+        $this->resetTable();
+    }
 
     public function table(Table $table): Table
     {
@@ -214,7 +230,7 @@ class VerificationAttentionQueue extends TableWidget
     protected function getTableHeading(): string | Htmlable | null
     {
         $label = match ($this->getActiveFilter()) {
-            'pending_unassigned' => 'Pending & Unassigned',
+            'new_pending' => 'New & Pending',
             'urgent_requests' => 'Urgent Requests',
             'due_today' => 'Due Today',
             'overdue' => 'Overdue SLA',
@@ -240,17 +256,14 @@ class VerificationAttentionQueue extends TableWidget
 
         return new HtmlString(
             '<span style="display:inline-flex;align-items:center;gap:0.5rem;">'
-            . '<span style="color:#64748b;">Filtered from the dashboard cards.</span>'
-            . '<a href="' . e(url('/verification#verification-attention-queue')) . '" style="color:#9a6700;font-weight:700;text-decoration:none;">Clear filter</a>'
+            . '<span style="color:#64748b;">Filtered from the dashboard cards. Click the active card again to clear it.</span>'
             . '</span>'
         );
     }
 
     protected function getActiveFilter(): ?string
     {
-        $filter = request()->query('attention_filter');
-
-        return filled($filter) ? (string) $filter : null;
+        return $this->activeFilter;
     }
 
     public function getExportUrl(string $format): string
@@ -282,17 +295,19 @@ class VerificationAttentionQueue extends TableWidget
         );
 
         match ($this->getActiveFilter()) {
-            'pending_unassigned' => $query
-                ->where(function (Builder $innerQuery): void {
-                    $innerQuery
-                        ->whereNull('assigned_to')
-                        ->orWhere('status', BillingWorkItem::STATUS_PENDING)
-                        ->orWhere('status', 'unassigned');
-                }),
+            'new_pending' => $query->whereIn('status', [
+                BillingWorkItem::STATUS_PENDING,
+                'unassigned',
+            ]),
             'urgent_requests' => $query->where('priority', 'urgent'),
             'due_today' => $query->whereDate('due_at', today())->where('status', '!=', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
             'overdue' => $query->where('due_at', '<', now())->where('status', '!=', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
-            'awaiting_clinic_response' => $query->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
+            'awaiting_clinic_response' => $query->whereIn('status', [
+                BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+                'waiting_on_client',
+                BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
+                'audit',
+            ]),
             'returned_for_rework' => $query->where('status', BillingWorkItem::STATUS_RETURNED_FOR_REWORK),
             default => null,
         };

@@ -385,6 +385,58 @@ class VerificationReport
             ->all();
     }
 
+    public static function monthlyVolumeBreakdown(Builder $query): array
+    {
+        return (clone $query)
+            ->selectRaw("DATE_FORMAT(billing_work_items.created_at, '%Y-%m') as report_month, COUNT(*) as total")
+            ->groupBy('report_month')
+            ->orderBy('report_month')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => filled($row->report_month)
+                    ? Carbon::createFromFormat('Y-m', (string) $row->report_month)->format('M Y')
+                    : 'Unknown',
+                'value' => (int) $row->total,
+                'key' => (string) $row->report_month,
+            ])
+            ->all();
+    }
+
+    public static function clinicVolumeBreakdown(Builder $query): array
+    {
+        return (clone $query)
+            ->leftJoin('clinics', 'billing_work_items.clinic_id', '=', 'clinics.id')
+            ->selectRaw("COALESCE(clinics.clinic_name, 'Unknown Clinic') as clinic_name, COUNT(*) as total")
+            ->groupBy('clinic_name')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row): array => [
+                'label' => (string) $row->clinic_name,
+                'value' => (int) $row->total,
+                'key' => (string) $row->clinic_name,
+            ])
+            ->all();
+    }
+
+    public static function priorityMixBreakdown(Builder $query): array
+    {
+        $rows = (clone $query)
+            ->selectRaw('priority, COUNT(*) as total')
+            ->groupBy('priority')
+            ->orderBy('priority')
+            ->get()
+            ->keyBy(fn ($row) => (string) $row->priority);
+
+        return collect([
+            'normal' => 'Normal',
+            'urgent' => 'Urgent',
+        ])->map(fn (string $label, string $priority): array => [
+            'label' => $label,
+            'value' => (int) ($rows[$priority]->total ?? 0),
+            'key' => $priority,
+        ])->values()->all();
+    }
+
     public static function barVisualization(array $rows): array
     {
         $max = max(array_column($rows, 'value') ?: [1]);

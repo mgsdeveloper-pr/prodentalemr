@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Models\BillingWorkItem;
+use App\Models\User;
 use App\Support\AdminClinicScope;
 use App\Support\VerificationReport;
 use BackedEnum;
@@ -65,6 +66,30 @@ class VerificationReports extends Page implements HasForms
 
     public function form(Schema $schema): Schema
     {
+        if ($this->isVerificationUserReportMode()) {
+            return $schema
+                ->statePath('data')
+                ->components([
+                    Section::make('Report Filters')
+                        ->description('Review month-wise, clinic-wise, and urgent or normal verification volume for your reporting scope.')
+                        ->schema([
+                            Grid::make(3)
+                                ->schema([
+                                    DatePicker::make('from_date')->label('From')->live(),
+                                    DatePicker::make('to_date')->label('To')->live(),
+                                    Select::make('clinic_id')
+                                        ->label('Clinic')
+                                        ->options(fn (): array => VerificationReport::clinicOptions())
+                                        ->searchable()
+                                        ->preload()
+                                        ->native(false)
+                                        ->placeholder('All clinics')
+                                        ->live(),
+                                ]),
+                        ]),
+                ]);
+        }
+
         return $schema
             ->statePath('data')
             ->components([
@@ -233,6 +258,21 @@ class VerificationReports extends Page implements HasForms
         return VerificationReport::recentRows($this->baseQuery(), 12);
     }
 
+    public function getMonthWiseVisualization(): array
+    {
+        return VerificationReport::barVisualization(VerificationReport::monthlyVolumeBreakdown($this->baseQuery()));
+    }
+
+    public function getClinicWiseVisualization(): array
+    {
+        return VerificationReport::barVisualization(VerificationReport::clinicVolumeBreakdown($this->baseQuery()));
+    }
+
+    public function getPriorityWiseVisualization(): array
+    {
+        return VerificationReport::barVisualization(VerificationReport::priorityMixBreakdown($this->baseQuery()));
+    }
+
     public function applyActivityFocus(string $focus): void
     {
         $state = $this->form->getState();
@@ -286,6 +326,11 @@ class VerificationReports extends Page implements HasForms
         $selectedClinic = VerificationReport::clinicOptions()[$state['clinic_id'] ?? null] ?? null;
 
         return $selectedClinic ?: 'All clinics';
+    }
+
+    public function isVerificationUserReportMode(): bool
+    {
+        return auth()->user()?->hasRole('verification_user') ?? false;
     }
 
     protected function baseQuery(): Builder

@@ -13,11 +13,28 @@ class ManagedServicesQuickLinks extends Widget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected function getActiveFilter(): ?string
+    public ?string $activeFilter = null;
+
+    public function mount(): void
     {
         $filter = request()->query('attention_filter');
+        $this->activeFilter = filled($filter) ? (string) $filter : null;
+    }
 
-        return filled($filter) ? (string) $filter : null;
+    public function applyFilter(?string $filter = null): void
+    {
+        $nextFilter = filled($filter) && $this->activeFilter !== $filter
+            ? (string) $filter
+            : null;
+
+        $this->activeFilter = $nextFilter;
+
+        $this->dispatch('verification-attention-filter-changed', filter: $nextFilter);
+    }
+
+    protected function getActiveFilter(): ?string
+    {
+        return $this->activeFilter;
     }
 
     protected function getViewData(): array
@@ -29,24 +46,34 @@ class ManagedServicesQuickLinks extends Widget
 
         $activeFilter = $this->getActiveFilter();
         $dashboardUrl = url('/verification');
+        $waitingOnClinicCount = (clone $verificationQuery)
+            ->whereIn('status', [
+                BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+                'waiting_on_client',
+            ])
+            ->count();
+        $returnedForReworkCount = (clone $verificationQuery)
+            ->whereIn('status', [
+                BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
+                'audit',
+            ])
+            ->count();
 
         return [
             'activeFilter' => $activeFilter,
             'links' => [
                 [
-                    'filter' => 'pending_unassigned',
-                    'title' => 'Pending & Unassigned',
-                    'description' => 'Start with new requests that still need ownership.',
+                    'filter' => 'new_pending',
+                    'title' => 'New & Pending',
+                    'description' => 'Start with newly opened requests that are still pending work.',
                     'metric' => (clone $verificationQuery)
-                        ->where(function (Builder $query): void {
-                            $query
-                                ->whereNull('assigned_to')
-                                ->orWhere('status', BillingWorkItem::STATUS_PENDING)
-                                ->orWhere('status', 'unassigned');
-                        })
+                        ->whereIn('status', [
+                            BillingWorkItem::STATUS_PENDING,
+                            'unassigned',
+                        ])
                         ->whereNotIn('status', [BillingWorkItem::STATUS_DONE, 'completed', 'cancelled'])
                         ->count(),
-                    'url' => "{$dashboardUrl}?attention_filter=pending_unassigned#verification-attention-queue",
+                    'url' => "{$dashboardUrl}?attention_filter=new_pending#verification-attention-queue",
                 ],
                 [
                     'filter' => 'urgent_requests',
@@ -57,17 +84,6 @@ class ManagedServicesQuickLinks extends Widget
                         ->whereNotIn('status', [BillingWorkItem::STATUS_DONE, 'completed', 'cancelled'])
                         ->count(),
                     'url' => "{$dashboardUrl}?attention_filter=urgent_requests#verification-attention-queue",
-                ],
-                [
-                    'filter' => 'due_today',
-                    'title' => 'Due Today',
-                    'description' => 'Review requests reaching their SLA today.',
-                    'metric' => (clone $verificationQuery)
-                        ->whereDate('due_at', today())
-                        ->where('status', '!=', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
-                        ->whereNotIn('status', [BillingWorkItem::STATUS_DONE, 'completed', 'cancelled'])
-                        ->count(),
-                    'url' => "{$dashboardUrl}?attention_filter=due_today#verification-attention-queue",
                 ],
                 [
                     'filter' => 'overdue',
@@ -81,29 +97,18 @@ class ManagedServicesQuickLinks extends Widget
                     'url' => "{$dashboardUrl}?attention_filter=overdue#verification-attention-queue",
                 ],
                 [
-                    'filter' => 'awaiting_clinic_response',
-                    'title' => 'Waiting on Clinic',
-                    'description' => 'Monitor requests paused until the clinic sends missing details.',
-                    'metric' => (clone $verificationQuery)
-                        ->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
-                        ->count(),
-                    'url' => "{$dashboardUrl}?attention_filter=awaiting_clinic_response#verification-attention-queue",
-                ],
-                [
                     'filter' => 'returned_for_rework',
                     'title' => 'Returned for Rework',
-                    'description' => 'Watch requests sent back for correction before closure.',
-                    'metric' => (clone $verificationQuery)
-                        ->where('status', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
-                        ->count(),
+                    'description' => 'Track requests sent back for correction before closure.',
+                    'metric' => $returnedForReworkCount,
                     'url' => "{$dashboardUrl}?attention_filter=returned_for_rework#verification-attention-queue",
                 ],
                 [
-                    'filter' => null,
-                    'title' => 'Verification Questions',
-                    'description' => 'Maintain clinic-specific verification sections and prompts.',
-                    'metric' => null,
-                    'url' => url('/verification/verification-form-questions'),
+                    'filter' => 'awaiting_clinic_response',
+                    'title' => 'Waiting on Clinic',
+                    'description' => 'Monitor requests paused until the clinic sends missing details.',
+                    'metric' => $waitingOnClinicCount,
+                    'url' => "{$dashboardUrl}?attention_filter=awaiting_clinic_response#verification-attention-queue",
                 ],
             ],
         ];

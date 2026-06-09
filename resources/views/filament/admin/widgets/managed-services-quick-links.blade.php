@@ -30,7 +30,7 @@
 
             .ms-console__grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                grid-template-columns: repeat(5, minmax(180px, 1fr));
                 gap: 1rem;
             }
 
@@ -91,26 +91,6 @@
                 text-align: center;
             }
 
-            .ms-console__action {
-                margin-top: 1rem;
-                display: inline-flex;
-                align-items: center;
-                gap: 0.35rem;
-                font-size: 0.79rem;
-                font-weight: 800;
-                color: #9a6700;
-            }
-
-            .ms-console__action::after {
-                content: '\203A';
-                font-size: 1rem;
-                line-height: 1;
-            }
-
-            .ms-console__action--active {
-                color: #0f766e;
-            }
-
             html.dark .ms-console__title,
             html.dark .ms-console__card-title {
                 color: #f9fafb;
@@ -141,13 +121,30 @@
                 color: #fcd34d;
             }
 
-            html.dark .ms-console__action {
-                color: #fcd34d;
+            @media (max-width: 1440px) {
+                .ms-console__grid {
+                    grid-template-columns: repeat(5, minmax(160px, 1fr));
+                }
             }
 
-            html.dark .ms-console__action--active {
-                color: #5eead4;
+            @media (max-width: 1280px) {
+                .ms-console__grid {
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                }
             }
+
+            @media (max-width: 900px) {
+                .ms-console__grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                }
+            }
+
+            @media (max-width: 768px) {
+                .ms-console__grid {
+                    grid-template-columns: minmax(0, 1fr);
+                }
+            }
+
         </style>
 
         <div class="ms-console">
@@ -162,7 +159,12 @@
                         $isActive = filled($link['filter']) && $activeFilter === $link['filter'];
                     @endphp
 
-                    <a href="{{ $link['url'] }}" class="ms-console__card {{ $isActive ? 'ms-console__card--active' : '' }}">
+                    <button
+                        type="button"
+                        wire:click="applyFilter('{{ $link['filter'] }}')"
+                        class="ms-console__card {{ $isActive ? 'ms-console__card--active' : '' }}"
+                        style="text-align: left; width: 100%;"
+                    >
                         <div class="ms-console__card-top">
                             <div>
                                 <h4 class="ms-console__card-title">{{ $link['title'] }}</h4>
@@ -173,11 +175,7 @@
                                 <span class="ms-console__metric">{{ number_format($link['metric']) }}</span>
                             @endif
                         </div>
-
-                        <div class="ms-console__action {{ $isActive ? 'ms-console__action--active' : '' }}">
-                            {{ $isActive ? 'Showing below' : 'Open queue' }}
-                        </div>
-                    </a>
+                    </button>
                 @endforeach
             </div>
         </div>
