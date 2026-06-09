@@ -13,7 +13,9 @@ use App\Support\VerificationAutoAssigner;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -32,6 +34,8 @@ class EditVerificationWorkItem extends EditRecord
     protected array $verificationProfileData = [];
     protected array $verificationFormAnswerData = [];
     public array $clinicResponseAttachments = [];
+    public bool $auditReady = false;
+    protected bool $shouldSkipWorkflowSyncOnSave = false;
 
     public function mount(int|string $record): void
     {
@@ -76,7 +80,7 @@ class EditVerificationWorkItem extends EditRecord
 
     public function getSaveButtonLabel(): string
     {
-        return 'Save verification';
+        return $this->auditReady ? 'Save' : 'Audit';
     }
 
     public function getViewButtonLabel(): string
@@ -86,93 +90,12 @@ class EditVerificationWorkItem extends EditRecord
 
     public function getIndexButtonLabel(): string
     {
-        return 'Back to queue';
+        return 'Save & Back';
     }
 
     public function getCancelButtonLabel(): string
     {
         return 'Cancel';
-    }
-
-    public function getStatusActionButtons(): array
-    {
-        $status = $this->record->normalized_status;
-        $user = auth()->user();
-        $isManager = $user?->canManageVerificationQueue() ?? false;
-
-        return [
-            [
-                'label' => 'Take Ownership',
-                'action' => 'takeOwnership',
-                'tone' => 'purple',
-                'visible' => $isManager
-                    && $status !== BillingWorkItem::STATUS_DONE
-                    && $this->record->assigned_to !== $user?->getKey(),
-            ],
-            [
-                'label' => 'Start Work',
-                'target' => BillingWorkItem::STATUS_IN_PROGRESS,
-                'tone' => 'primary',
-                'visible' => $status === BillingWorkItem::STATUS_PENDING
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_IN_PROGRESS),
-            ],
-            [
-                'label' => $status === BillingWorkItem::STATUS_INCOMPLETE ? 'Already Incomplete' : 'Mark Incomplete',
-                'target' => BillingWorkItem::STATUS_INCOMPLETE,
-                'tone' => 'warning',
-                'visible' => in_array($status, [
-                    BillingWorkItem::STATUS_PENDING,
-                    BillingWorkItem::STATUS_IN_PROGRESS,
-                    BillingWorkItem::STATUS_REVIEW,
-                    BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
-                    BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
-                ], true)
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_INCOMPLETE),
-            ],
-            [
-                'label' => 'Send to Review',
-                'target' => BillingWorkItem::STATUS_REVIEW,
-                'tone' => 'info',
-                'visible' => false,
-            ],
-            [
-                'label' => 'Request Clinic Info',
-                'target' => BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
-                'tone' => 'warning',
-                'visible' => in_array($status, [
-                    BillingWorkItem::STATUS_IN_PROGRESS,
-                    BillingWorkItem::STATUS_REVIEW,
-                ], true)
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
-            ],
-            [
-                'label' => 'Mark Done',
-                'target' => BillingWorkItem::STATUS_DONE,
-                'tone' => 'success',
-                'visible' => false,
-            ],
-            [
-                'label' => 'Return for Rework',
-                'target' => BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
-                'tone' => 'danger',
-                'visible' => false,
-            ],
-            [
-                'label' => in_array($status, [
-                    BillingWorkItem::STATUS_DONE,
-                    BillingWorkItem::STATUS_INCOMPLETE,
-                ], true) ? 'Reopen to In Progress' : 'Resume Verification',
-                'target' => BillingWorkItem::STATUS_IN_PROGRESS,
-                'tone' => 'primary',
-                'visible' => in_array($status, [
-                    BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
-                    BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
-                    BillingWorkItem::STATUS_INCOMPLETE,
-                    BillingWorkItem::STATUS_DONE,
-                ], true)
-                    && $this->record->canUserTransitionTo($user, BillingWorkItem::STATUS_IN_PROGRESS),
-            ],
-        ];
     }
 
     public function canManageQueueControl(): bool
@@ -214,6 +137,113 @@ class EditVerificationWorkItem extends EditRecord
     protected function beforeSave(): void
     {
         abort_unless($this->canSubmitForm(), 403);
+    }
+
+    public function updated($name, $value): void
+    {
+        if (str_starts_with((string) $name, 'data.')) {
+            $this->auditReady = false;
+        }
+    }
+
+    public function canRequestClinicInfo(): bool
+    {
+        return $this->record->canUserTransitionTo(auth()->user(), BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+    }
+
+    public function auditVerification(): void
+    {
+        abort_unless($this->canSubmitForm(), 403);
+
+        $this->resetErrorBag();
+
+        try {
+            $this->callHook('beforeValidate');
+
+            $this->form->getState(afterValidate: function (): void {
+                $this->callHook('afterValidate');
+            });
+        } catch (ValidationException $exception) {
+            Notification::make()
+                ->title('Audit found issues')
+                ->body('Please resolve the highlighted validation errors before saving.')
+                ->danger()
+                ->send();
+
+            throw $exception;
+        }
+
+        $missingFields = $this->missingRequiredVerificationFields();
+
+        if ($missingFields !== []) {
+            foreach ($missingFields as $fieldKey => $label) {
+                $this->addError('data.' . $fieldKey, $label . ' is required before saving.');
+            }
+
+            Notification::make()
+                ->title('Audit incomplete')
+                ->body('Some required verification answers are still missing. Complete them before saving.')
+                ->danger()
+                ->send();
+
+            $this->auditReady = false;
+
+            return;
+        }
+
+        $this->auditReady = true;
+
+        Notification::make()
+            ->title('Audit complete')
+            ->body('Validation passed. The Audit button is now ready to Save.')
+            ->success()
+            ->send();
+    }
+
+    public function saveAndBack(): void
+    {
+        abort_unless($this->canSubmitForm(), 403);
+
+        $this->shouldSkipWorkflowSyncOnSave = true;
+        $this->save(false, false);
+        $this->shouldSkipWorkflowSyncOnSave = false;
+
+        Notification::make()
+            ->title('Draft saved')
+            ->body('Your verification progress was saved.')
+            ->success()
+            ->send();
+
+        $redirectUrl = $this->getIndexUrl();
+
+        $this->redirect($redirectUrl, navigate: FilamentView::hasSpaMode($redirectUrl));
+    }
+
+    public function clearVerificationForm(): void
+    {
+        abort_unless($this->canSubmitForm(), 403);
+
+        foreach (array_keys($this->data ?? []) as $key) {
+            if (
+                str_starts_with((string) $key, 'vf_')
+                || str_starts_with((string) $key, 'custom_question_')
+                || in_array($key, ['notes', 'internal_summary', 'info_request_reason', 'return_reason'], true)
+            ) {
+                $this->data[$key] = null;
+            }
+        }
+
+        $this->data['outcome_status'] = 'pending';
+        $this->clinicResponseAttachments = [];
+        $this->data = $this->applyAutofillDefaults($this->data ?? []);
+        $this->auditReady = false;
+        $this->resetErrorBag();
+
+        Notification::make()
+            ->title('Form cleared')
+            ->body('Verification answers were reset to their base defaults.')
+            ->success()
+            ->send();
     }
 
     public function getQueueControlSnapshot(): array
@@ -494,7 +524,9 @@ class EditVerificationWorkItem extends EditRecord
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->syncVerificationFormAnswers();
         $this->persistClinicResponseAttachments();
-        $this->syncWorkflowStatusFromForm();
+        if (! $this->shouldSkipWorkflowSyncOnSave) {
+            $this->syncWorkflowStatusFromForm();
+        }
         $submission = $this->captureFormSubmissionSnapshot();
 
         if ($submission) {

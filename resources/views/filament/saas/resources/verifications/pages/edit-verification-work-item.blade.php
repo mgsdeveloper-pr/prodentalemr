@@ -22,13 +22,11 @@
         $activityTimeline = $this->getActivityTimeline(6);
         $attachments = $this->getAttachmentCards();
         $feeScheduleReference = $this->getFeeScheduleReference();
-        $statusButtons = collect($this->getStatusActionButtons())->filter(fn (array $button): bool => $button['visible'])->values()->all();
         $canSubmitForm = method_exists($this, 'canSubmitForm') ? $this->canSubmitForm() : true;
-        $showStatusButtons = count($statusButtons) > 0;
-        $showInfoRequestField = collect($statusButtons)->contains(fn (array $button): bool => ($button['target'] ?? null) === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
+        $canRequestClinicInfo = $this->canRequestClinicInfo();
+        $showInfoRequestField = $canRequestClinicInfo
             || $record->normalized_status === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
-        $showReworkReasonField = collect($statusButtons)->contains(fn (array $button): bool => ($button['target'] ?? null) === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
-            || $record->normalized_status === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
+        $showReworkReasonField = $record->normalized_status === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
         $showClinicResponseCard = ! $canManageQueueControl
             && $canSubmitForm
             && $record->normalized_status === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
@@ -175,39 +173,32 @@
             </div>
 
             <div class="verification-workbench-header__actions">
-                @if ($showStatusButtons)
-                    @foreach ($statusButtons as $button)
-                        @php
-                            $buttonTarget = $button['target'] ?? null;
-                            $isInfoRequestAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
-                            $isReworkAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
-                        @endphp
-                        <button
-                            type="button"
-                            @if ($isInfoRequestAction)
-                                onclick="openWorkflowModal('info-request-modal')"
-                            @elseif ($isReworkAction)
-                                onclick="openWorkflowModal('rework-reason-modal')"
-                            @else
-                                wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
-                            @endif
-                            style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
-                        >
-                            {{ $button['label'] }}
-                        </button>
-                    @endforeach
-                @endif
                 @if ($canSubmitForm)
-                    <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
-                        {{ $this->getSaveButtonLabel() }}
+                    @if ($this->auditReady)
+                        <button type="button" wire:click="save" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
+                            {{ $this->getSaveButtonLabel() }}
+                        </button>
+                    @else
+                        <button type="button" wire:click="auditVerification" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
+                            {{ $this->getSaveButtonLabel() }}
+                        </button>
+                    @endif
+                    @if ($canRequestClinicInfo)
+                        <button type="button" onclick="openWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 164px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                            Request to Clinic
+                        </button>
+                    @endif
+                    <button type="button" wire:click="saveAndBack" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer;">
+                        Back
                     </button>
+                    <button type="button" onclick="if (! confirm('Clear the verification answers and reset this form?')) return false;" wire:click="clearVerificationForm" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Clear Form
+                    </button>
+                @else
+                    <a href="{{ $this->getIndexUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
+                        Back
+                    </a>
                 @endif
-                <a href="{{ $this->getViewUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                    {{ $this->getViewButtonLabel() }}
-                </a>
-                <a href="{{ $this->getIndexUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                    {{ $this->getIndexButtonLabel() }}
-                </a>
             </div>
         </section>
 
@@ -864,35 +855,31 @@
                     </section>
 
                     <div style="display: flex; justify-content: flex-end; gap: 12px; padding-bottom: 6px;">
-                        <a href="{{ $this->getViewUrl() }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 128px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                            {{ $this->getCancelButtonLabel() }}
-                        </a>
-                        @if ($showStatusButtons)
-                        @foreach ($statusButtons as $button)
-                            @php
-                                $buttonTarget = $button['target'] ?? null;
-                                $isInfoRequestAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
-                                $isReworkAction = $buttonTarget === \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK;
-                            @endphp
-                            <button
-                                type="button"
-                                @if ($isInfoRequestAction)
-                                    onclick="openWorkflowModal('info-request-modal')"
-                                @elseif ($isReworkAction)
-                                    onclick="openWorkflowModal('rework-reason-modal')"
-                                @else
-                                    wire:click="{{ $button['action'] ?? (filled($button['target'] ?? null) ? "saveAndTransition('{$button['target']}')" : '') }}"
-                                @endif
-                                style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; font-size: 13px; font-weight: 800; cursor: pointer; {{ $actionToneStyles[$button['tone']] ?? $actionToneStyles['info'] }}"
-                            >
-                                {{ $button['label'] }}
-                            </button>
-                        @endforeach
-                        @endif
                         @if ($canSubmitForm)
-                            <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
-                                {{ $this->getSaveButtonLabel() }}
+                            @if ($this->auditReady)
+                                <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
+                                    {{ $this->getSaveButtonLabel() }}
+                                </button>
+                            @else
+                                <button type="button" wire:click="auditVerification" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
+                                    {{ $this->getSaveButtonLabel() }}
+                                </button>
+                            @endif
+                            @if ($canRequestClinicInfo)
+                                <button type="button" onclick="openWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 172px; padding: 12px 18px; border-radius: 14px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                                    Request to Clinic
+                                </button>
+                            @endif
+                            <button type="button" wire:click="saveAndBack" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer;">
+                                Back
                             </button>
+                            <button type="button" onclick="if (! confirm('Clear the verification answers and reset this form?')) return false;" wire:click="clearVerificationForm" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 12px 18px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                                Clear Form
+                            </button>
+                        @else
+                            <a href="{{ $this->getIndexUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
+                                Back
+                            </a>
                         @endif
                     </div>
                 </section>

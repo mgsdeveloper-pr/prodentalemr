@@ -5,6 +5,8 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\RolesAndPermissions;
 use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
+use App\Filament\Admin\Pages\VerificationInbox;
+use App\Filament\Admin\Pages\VerificationInboxSettings;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationNotificationCentre;
 use App\Filament\Admin\Pages\VerificationAssignmentManagement;
@@ -101,6 +103,8 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
                 VerificationNotificationControl::class,
+                VerificationInbox::class,
+                VerificationInboxSettings::class,
                 VerificationNotificationCentre::class,
                 VerificationReports::class,
                 VerificationReadiness::class,

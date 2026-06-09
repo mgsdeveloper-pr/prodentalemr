@@ -2,56 +2,7 @@
     @php
         $builtInSections = $this->getBuiltInSections();
         $selectedClinicName = $this->getSelectedClinicName();
-        $verificationNavItems = [
-            [
-                'key' => 'settings',
-                'label' => 'PDF Settings',
-                'description' => 'Control PDF output and default verification template rules.',
-                'url' => \App\Filament\Admin\Pages\VerificationSettings::getUrl(),
-            ],
-            [
-                'key' => 'insurance',
-                'label' => 'Insurance Directory',
-                'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
-                'url' => \App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource::getUrl('index'),
-            ],
-            [
-                'key' => 'participation',
-                'label' => 'Provider Participation',
-                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
-                'url' => \App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource::getUrl('index'),
-            ],
-            [
-                'key' => 'credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Maintain the shared portal credential vault clinics can inherit from.',
-                'url' => \App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource::getUrl('index'),
-            ],
-            [
-                'key' => 'questions',
-                'label' => 'Verification Questions',
-                'description' => 'Manage prompts and section-specific question content.',
-                'url' => \App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource::getUrl('index'),
-            ],
-            [
-                'key' => 'arrangement',
-                'label' => 'Question Arrangement',
-                'description' => 'Reorder questions inside each verification section.',
-                'url' => \App\Filament\Admin\Pages\VerificationQuestionArrangement::getUrl(),
-            ],
-            [
-                'key' => 'notifications',
-                'label' => 'Notification Control',
-                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
-                'url' => \App\Filament\Admin\Pages\VerificationNotificationControl::getUrl(),
-            ],
-            [
-                'key' => 'readiness',
-                'label' => 'Verification Readiness',
-                'description' => 'Review launch blockers, polish items, and readiness gaps.',
-                'url' => \App\Filament\Admin\Pages\VerificationReadiness::getUrl(),
-            ],
-        ];
+        $verificationNavItems = \App\Support\VerificationSettingsNavigation::items();
     @endphp
 
     <x-verification-management-shell

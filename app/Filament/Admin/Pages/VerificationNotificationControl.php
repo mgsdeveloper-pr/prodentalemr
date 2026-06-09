@@ -7,6 +7,7 @@ use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrier
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Models\SaasSetting;
 use BackedEnum;
+use App\Support\VerificationSettingsNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -168,55 +169,6 @@ class VerificationNotificationControl extends Page implements HasForms
 
     public function getVerificationNavItems(): array
     {
-        return [
-            [
-                'key' => 'settings',
-                'label' => 'PDF Settings',
-                'description' => 'Control PDF output and default verification template rules.',
-                'url' => VerificationSettings::getUrl(),
-            ],
-            [
-                'key' => 'insurance',
-                'label' => 'Insurance Directory',
-                'description' => 'Maintain the shared insurance carrier master and clinic-specific defaults.',
-                'url' => InsuranceCarrierResource::getUrl('index'),
-            ],
-            [
-                'key' => 'participation',
-                'label' => 'Provider Participation',
-                'description' => 'Manage participating and non-participating payer guidance for verifiers.',
-                'url' => InsuranceCarrierNetworkProfileResource::getUrl('index'),
-            ],
-            [
-                'key' => 'credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Maintain the shared portal credential vault clinics can inherit from.',
-                'url' => PortalCredentialSettings::getUrl(),
-            ],
-            [
-                'key' => 'questions',
-                'label' => 'Verification Questions',
-                'description' => 'Manage prompts and section-specific question content.',
-                'url' => VerificationFormQuestionResource::getUrl('index'),
-            ],
-            [
-                'key' => 'arrangement',
-                'label' => 'Question Arrangement',
-                'description' => 'Reorder questions inside each verification section.',
-                'url' => VerificationQuestionArrangement::getUrl(),
-            ],
-            [
-                'key' => 'notifications',
-                'label' => 'Notification Control',
-                'description' => 'Manage verification events, recipients, and urgent alert behavior.',
-                'url' => static::getUrl(),
-            ],
-            [
-                'key' => 'readiness',
-                'label' => 'Verification Readiness',
-                'description' => 'Review launch blockers, polish items, and readiness gaps.',
-                'url' => VerificationReadiness::getUrl(),
-            ],
-        ];
+        return VerificationSettingsNavigation::items();
     }
 }
