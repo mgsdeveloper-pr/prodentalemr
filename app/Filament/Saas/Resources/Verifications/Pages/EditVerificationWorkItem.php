@@ -223,9 +223,18 @@ class EditVerificationWorkItem extends EditRecord
     {
         abort_unless($this->canSubmitForm(), 403);
 
+        $formType = data_get($this->data, 'vf_form_type')
+            ?: $this->record->verificationProfile?->form_type
+            ?: 'full_form';
+
         foreach (array_keys($this->data ?? []) as $key) {
             if (
                 str_starts_with((string) $key, 'vf_')
+                && $key !== 'vf_form_type'
+                && $key !== 'vf_is_provider_in_network'
+                && $key !== 'vf_network_status'
+                && $key !== 'vf_insurance_provider_name'
+                && $key !== 'vf_payer_id'
                 || str_starts_with((string) $key, 'custom_question_')
                 || in_array($key, ['notes', 'internal_summary', 'info_request_reason', 'return_reason'], true)
             ) {
@@ -233,6 +242,7 @@ class EditVerificationWorkItem extends EditRecord
             }
         }
 
+        $this->data['vf_form_type'] = $formType;
         $this->data['outcome_status'] = 'pending';
         $this->clinicResponseAttachments = [];
         $this->data = $this->applyAutofillDefaults($this->data ?? []);
@@ -988,6 +998,7 @@ class EditVerificationWorkItem extends EditRecord
 
         $defaults = [
             'context_clinic_name' => $clinicDisplayName,
+            'vf_form_type' => $profile?->form_type ?: 'full_form',
             'vf_patient_full_name' => $profile?->patient_full_name ?: $patient?->full_name,
             'vf_patient_dob' => $this->formatDateForInput($profile?->patient_dob ?: $patient?->dob),
             'vf_patient_identifier' => $profile?->patient_identifier ?: $policy?->member_id ?: $primaryPlan?->member_id ?: $patient?->insurance_number,
