@@ -14,7 +14,16 @@
 @endphp
 
 <div
-    x-data="{ open: false, alertOpen: true }"
+    x-data="{
+        open: false,
+        alertOpen: false,
+        dismissAlert(key) {
+            this.alertOpen = false;
+            if (key) {
+                localStorage.setItem(key, '1');
+            }
+        },
+    }"
     class="fi-topbar-item relative"
     style="display: flex; align-items: center;"
 >
@@ -118,10 +127,12 @@
             $alertReadRoute = $panel === 'verification'
                 ? route('admin.verification-notifications.read', $alertNotification)
                 : route('clinic.verification-notifications.read', $alertNotification);
+            $alertDismissKey = 'verification-alert-dismissed:' . $panel . ':' . $alertNotification->getKey();
         @endphp
 
         <div
             x-cloak
+            x-init="alertOpen = localStorage.getItem(@js($alertDismissKey)) !== '1'"
             x-show="alertOpen"
             x-transition.opacity.scale.origin.top.right
             style="position: fixed; right: 24px; top: 92px; z-index: 70; width: min(26rem, calc(100vw - 2rem)); overflow: hidden; border-radius: 24px; border: 1px solid #fecaca; background: linear-gradient(135deg, #fff7ed 0%, #fef2f2 100%); box-shadow: 0 28px 64px rgba(15, 23, 42, 0.16);"
@@ -133,7 +144,7 @@
                         <div style="margin-top: 4px; font-size: 18px; font-weight: 800; color: #0f172a;">{{ $alertNotification->title }}</div>
                     </div>
 
-                    <button type="button" x-on:click="alertOpen = false" style="border: 0; background: transparent; font-size: 20px; line-height: 1; color: #64748b;">&times;</button>
+                    <button type="button" x-on:click="dismissAlert(@js($alertDismissKey))" style="border: 0; background: transparent; font-size: 20px; line-height: 1; color: #64748b;">&times;</button>
                 </div>
 
                 <div style="margin-top: 10px; font-size: 14px; line-height: 1.6; color: #334155;">
@@ -141,8 +152,8 @@
                 </div>
 
                 <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button type="button" x-on:click="alertOpen = false" style="border-radius: 12px; border: 1px solid #dbe4ee; background: #ffffff; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #0f172a;">Dismiss</button>
-                    <form method="POST" action="{{ $alertReadRoute }}">
+                    <button type="button" x-on:click="dismissAlert(@js($alertDismissKey))" style="border-radius: 12px; border: 1px solid #dbe4ee; background: #ffffff; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #0f172a;">Dismiss</button>
+                    <form method="POST" action="{{ $alertReadRoute }}" x-on:submit="dismissAlert(@js($alertDismissKey))">
                         @csrf
                         <button type="submit" style="border-radius: 12px; background: #dc2626; padding: 10px 14px; font-size: 13px; font-weight: 700; color: #ffffff;">Mark read</button>
                     </form>
