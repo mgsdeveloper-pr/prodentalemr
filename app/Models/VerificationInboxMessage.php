@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -11,6 +12,7 @@ use Illuminate\Support\Str;
 class VerificationInboxMessage extends Model
 {
     protected $fillable = [
+        'clinic_id',
         'mailbox_uid',
         'folder_name',
         'folder_type',
@@ -41,6 +43,7 @@ class VerificationInboxMessage extends Model
     protected function casts(): array
     {
         return [
+            'clinic_id' => 'integer',
             'to_emails' => 'array',
             'cc_emails' => 'array',
             'bcc_emails' => 'array',
@@ -60,6 +63,11 @@ class VerificationInboxMessage extends Model
     public function attachments(): HasMany
     {
         return $this->hasMany(VerificationInboxAttachment::class);
+    }
+
+    public function clinic(): BelongsTo
+    {
+        return $this->belongsTo(Clinic::class);
     }
 
     public function senderLabel(): string

@@ -6,19 +6,22 @@
 
     <div style="display: flex; flex-direction: column; gap: 24px;">
         <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden;">
-            <div style="padding: 22px 24px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap;">
+            <div class="verification-inbox-header" style="padding: 22px 24px; border-bottom: 1px solid #edf2f7; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: flex-start; gap: 18px;">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
-                        Shared Mailbox
+                        Clinic Inbox
                     </div>
                     <div>
                         <h2 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">Inbox</h2>
                         <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.75; color: #64748b;">
-                            Review inbox and spam together, surface portal OTP emails quickly, and keep a synced operations trail for the verification team.
+                            Review inbox and spam together, surface portal OTP emails quickly, and keep a synced operations trail for the selected clinic scope.
+                        </p>
+                        <p style="margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #0f172a;">
+                            Scope: {{ \App\Support\AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics' }}
                         </p>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
+                <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end; justify-self: end;">
                     <div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid {{ $status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca') }}; background: {{ $status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2') }}; color: {{ $status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c') }};">
                         <span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span>
                         <span style="font-size: 13px; font-weight: 800;">{{ $status['label'] }}</span>
@@ -182,6 +185,12 @@
     </div>
 
     <style>
+        @media (max-width: 980px) {
+            .verification-inbox-header {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+        }
+
         @media (max-width: 1180px) {
             .verification-inbox-shell {
                 grid-template-columns: minmax(0, 1fr) !important;

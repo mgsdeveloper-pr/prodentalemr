@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Pages;
 
 use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMessage;
+use App\Support\AdminClinicScope;
 use App\Support\VerificationInboxService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -65,7 +66,7 @@ class VerificationInbox extends Page
 
     public function refreshInbox(VerificationInboxService $service): void
     {
-        $result = $service->sync(force: true);
+        $result = $service->sync(force: true, clinicId: AdminClinicScope::selectedClinicId());
 
         Notification::make()
             ->title($result['ok'] ? 'Inbox refreshed' : 'Inbox refresh failed')
@@ -112,7 +113,7 @@ class VerificationInbox extends Page
 
     public function getFolderCounts(): array
     {
-        $base = VerificationInboxMessage::query();
+        $base = $this->query();
 
         return [
             'all' => (clone $base)->count(),
@@ -124,23 +125,27 @@ class VerificationInbox extends Page
 
     public function getSummary(): array
     {
-        $attachmentBytes = (int) VerificationInboxAttachment::query()->sum('file_size');
-        $settings = app(VerificationInboxService::class)->settings();
+        $messageIds = $this->query()->pluck('id');
+        $attachmentBytes = (int) VerificationInboxAttachment::query()
+            ->whereIn('verification_inbox_message_id', $messageIds)
+            ->sum('file_size');
+        $mailbox = app(VerificationInboxService::class)->mailbox(AdminClinicScope::selectedClinicId());
 
         return [
-            'messages' => VerificationInboxMessage::query()->count(),
-            'unread' => VerificationInboxMessage::query()->where('is_read', false)->count(),
-            'attachments' => VerificationInboxAttachment::query()->count(),
+            'messages' => $messageIds->count(),
+            'unread' => (clone $this->query())->where('is_read', false)->count(),
+            'attachments' => VerificationInboxAttachment::query()->whereIn('verification_inbox_message_id', $messageIds)->count(),
             'storage' => $attachmentBytes > 0 ? number_format($attachmentBytes / 1048576, 2) . ' MB' : '0 MB',
-            'last_sync' => $settings->verification_inbox_last_synced_at?->format('d M Y, h:i A') ?? 'Not synced yet',
-            'last_cleanup' => $settings->verification_inbox_last_cleanup_at?->format('d M Y, h:i A') ?? 'Not cleaned yet',
+            'last_sync' => $mailbox?->verification_inbox_last_synced_at?->format('d M Y, h:i A') ?? 'Not synced yet',
+            'last_cleanup' => $mailbox?->verification_inbox_last_cleanup_at?->format('d M Y, h:i A') ?? 'Not cleaned yet',
         ];
     }
 
     public function getConnectionStatus(): array
     {
         $service = app(VerificationInboxService::class);
-        $settings = $service->settings();
+        $selectedClinicId = AdminClinicScope::selectedClinicId();
+        $mailbox = $service->mailbox($selectedClinicId);
 
         if (! $service->imapAvailable()) {
             return [
@@ -150,26 +155,42 @@ class VerificationInbox extends Page
             ];
         }
 
-        if (! $service->isConfigured()) {
+        if (! $selectedClinicId) {
             return [
                 'tone' => 'warning',
-                'label' => 'Mailbox not configured',
-                'description' => 'Open Inbox Configuration and add the shared mailbox connection details.',
+                'label' => 'All assigned clinics',
+                'description' => 'Select a clinic in the workspace to manage a specific mailbox, or refresh to sync all accessible clinic mailboxes.',
             ];
         }
 
-        if (! $settings->verification_inbox_enabled) {
+        if (! $mailbox) {
+            return [
+                'tone' => 'warning',
+                'label' => 'Clinic mailbox not configured',
+                'description' => 'Open Inbox Configuration and add mailbox details for this clinic.',
+            ];
+        }
+
+        if (! $service->isConfigured($selectedClinicId)) {
+            return [
+                'tone' => 'warning',
+                'label' => 'Mailbox not configured',
+                'description' => 'Open Inbox Configuration and add this clinic mailbox connection details.',
+            ];
+        }
+
+        if (! $mailbox->verification_inbox_enabled) {
             return [
                 'tone' => 'warning',
                 'label' => 'Sync disabled',
-                'description' => 'Mailbox settings are saved, but sync is currently disabled.',
+                'description' => 'This clinic mailbox is saved, but sync is currently disabled.',
             ];
         }
 
         return [
             'tone' => 'success',
             'label' => 'Mailbox ready',
-            'description' => 'Inbox and Spam can be refreshed into the synced workspace from this screen.',
+            'description' => 'Inbox and Spam for this clinic can be refreshed into the synced workspace from this screen.',
         ];
     }
 
@@ -185,7 +206,7 @@ class VerificationInbox extends Page
 
     protected function query(): Builder
     {
-        return VerificationInboxMessage::query()
+        $query = AdminClinicScope::apply(VerificationInboxMessage::query(), 'clinic_id')
             ->when($this->folderFilter === VerificationInboxService::FOLDER_INBOX, fn (Builder $query) => $query->where('folder_type', VerificationInboxService::FOLDER_INBOX))
             ->when($this->folderFilter === VerificationInboxService::FOLDER_SPAM, fn (Builder $query) => $query->where('folder_type', VerificationInboxService::FOLDER_SPAM))
             ->when($this->readFilter === 'unread', fn (Builder $query) => $query->where('is_read', false))
@@ -199,5 +220,7 @@ class VerificationInbox extends Page
                         ->orWhere('snippet', 'like', '%' . $this->search . '%');
                 });
             });
+
+        return $query;
     }
 }

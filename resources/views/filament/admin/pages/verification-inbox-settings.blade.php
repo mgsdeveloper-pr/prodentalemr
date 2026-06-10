@@ -13,12 +13,15 @@
                 <div style="padding: 22px 24px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                     <div style="display: flex; flex-direction: column; gap: 12px;">
                         <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
-                            Shared Mailbox
+                            Clinic Mailbox
                         </div>
                         <div>
                             <h2 style="margin: 0; font-size: 30px; font-weight: 800; color: #0f172a;">Inbox Configuration</h2>
                             <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                                Connect the shared mailbox used for portal registration emails, MFA codes, and payer notices. Set the sync cadence, cleanup policy, and "do not delete" behavior here.
+                                Connect the mailbox used for portal registration emails, MFA codes, and payer notices for the selected clinic. Set the sync cadence, cleanup policy, and "do not delete" behavior here.
+                            </p>
+                            <p style="margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #0f172a;">
+                                Current clinic: {{ $this->getSelectedClinicLabel() }}
                             </p>
                         </div>
                     </div>

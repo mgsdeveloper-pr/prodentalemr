@@ -2,8 +2,9 @@
 
 namespace App\Filament\Admin\Pages;
 
-use App\Models\SaasSetting;
+use App\Models\VerificationInboxMailbox;
 use App\Support\VerificationInboxService;
+use App\Support\AdminClinicScope;
 use App\Support\VerificationSettingsNavigation;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -40,7 +41,7 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public ?array $data = [];
 
-    protected ?SaasSetting $settings = null;
+    protected ?VerificationInboxMailbox $settings = null;
 
     public static function canAccess(): bool
     {
@@ -54,10 +55,12 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->settings = $this->getSettingsRecord();
-        $state = $this->settings->only($this->settingKeys());
-        $state['verification_inbox_password'] = '';
-        $this->form->fill($state);
+        if ($this->selectedClinicId()) {
+            $this->settings = $this->getSettingsRecord();
+            $state = $this->settings->only($this->settingKeys());
+            $state['verification_inbox_password'] = '';
+            $this->form->fill($state);
+        }
     }
 
     public function form(Schema $schema): Schema
@@ -66,7 +69,7 @@ class VerificationInboxSettings extends Page implements HasForms
             ->statePath('data')
             ->components([
                 Section::make('Mailbox Connection')
-                    ->description('Connect the shared verification mailbox used for OTP codes, portal registration emails, and payer notices.')
+                    ->description('Connect the verification mailbox used for OTP codes, portal registration emails, and payer notices for the selected clinic.')
                     ->schema([
                         Grid::make(2)->schema([
                             Toggle::make('verification_inbox_enabled')
@@ -182,6 +185,10 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function save(): void
     {
+        if (! $this->ensureClinicSelected()) {
+            return;
+        }
+
         $state = $this->form->getState();
         $password = $state['verification_inbox_password'] ?? null;
 
@@ -198,15 +205,19 @@ class VerificationInboxSettings extends Page implements HasForms
 
         Notification::make()
             ->title('Inbox configuration saved')
-            ->body('Mailbox connection details, sync behavior, and cleanup rules have been updated.')
+            ->body('Mailbox connection details, sync behavior, and cleanup rules have been updated for the selected clinic.')
             ->success()
             ->send();
     }
 
     public function testConnection(VerificationInboxService $service): void
     {
+        if (! $this->ensureClinicSelected()) {
+            return;
+        }
+
         $this->saveDraftState();
-        $result = $service->testConnection();
+        $result = $service->testConnection($this->selectedClinicId());
 
         Notification::make()
             ->title($result['ok'] ? 'Mailbox connection verified' : 'Mailbox connection failed')
@@ -217,8 +228,12 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function syncNow(VerificationInboxService $service): void
     {
+        if (! $this->ensureClinicSelected()) {
+            return;
+        }
+
         $this->saveDraftState();
-        $result = $service->sync(force: true);
+        $result = $service->sync(force: true, clinicId: $this->selectedClinicId());
 
         Notification::make()
             ->title($result['ok'] ? 'Inbox sync finished' : 'Inbox sync failed')
@@ -226,13 +241,17 @@ class VerificationInboxSettings extends Page implements HasForms
             ->{$result['ok'] ? 'success' : 'danger'}()
             ->send();
 
-        $this->settings = SaasSetting::current();
+        $this->settings = $this->getSettingsRecord()->fresh();
     }
 
     public function runCleanup(VerificationInboxService $service): void
     {
+        if (! $this->ensureClinicSelected()) {
+            return;
+        }
+
         $this->saveDraftState();
-        $result = $service->cleanup();
+        $result = $service->cleanup($this->selectedClinicId());
 
         Notification::make()
             ->title($result['ok'] ? 'Inbox cleanup finished' : 'Inbox cleanup skipped')
@@ -240,7 +259,7 @@ class VerificationInboxSettings extends Page implements HasForms
             ->{$result['ok'] ? 'success' : 'warning'}()
             ->send();
 
-        $this->settings = SaasSetting::current();
+        $this->settings = $this->getSettingsRecord()->fresh();
     }
 
     public function getVerificationNavItems(): array
@@ -250,11 +269,17 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function getStorageSummary(): array
     {
+        $clinicId = $this->selectedClinicId();
+
         return [
-            'messages' => \App\Models\VerificationInboxMessage::query()->count(),
-            'attachments' => \App\Models\VerificationInboxAttachment::query()->count(),
-            'last_sync' => $this->getSettingsRecord()->verification_inbox_last_synced_at?->format('d M Y, h:i A') ?? 'Not synced yet',
-            'last_cleanup' => $this->getSettingsRecord()->verification_inbox_last_cleanup_at?->format('d M Y, h:i A') ?? 'Not cleaned yet',
+            'messages' => $clinicId ? \App\Models\VerificationInboxMessage::query()->where('clinic_id', $clinicId)->count() : 0,
+            'attachments' => $clinicId
+                ? \App\Models\VerificationInboxAttachment::query()
+                    ->whereHas('message', fn ($query) => $query->where('clinic_id', $clinicId))
+                    ->count()
+                : 0,
+            'last_sync' => $clinicId ? ($this->getSettingsRecord()->verification_inbox_last_synced_at?->format('d M Y, h:i A') ?? 'Not synced yet') : 'Select clinic first',
+            'last_cleanup' => $clinicId ? ($this->getSettingsRecord()->verification_inbox_last_cleanup_at?->format('d M Y, h:i A') ?? 'Not cleaned yet') : 'Select clinic first',
         ];
     }
 
@@ -272,9 +297,14 @@ class VerificationInboxSettings extends Page implements HasForms
         $this->settings = $settings->fresh();
     }
 
-    protected function getSettingsRecord(): SaasSetting
+    public function getSelectedClinicLabel(): string
     {
-        return $this->settings ??= SaasSetting::current();
+        return AdminClinicScope::selectedClinic()?->clinic_name ?? 'Select clinic in workspace';
+    }
+
+    protected function getSettingsRecord(): VerificationInboxMailbox
+    {
+        return $this->settings ??= app(VerificationInboxService::class)->mailbox($this->selectedClinicId(), createIfMissing: true);
     }
 
     protected function settingKeys(): array
@@ -300,5 +330,25 @@ class VerificationInboxSettings extends Page implements HasForms
             'verification_inbox_preserve_flagged',
             'verification_inbox_auto_cleanup_enabled',
         ];
+    }
+
+    protected function selectedClinicId(): ?int
+    {
+        return AdminClinicScope::selectedClinicId();
+    }
+
+    protected function ensureClinicSelected(): bool
+    {
+        if ($this->selectedClinicId()) {
+            return true;
+        }
+
+        Notification::make()
+            ->title('Select a clinic first')
+            ->body('Choose a clinic from the workspace switcher before updating inbox configuration.')
+            ->warning()
+            ->send();
+
+        return false;
     }
 }

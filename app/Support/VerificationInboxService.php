@@ -2,24 +2,38 @@
 
 namespace App\Support;
 
-use App\Models\SaasSetting;
 use App\Models\VerificationInboxAttachment;
+use App\Models\VerificationInboxMailbox;
 use App\Models\VerificationInboxMessage;
 use Carbon\Carbon;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use RuntimeException;
 
 class VerificationInboxService
 {
     public const FOLDER_INBOX = 'inbox';
     public const FOLDER_SPAM = 'spam';
 
-    public function settings(): SaasSetting
+    public function mailbox(?int $clinicId = null, bool $createIfMissing = false): ?VerificationInboxMailbox
     {
-        return SaasSetting::current();
+        $clinicId ??= AdminClinicScope::selectedClinicId();
+
+        if (! filled($clinicId)) {
+            return null;
+        }
+
+        $mailbox = VerificationInboxMailbox::query()
+            ->where('clinic_id', (int) $clinicId)
+            ->first();
+
+        if ($mailbox || ! $createIfMissing) {
+            return $mailbox;
+        }
+
+        return VerificationInboxMailbox::query()->create(
+            VerificationInboxMailbox::defaultState((int) $clinicId)
+        );
     }
 
     public function imapAvailable(): bool
@@ -27,16 +41,17 @@ class VerificationInboxService
         return function_exists('imap_open');
     }
 
-    public function isConfigured(): bool
+    public function isConfigured(?int $clinicId = null): bool
     {
-        $settings = $this->settings();
+        $mailbox = $this->mailbox($clinicId);
 
-        return filled($settings->verification_inbox_host)
-            && filled($settings->verification_inbox_username)
-            && filled($settings->verification_inbox_password);
+        return $mailbox instanceof VerificationInboxMailbox
+            && filled($mailbox->verification_inbox_host)
+            && filled($mailbox->verification_inbox_username)
+            && filled($mailbox->verification_inbox_password);
     }
 
-    public function testConnection(): array
+    public function testConnection(?int $clinicId = null): array
     {
         if (! $this->imapAvailable()) {
             return [
@@ -45,15 +60,23 @@ class VerificationInboxService
             ];
         }
 
-        if (! $this->isConfigured()) {
+        $mailbox = $this->mailbox($clinicId);
+
+        if (! $mailbox) {
+            return [
+                'ok' => false,
+                'message' => 'Select a clinic from the workspace first.',
+            ];
+        }
+
+        if (! $this->isConfigured((int) $mailbox->clinic_id)) {
             return [
                 'ok' => false,
                 'message' => 'Inbox host, username, and password are required before testing the connection.',
             ];
         }
 
-        $settings = $this->settings();
-        $connection = $this->openMailbox((string) $settings->verification_inbox_folder_inbox);
+        $connection = $this->openMailbox($mailbox, (string) $mailbox->verification_inbox_folder_inbox);
 
         if (! $connection) {
             return [
@@ -62,31 +85,21 @@ class VerificationInboxService
             ];
         }
 
-        $mailboxes = @imap_list($connection, $this->mailboxRoot(), '*') ?: [];
+        $mailboxes = @imap_list($connection, $this->mailboxRoot($mailbox), '*') ?: [];
         @imap_close($connection);
 
         return [
             'ok' => true,
             'message' => 'Mailbox connection verified successfully.',
             'mailboxes' => array_values(array_map(
-                fn ($mailbox): string => Str::after((string) $mailbox, $this->mailboxRoot()),
+                fn ($value): string => Str::after((string) $value, $this->mailboxRoot($mailbox)),
                 $mailboxes
             )),
         ];
     }
 
-    public function sync(bool $force = false): array
+    public function sync(bool $force = false, ?int $clinicId = null): array
     {
-        $settings = $this->settings();
-
-        if (! $settings->verification_inbox_enabled) {
-            return [
-                'ok' => false,
-                'skipped' => true,
-                'message' => 'Inbox sync is disabled in Inbox Configuration.',
-            ];
-        }
-
         if (! $this->imapAvailable()) {
             return [
                 'ok' => false,
@@ -94,18 +107,14 @@ class VerificationInboxService
             ];
         }
 
-        if (! $this->isConfigured()) {
+        $mailboxes = $this->targetMailboxes($clinicId);
+
+        if ($mailboxes === []) {
             return [
                 'ok' => false,
-                'message' => 'Inbox connection details are incomplete.',
-            ];
-        }
-
-        if (! $force && ! $this->shouldSyncNow()) {
-            return [
-                'ok' => true,
-                'skipped' => true,
-                'message' => 'Inbox sync is not due yet.',
+                'message' => filled($clinicId) || AdminClinicScope::selectedClinicId()
+                    ? 'This clinic does not have an inbox mailbox configured yet.'
+                    : 'No clinic-specific inbox mailboxes are available for the current scope.',
             ];
         }
 
@@ -115,91 +124,83 @@ class VerificationInboxService
             'created' => 0,
             'updated' => 0,
             'attachments' => 0,
+            'mailboxes' => 0,
             'message' => 'Inbox sync completed successfully.',
         ];
 
-        foreach ($this->folderMap() as $folderType => $folderName) {
-            $connection = $this->openMailbox($folderName);
+        foreach ($mailboxes as $mailbox) {
+            $result = $this->syncMailbox($mailbox, $force);
 
-            if (! $connection) {
-                return [
-                    'ok' => false,
-                    'message' => $this->lastImapError() ?: "Unable to open the {$folderType} mailbox.",
-                ];
+            if (! ($result['ok'] ?? false)) {
+                return $result;
             }
 
-            $searchCriteria = $this->buildSearchCriteria();
-            $uids = @imap_search($connection, $searchCriteria, SE_UID) ?: [];
-            rsort($uids);
-
-            foreach ($uids as $uid) {
-                $result = $this->syncMessage($connection, (string) $folderName, (string) $folderType, (string) $uid);
-
-                $stats['synced']++;
-                $stats['attachments'] += $result['attachments'];
-                $stats[$result['status']]++;
-            }
-
-            @imap_close($connection);
+            $stats['mailboxes']++;
+            $stats['synced'] += (int) ($result['synced'] ?? 0);
+            $stats['created'] += (int) ($result['created'] ?? 0);
+            $stats['updated'] += (int) ($result['updated'] ?? 0);
+            $stats['attachments'] += (int) ($result['attachments'] ?? 0);
         }
-
-        $settings->forceFill([
-            'verification_inbox_last_synced_at' => now(),
-        ])->save();
 
         return $stats;
     }
 
-    public function cleanup(): array
+    public function cleanup(?int $clinicId = null): array
     {
-        $settings = $this->settings();
+        $mailboxes = $this->targetMailboxes($clinicId, onlyEnabled: false)
+            ->filter(fn (VerificationInboxMailbox $mailbox): bool => (bool) $mailbox->verification_inbox_auto_cleanup_enabled)
+            ->values();
 
-        if (! $settings->verification_inbox_auto_cleanup_enabled) {
+        if ($mailboxes->isEmpty()) {
             return [
                 'ok' => false,
                 'skipped' => true,
-                'message' => 'Inbox cleanup is disabled in Inbox Configuration.',
+                'message' => 'No clinic mailbox currently has scheduled cleanup enabled.',
             ];
         }
 
         $deletedMessages = 0;
         $deletedAttachments = 0;
 
-        $inboxQuery = VerificationInboxMessage::query()
-            ->where('folder_type', self::FOLDER_INBOX)
-            ->where('is_protected', false);
+        foreach ($mailboxes as $mailbox) {
+            $inboxQuery = VerificationInboxMessage::query()
+                ->where('clinic_id', $mailbox->clinic_id)
+                ->where('folder_type', self::FOLDER_INBOX)
+                ->where('is_protected', false);
 
-        $spamQuery = VerificationInboxMessage::query()
-            ->where('folder_type', self::FOLDER_SPAM)
-            ->where('is_protected', false);
+            $spamQuery = VerificationInboxMessage::query()
+                ->where('clinic_id', $mailbox->clinic_id)
+                ->where('folder_type', self::FOLDER_SPAM)
+                ->where('is_protected', false);
 
-        if ($settings->verification_inbox_preserve_flagged) {
-            $inboxQuery->where('is_flagged', false);
-            $spamQuery->where('is_flagged', false);
+            if ($mailbox->verification_inbox_preserve_flagged) {
+                $inboxQuery->where('is_flagged', false);
+                $spamQuery->where('is_flagged', false);
+            }
+
+            if ($mailbox->verification_inbox_retention_mode === 'days') {
+                $cutoff = now()->subDays((int) $mailbox->verification_inbox_retention_days);
+                $deletedMessages += $this->deleteMessages((clone $inboxQuery)->where('received_at', '<', $cutoff), $deletedAttachments);
+            } elseif ($mailbox->verification_inbox_retention_mode === 'count') {
+                $keep = max(0, (int) $mailbox->verification_inbox_keep_latest_count);
+                $idsToDelete = (clone $inboxQuery)
+                    ->orderByDesc('received_at')
+                    ->skip($keep)
+                    ->pluck('id');
+
+                $deletedMessages += $this->deleteMessages(
+                    VerificationInboxMessage::query()->whereIn('id', $idsToDelete),
+                    $deletedAttachments
+                );
+            }
+
+            $spamCutoff = now()->subDays((int) $mailbox->verification_inbox_spam_retention_days);
+            $deletedMessages += $this->deleteMessages((clone $spamQuery)->where('received_at', '<', $spamCutoff), $deletedAttachments);
+
+            $mailbox->forceFill([
+                'verification_inbox_last_cleanup_at' => now(),
+            ])->save();
         }
-
-        if ($settings->verification_inbox_retention_mode === 'days') {
-            $cutoff = now()->subDays((int) $settings->verification_inbox_retention_days);
-            $deletedMessages += $this->deleteMessages((clone $inboxQuery)->where('received_at', '<', $cutoff), $deletedAttachments);
-        } elseif ($settings->verification_inbox_retention_mode === 'count') {
-            $keep = max(0, (int) $settings->verification_inbox_keep_latest_count);
-            $idsToDelete = (clone $inboxQuery)
-                ->orderByDesc('received_at')
-                ->skip($keep)
-                ->pluck('id');
-
-            $deletedMessages += $this->deleteMessages(
-                VerificationInboxMessage::query()->whereIn('id', $idsToDelete),
-                $deletedAttachments
-            );
-        }
-
-        $spamCutoff = now()->subDays((int) $settings->verification_inbox_spam_retention_days);
-        $deletedMessages += $this->deleteMessages((clone $spamQuery)->where('received_at', '<', $spamCutoff), $deletedAttachments);
-
-        $settings->forceFill([
-            'verification_inbox_last_cleanup_at' => now(),
-        ])->save();
 
         return [
             'ok' => true,
@@ -209,21 +210,128 @@ class VerificationInboxService
         ];
     }
 
-    public function shouldSyncNow(): bool
+    public function shouldSyncNow(VerificationInboxMailbox $mailbox): bool
     {
-        $settings = $this->settings();
-        $lastSyncedAt = $settings->verification_inbox_last_synced_at;
+        $lastSyncedAt = $mailbox->verification_inbox_last_synced_at;
 
         if (! $lastSyncedAt) {
             return true;
         }
 
         return Carbon::parse($lastSyncedAt)
-            ->addMinutes((int) $settings->verification_inbox_sync_frequency_minutes)
+            ->addMinutes((int) $mailbox->verification_inbox_sync_frequency_minutes)
             ->isPast();
     }
 
-    protected function syncMessage($connection, string $folderName, string $folderType, string $uid): array
+    protected function targetMailboxes(?int $clinicId = null, bool $onlyEnabled = true)
+    {
+        $query = VerificationInboxMailbox::query();
+
+        if ($onlyEnabled) {
+            $query->where('verification_inbox_enabled', true);
+        }
+
+        if (filled($clinicId)) {
+            return $query->where('clinic_id', (int) $clinicId)->get();
+        }
+
+        if (auth()->check()) {
+            $selectedClinicId = AdminClinicScope::selectedClinicId();
+
+            if (filled($selectedClinicId)) {
+                return $query->where('clinic_id', (int) $selectedClinicId)->get();
+            }
+
+            $user = auth()->user();
+
+            if (! $user?->hasFullVerificationClinicAccess()) {
+                $accessibleClinicIds = $user?->verificationAccessibleClinicIds() ?? [];
+
+                if ($accessibleClinicIds === []) {
+                    return collect();
+                }
+
+                $query->whereIn('clinic_id', $accessibleClinicIds);
+            }
+
+            return $query->get();
+        }
+
+        return $query->get();
+    }
+
+    protected function syncMailbox(VerificationInboxMailbox $mailbox, bool $force = false): array
+    {
+        if (! $mailbox->verification_inbox_enabled) {
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'message' => 'Inbox sync is disabled for this clinic mailbox.',
+                'synced' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'attachments' => 0,
+            ];
+        }
+
+        if (! $this->isConfigured((int) $mailbox->clinic_id)) {
+            return [
+                'ok' => false,
+                'message' => 'Inbox connection details are incomplete for clinic ID ' . $mailbox->clinic_id . '.',
+            ];
+        }
+
+        if (! $force && ! $this->shouldSyncNow($mailbox)) {
+            return [
+                'ok' => true,
+                'skipped' => true,
+                'message' => 'Inbox sync is not due yet.',
+                'synced' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'attachments' => 0,
+            ];
+        }
+
+        $stats = [
+            'ok' => true,
+            'synced' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'attachments' => 0,
+        ];
+
+        foreach ($this->folderMap($mailbox) as $folderType => $folderName) {
+            $connection = $this->openMailbox($mailbox, $folderName);
+
+            if (! $connection) {
+                return [
+                    'ok' => false,
+                    'message' => $this->lastImapError() ?: "Unable to open the {$folderType} mailbox for clinic ID {$mailbox->clinic_id}.",
+                ];
+            }
+
+            $uids = @imap_search($connection, $this->buildSearchCriteria($mailbox), SE_UID) ?: [];
+            rsort($uids);
+
+            foreach ($uids as $uid) {
+                $result = $this->syncMessage($mailbox, $connection, (string) $folderName, (string) $folderType, (string) $uid);
+                $stats['synced']++;
+                $stats['attachments'] += $result['attachments'];
+                $stats[$result['status']]++;
+            }
+
+            @imap_close($connection);
+        }
+
+        $mailbox->forceFill([
+            'verification_inbox_last_synced_at' => now(),
+        ])->save();
+
+        return $stats + ['message' => 'Inbox sync completed successfully.'];
+    }
+
+    protected function syncMessage(VerificationInboxMailbox $mailbox, $connection, string $folderName, string $folderType, string $uid): array
     {
         $overviewItems = @imap_fetch_overview($connection, $uid, FT_UID) ?: [];
         $overview = $overviewItems[0] ?? null;
@@ -249,11 +357,13 @@ class VerificationInboxService
         $parsed = $this->extractBodyAndAttachments($connection, $uid, $structure);
 
         $payload = [
+            'clinic_id' => $mailbox->clinic_id,
             'mailbox_uid' => $uid,
             'folder_name' => $folderName,
             'folder_type' => $folderType,
             'external_message_id' => filled($overview->message_id ?? null) ? trim((string) $overview->message_id, '<>') : null,
             'message_hash' => sha1(implode('|', [
+                $mailbox->clinic_id,
                 $folderName,
                 $uid,
                 $subject,
@@ -281,6 +391,7 @@ class VerificationInboxService
         ];
 
         $message = VerificationInboxMessage::query()->firstOrNew([
+            'clinic_id' => $mailbox->clinic_id,
             'folder_name' => $folderName,
             'mailbox_uid' => $uid,
         ]);
@@ -356,7 +467,6 @@ class VerificationInboxService
 
         $parameters = $this->collectParameters($structure);
         $content = $this->fetchDecodedPart($connection, $uid, $currentPartNumber, (int) ($structure->encoding ?? 0));
-
         $isAttachment = isset($parameters['filename']) || isset($parameters['name']) || strtolower((string) ($structure->disposition ?? '')) === 'attachment';
 
         if ($isAttachment) {
@@ -453,7 +563,7 @@ class VerificationInboxService
         $safeName = Str::slug(pathinfo((string) $attachment['file_name'], PATHINFO_FILENAME));
         $extension = pathinfo((string) $attachment['file_name'], PATHINFO_EXTENSION);
         $extension = $extension !== '' ? '.' . $extension : '';
-        $path = 'verification-inbox/' . $message->id . '/' . $safeName . '-' . Str::random(8) . $extension;
+        $path = 'verification-inbox/' . ($message->clinic_id ?: 'shared') . '/' . $message->id . '/' . $safeName . '-' . Str::random(8) . $extension;
 
         Storage::disk('verification_inbox')->put($path, $attachment['content']);
 
@@ -462,7 +572,7 @@ class VerificationInboxService
 
     protected function deleteMessages($query, int &$deletedAttachments): int
     {
-        $messages = $query->get();
+        $messages = $query->with('attachments')->get();
 
         foreach ($messages as $message) {
             foreach ($message->attachments as $attachment) {
@@ -496,9 +606,7 @@ class VerificationInboxService
 
         return [
             'name' => filled($address->personal ?? null) ? $this->decodeMimeHeader((string) $address->personal) : null,
-            'email' => ($mailbox && $host && $host !== '.SYNTAX-ERROR.')
-                ? $mailbox . '@' . $host
-                : null,
+            'email' => ($mailbox && $host && $host !== '.SYNTAX-ERROR.') ? $mailbox . '@' . $host : null,
         ];
     }
 
@@ -538,48 +646,42 @@ class VerificationInboxService
 
         $segments = @imap_mime_header_decode($value) ?: [];
 
-        return trim(collect($segments)
-            ->map(fn ($segment) => $segment->text ?? '')
-            ->implode(''));
+        return trim(collect($segments)->map(fn ($segment) => $segment->text ?? '')->implode(''));
     }
 
-    protected function folderMap(): array
+    protected function folderMap(VerificationInboxMailbox $mailbox): array
     {
-        $settings = $this->settings();
-
         return array_filter([
-            self::FOLDER_INBOX => $settings->verification_inbox_folder_inbox ?: 'INBOX',
-            self::FOLDER_SPAM => $settings->verification_inbox_folder_spam ?: null,
+            self::FOLDER_INBOX => $mailbox->verification_inbox_folder_inbox ?: 'INBOX',
+            self::FOLDER_SPAM => $mailbox->verification_inbox_folder_spam ?: null,
         ]);
     }
 
-    protected function buildSearchCriteria(): string
+    protected function buildSearchCriteria(VerificationInboxMailbox $mailbox): string
     {
-        $days = max(1, (int) $this->settings()->verification_inbox_sync_window_days);
+        $days = max(1, (int) $mailbox->verification_inbox_sync_window_days);
 
         return 'SINCE "' . now()->subDays($days)->format('d-M-Y') . '"';
     }
 
-    protected function openMailbox(string $folderName)
+    protected function openMailbox(VerificationInboxMailbox $mailbox, string $folderName)
     {
         return @imap_open(
-            $this->mailboxPath($folderName),
-            (string) $this->settings()->verification_inbox_username,
-            (string) $this->settings()->verification_inbox_password
+            $this->mailboxPath($mailbox, $folderName),
+            (string) $mailbox->verification_inbox_username,
+            (string) $mailbox->verification_inbox_password
         );
     }
 
-    protected function mailboxRoot(): string
+    protected function mailboxRoot(VerificationInboxMailbox $mailbox): string
     {
-        return $this->mailboxPath('');
+        return $this->mailboxPath($mailbox, '');
     }
 
-    protected function mailboxPath(string $folderName): string
+    protected function mailboxPath(VerificationInboxMailbox $mailbox, string $folderName): string
     {
-        $settings = $this->settings();
-        $flags = ['/' . ($settings->verification_inbox_protocol ?: 'imap')];
-
-        $encryption = strtolower((string) $settings->verification_inbox_encryption);
+        $flags = ['/' . ($mailbox->verification_inbox_protocol ?: 'imap')];
+        $encryption = strtolower((string) $mailbox->verification_inbox_encryption);
 
         if ($encryption === 'ssl') {
             $flags[] = '/ssl';
@@ -587,13 +689,13 @@ class VerificationInboxService
             $flags[] = '/tls';
         }
 
-        if (! $settings->verification_inbox_validate_certificate) {
+        if (! $mailbox->verification_inbox_validate_certificate) {
             $flags[] = '/novalidate-cert';
         }
 
-        $port = $settings->verification_inbox_port ?: 993;
+        $port = $mailbox->verification_inbox_port ?: 993;
 
-        return '{' . $settings->verification_inbox_host . ':' . $port . implode('', $flags) . '}' . $folderName;
+        return '{' . $mailbox->verification_inbox_host . ':' . $port . implode('', $flags) . '}' . $folderName;
     }
 
     protected function lastImapError(): ?string
