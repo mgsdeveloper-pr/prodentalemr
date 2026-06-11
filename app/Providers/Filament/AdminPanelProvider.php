@@ -5,9 +5,12 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\VerificationClinicAssignments;
 use App\Filament\Admin\Pages\RolesAndPermissions;
+use App\Filament\Admin\Pages\UserMailboxPage;
+use App\Filament\Admin\Pages\UserMailboxSettingsPage;
 use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
 use App\Filament\Admin\Pages\VerificationInbox;
+use App\Filament\Admin\Pages\VerificationUnassignedPatients;
 use App\Filament\Admin\Pages\VerificationInboxSettings;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationNotificationCentre;
@@ -70,11 +73,19 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make()->label('Dashboard'),
-                NavigationGroup::make()->label('Operations'),
-                NavigationGroup::make()->label('Reports'),
+                NavigationGroup::make()->label('Verifications'),
                 NavigationGroup::make()->label('Access Management'),
+                NavigationGroup::make()->label('Reports'),
                 NavigationGroup::make()->label('Settings'),
             ])
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
+                fn (): string => view('filament.admin.partials.sidebar-greeting')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
+                fn (): string => view('filament.admin.partials.sidebar-toggle')->render(),
+            )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
                 fn (): string => view('filament.admin.partials.clinic-scope-switcher', [
@@ -104,6 +115,9 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                UserMailboxPage::class,
+                UserMailboxSettingsPage::class,
+                VerificationUnassignedPatients::class,
                 VerificationNotificationControl::class,
                 VerificationInbox::class,
                 VerificationInboxSettings::class,

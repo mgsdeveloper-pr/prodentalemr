@@ -39,15 +39,6 @@
         background: linear-gradient(90deg, rgba(245, 158, 11, 0.22) 0%, rgba(148, 163, 184, 0.4) 52%, rgba(245, 158, 11, 0.12) 100%);
     }
 
-    .admin-workspace-scope-wrap__section {
-        margin: 0 0 0.65rem;
-        padding: 0 0.15rem;
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        color: #94a3b8;
-    }
-
     .admin-workspace-scope__eyebrow {
         display: inline-flex;
         align-items: center;
@@ -69,17 +60,19 @@
         box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16);
     }
 
-    .admin-workspace-scope__title {
-        margin: 0;
-        font-size: 0.96rem;
-        font-weight: 700;
-        color: #0f172a;
-    }
-
     .admin-workspace-scope__hint {
-        margin: 0.25rem 0 0.8rem;
+        margin: 0 0 0.8rem;
         font-size: 0.8rem;
         line-height: 1.35;
+        color: #64748b;
+    }
+
+    .admin-workspace-scope__field-label {
+        display: inline-flex;
+        margin-bottom: 0.45rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
         color: #64748b;
     }
 
@@ -122,20 +115,13 @@
         background: linear-gradient(90deg, rgba(250, 204, 21, 0.22) 0%, rgba(71, 85, 105, 0.75) 52%, rgba(250, 204, 21, 0.12) 100%);
     }
 
-    html.dark .admin-workspace-scope-wrap__section {
-        color: #64748b;
-    }
-
     html.dark .admin-workspace-scope__eyebrow {
         color: #f8d17d;
     }
 
-    html.dark .admin-workspace-scope__title {
-        color: #f8fafc;
-    }
-
     html.dark .admin-workspace-scope__hint,
-    html.dark .admin-workspace-scope__status {
+    html.dark .admin-workspace-scope__status,
+    html.dark .admin-workspace-scope__field-label {
         color: #94a3b8;
     }
 
@@ -151,16 +137,14 @@
 </style>
 
 <div class="admin-workspace-scope-wrap">
-    <div class="admin-workspace-scope-wrap__section">Workspace</div>
-
     <form method="GET" action="{{ route('admin.clinic-scope') }}" class="admin-workspace-scope">
-        <div class="admin-workspace-scope__eyebrow">Workspace</div>
-        <h3 class="admin-workspace-scope__title">Clinic Scope</h3>
+        <div class="admin-workspace-scope__eyebrow">Clinic Scope</div>
         <p class="admin-workspace-scope__hint">{!! $scopeHint !!}</p>
 
         <input type="hidden" name="redirect" value="{{ url()->full() }}">
 
-        <select name="clinic_id" class="admin-workspace-scope__select" onchange="this.form.submit()">
+        <label class="admin-workspace-scope__field-label" for="verification-clinic-scope-select">Select Clinic</label>
+        <select id="verification-clinic-scope-select" name="clinic_id" class="admin-workspace-scope__select" onchange="this.form.submit()">
             @if ($showAllClinicsOption)
                 <option value="">All Clinics</option>
             @endif

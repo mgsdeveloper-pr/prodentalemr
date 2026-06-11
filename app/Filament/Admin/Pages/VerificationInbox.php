@@ -17,11 +17,11 @@ class VerificationInbox extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-inbox-stack';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Operations';
+    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
 
-    protected static ?string $navigationLabel = 'Inbox';
+    protected static ?string $navigationLabel = 'Clinic Inbox';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $title = '';
 

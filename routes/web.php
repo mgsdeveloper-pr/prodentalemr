@@ -14,6 +14,8 @@ use App\Http\Controllers\Clinic\VerificationRequestSampleController;
 use App\Http\Controllers\Verification\VerificationNotificationActionController;
 use App\Http\Controllers\Verification\VerificationInboxAttachmentController;
 use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
+use App\Http\Controllers\Verification\UserMailboxAttachmentController;
+use App\Http\Controllers\Verification\UserMailboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationAttentionQueueExportController;
 use App\Http\Controllers\Verification\VerificationAuditTrailController;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
@@ -87,6 +89,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/verification/notifications/read-all', [VerificationNotificationActionController::class, 'markAllRead'])->defaults('panel', 'verification')->name('admin.verification-notifications.read-all');
     Route::get('/verification/inbox/attachments/{attachment}/download', VerificationInboxAttachmentController::class)->name('admin.verification-inbox-attachments.download');
     Route::get('/verification/inbox/messages/{message}/preview', VerificationInboxMessagePreviewController::class)->name('admin.verification-inbox-messages.preview');
+    Route::get('/verification/mailbox/attachments/download', UserMailboxAttachmentController::class)->name('admin.user-mailbox-attachments.download');
+    Route::get('/verification/mailbox/messages/preview', UserMailboxMessagePreviewController::class)->name('admin.user-mailbox-messages.preview');
     Route::get('/clinic/verification-requests/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForClinic'])->name('clinic.verification-requests.pdf.download');
     Route::get('/clinic/verification-requests/{billingWorkItem}/preview', [VerificationResultPdfController::class, 'previewForClinic'])->name('clinic.verification-requests.pdf.preview');
     Route::get('/clinic/billing-work-item-attachments/{attachment}/download', [ClinicBillingWorkItemAttachmentController::class, 'download'])->name('clinic.billing-work-item-attachments.download');

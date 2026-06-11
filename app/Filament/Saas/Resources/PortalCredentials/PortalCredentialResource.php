@@ -35,9 +35,9 @@ class PortalCredentialResource extends Resource
 
     protected static ?string $navigationLabel = 'Portal Credentials';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Operations';
+    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 4;
 
     public static function form(Schema $schema): Schema
     {

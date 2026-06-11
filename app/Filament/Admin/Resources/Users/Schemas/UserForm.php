@@ -40,8 +40,8 @@ class UserForm
                     ->multiple()
                     ->searchable()
                     ->preload()
-                    ->visible(fn (Get $get): bool => in_array($get('selected_role'), ['verification_manager', 'verification_user'], true))
-                    ->required(fn (Get $get): bool => in_array($get('selected_role'), ['verification_manager', 'verification_user'], true))
+                    ->visible(fn (Get $get): bool => filled($get('selected_role')) && User::isVerificationRole($get('selected_role')) && $get('selected_role') !== 'verification_admin')
+                    ->required(fn (Get $get): bool => filled($get('selected_role')) && User::isVerificationRole($get('selected_role')) && $get('selected_role') !== 'verification_admin')
                     ->columnSpanFull(),
                 TextInput::make('password')
                     ->label('Password')
