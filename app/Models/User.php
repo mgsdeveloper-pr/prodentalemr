@@ -12,9 +12,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
@@ -116,6 +119,11 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ->withTimestamps();
     }
 
+    public function mailbox(): HasOne
+    {
+        return $this->hasOne(UserMailbox::class);
+    }
+
     public static function saasRoleOptions(): array
     {
         return self::SAAS_ROLE_LABELS;
@@ -128,7 +136,24 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public static function verificationRoleOptions(): array
     {
-        return self::VERIFICATION_ROLE_LABELS;
+        $roles = Role::query()
+            ->where('guard_name', 'web')
+            ->where('name', 'like', 'verification\_%')
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+
+        $options = self::VERIFICATION_ROLE_LABELS;
+
+        foreach ($roles as $role) {
+            $options[$role] ??= Str::of($role)
+                ->after('verification_')
+                ->replace('_', ' ')
+                ->headline()
+                ->toString();
+        }
+
+        return $options;
     }
 
     public static function verificationPanelAccessRoleOptions(): array
@@ -160,7 +185,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public static function isVerificationRole(?string $role): bool
     {
-        return filled($role) && array_key_exists($role, self::VERIFICATION_ROLE_LABELS);
+        return filled($role) && Str::startsWith($role, 'verification_');
     }
 
     public function getPrimaryRoleName(): ?string
@@ -173,7 +198,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         $role = $this->getPrimaryRoleName();
 
         return self::SAAS_ROLE_LABELS[$role]
-            ?? self::VERIFICATION_ROLE_LABELS[$role]
+            ?? self::verificationRoleOptions()[$role]
             ?? self::CLINIC_ROLE_LABELS[$role]
             ?? $role;
     }
@@ -316,23 +341,25 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function verificationAssignableRoleOptions(): array
     {
+        $verificationRoles = self::verificationRoleOptions();
+
         if (! $this->status) {
             return [];
         }
 
         if ($this->isSaasAdmin()) {
-            return self::verificationRoleOptions();
+            return $verificationRoles;
         }
 
         if ($this->isVerificationAdmin()) {
-            return collect(self::verificationRoleOptions())
+            return collect($verificationRoles)
                 ->except('verification_admin')
                 ->all();
         }
 
         if ($this->isVerificationManager()) {
             return [
-                'verification_user' => self::VERIFICATION_ROLE_LABELS['verification_user'],
+                'verification_user' => $verificationRoles['verification_user'] ?? 'Verification User',
             ];
         }
 

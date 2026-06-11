@@ -57,7 +57,9 @@ class ListUsers extends ListRecords
                     $actor = auth()->user();
                     $user = User::query()
                         ->whereKey((int) $data['user_id'])
-                        ->whereHas('roles', fn ($query) => $query->whereIn('name', ['verification_manager', 'verification_user']))
+                        ->whereHas('roles', fn ($query) => $query
+                            ->whereIn('name', array_keys(User::verificationRoleOptions()))
+                            ->where('name', '!=', 'verification_admin'))
                         ->firstOrFail();
 
                     abort_unless(UserResource::canManageRecord($user), 403);
@@ -90,7 +92,7 @@ class ListUsers extends ListRecords
     {
         return UserResource::getEloquentQuery()
             ->get()
-            ->filter(fn (User $user): bool => in_array($user->getPrimaryRoleName(), ['verification_manager', 'verification_user'], true))
+            ->filter(fn (User $user): bool => User::isVerificationRole($user->getPrimaryRoleName()) && $user->getPrimaryRoleName() !== 'verification_admin')
             ->mapWithKeys(function (User $user): array {
                 $role = $user->getPrimaryRoleLabel() ?: 'Verification User';
 

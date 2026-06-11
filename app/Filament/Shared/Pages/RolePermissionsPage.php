@@ -17,6 +17,10 @@ abstract class RolePermissionsPage extends Page
 
     public array $matrix = [];
 
+    public bool $showCreateRoleModal = false;
+
+    public string $newRoleName = '';
+
     abstract protected static function panelKey(): string;
 
     abstract protected static function panelLabel(): string;
@@ -58,6 +62,20 @@ abstract class RolePermissionsPage extends Page
         return ! $this->isProtectedRole($this->selectedRole);
     }
 
+    public function openCreateRoleModal(): void
+    {
+        $this->resetValidation();
+        $this->newRoleName = '';
+        $this->showCreateRoleModal = true;
+    }
+
+    public function closeCreateRoleModal(): void
+    {
+        $this->resetValidation();
+        $this->newRoleName = '';
+        $this->showCreateRoleModal = false;
+    }
+
     public function getVisibleModulesProperty(): Collection
     {
         return collect(PanelPermissionMatrix::modules(static::panelKey()))
@@ -73,6 +91,41 @@ abstract class RolePermissionsPage extends Page
     public function getActionLabelsProperty(): array
     {
         return PanelPermissionMatrix::ACTIONS;
+    }
+
+    public function getNewRoleKeyPreviewProperty(): string
+    {
+        return $this->normalizedRoleName($this->newRoleName ?: 'new role');
+    }
+
+    public function createRole(): void
+    {
+        $this->validate([
+            'newRoleName' => ['required', 'string', 'min:3', 'max:80'],
+        ]);
+
+        $roleName = $this->normalizedRoleName($this->newRoleName);
+
+        if (array_key_exists($roleName, $this->getRoleOptions())) {
+            $this->addError('newRoleName', 'A verification role with that name already exists.');
+
+            return;
+        }
+
+        Role::query()->create([
+            'name' => $roleName,
+            'guard_name' => 'web',
+        ]);
+
+        $this->selectedRole = $roleName;
+        $this->loadPermissions();
+        $this->closeCreateRoleModal();
+
+        Notification::make()
+            ->title('Role created')
+            ->body('The new role is ready. You can now set its permissions below.')
+            ->success()
+            ->send();
     }
 
     public function savePermissions(): void
@@ -190,5 +243,27 @@ abstract class RolePermissionsPage extends Page
             'verification' => $role === 'verification_admin',
             default => false,
         };
+    }
+
+    protected function normalizedRoleName(string $label): string
+    {
+        $prefix = static::panelKey() . '_';
+        $slug = Str::of($label)
+            ->trim()
+            ->replaceMatches('/[^A-Za-z0-9]+/', ' ')
+            ->slug('_')
+            ->value();
+
+        $slug = Str::of($slug)->ltrim('_')->value();
+
+        if (blank($slug)) {
+            return $prefix . 'role';
+        }
+
+        if (! Str::startsWith($slug, $prefix)) {
+            $slug = $prefix . $slug;
+        }
+
+        return $slug;
     }
 }

@@ -62,7 +62,7 @@ class UserResource extends Resource
         }
 
         if ($user?->isVerificationAdmin()) {
-            return $query->whereHas('roles', fn (Builder $roleQuery): Builder => $roleQuery->whereIn('name', ['verification_manager', 'verification_user']));
+            return $query->whereHas('roles', fn (Builder $roleQuery): Builder => $roleQuery->where('name', '!=', 'verification_admin'));
         }
 
         if ($user?->isVerificationManager()) {
@@ -144,7 +144,7 @@ class UserResource extends Resource
         }
 
         if ($user->isVerificationAdmin()) {
-            return in_array($recordRole, ['verification_manager', 'verification_user'], true);
+            return $recordRole !== 'verification_admin';
         }
 
         if ($user->isVerificationManager()) {
