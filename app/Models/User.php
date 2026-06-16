@@ -259,6 +259,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
         if ($this->hasFullVerificationClinicAccess()) {
             return Clinic::query()
+                ->where('verification_services_enabled', true)
                 ->whereHas('serviceEnrollments', function ($query): void {
                     $query
                         ->where('status', 'active')
@@ -271,6 +272,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         }
 
         return $this->verificationClinics()
+            ->where('verification_services_enabled', true)
             ->whereHas('serviceEnrollments', function ($query): void {
                 $query
                     ->where('status', 'active')
@@ -289,7 +291,10 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         }
 
         if ($this->hasFullVerificationClinicAccess()) {
-            return true;
+            return Clinic::query()
+                ->whereKey($clinicId)
+                ->where('verification_services_enabled', true)
+                ->exists();
         }
 
         return in_array((int) $clinicId, $this->verificationAccessibleClinicIds(), true);
@@ -303,6 +308,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
         return Clinic::query()
             ->with('organization')
+            ->where('verification_services_enabled', true)
             ->whereHas('serviceEnrollments', function ($query): void {
                 $query
                     ->where('status', 'active')
@@ -386,6 +392,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function canManageClinicVerificationSettings(): bool
     {
         return $this->status
+            && $this->clinicServiceModuleEnabled('verification_requests')
             && $this->hasAnyRole([
                 'saas_admin',
                 'clinic_admin',
@@ -408,6 +415,10 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return false;
         }
 
+        if (! $this->clinicServiceModuleEnabled($module)) {
+            return false;
+        }
+
         if ($this->isSaasAdmin()) {
             return $this->hasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, 'view'));
         }
@@ -415,6 +426,87 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return filled($this->organization_id)
             && filled($this->clinic_id)
             && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, 'view'));
+    }
+
+    protected function clinicServiceModuleEnabled(string $module): bool
+    {
+        $clinic = $this->serviceGateClinic();
+
+        if (! $clinic instanceof Clinic) {
+            return $this->shouldBypassClinicScope();
+        }
+
+        if (in_array($module, self::verificationClinicModules(), true)) {
+            return $clinic->hasVerificationServices();
+        }
+
+        if (in_array($module, self::clinicOperationsModules(), true)) {
+            return $clinic->hasClinicOperations();
+        }
+
+        if (in_array($module, self::sharedClinicModules(), true)) {
+            return $clinic->hasVerificationServices() || $clinic->hasClinicOperations();
+        }
+
+        return true;
+    }
+
+    protected function hasAnyEnabledClinicService(): bool
+    {
+        $clinic = $this->serviceGateClinic();
+
+        if (! $clinic instanceof Clinic) {
+            return $this->shouldBypassClinicScope();
+        }
+
+        return $clinic->hasVerificationServices() || $clinic->hasClinicOperations();
+    }
+
+    protected function serviceGateClinic(): ?Clinic
+    {
+        if ($this->shouldBypassClinicScope()) {
+            return \App\Support\ClinicPanelScope::selectedClinic();
+        }
+
+        return $this->clinic;
+    }
+
+    protected static function verificationClinicModules(): array
+    {
+        return [
+            'verification_requests',
+            'portal_credentials',
+            'insurance_directory',
+            'managed_services',
+        ];
+    }
+
+    protected static function clinicOperationsModules(): array
+    {
+        return [
+            'patients',
+            'providers',
+            'appointments',
+            'encounters',
+            'treatment_plans',
+            'clinic_services',
+            'dental_chart_entries',
+            'perio_charts',
+            'patient_documents',
+            'patient_insurance_policies',
+            'patient_ledger_entries',
+            'patient_insurance_claims',
+            'patient_statements',
+            'clinic_operatories',
+            'patient_consent_forms',
+        ];
+    }
+
+    protected static function sharedClinicModules(): array
+    {
+        return [
+            'users',
+        ];
     }
 
     public function shouldBypassClinicScope(): bool
@@ -1091,7 +1183,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
                 'doctor',
                 'receptionist',
                 'staff',
-            ]),
+            ]) && $this->hasAnyEnabledClinicService(),
             default => false,
         };
     }

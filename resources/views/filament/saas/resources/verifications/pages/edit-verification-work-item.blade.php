@@ -963,6 +963,31 @@
         </div>
     @endif
 
+    @if ($this->openInfoRequestModalOnLoad && $showInfoRequestField)
+        <script>
+            (function () {
+                const openRequestModal = function () {
+                    openWorkflowModal('info-request-modal');
+
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('request_clinic');
+                    window.history.replaceState({}, document.title, url.toString());
+                };
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', openRequestModal, { once: true });
+                } else {
+                    setTimeout(openRequestModal, 60);
+                }
+
+                document.addEventListener('livewire:navigated', function handleNavigation() {
+                    openRequestModal();
+                    document.removeEventListener('livewire:navigated', handleNavigation);
+                });
+            })();
+        </script>
+    @endif
+
     <div id="reference-viewer-modal" style="position: fixed; inset: 0; z-index: 85; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">
         <div style="position: relative; width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">
@@ -1152,17 +1177,7 @@
         }
 
         document.addEventListener('click', function (event) {
-            const infoModal = document.getElementById('info-request-modal');
-            const reworkModal = document.getElementById('rework-reason-modal');
             const referenceModal = document.getElementById('reference-viewer-modal');
-
-            if (infoModal && event.target === infoModal) {
-                closeWorkflowModal('info-request-modal');
-            }
-
-            if (reworkModal && event.target === reworkModal) {
-                closeWorkflowModal('rework-reason-modal');
-            }
 
             if (referenceModal && event.target === referenceModal) {
                 closeReferenceViewerModal();

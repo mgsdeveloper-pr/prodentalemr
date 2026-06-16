@@ -35,6 +35,7 @@ class EditVerificationWorkItem extends EditRecord
     protected array $verificationFormAnswerData = [];
     public array $clinicResponseAttachments = [];
     public bool $auditReady = false;
+    public bool $openInfoRequestModalOnLoad = false;
     protected bool $shouldSkipWorkflowSyncOnSave = false;
 
     public function mount(int|string $record): void
@@ -46,6 +47,10 @@ class EditVerificationWorkItem extends EditRecord
             'user_name' => auth()->user()?->name,
             'status' => $this->record->normalized_status,
         ]);
+
+        $this->openInfoRequestModalOnLoad = request()->boolean('request_clinic')
+            && ($this->canRequestClinicInfo()
+                || $this->record->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
     }
 
     public function getTitle(): string
@@ -742,7 +747,7 @@ class EditVerificationWorkItem extends EditRecord
             $this->record->refresh();
         }
 
-        if ($targetStatus !== BillingWorkItem::STATUS_IN_PROGRESS || $this->record->normalized_status !== BillingWorkItem::STATUS_IN_PROGRESS) {
+        if ($this->record->normalized_status !== $targetStatus) {
             $this->record->transitionStatus($targetStatus);
         }
 

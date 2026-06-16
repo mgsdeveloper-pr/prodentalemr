@@ -9,6 +9,7 @@ use App\Filament\Admin\Pages\UserMailboxPage;
 use App\Filament\Admin\Pages\UserMailboxSettingsPage;
 use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
+use App\Filament\Admin\Pages\VerificationRequestResponse;
 use App\Filament\Admin\Pages\VerificationInbox;
 use App\Filament\Admin\Pages\VerificationUnassignedPatients;
 use App\Filament\Admin\Pages\VerificationInboxSettings;
@@ -118,6 +119,7 @@ class AdminPanelProvider extends PanelProvider
                 UserMailboxPage::class,
                 UserMailboxSettingsPage::class,
                 VerificationUnassignedPatients::class,
+                VerificationRequestResponse::class,
                 VerificationNotificationControl::class,
                 VerificationInbox::class,
                 VerificationInboxSettings::class,
