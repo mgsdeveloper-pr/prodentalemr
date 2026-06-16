@@ -98,6 +98,7 @@ class AdminClinicScope
     public static function managedServiceClinicQuery(): Builder
     {
         return Clinic::query()
+            ->where('verification_services_enabled', true)
             ->whereHas('serviceEnrollments', function (Builder $query): void {
                 $query
                     ->where('status', 'active')

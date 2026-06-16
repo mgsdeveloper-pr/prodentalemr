@@ -18,6 +18,7 @@ use App\Http\Controllers\Verification\UserMailboxAttachmentController;
 use App\Http\Controllers\Verification\UserMailboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationAttentionQueueExportController;
 use App\Http\Controllers\Verification\VerificationAuditTrailController;
+use App\Http\Controllers\Verification\VerificationRequestResponseExportController;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
 use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
 use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
@@ -84,6 +85,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/verifications/{billingWorkItem}/audit', [VerificationAuditTrailController::class, 'downloadForAdmin'])->name('admin.verifications.audit.download');
     Route::get('/verification/attention-queue/export/excel', [VerificationAttentionQueueExportController::class, 'excel'])->name('admin.verification-attention-queue.export.excel');
     Route::get('/verification/attention-queue/export/pdf', [VerificationAttentionQueueExportController::class, 'pdf'])->name('admin.verification-attention-queue.export.pdf');
+    Route::get('/verification/request-response/export', VerificationRequestResponseExportController::class)->name('admin.verification-request-response.export');
     Route::get('/verification/notifications/{notification}/open', [VerificationNotificationActionController::class, 'open'])->defaults('panel', 'verification')->name('admin.verification-notifications.open');
     Route::post('/verification/notifications/{notification}/read', [VerificationNotificationActionController::class, 'markRead'])->defaults('panel', 'verification')->name('admin.verification-notifications.read');
     Route::post('/verification/notifications/read-all', [VerificationNotificationActionController::class, 'markAllRead'])->defaults('panel', 'verification')->name('admin.verification-notifications.read-all');

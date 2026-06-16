@@ -29,6 +29,12 @@ class ClinicInfolist
                                 IconEntry::make('status')
                                     ->label('Active')
                                     ->boolean(),
+                                IconEntry::make('verification_services_enabled')
+                                    ->label('Verification Services')
+                                    ->boolean(),
+                                IconEntry::make('clinic_operations_enabled')
+                                    ->label('Clinic Operations')
+                                    ->boolean(),
                                 TextEntry::make('clinic_code')
                                     ->label('Clinic code')
                                     ->badge()

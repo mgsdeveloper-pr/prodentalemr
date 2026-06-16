@@ -20,6 +20,8 @@ class Clinic extends Model
         'clinic_code',
         'timezone',
         'status',
+        'verification_services_enabled',
+        'clinic_operations_enabled',
         'verification_pdf_output_mode',
         'verification_pdf_output_sections',
         'verification_pdf_output_question_ids',
@@ -29,9 +31,21 @@ class Clinic extends Model
     {
         return [
             'status' => 'boolean',
+            'verification_services_enabled' => 'boolean',
+            'clinic_operations_enabled' => 'boolean',
             'verification_pdf_output_sections' => 'array',
             'verification_pdf_output_question_ids' => 'array',
         ];
+    }
+
+    public function hasVerificationServices(): bool
+    {
+        return (bool) $this->verification_services_enabled;
+    }
+
+    public function hasClinicOperations(): bool
+    {
+        return (bool) $this->clinic_operations_enabled;
     }
 
     public function organization(): BelongsTo

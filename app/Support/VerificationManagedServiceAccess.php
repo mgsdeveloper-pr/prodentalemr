@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\ClientServiceEnrollment;
+use App\Models\Clinic;
 
 class VerificationManagedServiceAccess
 {
@@ -17,6 +18,13 @@ class VerificationManagedServiceAccess
     public static function clinicHasActiveVerificationService(?int $clinicId, ?int $organizationId): bool
     {
         if (! $clinicId || ! $organizationId) {
+            return false;
+        }
+
+        if (! Clinic::query()
+            ->whereKey($clinicId)
+            ->where('verification_services_enabled', true)
+            ->exists()) {
             return false;
         }
 
