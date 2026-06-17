@@ -80,8 +80,16 @@ class SaasPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('User Management'),
             ])
             ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
+                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
+                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.saas.partials.sidebar-theme')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-theme')->render(),
             )
             ->resources([
                 OrganizationResource::class,

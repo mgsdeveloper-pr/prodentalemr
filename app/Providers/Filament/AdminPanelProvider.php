@@ -82,11 +82,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
-                fn (): string => view('filament.admin.partials.sidebar-greeting')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_LOGO_AFTER,
-                fn (): string => view('filament.admin.partials.sidebar-toggle')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
@@ -96,7 +96,7 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.admin.partials.sidebar-theme')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-theme')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,

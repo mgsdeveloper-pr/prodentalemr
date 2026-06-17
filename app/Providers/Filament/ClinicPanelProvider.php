@@ -79,6 +79,14 @@ class ClinicPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Settings'),
             ])
             ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
+                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
+                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
+            )
+            ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
                 fn (): string => view('filament.clinic.partials.clinic-scope-switcher', [
                     'clinicOptions' => \App\Support\ClinicPanelScope::clinicOptions(),
@@ -86,7 +94,7 @@ class ClinicPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.clinic.partials.sidebar-theme')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-theme')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,
