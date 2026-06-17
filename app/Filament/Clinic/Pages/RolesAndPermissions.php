@@ -13,9 +13,9 @@ class RolesAndPermissions extends RolePermissionsPage
 
     protected static string|UnitEnum|null $navigationGroup = 'Access Management';
 
-    protected static ?string $navigationLabel = 'Roles & Permissions';
+    protected static ?string $navigationLabel = 'Role & Permission';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $slug = 'roles-permissions';
 
@@ -38,6 +38,7 @@ class RolesAndPermissions extends RolePermissionsPage
         return $user?->status
             && filled($user?->organization_id)
             && filled($user?->clinic_id)
-            && $user->hasRole('clinic_admin');
+            && $user->hasRole('clinic_admin')
+            && ($user->canAccessClinicModule('roles_permissions') ?? false);
     }
 }

@@ -3,14 +3,17 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Clinic\Widgets\ClinicAccountWidget;
+use App\Filament\Clinic\Pages\Dashboard;
+use App\Filament\Clinic\Pages\VerificationRequestResponse;
 use App\Filament\Clinic\Pages\VerificationNotificationCentre;
+use App\Http\Middleware\EnsureClinicWorkspaceSelected;
 use App\Http\Middleware\PanelAuthenticateRedirect;
+use App\Support\ClinicWorkspace;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -29,8 +32,27 @@ class ClinicPanelProvider extends PanelProvider
         return $panel
             ->id('clinic')
             ->path('clinic')
+            ->homeUrl(fn (): string => ClinicWorkspace::homeUrl(ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) ?: ClinicWorkspace::CLINIC_PMS))
             ->userMenu()
             ->userMenuItems([
+                'choose_workspace' => MenuItem::make()
+                    ->label('Choose Workspace')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedSquares2x2)
+                    ->url(fn (): string => route('clinic.choose-workspace'))
+                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()))
+                    ->sort(850),
+                'switch_to_verification' => MenuItem::make()
+                    ->label('Go to Verification Zone')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedClipboardDocumentCheck)
+                    ->url(fn (): string => route('clinic.switch-workspace', ['workspace' => ClinicWorkspace::VERIFICATION]))
+                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::VERIFICATION)
+                    ->sort(860),
+                'switch_to_clinic_pms' => MenuItem::make()
+                    ->label('Go to Clinic PMS')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2)
+                    ->url(fn (): string => route('clinic.switch-workspace', ['workspace' => ClinicWorkspace::CLINIC_PMS]))
+                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::CLINIC_PMS)
+                    ->sort(870),
                 'logout' => MenuItem::make()->hidden(),
                 'sign_out' => MenuItem::make()
                     ->label('Sign out')
@@ -42,6 +64,8 @@ class ClinicPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->navigationGroups([
+                NavigationGroup::make()->label('Dashboard'),
+                NavigationGroup::make()->label('Verifications'),
                 NavigationGroup::make()->label('Scheduling'),
                 NavigationGroup::make()->label('Clinical Records'),
                 NavigationGroup::make()->label('Dental Charting'),
@@ -75,6 +99,7 @@ class ClinicPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Clinic/Pages'), for: 'App\Filament\Clinic\Pages')
             ->pages([
                 Dashboard::class,
+                VerificationRequestResponse::class,
                 VerificationNotificationCentre::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Clinic/Widgets'), for: 'App\Filament\Clinic\Widgets')
@@ -94,6 +119,7 @@ class ClinicPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 PanelAuthenticateRedirect::class,
+                EnsureClinicWorkspaceSelected::class,
             ]);
     }
 }

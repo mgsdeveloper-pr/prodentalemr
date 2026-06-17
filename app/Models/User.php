@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\PanelPermissionMatrix;
+use App\Support\ClinicWorkspace;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -437,18 +438,21 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         }
 
         if (in_array($module, self::verificationClinicModules(), true)) {
-            return $clinic->hasVerificationServices();
+            return $clinic->hasVerificationServices()
+                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
         if (in_array($module, self::clinicOperationsModules(), true)) {
-            return $clinic->hasClinicOperations();
+            return $clinic->hasClinicOperations()
+                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
         if (in_array($module, self::sharedClinicModules(), true)) {
-            return $clinic->hasVerificationServices() || $clinic->hasClinicOperations();
+            return ($clinic->hasVerificationServices() || $clinic->hasClinicOperations())
+                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
-        return true;
+        return ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
     }
 
     protected function hasAnyEnabledClinicService(): bool
@@ -474,38 +478,21 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     protected static function verificationClinicModules(): array
     {
         return [
-            'verification_requests',
-            'portal_credentials',
-            'insurance_directory',
-            'managed_services',
+            ...ClinicWorkspace::verificationModules(),
         ];
     }
 
     protected static function clinicOperationsModules(): array
     {
         return [
-            'patients',
-            'providers',
-            'appointments',
-            'encounters',
-            'treatment_plans',
-            'clinic_services',
-            'dental_chart_entries',
-            'perio_charts',
-            'patient_documents',
-            'patient_insurance_policies',
-            'patient_ledger_entries',
-            'patient_insurance_claims',
-            'patient_statements',
-            'clinic_operatories',
-            'patient_consent_forms',
+            ...ClinicWorkspace::clinicPmsModules(),
         ];
     }
 
     protected static function sharedClinicModules(): array
     {
         return [
-            'users',
+            ...ClinicWorkspace::sharedModules(),
         ];
     }
 

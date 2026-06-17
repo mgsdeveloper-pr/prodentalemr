@@ -6,6 +6,7 @@ use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Controllers\Admin\AdminClinicScopeController;
 use App\Http\Controllers\Auth\PanelLogoutController;
 use App\Http\Controllers\Clinic\BillingWorkItemAttachmentController as ClinicBillingWorkItemAttachmentController;
+use App\Http\Controllers\Clinic\ChooseWorkspaceController;
 use App\Http\Controllers\Clinic\PatientFinancialDocumentController;
 use App\Http\Controllers\Clinic\ClinicPanelScopeController;
 use App\Http\Controllers\Clinic\PatientConsentFormController;
@@ -55,6 +56,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('admin.signout.perform')]))->name('admin.signout');
     Route::get('/verification/clinic-scope', AdminClinicScopeController::class)->name('admin.clinic-scope');
     Route::get('/clinic/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('clinic.signout.perform')]))->name('clinic.signout');
+    Route::get('/choose-workspace', [ChooseWorkspaceController::class, 'show'])->name('clinic.choose-workspace');
+    Route::get('/choose-workspace/{workspace}', [ChooseWorkspaceController::class, 'switch'])
+        ->whereIn('workspace', [\App\Support\ClinicWorkspace::VERIFICATION, \App\Support\ClinicWorkspace::CLINIC_PMS])
+        ->name('clinic.switch-workspace');
     Route::get('/clinic/clinic-scope', ClinicPanelScopeController::class)->name('clinic.clinic-scope');
     Route::get('/clinic/verification-requests/sample', VerificationRequestSampleController::class)->name('clinic.verification-requests.sample');
     Route::get('/clinic/verification-requests/{billingWorkItem}/start', function (BillingWorkItem $billingWorkItem) {

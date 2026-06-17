@@ -14,6 +14,8 @@ use UnitEnum;
 
 class VerificationNotificationCentre extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
     protected static string|UnitEnum|null $navigationGroup = 'Notifications';

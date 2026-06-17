@@ -24,6 +24,8 @@ class VerificationReports extends Page implements HasForms
 {
     use InteractsWithForms;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartBar;
 
     protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';

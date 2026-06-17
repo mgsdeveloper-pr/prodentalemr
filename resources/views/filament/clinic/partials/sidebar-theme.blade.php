@@ -23,6 +23,10 @@
         background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
     }
 
+    .fi-main.fi-width-7xl {
+        max-width: none !important;
+    }
+
     html.dark .fi-main-sidebar {
         background: linear-gradient(180deg, rgba(15, 23, 42, 0.985) 0%, rgba(17, 24, 39, 0.985) 100%);
         border-inline-end: 1px solid rgba(51, 65, 85, 0.95);

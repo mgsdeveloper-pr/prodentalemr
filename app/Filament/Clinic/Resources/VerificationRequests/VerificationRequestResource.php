@@ -29,9 +29,9 @@ class VerificationRequestResource extends Resource
 
     protected static ?string $navigationLabel = 'Insurance Verification';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'reference_number';
 
@@ -45,6 +45,11 @@ class VerificationRequestResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return 'insurance verification';
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return 'Verification List';
     }
 
     public static function form(Schema $schema): Schema

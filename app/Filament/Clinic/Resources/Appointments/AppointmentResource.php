@@ -11,6 +11,7 @@ use App\Filament\Clinic\Resources\Appointments\Schemas\AppointmentInfolist;
 use App\Filament\Clinic\Resources\Appointments\Tables\AppointmentsTable;
 use App\Models\Appointment;
 use App\Support\ClinicPanelScope;
+use App\Support\ClinicWorkspace;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -33,6 +34,25 @@ class AppointmentResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'appointment_type';
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION
+            ? 'Verifications'
+            : 'Scheduling';
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION
+            ? 'Appointment'
+            : 'Appointments';
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION ? 2 : 2;
+    }
 
     public static function form(Schema $schema): Schema
     {

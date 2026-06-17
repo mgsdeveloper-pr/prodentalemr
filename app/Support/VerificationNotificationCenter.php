@@ -424,13 +424,13 @@ class VerificationNotificationCenter
     protected static function targetUrl(string $panel, BillingWorkItem $workItem, User $recipient): ?string
     {
         if ($panel === 'verification') {
-            return VerificationWorkItemResource::getUrl('edit', ['record' => $workItem]);
+            return route('filament.admin.resources.verifications.edit', ['record' => $workItem]);
         }
 
         if (! $recipient->canPerformClinicModuleAction('verification_requests', 'update')) {
-            return VerificationRequestResource::getUrl('view', ['record' => $workItem]);
+            return route('filament.clinic.resources.verification-requests.view', ['record' => $workItem]);
         }
 
-        return VerificationRequestResource::getUrl('edit', ['record' => $workItem]);
+        return route('filament.clinic.resources.verification-requests.edit', ['record' => $workItem]);
     }
 }

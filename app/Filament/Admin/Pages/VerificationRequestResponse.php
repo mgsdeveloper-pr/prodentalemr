@@ -14,11 +14,13 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use UnitEnum;
 
 class VerificationRequestResponse extends Page
 {
+    use WithFileUploads;
     use WithPagination;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
@@ -55,6 +57,14 @@ class VerificationRequestResponse extends Page
 
     public string $requestComposerReason = '';
 
+    public bool $showResponseComposerModal = false;
+
+    public ?int $responseComposerWorkItemId = null;
+
+    public string $responseComposerNote = '';
+
+    public array $responseComposerAttachments = [];
+
     public function selectStatusFilter(string $filter): void
     {
         $this->statusFilter = in_array($filter, ['all', 'open', 'responded', 'closed'], true)
@@ -74,7 +84,12 @@ class VerificationRequestResponse extends Page
         $count = AdminClinicScope::apply(BillingWorkItem::query(), 'clinic_id')
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
             ->where('source', '!=', 'clinic_self_service')
-            ->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
+            ->where('status', '!=', BillingWorkItem::STATUS_DONE)
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->whereNotNull('clinic_responded_at')
+                    ->orWhereHas('activities', fn (Builder $activityQuery) => $activityQuery->where('activity_type', self::RESPONSE_ACTIVITY));
+            })
             ->count();
 
         return $count > 0 ? (string) $count : null;
@@ -82,7 +97,7 @@ class VerificationRequestResponse extends Page
 
     public static function getNavigationBadgeColor(): ?string
     {
-        return 'warning';
+        return 'info';
     }
 
     public function updatingSearch(): void
@@ -105,6 +120,7 @@ class VerificationRequestResponse extends Page
     {
         $this->showDetailsModal = false;
         $this->closeRequestComposer();
+        $this->closeResponseComposer();
     }
 
     public function openRequestComposer(int $workItemId): void
@@ -198,6 +214,69 @@ class VerificationRequestResponse extends Page
             : 'Request Again';
     }
 
+    public function canShowResponseShortcut(BillingWorkItem $workItem): bool
+    {
+        return false;
+    }
+
+    public function canShowResponseEdit(BillingWorkItem $workItem): bool
+    {
+        return false;
+    }
+
+    public function canCloseRequestResponse(BillingWorkItem $workItem): bool
+    {
+        $user = auth()->user();
+
+        if (! $user?->canWorkVerificationQueue()) {
+            return false;
+        }
+
+        if ($workItem->normalized_status === BillingWorkItem::STATUS_DONE) {
+            return false;
+        }
+
+        return filled($workItem->clinic_responded_at)
+            || $workItem->activities->contains(
+                fn (BillingWorkItemActivity $activity): bool => $activity->activity_type === self::RESPONSE_ACTIVITY
+            );
+    }
+
+    public function closeRequestResponse(int $workItemId): void
+    {
+        $workItem = $this->query()->findOrFail($workItemId);
+
+        abort_unless($this->canCloseRequestResponse($workItem), 403);
+
+        $workItem->transitionStatus(BillingWorkItem::STATUS_DONE);
+        $this->selectedWorkItemId = $workItem->getKey();
+        $this->showDetailsModal = false;
+
+        Notification::make()
+            ->title('Request closed')
+            ->body('The clinic response has been reviewed and moved to Closed Requests.')
+            ->success()
+            ->send();
+    }
+
+    public function openResponseComposer(int $workItemId): void
+    {
+        $workItem = $this->query()->findOrFail($workItemId);
+
+        abort_unless($this->canShowResponseShortcut($workItem) || $this->canShowResponseEdit($workItem), 403);
+    }
+
+    public function closeResponseComposer(): void
+    {
+        $this->showResponseComposerModal = false;
+        $this->responseComposerWorkItemId = null;
+        $this->responseComposerNote = '';
+        $this->responseComposerAttachments = [];
+        $this->resetErrorBag('responseComposerNote');
+        $this->resetErrorBag('responseComposerAttachments');
+        $this->resetErrorBag('responseComposerAttachments.*');
+    }
+
     protected function getHeaderActions(): array
     {
         return [];
@@ -247,7 +326,7 @@ class VerificationRequestResponse extends Page
                 'filter' => 'all',
             ],
             [
-                'label' => 'Closed Items',
+                'label' => 'Closed Requests',
                 'count' => (clone $query)->where('status', BillingWorkItem::STATUS_DONE)->count(),
                 'tone' => 'emerald',
                 'filter' => 'closed',
@@ -305,7 +384,7 @@ class VerificationRequestResponse extends Page
 
     public function getResponseHistory(BillingWorkItem $workItem): Collection
     {
-        return $workItem->activities
+        $history = $workItem->activities
             ->where('activity_type', self::RESPONSE_ACTIVITY)
             ->sortByDesc('created_at')
             ->values()
@@ -320,12 +399,36 @@ class VerificationRequestResponse extends Page
                 'target_label' => 'Verification',
                 'date' => optional($activity->created_at)->format('d M Y, h:i A') ?: '-',
             ]);
+
+        if ($history->isNotEmpty() || blank($workItem->clinic_responded_at)) {
+            return $history;
+        }
+
+        $message = trim((string) $workItem->notes);
+
+        return collect([[
+            'title' => Str::limit($message ?: 'Clinic response received', 180),
+            'message' => $message,
+            'message_label' => 'Response received',
+            'message_fallback' => 'No response note captured',
+            'actor' => 'Clinic',
+            'role' => 'Clinic',
+            'source_label' => 'Clinic',
+            'target_label' => 'Verification',
+            'date' => optional($workItem->clinic_responded_at)->format('d M Y, h:i A') ?: '-',
+        ]]);
     }
 
     public function presentRow(BillingWorkItem $workItem): array
     {
         $request = $workItem->activities->firstWhere('activity_type', self::REQUEST_ACTIVITY);
         $response = $this->resolveLatestResponse($workItem, $request);
+        $responseCount = $workItem->activities->where('activity_type', self::RESPONSE_ACTIVITY)->count();
+
+        if ($responseCount === 0 && filled($workItem->clinic_responded_at)) {
+            $responseCount = 1;
+        }
+
         $latestActivityAt = collect([$request?->created_at, $response?->created_at])->filter()->max();
         $status = $this->resolveWorkflowState($workItem, $request, $response);
         $statusStyles = match ($status['tone']) {
@@ -348,7 +451,7 @@ class VerificationRequestResponse extends Page
             'status' => $status,
             'status_styles' => $statusStyles,
             'request_count' => $workItem->activities->where('activity_type', self::REQUEST_ACTIVITY)->count(),
-            'response_count' => $workItem->activities->where('activity_type', self::RESPONSE_ACTIVITY)->count(),
+            'response_count' => $responseCount,
         ];
     }
 
@@ -359,6 +462,11 @@ class VerificationRequestResponse extends Page
                 || str_contains((string) $attachment->file_path, '\\clinic-response\\')
                 || strcasecmp((string) $attachment->title, 'Clinic response attachment') === 0)
             ->values();
+    }
+
+    public function responseAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
+    {
+        return route('saas.billing-work-item-attachments.download', $attachment);
     }
 
     public function openWorkItemUrl(BillingWorkItem $workItem): string
@@ -433,13 +541,26 @@ class VerificationRequestResponse extends Page
 
     protected function resolveLatestResponse(BillingWorkItem $workItem, ?BillingWorkItemActivity $request): ?BillingWorkItemActivity
     {
-        return $workItem->activities
+        $response = $workItem->activities
             ->where('activity_type', self::RESPONSE_ACTIVITY)
             ->when($request, fn (Collection $items) => $items->filter(
                 fn (BillingWorkItemActivity $activity): bool => optional($activity->created_at)?->greaterThanOrEqualTo($request->created_at) ?? false
             ))
             ->sortByDesc('created_at')
             ->first();
+
+        if ($response || blank($workItem->clinic_responded_at)) {
+            return $response;
+        }
+
+        $fallback = new BillingWorkItemActivity([
+            'activity_type' => self::RESPONSE_ACTIVITY,
+            'description' => 'Clinic response received',
+            'meta' => ['clinic_response_note' => $workItem->notes],
+        ]);
+        $fallback->created_at = $workItem->clinic_responded_at;
+
+        return $fallback;
     }
 
     protected function resolveWorkflowState(BillingWorkItem $workItem, ?BillingWorkItemActivity $request, ?BillingWorkItemActivity $response): array

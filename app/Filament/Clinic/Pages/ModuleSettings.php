@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Pages;
 
 use App\Filament\Shared\Pages\ModuleSettingsPage;
+use App\Support\ClinicWorkspace;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
 use UnitEnum;
@@ -31,6 +32,7 @@ class ModuleSettings extends ModuleSettingsPage
         $user = auth()->user();
 
         return $user?->status
+            && ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) !== ClinicWorkspace::VERIFICATION
             && filled($user?->organization_id)
             && filled($user?->clinic_id)
             && $user->hasRole('clinic_admin');

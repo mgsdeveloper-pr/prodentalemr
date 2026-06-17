@@ -39,9 +39,9 @@ class VerificationSettings extends Page implements HasForms
 
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
-    protected static ?string $navigationLabel = 'Verification Settings';
+    protected static ?string $navigationLabel = 'Settings';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 7;
 
     protected static ?string $title = 'Verification Settings';
 
