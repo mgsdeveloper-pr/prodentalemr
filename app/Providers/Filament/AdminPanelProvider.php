@@ -19,6 +19,7 @@ use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationSettings;
 use App\Filament\Admin\Pages\VerificationReadiness;
 use App\Filament\Admin\Pages\PortalCredentialSettings;
+use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Filament\Admin\Widgets\ManagedServicesQuickLinks;
 use App\Filament\Admin\Widgets\VerificationAttentionQueue;
@@ -105,6 +106,7 @@ class AdminPanelProvider extends PanelProvider
                 ])->render(),
             )
             ->resources([
+                AppointmentResource::class,
                 BillingWorkItemResource::class,
                 VerificationWorkItemResource::class,
                 VerificationFormQuestionResource::class,

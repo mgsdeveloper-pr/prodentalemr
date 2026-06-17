@@ -5,7 +5,7 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages;
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Pages\AppointmentCalendar;
 use App\Models\Appointment;
-use App\Support\ClinicPanelScope;
+use App\Support\AppointmentWorkspaceScope;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -35,14 +35,19 @@ class ListAppointments extends ListRecords
         return AppointmentResource::getUrl('create');
     }
 
+    public function canCreateAppointments(): bool
+    {
+        return auth()->user()?->canCreateClinicAppointments() ?? false;
+    }
+
     public function getSelectedClinicName(): ?string
     {
-        return ClinicPanelScope::selectedClinic()?->clinic_name;
+        return AppointmentWorkspaceScope::selectedClinic()?->clinic_name;
     }
 
     public function getDisplayTimezone(): string
     {
-        return ClinicPanelScope::selectedClinic()?->timezone ?: config('app.timezone', 'UTC');
+        return AppointmentWorkspaceScope::selectedClinic()?->timezone ?: config('app.timezone', 'UTC');
     }
 
     public function getAppointmentStats(): array

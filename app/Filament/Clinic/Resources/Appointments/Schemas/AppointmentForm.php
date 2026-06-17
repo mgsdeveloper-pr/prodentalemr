@@ -6,7 +6,7 @@ use App\Models\ClinicOperatory;
 use App\Models\Location;
 use App\Models\Patient;
 use App\Models\Provider;
-use App\Support\ClinicPanelScope;
+use App\Support\AppointmentWorkspaceScope;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -27,15 +27,15 @@ class AppointmentForm
         return $schema
             ->components([
                 Hidden::make('organization_id')
-                    ->default(fn () => ClinicPanelScope::selectedOrganizationId()),
+                    ->default(fn () => AppointmentWorkspaceScope::selectedOrganizationId()),
                 Hidden::make('clinic_id')
-                    ->default(fn () => ClinicPanelScope::selectedClinicId()),
+                    ->default(fn () => AppointmentWorkspaceScope::selectedClinicId()),
                 Grid::make(12)
                     ->schema([
                         Select::make('location_id')
                             ->label('Select Clinic Location')
                             ->options(fn (): array => Location::query()
-                                ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+                                ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
                                 ->orderBy('location_name')
                                 ->pluck('location_name', 'id')
                                 ->all())
@@ -49,8 +49,8 @@ class AppointmentForm
                             ->label('Select Doctor')
                             ->options(fn (): array => Provider::query()
                                 ->with('user')
-                                ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
-                                ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+                                ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+                                ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
                                 ->where('status', true)
                                 ->orderBy('id')
                                 ->get()
@@ -71,8 +71,8 @@ class AppointmentForm
                         Select::make('patient_id')
                             ->label('Select Patient')
                             ->options(fn (): array => Patient::query()
-                                ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
-                                ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+                                ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+                                ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
                                 ->orderBy('last_name')
                                 ->orderBy('first_name')
                                 ->get()
@@ -122,8 +122,8 @@ class AppointmentForm
                             ])
                             ->createOptionUsing(function (array $data, Get $get): int {
                                 return Patient::query()->create([
-                                    'organization_id' => ClinicPanelScope::selectedOrganizationId(),
-                                    'clinic_id' => ClinicPanelScope::selectedClinicId(),
+                                    'organization_id' => AppointmentWorkspaceScope::selectedOrganizationId(),
+                                    'clinic_id' => AppointmentWorkspaceScope::selectedClinicId(),
                                     'location_id' => $get('location_id'),
                                     'first_name' => $data['first_name'],
                                     'last_name' => $data['last_name'],
@@ -208,7 +208,7 @@ class AppointmentForm
                         Select::make('clinic_operatory_id')
                             ->label('Operatory / Chair')
                             ->options(fn (Get $get): array => ClinicOperatory::query()
-                                ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+                                ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
                                 ->when(filled($get('location_id')), fn ($query) => $query->where('location_id', $get('location_id')))
                                 ->where('status', true)
                                 ->orderBy('display_order')

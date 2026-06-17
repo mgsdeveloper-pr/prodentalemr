@@ -1,0 +1,4 @@
+patient_full_name,first_name,last_name,patient_dob,phone,email,pms_patient_id,appointment_date,appointment_time,service,provider_name,location_name,duration_minutes,status,notes
+Liam Bennett,Liam,Bennett,1992-08-14,555-0101,liam.bennett@example.com,PMS-1001,2026-06-25,09:30,Crown Consultation,Dr. Avery Stone,Main Office,60,scheduled,New patient consult
+Demo Patient 2,Demo,Patient 2,1988-04-22,555-0102,demo.patient2@example.com,PMS-1002,2026-06-26,14:00,Implant Follow Up,Dr. Maya Patel,Main Office,45,scheduled,Verify insurance before visit
+Jordan Smith,Jordan,Smith,1979-11-03,555-0103,jordan.smith@example.com,PMS-1003,2026-06-27,,Cleaning,Dr. Avery Stone,Hygiene Room,30,scheduled,Appointment time can be blank

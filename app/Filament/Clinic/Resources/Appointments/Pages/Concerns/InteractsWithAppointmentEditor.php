@@ -2,12 +2,11 @@
 
 namespace App\Filament\Clinic\Resources\Appointments\Pages\Concerns;
 
-use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
 use App\Models\Location;
 use App\Models\Patient;
 use App\Models\Provider;
-use App\Support\ClinicPanelScope;
+use App\Support\AppointmentWorkspaceScope;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -17,12 +16,12 @@ trait InteractsWithAppointmentEditor
 
     public function getSelectedClinicName(): string
     {
-        return ClinicPanelScope::selectedClinic()?->clinic_name ?? 'Select clinic scope';
+        return AppointmentWorkspaceScope::selectedClinic()?->clinic_name ?? 'Select clinic scope';
     }
 
     public function getDisplayTimezone(): string
     {
-        return ClinicPanelScope::selectedClinic()?->timezone ?: config('app.timezone', 'UTC');
+        return AppointmentWorkspaceScope::selectedClinic()?->timezone ?: config('app.timezone', 'UTC');
     }
 
     public function getCurrentPatientLabel(): string
@@ -122,8 +121,8 @@ trait InteractsWithAppointmentEditor
 
         $query = Appointment::query()
             ->with(['patient'])
-            ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
-            ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+            ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+            ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
             ->where('provider_id', $providerId)
             ->whereDate('appointment_date', $date)
             ->orderBy('start_time');
@@ -160,8 +159,8 @@ trait InteractsWithAppointmentEditor
         $duration = max((int) ($this->data['duration_minutes'] ?? 30), 15);
 
         $existing = Appointment::query()
-            ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
-            ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+            ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+            ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
             ->where('provider_id', $providerId)
             ->whereDate('appointment_date', $date)
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))
@@ -278,12 +277,16 @@ trait InteractsWithAppointmentEditor
 
     public function getCancelUrl(): string
     {
-        return $this->previousUrl ?: AppointmentResource::getUrl();
+        $resource = static::getResource();
+
+        return $this->previousUrl ?: $resource::getUrl();
     }
 
     public function getBackUrl(): string
     {
-        return AppointmentResource::getUrl();
+        $resource = static::getResource();
+
+        return $resource::getUrl();
     }
 
     protected function getSelectedPatient(): ?Patient
@@ -336,8 +339,8 @@ trait InteractsWithAppointmentEditor
         }
 
         return Appointment::query()
-            ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
-            ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+            ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+            ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
             ->where('provider_id', $providerId)
             ->whereBetween('appointment_date', [$from->toDateString(), $to->toDateString()])
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))

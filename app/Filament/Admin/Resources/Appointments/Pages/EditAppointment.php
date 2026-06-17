@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Filament\Clinic\Resources\Appointments\Pages;
+namespace App\Filament\Admin\Resources\Appointments\Pages;
 
-use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
+use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\Concerns\InteractsWithAppointmentEditor;
 use App\Support\AppointmentWorkspaceScope;
-use Filament\Resources\Pages\CreateRecord;
+use Filament\Actions\ViewAction;
+use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 
-class CreateAppointment extends CreateRecord
+class EditAppointment extends EditRecord
 {
     use InteractsWithAppointmentEditor;
 
@@ -18,7 +19,7 @@ class CreateAppointment extends CreateRecord
 
     protected Width | string | null $maxContentWidth = Width::Full;
 
-    protected function mutateFormDataBeforeCreate(array $data): array
+    protected function mutateFormDataBeforeSave(array $data): array
     {
         $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
         $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
@@ -36,20 +37,20 @@ class CreateAppointment extends CreateRecord
         }
 
         if ($status === 'checked_in') {
-            $data['confirmed_at'] ??= now();
+            $data['confirmed_at'] ??= $data['confirmed_at'] ?? now();
             $data['checked_in_at'] ??= now();
         }
 
         if ($status === 'in_chair') {
-            $data['confirmed_at'] ??= now();
-            $data['checked_in_at'] ??= now();
+            $data['confirmed_at'] ??= $data['confirmed_at'] ?? now();
+            $data['checked_in_at'] ??= $data['checked_in_at'] ?? now();
             $data['seated_at'] ??= now();
         }
 
         if ($status === 'completed') {
-            $data['confirmed_at'] ??= now();
-            $data['checked_in_at'] ??= now();
-            $data['seated_at'] ??= now();
+            $data['confirmed_at'] ??= $data['confirmed_at'] ?? now();
+            $data['checked_in_at'] ??= $data['checked_in_at'] ?? now();
+            $data['seated_at'] ??= $data['seated_at'] ?? now();
             $data['completed_at'] ??= now();
         }
 
@@ -58,5 +59,12 @@ class CreateAppointment extends CreateRecord
         }
 
         return $data;
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            ViewAction::make(),
+        ];
     }
 }

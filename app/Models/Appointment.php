@@ -11,6 +11,18 @@ class Appointment extends Model
 {
     use SoftDeletes;
 
+    public const VERIFICATION_STATUS_NOT_SENT = 'not_sent';
+    public const VERIFICATION_STATUS_SENT = 'sent';
+    public const VERIFICATION_STATUS_IN_PROGRESS = 'in_progress';
+    public const VERIFICATION_STATUS_COMPLETED = 'completed';
+
+    public const VERIFICATION_STATUS_OPTIONS = [
+        self::VERIFICATION_STATUS_NOT_SENT => 'Not Sent',
+        self::VERIFICATION_STATUS_SENT => 'Sent',
+        self::VERIFICATION_STATUS_IN_PROGRESS => 'In Progress',
+        self::VERIFICATION_STATUS_COMPLETED => 'Completed',
+    ];
+
     protected $fillable = [
         'organization_id',
         'clinic_id',
@@ -28,6 +40,8 @@ class Appointment extends Model
         'completed_at',
         'cancelled_at',
         'status',
+        'verification_status',
+        'verification_work_item_id',
         'appointment_type',
         'notes',
         'arrival_notes',
@@ -103,5 +117,10 @@ class Appointment extends Model
     public function billingWorkItems(): HasMany
     {
         return $this->hasMany(BillingWorkItem::class);
+    }
+
+    public function verificationWorkItem(): BelongsTo
+    {
+        return $this->belongsTo(BillingWorkItem::class, 'verification_work_item_id');
     }
 }

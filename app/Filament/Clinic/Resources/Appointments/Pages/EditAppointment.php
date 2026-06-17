@@ -4,7 +4,7 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages;
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\Concerns\InteractsWithAppointmentEditor;
-use App\Support\ClinicPanelScope;
+use App\Support\AppointmentWorkspaceScope;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
@@ -22,8 +22,8 @@ class EditAppointment extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['organization_id'] ??= ClinicPanelScope::selectedOrganizationId();
-        $data['clinic_id'] ??= ClinicPanelScope::selectedClinicId();
+        $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
+        $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
         $data = $this->syncStatusTimestamps($data);
 
         return $data;

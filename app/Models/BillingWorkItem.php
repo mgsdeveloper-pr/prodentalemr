@@ -207,6 +207,10 @@ class BillingWorkItem extends Model
                 $workItem->recordActivity('urgent_priority_flagged', 'Verification marked as urgent.');
             }
 
+            if (array_key_exists('status', $changes) && filled($workItem->appointment_id)) {
+                $workItem->syncAppointmentVerificationStatus();
+            }
+
             if (! array_intersect(array_keys($changes), ['status', 'assigned_to', 'outcome_status']) && count($changes) > 0) {
                 $workItem->recordActivity('updated', 'Work item details updated.');
             }
@@ -798,5 +802,29 @@ class BillingWorkItem extends Model
         }
 
         return 'verification_user';
+    }
+
+    protected function syncAppointmentVerificationStatus(): void
+    {
+        $appointment = $this->appointment;
+
+        if (! $appointment) {
+            return;
+        }
+
+        $status = match ($this->normalized_status) {
+            self::STATUS_DONE => Appointment::VERIFICATION_STATUS_COMPLETED,
+            self::STATUS_IN_PROGRESS,
+            self::STATUS_REVIEW,
+            self::STATUS_AWAITING_CLINIC_RESPONSE,
+            self::STATUS_RETURNED_FOR_REWORK,
+            self::STATUS_INCOMPLETE => Appointment::VERIFICATION_STATUS_IN_PROGRESS,
+            default => Appointment::VERIFICATION_STATUS_SENT,
+        };
+
+        $appointment->forceFill([
+            'verification_status' => $status,
+            'verification_work_item_id' => $this->getKey(),
+        ])->save();
     }
 }

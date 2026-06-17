@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Appointments\Tables;
 
 use App\Models\Appointment;
+use App\Support\AdminClinicScope;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -144,7 +145,8 @@ class AppointmentsTable
                     ->iconButton(),
                 EditAction::make()
                     ->iconButton()
-                    ->visible(fn (): bool => auth()->user()?->canEditClinicAppointments() ?? false),
+                    ->visible(fn (): bool => (auth()->user()?->canEditClinicAppointments() ?? false)
+                        || ((auth()->user()?->canAccessVerificationWorkspace() ?? false) && filled(AdminClinicScope::selectedClinicId()))),
                 DeleteAction::make()
                     ->iconButton()
                     ->visible(fn (Appointment $record): bool => (auth()->user()?->canDeleteClinicAppointments() ?? false) && ! $record->trashed()),

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Clinic\Resources\Appointments\Pages;
+namespace App\Filament\Admin\Resources\Appointments\Pages;
 
-use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
+use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\Concerns\InteractsWithAppointmentEditor;
 use App\Support\AppointmentWorkspaceScope;
 use Filament\Resources\Pages\CreateRecord;
