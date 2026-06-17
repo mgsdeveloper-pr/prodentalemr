@@ -15,11 +15,20 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use UnitEnum;
 
 class UserMailboxSettingsPage extends Page implements HasForms
 {
     use InteractsWithForms;
+
+    protected const PROVIDER_MEDITYA = 'meditya';
+
+    protected const PROVIDER_CUSTOM = 'custom';
+
+    protected const MEDITYA_HOST = 'mail.medityaglobalservices.com';
+
+    protected const MEDITYA_PROVIDER_LABEL = 'Meditya MailBox';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
@@ -70,25 +79,52 @@ class UserMailboxSettingsPage extends Page implements HasForms
             ->statePath('data')
             ->components([
                 Section::make('Mailbox Connection')
-                    ->description('Connect your own mailbox for live receive and send access. Default Meditya server details are prefilled, but you can replace them for another provider.')
+                    ->description('Choose Meditya MailBox for fixed server settings, or Custom Mail Server when the mailbox is hosted somewhere else.')
                     ->schema([
                         Grid::make(2)->schema([
                             Toggle::make('enabled')
                                 ->label('Enable mailbox')
                                 ->default(true),
+                            Select::make('mailbox_provider_mode')
+                                ->label('Mailbox type')
+                                ->options([
+                                    self::PROVIDER_MEDITYA => 'Meditya MailBox',
+                                    self::PROVIDER_CUSTOM => 'Custom Mail Server',
+                                ])
+                                ->default(self::PROVIDER_MEDITYA)
+                                ->native(false)
+                                ->live()
+                                ->required()
+                                ->helperText('Meditya MailBox only needs the mailbox user ID and password.'),
+                            TextInput::make('imap_username')
+                                ->label('Mailbox user ID')
+                                ->email()
+                                ->required(),
+                            TextInput::make('imap_password')
+                                ->label('Mailbox password')
+                                ->password()
+                                ->revealable()
+                                ->placeholder('Leave blank to keep the saved password'),
+                        ]),
+                    ]),
+                Section::make('Custom Server Details')
+                    ->description('Use this only when the mailbox is not hosted on the Meditya mail server.')
+                    ->visible(fn (Get $get): bool => $get('mailbox_provider_mode') === self::PROVIDER_CUSTOM)
+                    ->schema([
+                        Grid::make(2)->schema([
+                            TextInput::make('provider_label')
+                                ->label('Provider label')
+                                ->placeholder('Gmail, Outlook, Zoho, Custom'),
                             Toggle::make('imap_validate_certificate')
                                 ->label('Validate IMAP certificate')
                                 ->default(false),
-                            TextInput::make('provider_label')
-                                ->label('Provider label')
-                                ->placeholder('Meditya Mail, Gmail, Outlook, Zoho, Custom'),
                             TextInput::make('imap_host')
                                 ->label('IMAP host')
-                                ->required()
-                                ->default('mail.medityaglobalservices.com'),
+                                ->required(fn (Get $get): bool => $get('mailbox_provider_mode') === self::PROVIDER_CUSTOM)
+                                ->default(self::MEDITYA_HOST),
                             TextInput::make('imap_port')
                                 ->label('IMAP port')
-                                ->required()
+                                ->required(fn (Get $get): bool => $get('mailbox_provider_mode') === self::PROVIDER_CUSTOM)
                                 ->numeric()
                                 ->default(993),
                             Select::make('imap_encryption')
@@ -100,14 +136,6 @@ class UserMailboxSettingsPage extends Page implements HasForms
                                 ])
                                 ->default('ssl')
                                 ->native(false),
-                            TextInput::make('imap_username')
-                                ->label('Mailbox user ID')
-                                ->required(),
-                            TextInput::make('imap_password')
-                                ->label('Mailbox password')
-                                ->password()
-                                ->revealable()
-                                ->placeholder('Leave blank to keep the saved password'),
                             TextInput::make('inbox_folder')
                                 ->label('Inbox folder')
                                 ->default('INBOX'),
@@ -120,12 +148,13 @@ class UserMailboxSettingsPage extends Page implements HasForms
                         ]),
                     ]),
                 Section::make('Outgoing Email')
-                    ->description('Use the same mailbox for sending, or replace these details if your outgoing server is different.')
+                    ->description('Custom outgoing email settings. Leave username/password blank to reuse the mailbox login.')
+                    ->visible(fn (Get $get): bool => $get('mailbox_provider_mode') === self::PROVIDER_CUSTOM)
                     ->schema([
                         Grid::make(2)->schema([
                             TextInput::make('smtp_host')
                                 ->label('SMTP host')
-                                ->default('mail.medityaglobalservices.com'),
+                                ->default(self::MEDITYA_HOST),
                             TextInput::make('smtp_port')
                                 ->label('SMTP port')
                                 ->numeric()
@@ -154,6 +183,11 @@ class UserMailboxSettingsPage extends Page implements HasForms
                                 ->label('From address')
                                 ->email()
                                 ->placeholder('Leave blank to reuse the mailbox user ID'),
+                        ]),
+                    ]),
+                Section::make('Mailbox Preferences')
+                    ->schema([
+                        Grid::make(2)->schema([
                             TextInput::make('attachment_limit_mb')
                                 ->label('Attachment size limit (MB)')
                                 ->numeric()
@@ -168,8 +202,16 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function save(): void
     {
-        $state = $this->form->getState();
+        $state = $this->normalizeMailboxState($this->form->getState());
         $existing = $this->getMailboxRecord();
+
+        if (
+            ($state['provider_label'] ?? null) === self::MEDITYA_PROVIDER_LABEL
+            && blank($state['smtp_password'] ?? null)
+            && filled($existing->imap_password)
+        ) {
+            $state['smtp_password'] = $existing->imap_password;
+        }
 
         if (blank($state['imap_password'] ?? null) && blank($existing->imap_password)) {
             Notification::make()
@@ -212,7 +254,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function testConnection(UserMailboxService $service): void
     {
-        $state = $this->form->getState();
+        $state = $this->normalizeMailboxState($this->form->getState());
         $mailbox = $this->getMailboxRecord();
 
         if (blank($state['imap_password'] ?? null)) {
@@ -299,9 +341,50 @@ class UserMailboxSettingsPage extends Page implements HasForms
             'attachment_limit_mb',
         ]);
 
+        $state['mailbox_provider_mode'] = $this->detectProviderMode($mailbox);
         $state['imap_password'] = '';
         $state['smtp_password'] = '';
 
         return $state;
+    }
+
+    protected function normalizeMailboxState(array $state): array
+    {
+        $mode = $state['mailbox_provider_mode'] ?? self::PROVIDER_MEDITYA;
+        unset($state['mailbox_provider_mode']);
+
+        if ($mode === self::PROVIDER_MEDITYA) {
+            $username = $state['imap_username'] ?? null;
+
+            return array_merge($state, [
+                'provider_label' => self::MEDITYA_PROVIDER_LABEL,
+                'imap_host' => self::MEDITYA_HOST,
+                'imap_port' => 993,
+                'imap_encryption' => 'ssl',
+                'imap_validate_certificate' => false,
+                'inbox_folder' => 'INBOX',
+                'spam_folder' => 'INBOX.Spam',
+                'sent_folder' => 'INBOX.Sent',
+                'smtp_host' => self::MEDITYA_HOST,
+                'smtp_port' => 465,
+                'smtp_encryption' => 'ssl',
+                'smtp_username' => $username,
+                'smtp_password' => $state['imap_password'] ?? null,
+                'from_address' => filled($state['from_address'] ?? null) ? $state['from_address'] : $username,
+            ]);
+        }
+
+        return $state;
+    }
+
+    protected function detectProviderMode(UserMailbox $mailbox): string
+    {
+        $isMeditya = $mailbox->imap_host === self::MEDITYA_HOST
+            && (int) $mailbox->imap_port === 993
+            && strtolower((string) $mailbox->imap_encryption) === 'ssl'
+            && ($mailbox->smtp_host === self::MEDITYA_HOST || blank($mailbox->smtp_host))
+            && ((int) $mailbox->smtp_port === 465 || blank($mailbox->smtp_port));
+
+        return $isMeditya ? self::PROVIDER_MEDITYA : self::PROVIDER_CUSTOM;
     }
 }
