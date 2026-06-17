@@ -96,7 +96,8 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
+                    . view('filament.admin.partials.page-header-theme')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,

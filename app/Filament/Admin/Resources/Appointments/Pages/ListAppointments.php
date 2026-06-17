@@ -6,6 +6,8 @@ use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
 use App\Support\AppointmentWorkspaceScope;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Filament\Resources\Pages\ListRecords;
 
 class ListAppointments extends ListRecords
@@ -107,6 +109,28 @@ class ListAppointments extends ListRecords
                 ->where('status', 'cancelled')
                 ->count(),
         ];
+    }
+
+    protected function getTableQuery(): Builder | Relation | null
+    {
+        $query = parent::getTableQuery();
+
+        return $query ? $this->applyDashboardDateFilter($query) : $query;
+    }
+
+    public function updatedAppointmentDatePreset(): void
+    {
+        $this->resetTable();
+    }
+
+    public function updatedCustomDateFrom(): void
+    {
+        $this->resetTable();
+    }
+
+    public function updatedCustomDateTo(): void
+    {
+        $this->resetTable();
     }
 
     public function getDashboardDatePresetOptions(): array

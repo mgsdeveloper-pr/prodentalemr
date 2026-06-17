@@ -111,7 +111,8 @@ class AppointmentsTable
                     ->requiresConfirmation()
                     ->modalHeading('Send appointment for verification?')
                     ->modalDescription('This will create a verification request from this appointment and mark it as Sent.')
-                    ->visible(fn (Appointment $record): bool => ($record->verification_status ?: Appointment::VERIFICATION_STATUS_NOT_SENT) === Appointment::VERIFICATION_STATUS_NOT_SENT)
+                    ->visible(fn (Appointment $record): bool => ! in_array($record->status, ['cancelled', 'no_show'], true)
+                        && ($record->verification_status ?: Appointment::VERIFICATION_STATUS_NOT_SENT) === Appointment::VERIFICATION_STATUS_NOT_SENT)
                     ->action(function (Appointment $record, AppointmentVerificationSender $sender): void {
                         try {
                             $workItem = $sender->send($record);
