@@ -3,8 +3,9 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Models\VerificationInboxMailbox;
-use App\Support\VerificationInboxService;
 use App\Support\AdminClinicScope;
+use App\Support\SaasEntitlements;
+use App\Support\VerificationInboxService;
 use App\Support\VerificationSettingsNavigation;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -45,7 +46,8 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return (auth()->user()?->canManageVerificationSettings() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'clinic_inbox', AdminClinicScope::selectedClinic());
     }
 
     public static function shouldRegisterNavigation(): bool

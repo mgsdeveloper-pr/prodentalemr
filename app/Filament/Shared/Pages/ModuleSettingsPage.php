@@ -154,6 +154,7 @@ abstract class ModuleSettingsPage extends Page
     {
         return match (static::panelKey()) {
             'saas' => $role === 'saas_admin',
+            'dso' => $role === 'dso_admin',
             default => false,
         };
     }

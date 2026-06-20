@@ -22,6 +22,16 @@ class Clinic extends Model
         'status',
         'verification_services_enabled',
         'clinic_operations_enabled',
+        'service_status',
+        'pms_service_status',
+        'verification_service_status',
+        'managed_services_status',
+        'trial_ends_at',
+        'demo_mode',
+        'feature_overrides',
+        'usage_snapshot',
+        'account_manager_user_id',
+        'service_notes',
         'verification_pdf_output_mode',
         'verification_pdf_output_sections',
         'verification_pdf_output_question_ids',
@@ -33,6 +43,10 @@ class Clinic extends Model
             'status' => 'boolean',
             'verification_services_enabled' => 'boolean',
             'clinic_operations_enabled' => 'boolean',
+            'trial_ends_at' => 'date',
+            'demo_mode' => 'boolean',
+            'feature_overrides' => 'array',
+            'usage_snapshot' => 'array',
             'verification_pdf_output_sections' => 'array',
             'verification_pdf_output_question_ids' => 'array',
         ];
@@ -48,9 +62,43 @@ class Clinic extends Model
         return (bool) $this->clinic_operations_enabled;
     }
 
+    public function hasActiveClinicOperations(): bool
+    {
+        return $this->hasClinicOperations()
+            && in_array($this->pms_service_status, ['active', 'trial'], true)
+            && in_array($this->service_status, ['active', 'trial'], true);
+    }
+
+    public function hasActiveVerificationServices(): bool
+    {
+        return $this->hasVerificationServices()
+            && in_array($this->verification_service_status, ['active', 'trial'], true)
+            && in_array($this->service_status, ['active', 'trial'], true);
+    }
+
+    public function allowsManagedServices(): bool
+    {
+        return in_array($this->managed_services_status, ['active', 'trial'], true);
+    }
+
+    public function featureOverride(string $feature, mixed $default = null): mixed
+    {
+        return data_get($this->feature_overrides ?? [], $feature, $default);
+    }
+
+    public function usageValue(string $key, mixed $default = null): mixed
+    {
+        return data_get($this->usage_snapshot ?? [], $key, $default);
+    }
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function accountManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'account_manager_user_id');
     }
 
     public function locations(): HasMany

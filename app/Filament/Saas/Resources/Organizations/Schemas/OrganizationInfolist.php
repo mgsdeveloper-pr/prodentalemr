@@ -22,6 +22,9 @@ class OrganizationInfolist
                                 TextEntry::make('name')
                                     ->label('Organization name')
                                     ->columnSpan(2),
+                                TextEntry::make('dso.name')
+                                    ->label('DSO')
+                                    ->placeholder('Independent'),
                                 TextEntry::make('owner_name')
                                     ->label('Owner name')
                                     ->placeholder('-'),

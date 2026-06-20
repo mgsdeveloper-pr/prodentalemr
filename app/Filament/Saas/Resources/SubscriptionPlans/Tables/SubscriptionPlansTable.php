@@ -22,6 +22,30 @@ class SubscriptionPlansTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('plan_code')
+                    ->label('Code')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('plan_type')
+                    ->label('Type')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'pms' => 'Clinic PMS',
+                        'verification' => 'Verification',
+                        'pms_verification' => 'PMS + Verification',
+                        default => $state ? str($state)->headline()->toString() : '-',
+                    })
+                    ->color(fn (?string $state): string => match ($state) {
+                        'pms' => 'info',
+                        'verification' => 'warning',
+                        'pms_verification' => 'success',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+                TextColumn::make('workspace_mode')
+                    ->label('Workspace')
+                    ->badge()
+                    ->toggleable(),
                 TextColumn::make('price')
                     ->money('USD')
                     ->sortable(),
@@ -37,6 +61,16 @@ class SubscriptionPlansTable
                     ->badge()
                     ->color('primary')
                     ->sortable(query: fn ($query, string $direction) => $query->orderByRaw('JSON_LENGTH(included_modules) ' . $direction)),
+                TextColumn::make('included_features_count')
+                    ->label('Features')
+                    ->state(fn ($record): int => count($record->included_features ?? []))
+                    ->badge()
+                    ->color('success')
+                    ->toggleable(),
+                IconColumn::make('managed_services_allowed')
+                    ->label('Managed')
+                    ->boolean()
+                    ->toggleable(),
                 TextColumn::make('subscriptions_count')
                     ->label('Subscriptions')
                     ->counts('subscriptions')

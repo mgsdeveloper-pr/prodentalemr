@@ -8,6 +8,7 @@ use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
 use App\Support\ClinicPanelScope;
+use App\Support\SaasEntitlements;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -28,7 +29,8 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessClinicVerificationRequests() ?? false;
+        return (auth()->user()?->canAccessClinicVerificationRequests() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'request_response', ClinicPanelScope::selectedClinic());
     }
 
     public static function getNavigationBadge(): ?string
@@ -263,6 +265,7 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
                 'patient',
                 'verificationProfile',
                 'assignedTo',
+                'closedBy',
                 'activities' => fn ($builder) => $builder
                     ->whereIn('activity_type', [self::REQUEST_ACTIVITY, self::RESPONSE_ACTIVITY])
                     ->with('user')
@@ -270,7 +273,15 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
                 'attachments' => fn ($builder) => $builder->latest('created_at'),
             ])
             ->when($this->statusFilter === 'open', fn (Builder $builder) => $builder->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE))
-            ->when($this->statusFilter === 'responded', fn (Builder $builder) => $builder->whereNotNull('clinic_responded_at'))
+            ->when($this->statusFilter === 'responded', function (Builder $builder): void {
+                $builder
+                    ->where('status', '!=', BillingWorkItem::STATUS_DONE)
+                    ->where(function (Builder $responseQuery): void {
+                        $responseQuery
+                            ->whereNotNull('clinic_responded_at')
+                            ->orWhereHas('activities', fn (Builder $activityQuery) => $activityQuery->where('activity_type', self::RESPONSE_ACTIVITY));
+                    });
+            })
             ->when($this->statusFilter === 'closed', fn (Builder $builder) => $builder->where('status', BillingWorkItem::STATUS_DONE))
             ->when(filled($this->search), function (Builder $builder): void {
                 $search = '%' . trim($this->search) . '%';

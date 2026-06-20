@@ -6,6 +6,7 @@ use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
 use App\Support\AdminClinicScope;
+use App\Support\SaasEntitlements;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -36,9 +37,12 @@ class PortalCredentialSettings extends Page
     public static function canAccess(): bool
     {
         return (bool) (
-            auth()->user()?->canManageVerificationSettings()
-            || auth()->user()?->canAccessVerificationModule('portal_credentials')
-            || auth()->user()?->canAccessSaasModule('portal_credentials')
+            (
+                auth()->user()?->canManageVerificationSettings()
+                || auth()->user()?->canAccessVerificationModule('portal_credentials')
+                || auth()->user()?->canAccessSaasModule('portal_credentials')
+            )
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'portal_credentials', AdminClinicScope::selectedClinic())
         );
     }
 

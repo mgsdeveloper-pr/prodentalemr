@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Models\UserMailbox;
+use App\Support\SaasEntitlements;
 use App\Support\UserMailboxService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -50,7 +51,8 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
+        return (auth()->user()?->canAccessVerificationWorkspace() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'mailbox');
     }
 
     public function mount(): void

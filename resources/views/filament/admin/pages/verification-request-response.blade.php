@@ -83,8 +83,8 @@
                     <select wire:model.live="statusFilter" style="padding: 11px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px; min-width: 150px;">
                         <option value="all">All items</option>
                         <option value="open">Open requests</option>
-                        <option value="responded">Responded items</option>
-                        <option value="closed">Closed items</option>
+                        <option value="responded">Responses received</option>
+                        <option value="closed">Closed requests</option>
                     </select>
 
                     <div style="position: relative; min-width: 280px;">
@@ -111,7 +111,7 @@
                             <th style="width: 220px; padding: 16px 18px; text-align: left; vertical-align: middle; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Response Received</th>
                             <th style="width: 165px; padding: 16px 18px; text-align: left; vertical-align: middle; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Date &amp; Time</th>
                             <th style="width: 110px; padding: 16px 18px; text-align: left; vertical-align: middle; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Status</th>
-                            <th style="width: 176px; padding: 16px 18px; text-align: left; vertical-align: middle; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Action</th>
+                            <th style="width: 250px; padding: 16px 18px; text-align: left; vertical-align: middle; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -159,6 +159,18 @@
                                             <x-heroicon-o-arrow-top-right-on-square style="width: 16px; height: 16px;" />
                                             <span>Open</span>
                                         </a>
+
+                                        @if ($this->canCloseRequestResponse($workItem))
+                                            <button
+                                                type="button"
+                                                wire:click="closeRequestResponse({{ $workItem->getKey() }})"
+                                                wire:confirm="Close this request and move it to Closed Requests?"
+                                                style="display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px; border-radius: 12px; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; font-size: 13px; font-weight: 800;"
+                                            >
+                                                <x-heroicon-o-check-circle style="width: 16px; height: 16px;" />
+                                                <span>Close</span>
+                                            </button>
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
@@ -199,6 +211,9 @@
         @php($requestHistory = $this->getRequestHistory($selectedWorkItem))
         @php($responseHistory = $this->getResponseHistory($selectedWorkItem))
         @php($responseAttachments = $this->getResponseAttachments($selectedWorkItem))
+        @php($workflowStatus = $this->getWorkflowStatus($selectedWorkItem))
+        @php($workflowStatusStyles = $this->workflowStatusStyles($workflowStatus['tone']))
+        @php($closureSummary = $this->getClosureSummary($selectedWorkItem))
 
         <div style="position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.42); display: flex; align-items: center; justify-content: center; padding: 24px;">
             <div style="display: flex; flex-direction: column; width: min(1200px, 100%); max-height: calc(100vh - 48px); border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 30px 80px rgba(15, 23, 42, 0.26); overflow: hidden;">
@@ -209,9 +224,13 @@
                         </div>
                         <div>
                             <h3 style="margin: 0; font-size: 28px; font-weight: 800; color: #0f172a;">{{ $selectedWorkItem->verificationProfile?->patient_full_name ?: ($selectedWorkItem->patient?->full_name ?: 'Unknown patient') }}</h3>
-                            <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
-                                {{ $selectedWorkItem->clinic?->clinic_name ?: '-' }} · {{ \App\Models\BillingWorkItem::STATUS_OPTIONS[$selectedWorkItem->normalized_status] ?? str($selectedWorkItem->normalized_status)->headline()->toString() }}
-                            </p>
+                            <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <span style="font-size: 14px; line-height: 1.7; color: #64748b;">{{ $selectedWorkItem->clinic?->clinic_name ?: '-' }}</span>
+                                <span style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 999px; border: 1px solid {{ $workflowStatusStyles['border'] }}; background: {{ $workflowStatusStyles['bg'] }}; color: {{ $workflowStatusStyles['text'] }}; font-size: 12px; font-weight: 800;">
+                                    <span style="width: 7px; height: 7px; border-radius: 999px; background: currentColor;"></span>
+                                    {{ $workflowStatus['label'] }}
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -223,6 +242,21 @@
                         <x-heroicon-o-x-mark style="width: 20px; height: 20px;" />
                     </button>
                 </div>
+
+                @if ($closureSummary)
+                    <div style="padding: 14px 24px; border-bottom: 1px solid #edf2f7; background: #f0fdf4;">
+                        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                            <div style="padding: 12px 14px; border-radius: 16px; border: 1px solid #bbf7d0; background: #ffffff;">
+                                <div style="margin-bottom: 5px; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #166534;">Closed By</div>
+                                <div style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $closureSummary['closed_by'] }}</div>
+                            </div>
+                            <div style="padding: 12px 14px; border-radius: 16px; border: 1px solid #bbf7d0; background: #ffffff;">
+                                <div style="margin-bottom: 5px; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #166534;">Closed At</div>
+                                <div style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $closureSummary['closed_at'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 <div style="flex: 1 1 auto; overflow: auto; padding: 24px;">
                     <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
@@ -293,17 +327,16 @@
                                         <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px;">
                                             @foreach ($responseAttachments as $attachment)
                                                 @php($attachmentLabel = $attachment->original_file_name ?: $attachment->title ?: ('Uploaded document ' . $loop->iteration))
-                                                <a
-                                                    href="{{ $this->responseAttachmentDownloadUrl($attachment) }}"
-                                                    target="_blank"
-                                                    rel="noopener"
-                                                    style="display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 10px; border-radius: 999px; border: 1px solid #bfdbfe; background: #ffffff; color: #1d4ed8; font-size: 12px; font-weight: 800; text-decoration: none;"
+                                                <button
+                                                    type="button"
+                                                    wire:click="openResponseAttachmentPreview({{ $attachment->getKey() }})"
+                                                    style="display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 7px 10px; border-radius: 999px; border: 1px solid #bfdbfe; background: #ffffff; color: #1d4ed8; font-size: 12px; font-weight: 800; text-decoration: none; cursor: pointer;"
                                                 >
                                                     <x-heroicon-o-paper-clip style="width: 14px; height: 14px; flex: 0 0 auto;" />
                                                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                                                         {{ $attachmentLabel }}
                                                     </span>
-                                                </a>
+                                                </button>
                                             @endforeach
                                         </div>
                                     @endif
@@ -350,7 +383,7 @@
                             style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; border-radius: 14px; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; font-size: 14px; font-weight: 800; text-decoration: none;"
                         >
                             <x-heroicon-o-check-circle style="width: 17px; height: 17px;" />
-                            Close Item
+                            Close Request
                         </button>
                     @endif
                     <a
@@ -363,6 +396,46 @@
                 </div>
 
             </div>
+        </div>
+    @endif
+
+    @php($selectedResponseAttachment = $this->getSelectedResponseAttachment())
+    @if ($showResponseAttachmentPreview && $selectedResponseAttachment && $selectedWorkItem)
+        @php($attachmentTitle = $selectedResponseAttachment->original_file_name ?: $selectedResponseAttachment->title ?: 'Uploaded document')
+        @php($attachmentUrl = $this->responseAttachmentDownloadUrl($selectedResponseAttachment))
+
+        <div
+            wire:click.self="closeResponseAttachmentPreview"
+            style="position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, 0.54); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 28px;"
+        >
+            <section style="width: min(1080px, 96vw); height: min(780px, 92vh); border-radius: 26px; background: #ffffff; box-shadow: 0 28px 80px rgba(15, 23, 42, 0.32); overflow: hidden; display: flex; flex-direction: column;">
+                <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+                    <div style="min-width: 0;">
+                        <div style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;">
+                            Response Document
+                        </div>
+                        <h3 style="margin: 10px 0 0; font-size: 24px; font-weight: 900; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $attachmentTitle }}</h3>
+                        <p style="margin: 6px 0 0; font-size: 13px; color: #64748b;">
+                            {{ $selectedWorkItem->verificationProfile?->patient_full_name ?: ($selectedWorkItem->patient?->full_name ?: 'Unknown patient') }}
+                            &middot; {{ $selectedWorkItem->clinic?->clinic_name ?: '-' }}
+                            &middot; {{ optional($selectedResponseAttachment->created_at)->format('M d, Y h:i A') ?: '-' }}
+                        </p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                        <a href="{{ $attachmentUrl }}" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 900; text-decoration: none;">Open New Tab</a>
+                        <a href="{{ $attachmentUrl }}" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 900; text-decoration: none;">Download</a>
+                        <button type="button" wire:click="closeResponseAttachmentPreview" style="width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 22px; line-height: 1; cursor: pointer;">&times;</button>
+                    </div>
+                </div>
+
+                <div style="flex: 1; background: #f8fafc; padding: 18px; min-height: 0;">
+                    <iframe
+                        src="{{ $attachmentUrl }}"
+                        title="{{ $attachmentTitle }}"
+                        style="width: 100%; height: 100%; border: 1px solid #dbe4ee; border-radius: 18px; background: #ffffff;"
+                    ></iframe>
+                </div>
+            </section>
         </div>
     @endif
 

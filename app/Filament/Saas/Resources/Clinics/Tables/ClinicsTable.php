@@ -40,6 +40,32 @@ class ClinicsTable
                     ->label('Users')
                     ->counts('users')
                     ->sortable(),
+                TextColumn::make('service_status')
+                    ->label('Service')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
+                    ->color(fn (?string $state): string => match ($state) {
+                        'active' => 'success',
+                        'trial' => 'info',
+                        'pending_setup' => 'warning',
+                        'suspended', 'cancelled' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('verification_service_status')
+                    ->label('Verification')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
+                    ->toggleable(),
+                TextColumn::make('pms_service_status')
+                    ->label('PMS')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('accountManager.name')
+                    ->label('Manager')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('status')
                     ->label('Active')
                     ->boolean(),

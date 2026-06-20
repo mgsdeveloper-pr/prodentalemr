@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Appointments;
 
 use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
 use App\Filament\Clinic\Resources\Appointments\Pages\EditAppointment;
+use App\Filament\Clinic\Resources\Appointments\Pages\ImportAppointments;
 use App\Filament\Clinic\Resources\Appointments\Pages\ListAppointments;
 use App\Filament\Clinic\Resources\Appointments\Pages\ViewAppointment;
 use App\Filament\Clinic\Resources\Appointments\Schemas\AppointmentForm;
@@ -129,6 +130,7 @@ class AppointmentResource extends Resource
         return [
             'index' => ListAppointments::route('/'),
             'create' => CreateAppointment::route('/create'),
+            'import' => ImportAppointments::route('/import'),
             'view' => ViewAppointment::route('/{record}'),
             'edit' => EditAppointment::route('/{record}/edit'),
         ];

@@ -18,9 +18,24 @@ class SubscriptionInfolist
                     ->schema([
                         Grid::make(4)
                             ->schema([
+                                TextEntry::make('subscription_scope')
+                                    ->label('Scope')
+                                    ->badge()
+                                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                        'dso' => 'DSO',
+                                        'clinic' => 'Clinic',
+                                        'organization' => 'Organization',
+                                        default => '-',
+                                    }),
+                                TextEntry::make('dso.name')
+                                    ->label('DSO')
+                                    ->placeholder('-'),
+                                TextEntry::make('clinic.clinic_name')
+                                    ->label('Clinic')
+                                    ->placeholder('-'),
                                 TextEntry::make('organization.name')
                                     ->label('Organization')
-                                    ->columnSpan(2),
+                                    ->placeholder('-'),
                                 TextEntry::make('subscriptionPlan.name')
                                     ->label('Subscription plan')
                                     ->badge()

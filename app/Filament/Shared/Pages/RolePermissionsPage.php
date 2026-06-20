@@ -107,7 +107,7 @@ abstract class RolePermissionsPage extends Page
         $roleName = $this->normalizedRoleName($this->newRoleName);
 
         if (array_key_exists($roleName, $this->getRoleOptions())) {
-            $this->addError('newRoleName', 'A verification role with that name already exists.');
+            $this->addError('newRoleName', 'A role with that name already exists.');
 
             return;
         }
@@ -241,6 +241,7 @@ abstract class RolePermissionsPage extends Page
         return match (static::panelKey()) {
             'saas' => $role === 'saas_admin',
             'verification' => $role === 'verification_admin',
+            'dso' => $role === 'dso_admin',
             default => false,
         };
     }

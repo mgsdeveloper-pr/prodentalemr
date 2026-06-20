@@ -4,8 +4,10 @@ namespace App\Filament\Saas\Resources\Clinics\Schemas;
 
 use App\Models\Clinic;
 use App\Support\UsTimezoneOptions;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -62,6 +64,72 @@ class ClinicForm
                             ->inline(false),
                     ])
                     ->columns(2),
+                Section::make('Service Status & Ownership')
+                    ->description('Control live service access, trial/demo state, and internal ownership.')
+                    ->schema([
+                        Select::make('service_status')
+                            ->label('Overall service status')
+                            ->default('active')
+                            ->options([
+                                'active' => 'Active',
+                                'trial' => 'Trial',
+                                'pending_setup' => 'Pending setup',
+                                'suspended' => 'Suspended',
+                                'cancelled' => 'Cancelled',
+                            ])
+                            ->native(false),
+                        Select::make('pms_service_status')
+                            ->label('Clinic PMS status')
+                            ->default('active')
+                            ->options([
+                                'active' => 'Active',
+                                'trial' => 'Trial',
+                                'pending_setup' => 'Pending setup',
+                                'suspended' => 'Suspended',
+                                'cancelled' => 'Cancelled',
+                                'not_enabled' => 'Not enabled',
+                            ])
+                            ->native(false),
+                        Select::make('verification_service_status')
+                            ->label('Verification status')
+                            ->default('active')
+                            ->options([
+                                'active' => 'Active',
+                                'trial' => 'Trial',
+                                'pending_setup' => 'Pending setup',
+                                'suspended' => 'Suspended',
+                                'cancelled' => 'Cancelled',
+                                'not_enabled' => 'Not enabled',
+                            ])
+                            ->native(false),
+                        Select::make('managed_services_status')
+                            ->label('Managed services status')
+                            ->default('not_enabled')
+                            ->options([
+                                'not_enabled' => 'Not enabled',
+                                'requested' => 'Requested',
+                                'active' => 'Active',
+                                'paused' => 'Paused',
+                                'cancelled' => 'Cancelled',
+                            ])
+                            ->native(false),
+                        DatePicker::make('trial_ends_at')
+                            ->label('Trial ends at'),
+                        Toggle::make('demo_mode')
+                            ->label('Demo mode')
+                            ->default(false)
+                            ->inline(false),
+                        Select::make('account_manager_user_id')
+                            ->label('Account manager')
+                            ->relationship('accountManager', 'name')
+                            ->searchable()
+                            ->preload(),
+                        Textarea::make('service_notes')
+                            ->label('Internal service notes')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(3),
             ]);
     }
 

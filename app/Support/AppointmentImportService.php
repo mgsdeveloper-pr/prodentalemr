@@ -16,6 +16,51 @@ use ZipArchive;
 
 class AppointmentImportService
 {
+    public function previewFromStoredFile(string $disk, string $path, Clinic $clinic, ?string $originalName = null): array
+    {
+        return $this->previewFromAbsolutePath(Storage::disk($disk)->path($path), $clinic, $originalName);
+    }
+
+    public function previewFromAbsolutePath(string $path, Clinic $clinic, ?string $originalName = null): array
+    {
+        $rows = $this->readRows($path, $originalName);
+
+        if ($rows === []) {
+            throw new RuntimeException('The uploaded file does not contain appointment rows.');
+        }
+
+        $rowResults = [];
+        $ready = 0;
+        $failed = 0;
+        $warnings = 0;
+
+        foreach ($rows as $index => $row) {
+            $normalizedRow = $this->normalizeRow($row);
+            $result = $this->previewRow($normalizedRow, $clinic);
+            $result['row'] = $index + 2;
+
+            if (($result['status'] ?? null) === 'failed') {
+                $failed++;
+            } else {
+                $ready++;
+            }
+
+            if (($result['warnings'] ?? []) !== []) {
+                $warnings++;
+            }
+
+            $rowResults[] = $result;
+        }
+
+        return [
+            'total' => count($rows),
+            'ready' => $ready,
+            'failed' => $failed,
+            'warnings' => $warnings,
+            'row_results' => $rowResults,
+        ];
+    }
+
     public function importFromStoredFile(string $disk, string $path, Clinic $clinic, ?User $user, ?string $originalName = null): array
     {
         return $this->importFromAbsolutePath(Storage::disk($disk)->path($path), $clinic, $user, $originalName);
@@ -31,12 +76,22 @@ class AppointmentImportService
 
         $imported = 0;
         $errors = [];
+        $warnings = 0;
         $rowResults = [];
+        $failedRowResults = [];
 
         foreach ($rows as $index => $row) {
+            $normalizedRow = $this->normalizeRow($row);
+
             try {
-                $appointment = $this->importRow($this->normalizeRow($row), $clinic, $user);
+                $importResult = $this->importRow($normalizedRow, $clinic, $user);
+                $appointment = $importResult['appointment'];
+                $rowWarnings = $importResult['warnings'];
                 $imported++;
+
+                if ($rowWarnings !== []) {
+                    $warnings++;
+                }
 
                 $rowResults[] = [
                     'row' => $index + 2,
@@ -44,20 +99,25 @@ class AppointmentImportService
                     'patient' => $appointment->patient?->full_name,
                     'date' => $appointment->appointment_date?->format('M d, Y'),
                     'service' => $appointment->appointment_type,
-                    'message' => 'Imported',
+                    'message' => $importResult['patient_was_existing'] ? 'Imported with existing patient' : 'Imported with new patient',
+                    'warnings' => $rowWarnings,
                 ];
             } catch (\Throwable $throwable) {
                 $message = 'Row ' . ($index + 2) . ': ' . $throwable->getMessage();
                 $errors[] = $message;
 
-                $rowResults[] = [
+                $failedResult = [
                     'row' => $index + 2,
                     'status' => 'failed',
-                    'patient' => $row['patient_full_name'] ?? $row['patient_name'] ?? null,
-                    'date' => $row['appointment_date'] ?? null,
-                    'service' => $row['service'] ?? $row['appointment_type'] ?? null,
+                    'patient' => $normalizedRow['patient_full_name'] ?? $normalizedRow['patient_name'] ?? null,
+                    'date' => $normalizedRow['appointment_date'] ?? null,
+                    'service' => $normalizedRow['service'] ?? $normalizedRow['appointment_type'] ?? null,
                     'message' => $throwable->getMessage(),
+                    'source' => $normalizedRow,
                 ];
+
+                $rowResults[] = $failedResult;
+                $failedRowResults[] = $failedResult;
             }
         }
 
@@ -65,20 +125,77 @@ class AppointmentImportService
             'total' => count($rows),
             'imported' => $imported,
             'failed' => count($errors),
+            'warnings' => $warnings,
             'errors' => $errors,
             'row_results' => $rowResults,
+            'failed_row_results' => $failedRowResults,
         ];
     }
 
-    protected function importRow(array $row, Clinic $clinic, ?User $user): Appointment
+    protected function previewRow(array $row, Clinic $clinic): array
+    {
+        try {
+            [$firstName, $lastName] = $this->patientNameParts($row);
+            $location = $this->resolveLocation($clinic, $row['location_name'] ?? null);
+            $provider = $this->resolveProvider($clinic, $location, $row['provider_name'] ?? null);
+            $existingPatient = $this->findExistingPatient($clinic, $row);
+            $date = $this->normalizeDate($row['appointment_date'] ?? $row['date'] ?? null);
+            $startTime = $this->normalizeTime($row['appointment_time'] ?? $row['start_time'] ?? $row['time'] ?? null) ?: '09:00:00';
+            $service = trim((string) ($row['service'] ?? $row['appointment_type'] ?? ''));
+            $warnings = [];
+
+            if ($firstName === '' || $lastName === '') {
+                throw new RuntimeException('Patient name is required.');
+            }
+
+            if (! $date) {
+                throw new RuntimeException('Appointment date is required.');
+            }
+
+            if ($service === '') {
+                throw new RuntimeException('Service is required.');
+            }
+
+            if ($existingPatient) {
+                $warnings[] = 'Existing patient will be reused.';
+            }
+
+            if ($this->hasDuplicateAppointment($clinic, $existingPatient, $date, $startTime, $service)) {
+                $warnings[] = 'Possible duplicate appointment found for this patient, date, time, and service.';
+            }
+
+            return [
+                'status' => 'ready',
+                'patient' => trim($firstName . ' ' . $lastName),
+                'date' => Carbon::parse($date)->format('M d, Y'),
+                'service' => $service,
+                'message' => $existingPatient ? 'Ready: existing patient' : 'Ready: new patient',
+                'warnings' => $warnings,
+                'provider' => $provider->display_name,
+                'location' => $location->location_name,
+            ];
+        } catch (\Throwable $throwable) {
+            return [
+                'status' => 'failed',
+                'patient' => $row['patient_full_name'] ?? $row['patient_name'] ?? trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')),
+                'date' => $row['appointment_date'] ?? $row['date'] ?? null,
+                'service' => $row['service'] ?? $row['appointment_type'] ?? null,
+                'message' => $throwable->getMessage(),
+                'warnings' => [],
+            ];
+        }
+    }
+
+    protected function importRow(array $row, Clinic $clinic, ?User $user): array
     {
         $location = $this->resolveLocation($clinic, $row['location_name'] ?? null);
         $provider = $this->resolveProvider($clinic, $location, $row['provider_name'] ?? null);
-        $patient = $this->resolvePatient($clinic, $location, $row, $user);
+        [$patient, $patientWasExisting] = $this->resolvePatientWithStatus($clinic, $location, $row, $user);
         $date = $this->normalizeDate($row['appointment_date'] ?? $row['date'] ?? null);
         $startTime = $this->normalizeTime($row['appointment_time'] ?? $row['start_time'] ?? $row['time'] ?? null) ?: '09:00:00';
         $duration = (int) ($row['duration_minutes'] ?? $row['duration'] ?? 30);
         $service = trim((string) ($row['service'] ?? $row['appointment_type'] ?? ''));
+        $warnings = [];
 
         if (! $date) {
             throw new RuntimeException('Appointment date is required.');
@@ -88,9 +205,17 @@ class AppointmentImportService
             throw new RuntimeException('Service is required.');
         }
 
+        if ($patientWasExisting) {
+            $warnings[] = 'Existing patient reused.';
+        }
+
+        if ($this->hasDuplicateAppointment($clinic, $patient, $date, $startTime, $service)) {
+            $warnings[] = 'Possible duplicate appointment exists.';
+        }
+
         $endTime = Carbon::parse($startTime)->addMinutes(max($duration, 15))->format('H:i:s');
 
-        return Appointment::query()->create([
+        $appointment = Appointment::query()->create([
             'organization_id' => $clinic->organization_id,
             'clinic_id' => $clinic->id,
             'location_id' => $location->id,
@@ -105,6 +230,12 @@ class AppointmentImportService
             'appointment_type' => $service,
             'notes' => $row['notes'] ?? null,
         ]);
+
+        return [
+            'appointment' => $appointment,
+            'patient_was_existing' => $patientWasExisting,
+            'warnings' => $warnings,
+        ];
     }
 
     protected function resolveLocation(Clinic $clinic, mixed $locationName): Location
@@ -151,12 +282,45 @@ class AppointmentImportService
 
     protected function resolvePatient(Clinic $clinic, Location $location, array $row, ?User $user): Patient
     {
+        return $this->resolvePatientWithStatus($clinic, $location, $row, $user)[0];
+    }
+
+    protected function resolvePatientWithStatus(Clinic $clinic, Location $location, array $row, ?User $user): array
+    {
         [$firstName, $lastName] = $this->patientNameParts($row);
         $dob = $this->normalizeDate($row['patient_dob'] ?? $row['dob'] ?? null);
 
         if ($firstName === '' || $lastName === '') {
             throw new RuntimeException('Patient name is required.');
         }
+
+        $patient = $this->findExistingPatient($clinic, $row);
+
+        if ($patient) {
+            return [$patient, true];
+        }
+
+        $patient = Patient::query()->create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'location_id' => $location->id,
+            'created_by' => $user?->id,
+            'pms_patient_id' => $row['pms_patient_id'] ?? $row['pms_id'] ?? null,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'dob' => $dob,
+            'phone' => $row['phone'] ?? null,
+            'email' => $row['email'] ?? null,
+            'status' => true,
+        ]);
+
+        return [$patient, false];
+    }
+
+    protected function findExistingPatient(Clinic $clinic, array $row): ?Patient
+    {
+        [$firstName, $lastName] = $this->patientNameParts($row);
+        $dob = $this->normalizeDate($row['patient_dob'] ?? $row['dob'] ?? null);
 
         $scope = Patient::query()
             ->where('organization_id', $clinic->organization_id)
@@ -180,29 +344,27 @@ class AppointmentImportService
             }
         }
 
-        $patient = (clone $scope)
+        return (clone $scope)
             ->where('first_name', $firstName)
             ->where('last_name', $lastName)
             ->when($dob, fn ($query) => $query->whereDate('dob', $dob))
             ->first();
+    }
 
-        if ($patient) {
-            return $patient;
+    protected function hasDuplicateAppointment(Clinic $clinic, ?Patient $patient, string $date, string $startTime, string $service): bool
+    {
+        if (! $patient) {
+            return false;
         }
 
-        return Patient::query()->create([
-            'organization_id' => $clinic->organization_id,
-            'clinic_id' => $clinic->id,
-            'location_id' => $location->id,
-            'created_by' => $user?->id,
-            'pms_patient_id' => $row['pms_patient_id'] ?? $row['pms_id'] ?? null,
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'dob' => $dob,
-            'phone' => $row['phone'] ?? null,
-            'email' => $row['email'] ?? null,
-            'status' => true,
-        ]);
+        return Appointment::query()
+            ->where('organization_id', $clinic->organization_id)
+            ->where('clinic_id', $clinic->id)
+            ->where('patient_id', $patient->id)
+            ->whereDate('appointment_date', $date)
+            ->where('start_time', $startTime)
+            ->where('appointment_type', $service)
+            ->exists();
     }
 
     protected function patientNameParts(array $row): array

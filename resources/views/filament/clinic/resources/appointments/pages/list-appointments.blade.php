@@ -2,6 +2,8 @@
     @php
         $stats = $this->getAppointmentStats();
         $isVerificationStats = array_key_exists('not_sent', $stats);
+        $hasCancelledStat = array_key_exists('cancelled', $stats);
+        $statCardCount = ($isVerificationStats || $hasCancelledStat) ? 5 : 4;
         $workspaceBadge = method_exists($this, 'getWorkspaceBadgeLabel') ? $this->getWorkspaceBadgeLabel() : 'Scheduling Workspace';
         $pageTitle = method_exists($this, 'getAppointmentPageTitle') ? $this->getAppointmentPageTitle() : 'All Appointments';
         $pageDescription = method_exists($this, 'getAppointmentPageDescription')
@@ -17,7 +19,9 @@
         $hasDashboardDateFilter = method_exists($this, 'getDashboardDatePresetOptions');
         $dashboardDateOptions = $hasDashboardDateFilter ? $this->getDashboardDatePresetOptions() : [];
         $dashboardDateRangeLabel = $hasDashboardDateFilter ? $this->getDashboardDateRangeLabel() : null;
-        $indiaNow = now('Asia/Kolkata');
+        $displayTimezone = method_exists($this, 'getDisplayTimezone') ? $this->getDisplayTimezone() : config('app.timezone', 'UTC');
+        $displayNow = now($displayTimezone);
+        $displayTimezoneLabel = strtoupper($displayNow->format('T'));
     @endphp
 
     <div style="display:flex;flex-direction:column;gap:22px;">
@@ -71,7 +75,7 @@
                         </div>
                     @endif
 
-                    <div style="display:grid;grid-template-columns:repeat({{ $isVerificationStats ? 5 : 4 }},minmax(0,1fr));gap:14px;">
+                    <div style="display:grid;grid-template-columns:repeat({{ $statCardCount }},minmax(0,1fr));gap:14px;">
                         @if ($isVerificationStats)
                             <div style="border:1px solid #e5e7eb;border-radius:18px;background:#ffffff;padding:16px 18px;">
                                 <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Not Sent</div>
@@ -110,6 +114,12 @@
                                 <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#b45309;">Pending</div>
                                 <div style="margin-top:8px;font-size:28px;font-weight:800;color:#b45309;">{{ $stats['pending'] }}</div>
                             </div>
+                            @if ($hasCancelledStat)
+                                <div style="border:1px solid #fecaca;border-radius:18px;background:#fef2f2;padding:16px 18px;">
+                                    <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#b91c1c;">Cancelled</div>
+                                    <div style="margin-top:8px;font-size:28px;font-weight:800;color:#b91c1c;">{{ $stats['cancelled'] }}</div>
+                                </div>
+                            @endif
                         @endif
                     </div>
                 </div>
@@ -131,18 +141,16 @@
                         </div>
                     @endif
 
-                    @if ($isVerificationStats)
-                        <div style="border:1px solid #dbeafe;border-radius:18px;background:linear-gradient(135deg,#eff6ff 0%,#ffffff 100%);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px;">
-                            <div style="display:flex;flex-direction:column;gap:4px;">
-                                <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#1d4ed8;">Today</div>
-                                <div style="font-size:15px;font-weight:800;color:#0f172a;">{{ $indiaNow->format('M d, Y') }}</div>
-                            </div>
-                            <div style="display:flex;align-items:flex-end;gap:8px;">
-                                <span style="font-size:26px;font-weight:900;letter-spacing:-0.04em;color:#0f172a;">{{ $indiaNow->format('h:i A') }}</span>
-                                <span style="padding-bottom:4px;font-size:11px;font-weight:900;letter-spacing:0.12em;color:#1d4ed8;">IST</span>
-                            </div>
+                    <div style="border:1px solid #dbeafe;border-radius:18px;background:linear-gradient(135deg,#eff6ff 0%,#ffffff 100%);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px;">
+                        <div style="display:flex;flex-direction:column;gap:4px;">
+                            <div style="font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#1d4ed8;">Today</div>
+                            <div style="font-size:15px;font-weight:800;color:#0f172a;">{{ $displayNow->format('M d, Y') }}</div>
                         </div>
-                    @endif
+                        <div style="display:flex;align-items:flex-end;gap:8px;">
+                            <span style="font-size:26px;font-weight:900;letter-spacing:-0.04em;color:#0f172a;">{{ $displayNow->format('h:i A') }}</span>
+                            <span style="padding-bottom:4px;font-size:11px;font-weight:900;letter-spacing:0.12em;color:#1d4ed8;">{{ $displayTimezoneLabel }}</span>
+                        </div>
+                    </div>
 
                     @if ($canCreateAppointments || ($canImportAppointments && filled($importUrl)))
                         <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;">

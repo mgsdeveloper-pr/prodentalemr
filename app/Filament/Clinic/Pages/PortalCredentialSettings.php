@@ -6,6 +6,7 @@ use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
 use App\Support\ClinicPanelScope;
+use App\Support\SaasEntitlements;
 use App\Support\VerificationManagedServiceAccess;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -36,7 +37,8 @@ class PortalCredentialSettings extends Page
     public static function canAccess(): bool
     {
         return VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService()
-            && (auth()->user()?->canManageClinicVerificationSettings() ?? false);
+            && (auth()->user()?->canManageClinicVerificationSettings() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'portal_credentials', ClinicPanelScope::selectedClinic());
     }
 
     public function getSelectedClinic(): ?Clinic

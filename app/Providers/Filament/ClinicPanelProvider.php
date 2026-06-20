@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Clinic\Widgets\ClinicAccountWidget;
 use App\Filament\Clinic\Pages\Dashboard;
+use App\Filament\Clinic\Pages\DocumentCenter;
 use App\Filament\Clinic\Pages\VerificationRequestResponse;
 use App\Filament\Clinic\Pages\VerificationNotificationCentre;
 use App\Http\Middleware\EnsureClinicWorkspaceSelected;
@@ -94,7 +95,8 @@ class ClinicPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render(),
+                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
+                    . view('filament.shared.partials.page-header-theme')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,
@@ -107,6 +109,7 @@ class ClinicPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Clinic/Pages'), for: 'App\Filament\Clinic\Pages')
             ->pages([
                 Dashboard::class,
+                DocumentCenter::class,
                 VerificationRequestResponse::class,
                 VerificationNotificationCentre::class,
             ])

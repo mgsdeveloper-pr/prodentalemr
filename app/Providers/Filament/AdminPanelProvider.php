@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\DocumentCenter;
 use App\Filament\Admin\Pages\VerificationClinicAssignments;
 use App\Filament\Admin\Pages\RolesAndPermissions;
 use App\Filament\Admin\Pages\UserMailboxPage;
@@ -97,7 +98,7 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => view('filament.shared.partials.sidebar-theme')->render()
-                    . view('filament.admin.partials.page-header-theme')->render(),
+                    . view('filament.shared.partials.page-header-theme')->render(),
             )
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_AFTER,
@@ -119,6 +120,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
+                DocumentCenter::class,
                 UserMailboxPage::class,
                 UserMailboxSettingsPage::class,
                 VerificationUnassignedPatients::class,

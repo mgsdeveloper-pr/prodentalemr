@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Resources\Appointments\Pages;
 use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
 use App\Support\AppointmentWorkspaceScope;
+use App\Support\SaasEntitlements;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -44,7 +45,8 @@ class ListAppointments extends ListRecords
 
     public function canImportAppointments(): bool
     {
-        return AppointmentResource::canCreate();
+        return AppointmentResource::canCreate()
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'appointment_import', AppointmentWorkspaceScope::selectedClinic());
     }
 
     public function getSelectedClinicName(): ?string
@@ -136,6 +138,7 @@ class ListAppointments extends ListRecords
     public function getDashboardDatePresetOptions(): array
     {
         return [
+            'today' => 'Today',
             'current_month' => 'Current Month',
             'last_month' => 'Last Month',
             'week' => 'This Week',
@@ -165,6 +168,10 @@ class ListAppointments extends ListRecords
         $now = now();
 
         return match ($this->appointmentDatePreset) {
+            'today' => [
+                $now->copy()->startOfDay(),
+                $now->copy()->endOfDay(),
+            ],
             'last_month' => [
                 $now->copy()->subMonthNoOverflow()->startOfMonth(),
                 $now->copy()->subMonthNoOverflow()->endOfMonth(),

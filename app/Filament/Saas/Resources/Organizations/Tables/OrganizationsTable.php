@@ -22,6 +22,12 @@ class OrganizationsTable
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('dso.name')
+                    ->label('DSO')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('Independent')
+                    ->toggleable(),
                 TextColumn::make('owner_name')
                     ->searchable()
                     ->sortable(),
@@ -44,6 +50,27 @@ class OrganizationsTable
                     ->label('Locations')
                     ->counts('locations')
                     ->sortable(),
+                TextColumn::make('lifecycle_status')
+                    ->label('Lifecycle')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
+                    ->color(fn (?string $state): string => match ($state) {
+                        'active' => 'success',
+                        'onboarding' => 'info',
+                        'at_risk', 'blocked' => 'warning',
+                        'paused', 'cancelled' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('onboarding_status')
+                    ->label('Onboarding')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
+                    ->toggleable(),
+                TextColumn::make('accountManager.name')
+                    ->label('Manager')
+                    ->toggleable(),
                 IconColumn::make('status')
                     ->label('Active')
                     ->boolean(),

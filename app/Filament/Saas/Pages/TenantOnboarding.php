@@ -4,6 +4,7 @@ namespace App\Filament\Saas\Pages;
 
 use App\Filament\Saas\Resources\Organizations\OrganizationResource;
 use App\Models\Clinic;
+use App\Models\Dso;
 use App\Models\Location;
 use App\Models\OnboardingDraft;
 use App\Models\Organization;
@@ -11,6 +12,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Support\SaasNotifications;
+use App\Support\SaasEntitlements;
 use App\Support\UsLocationOptions;
 use App\Support\UsTimezoneOptions;
 use BackedEnum;
@@ -39,15 +41,15 @@ class TenantOnboarding extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Tenant Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Organization Onboarding';
+    protected static ?string $navigationLabel = 'Client Onboarding';
 
     protected static ?int $navigationSort = 0;
 
-    protected static ?string $title = 'Organization Onboarding';
+    protected static ?string $title = 'Client Onboarding';
 
     protected static ?string $slug = 'organization-onboarding';
 
@@ -75,6 +77,9 @@ class TenantOnboarding extends Page implements HasForms
             'attach_subscription' => SubscriptionPlan::query()->where('status', true)->exists(),
             'subscription_start_date' => now()->toDateString(),
             'subscription_status' => 'active',
+            'service_status' => 'active',
+            'workspace_mode' => 'plan_default',
+            'managed_services_status' => 'not_enabled',
         ];
 
         $this->draft = OnboardingDraft::query()
@@ -106,6 +111,15 @@ class TenantOnboarding extends Page implements HasForms
                     Step::make('Organization')
                         ->description('Create the parent practice group or business record.')
                         ->schema([
+                            Select::make('dso_id')
+                                ->label('DSO / Enterprise account')
+                                ->options(fn (): array => Dso::query()
+                                    ->orderBy('name')
+                                    ->pluck('name', 'id')
+                                    ->all())
+                                ->searchable()
+                                ->preload()
+                                ->helperText('Optional. Use this when this customer belongs to a larger DSO.'),
                             TextInput::make('organization_name')
                                 ->label('Organization name')
                                 ->required()
@@ -257,6 +271,18 @@ class TenantOnboarding extends Page implements HasForms
                                     ->all())
                                 ->searchable()
                                 ->preload()
+                                ->live()
+                                ->afterStateUpdated(function (?string $state, Set $set): void {
+                                    $plan = filled($state) ? SubscriptionPlan::find($state) : null;
+
+                                    if (! $plan) {
+                                        return;
+                                    }
+
+                                    $set('service_status', $plan->trial_days ? 'trial' : 'active');
+                                    $set('subscription_status', $plan->trial_days ? 'trial' : 'active');
+                                    $set('subscription_end_date', null);
+                                })
                                 ->required(fn (Get $get): bool => (bool) $get('attach_subscription'))
                                 ->visible(fn (Get $get): bool => (bool) $get('attach_subscription')),
                             DatePicker::make('subscription_start_date')
@@ -279,6 +305,42 @@ class TenantOnboarding extends Page implements HasForms
                                 ])
                                 ->required(fn (Get $get): bool => (bool) $get('attach_subscription'))
                                 ->visible(fn (Get $get): bool => (bool) $get('attach_subscription')),
+                            Select::make('service_status')
+                                ->label('Service status')
+                                ->default('active')
+                                ->options([
+                                    'active' => 'Active',
+                                    'trial' => 'Trial',
+                                    'pending_setup' => 'Pending setup',
+                                    'suspended' => 'Suspended',
+                                ])
+                                ->required(fn (Get $get): bool => (bool) $get('attach_subscription'))
+                                ->visible(fn (Get $get): bool => (bool) $get('attach_subscription'))
+                                ->native(false),
+                            Select::make('managed_services_status')
+                                ->label('Managed services')
+                                ->default('not_enabled')
+                                ->options([
+                                    'not_enabled' => 'Not enabled',
+                                    'requested' => 'Requested',
+                                    'active' => 'Active',
+                                ])
+                                ->native(false),
+                        ])
+                        ->columns(2),
+                    Step::make('Workspace Access')
+                        ->description('Confirm where the owner lands after login.')
+                        ->schema([
+                            Select::make('workspace_mode')
+                                ->label('Owner workspace access')
+                                ->default('plan_default')
+                                ->options([
+                                    'plan_default' => 'Use selected plan',
+                                    'verification' => 'Verification Zone only',
+                                    'clinic' => 'Clinic PMS only',
+                                    'both' => 'Choose Workspace',
+                                ])
+                                ->native(false),
                         ])
                         ->columns(2),
                 ])->persistStepInQueryString(),
@@ -291,12 +353,23 @@ class TenantOnboarding extends Page implements HasForms
 
         try {
             $result = DB::transaction(function () use ($state): array {
+                $plan = (! empty($state['attach_subscription']) && ! empty($state['subscription_plan_id']))
+                    ? SubscriptionPlan::find($state['subscription_plan_id'])
+                    : null;
+
+                $workspaceAccess = $this->workspaceAccessFor($state, $plan);
+                $defaultWorkspace = $this->defaultWorkspaceFor($state, $plan, $workspaceAccess);
+
                 $organization = Organization::create([
+                    'dso_id' => $state['dso_id'] ?? null,
                     'name' => $state['organization_name'],
                     'owner_name' => $state['organization_owner_name'],
                     'email' => $state['organization_email'] ?? null,
                     'phone' => $state['organization_phone'] ?? null,
                     'status' => (bool) $state['organization_status'],
+                    'lifecycle_status' => 'active',
+                    'onboarding_status' => 'complete',
+                    'account_manager_user_id' => auth()->id(),
                 ]);
 
                 $clinic = Clinic::create([
@@ -305,6 +378,15 @@ class TenantOnboarding extends Page implements HasForms
                     'clinic_code' => $state['clinic_code'],
                     'timezone' => $state['clinic_timezone'],
                     'status' => (bool) $state['clinic_status'],
+                    'verification_services_enabled' => $plan?->includesVerification() ?? true,
+                    'clinic_operations_enabled' => $plan?->includesPms() ?? true,
+                    'service_status' => $state['service_status'] ?? 'active',
+                    'pms_service_status' => ($plan?->includesPms() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
+                    'verification_service_status' => ($plan?->includesVerification() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
+                    'managed_services_status' => $state['managed_services_status'] ?? 'not_enabled',
+                    'trial_ends_at' => $plan?->trial_days ? now()->addDays((int) $plan->trial_days)->toDateString() : null,
+                    'demo_mode' => (bool) ($plan?->demo_mode_available && ($state['subscription_status'] ?? null) === 'trial'),
+                    'account_manager_user_id' => auth()->id(),
                 ]);
 
                 $location = Location::create([
@@ -320,6 +402,7 @@ class TenantOnboarding extends Page implements HasForms
                 ]);
 
                 $owner = User::create([
+                    'dso_id' => $state['dso_id'] ?? null,
                     'name' => $state['owner_name'],
                     'email' => $state['owner_email'],
                     'phone' => $state['owner_phone'],
@@ -329,19 +412,30 @@ class TenantOnboarding extends Page implements HasForms
                     'created_by' => auth()->id(),
                     'status' => (bool) $state['owner_status'],
                     'password' => Hash::make($state['owner_password']),
+                    'allowed_workspaces' => $workspaceAccess,
+                    'default_workspace' => $defaultWorkspace,
                 ]);
 
                 $owner->assignRole('clinic_admin');
 
                 $subscription = null;
 
-                if (! empty($state['attach_subscription']) && ! empty($state['subscription_plan_id'])) {
+                if ($plan) {
                     $subscription = Subscription::create([
+                        'dso_id' => $state['dso_id'] ?? null,
                         'organization_id' => $organization->id,
-                        'subscription_plan_id' => $state['subscription_plan_id'],
+                        'subscription_scope' => 'organization',
+                        'subscription_plan_id' => $plan->id,
                         'start_date' => $state['subscription_start_date'],
                         'end_date' => $state['subscription_end_date'] ?? null,
                         'status' => $state['subscription_status'],
+                        'service_status' => $state['service_status'] ?? 'active',
+                        'change_type' => 'new',
+                        'effective_date' => $state['subscription_start_date'],
+                        'trial_starts_at' => $plan->trial_days ? $state['subscription_start_date'] : null,
+                        'trial_ends_at' => $plan->trial_days ? now()->addDays((int) $plan->trial_days)->toDateString() : null,
+                        'is_demo' => (bool) ($plan->demo_mode_available && ($state['subscription_status'] ?? null) === 'trial'),
+                        'account_manager_user_id' => auth()->id(),
                     ]);
                 }
 
@@ -436,6 +530,26 @@ class TenantOnboarding extends Page implements HasForms
         }
 
         return 1;
+    }
+
+    protected function workspaceAccessFor(array $state, ?SubscriptionPlan $plan): array
+    {
+        return match ($state['workspace_mode'] ?? 'plan_default') {
+            'verification' => ['verification'],
+            'clinic' => ['clinic'],
+            'both' => ['verification', 'clinic'],
+            default => SaasEntitlements::workspacesForPlan($plan) ?: ['verification', 'clinic'],
+        };
+    }
+
+    protected function defaultWorkspaceFor(array $state, ?SubscriptionPlan $plan, array $workspaces): ?string
+    {
+        return match ($state['workspace_mode'] ?? 'plan_default') {
+            'verification' => 'verification',
+            'clinic' => 'clinic',
+            'both' => null,
+            default => SaasEntitlements::defaultWorkspaceForPlan($plan) ?? (count($workspaces) === 1 ? $workspaces[0] : null),
+        };
     }
 
     protected function generateClinicCode(): string

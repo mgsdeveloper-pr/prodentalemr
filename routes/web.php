@@ -12,6 +12,7 @@ use App\Http\Controllers\Clinic\ClinicPanelScopeController;
 use App\Http\Controllers\Clinic\PatientConsentFormController;
 use App\Http\Controllers\Clinic\PatientDocumentController;
 use App\Http\Controllers\Clinic\VerificationRequestSampleController;
+use App\Http\Controllers\Dso\DsoClinicScopeController;
 use App\Http\Controllers\Verification\VerificationNotificationActionController;
 use App\Http\Controllers\Verification\VerificationInboxAttachmentController;
 use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
@@ -56,6 +57,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('admin.signout.perform')]))->name('admin.signout');
     Route::get('/verification/clinic-scope', AdminClinicScopeController::class)->name('admin.clinic-scope');
     Route::get('/clinic/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('clinic.signout.perform')]))->name('clinic.signout');
+    Route::get('/dso/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('dso.signout.perform')]))->name('dso.signout');
+    Route::get('/dso/clinic-scope', DsoClinicScopeController::class)->name('dso.clinic-scope');
     Route::get('/choose-workspace', [ChooseWorkspaceController::class, 'show'])->name('clinic.choose-workspace');
     Route::get('/choose-workspace/{workspace}', [ChooseWorkspaceController::class, 'switch'])
         ->whereIn('workspace', [\App\Support\ClinicWorkspace::VERIFICATION, \App\Support\ClinicWorkspace::CLINIC_PMS])
@@ -77,6 +80,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/saas/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('saas.signout.perform')]))->name('saas.signout');
     Route::get('/verification/sign-out/perform', PanelLogoutController::class)->name('admin.signout.perform');
     Route::get('/clinic/sign-out/perform', PanelLogoutController::class)->name('clinic.signout.perform');
+    Route::get('/dso/sign-out/perform', PanelLogoutController::class)->name('dso.signout.perform');
     Route::get('/saas/sign-out/perform', PanelLogoutController::class)->name('saas.signout.perform');
     Route::get('/verification/verifications/{billingWorkItem}/start', function (BillingWorkItem $billingWorkItem) {
         abort_unless(auth()->user()?->canAccessSaasRevenueOperations(), 403);
@@ -100,12 +104,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/mailbox/messages/preview', UserMailboxMessagePreviewController::class)->name('admin.user-mailbox-messages.preview');
     Route::get('/clinic/verification-requests/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForClinic'])->name('clinic.verification-requests.pdf.download');
     Route::get('/clinic/verification-requests/{billingWorkItem}/preview', [VerificationResultPdfController::class, 'previewForClinic'])->name('clinic.verification-requests.pdf.preview');
+    Route::get('/clinic/billing-work-item-attachments/{attachment}/preview', [ClinicBillingWorkItemAttachmentController::class, 'preview'])->name('clinic.billing-work-item-attachments.preview');
     Route::get('/clinic/billing-work-item-attachments/{attachment}/download', [ClinicBillingWorkItemAttachmentController::class, 'download'])->name('clinic.billing-work-item-attachments.download');
     Route::get('/clinic/notifications/{notification}/open', [VerificationNotificationActionController::class, 'open'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.open');
     Route::post('/clinic/notifications/{notification}/read', [VerificationNotificationActionController::class, 'markRead'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.read');
     Route::post('/clinic/notifications/read-all', [VerificationNotificationActionController::class, 'markAllRead'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.read-all');
     Route::get('/saas/invoices/{invoice}/pdf', [InvoicePdfController::class, 'show'])->name('saas.invoices.pdf.view');
     Route::get('/saas/invoices/{invoice}/download', [InvoicePdfController::class, 'download'])->name('saas.invoices.pdf.download');
+    Route::get('/saas/billing-work-item-attachments/{attachment}/preview', [BillingWorkItemAttachmentController::class, 'preview'])->name('saas.billing-work-item-attachments.preview');
     Route::get('/saas/billing-work-item-attachments/{attachment}/download', [BillingWorkItemAttachmentController::class, 'download'])->name('saas.billing-work-item-attachments.download');
 });
 

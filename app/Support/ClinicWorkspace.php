@@ -53,11 +53,11 @@ class ClinicWorkspace
 
         $workspaces = [];
 
-        if ($clinic->hasVerificationServices()) {
+        if ($clinic->hasActiveVerificationServices()) {
             $workspaces[] = self::VERIFICATION;
         }
 
-        if ($clinic->hasClinicOperations()) {
+        if ($clinic->hasActiveClinicOperations()) {
             $workspaces[] = self::CLINIC_PMS;
         }
 

@@ -7,6 +7,7 @@ use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
 use App\Support\AdminClinicScope;
+use App\Support\SaasEntitlements;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -65,6 +66,10 @@ class VerificationRequestResponse extends Page
 
     public array $responseComposerAttachments = [];
 
+    public ?int $selectedResponseAttachmentId = null;
+
+    public bool $showResponseAttachmentPreview = false;
+
     public function selectStatusFilter(string $filter): void
     {
         $this->statusFilter = in_array($filter, ['all', 'open', 'responded', 'closed'], true)
@@ -76,7 +81,8 @@ class VerificationRequestResponse extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
+        return (auth()->user()?->canAccessVerificationWorkspace() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'request_response', AdminClinicScope::selectedClinic());
     }
 
     public static function getNavigationBadge(): ?string
@@ -119,6 +125,7 @@ class VerificationRequestResponse extends Page
     public function closeDetails(): void
     {
         $this->showDetailsModal = false;
+        $this->closeResponseAttachmentPreview();
         $this->closeRequestComposer();
         $this->closeResponseComposer();
     }
@@ -310,7 +317,14 @@ class VerificationRequestResponse extends Page
             ],
             [
                 'label' => 'Responses Received',
-                'count' => (clone $query)->whereNotNull('clinic_responded_at')->count(),
+                'count' => (clone $query)
+                    ->where('status', '!=', BillingWorkItem::STATUS_DONE)
+                    ->where(function (Builder $builder): void {
+                        $builder
+                            ->whereNotNull('clinic_responded_at')
+                            ->orWhereHas('activities', fn (Builder $activityQuery) => $activityQuery->where('activity_type', self::RESPONSE_ACTIVITY));
+                    })
+                    ->count(),
                 'tone' => 'sky',
                 'filter' => 'responded',
             ],
@@ -464,6 +478,30 @@ class VerificationRequestResponse extends Page
             ->values();
     }
 
+    public function openResponseAttachmentPreview(int $attachmentId): void
+    {
+        $this->selectedResponseAttachmentId = $attachmentId;
+        $this->showResponseAttachmentPreview = true;
+    }
+
+    public function closeResponseAttachmentPreview(): void
+    {
+        $this->showResponseAttachmentPreview = false;
+        $this->selectedResponseAttachmentId = null;
+    }
+
+    public function getSelectedResponseAttachment(): ?BillingWorkItemAttachment
+    {
+        $workItem = $this->getSelectedWorkItem();
+
+        if (! $workItem || ! $this->selectedResponseAttachmentId) {
+            return null;
+        }
+
+        return $this->getResponseAttachments($workItem)
+            ->first(fn (BillingWorkItemAttachment $attachment): bool => (int) $attachment->getKey() === (int) $this->selectedResponseAttachmentId);
+    }
+
     public function responseAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
     {
         return route('saas.billing-work-item-attachments.download', $attachment);
@@ -494,6 +532,7 @@ class VerificationRequestResponse extends Page
                 'patient',
                 'verificationProfile',
                 'assignedTo',
+                'closedBy',
                 'activities' => fn ($builder) => $builder
                     ->whereIn('activity_type', [self::REQUEST_ACTIVITY, self::RESPONSE_ACTIVITY])
                     ->with('user')
@@ -501,7 +540,15 @@ class VerificationRequestResponse extends Page
                 'attachments' => fn ($builder) => $builder->latest('created_at'),
             ])
             ->when($this->statusFilter === 'open', fn (Builder $builder) => $builder->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE))
-            ->when($this->statusFilter === 'responded', fn (Builder $builder) => $builder->whereNotNull('clinic_responded_at'))
+            ->when($this->statusFilter === 'responded', function (Builder $builder): void {
+                $builder
+                    ->where('status', '!=', BillingWorkItem::STATUS_DONE)
+                    ->where(function (Builder $responseQuery): void {
+                        $responseQuery
+                            ->whereNotNull('clinic_responded_at')
+                            ->orWhereHas('activities', fn (Builder $activityQuery) => $activityQuery->where('activity_type', self::RESPONSE_ACTIVITY));
+                    });
+            })
             ->when($this->statusFilter === 'closed', fn (Builder $builder) => $builder->where('status', BillingWorkItem::STATUS_DONE))
             ->when(filled($this->search), function (Builder $builder): void {
                 $search = '%' . trim($this->search) . '%';
@@ -566,18 +613,48 @@ class VerificationRequestResponse extends Page
     protected function resolveWorkflowState(BillingWorkItem $workItem, ?BillingWorkItemActivity $request, ?BillingWorkItemActivity $response): array
     {
         if ($workItem->normalized_status === BillingWorkItem::STATUS_DONE) {
-            return ['label' => 'Closed', 'tone' => 'emerald'];
+            return ['label' => 'Closed Request', 'tone' => 'emerald'];
         }
 
         if ($response) {
-            return ['label' => 'Responded', 'tone' => 'sky'];
+            return ['label' => 'Response Received', 'tone' => 'sky'];
         }
 
         if ($request) {
-            return ['label' => 'Open', 'tone' => 'amber'];
+            return ['label' => 'Waiting on Clinic', 'tone' => 'amber'];
         }
 
         return ['label' => 'Pending', 'tone' => 'slate'];
+    }
+
+    public function getClosureSummary(BillingWorkItem $workItem): ?array
+    {
+        if ($workItem->normalized_status !== BillingWorkItem::STATUS_DONE) {
+            return null;
+        }
+
+        return [
+            'closed_by' => $workItem->closedBy?->name ?: 'System',
+            'closed_at' => optional($workItem->completed_at)->format('d M Y, h:i A') ?: '-',
+        ];
+    }
+
+    public function getWorkflowStatus(BillingWorkItem $workItem): array
+    {
+        $request = $workItem->activities->firstWhere('activity_type', self::REQUEST_ACTIVITY);
+        $response = $this->resolveLatestResponse($workItem, $request);
+
+        return $this->resolveWorkflowState($workItem, $request, $response);
+    }
+
+    public function workflowStatusStyles(string $tone): array
+    {
+        return match ($tone) {
+            'amber' => ['border' => '#fde68a', 'bg' => '#fffbeb', 'text' => '#92400e'],
+            'sky' => ['border' => '#bfdbfe', 'bg' => '#eff6ff', 'text' => '#1d4ed8'],
+            'emerald' => ['border' => '#bbf7d0', 'bg' => '#f0fdf4', 'text' => '#166534'],
+            default => ['border' => '#dbe4ee', 'bg' => '#f8fafc', 'text' => '#475569'],
+        };
     }
 
     protected function formatRoleLabel(?string $role): string

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -12,6 +13,7 @@ class Organization extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'dso_id',
         'name',
         'owner_name',
         'email',
@@ -22,11 +24,27 @@ class Organization extends Model
         'zip_code',
         'country',
         'status',
+        'lifecycle_status',
+        'onboarding_status',
+        'account_manager_user_id',
+        'internal_notes',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'status' => 'boolean',
+        ];
+    }
 
     public function clinics(): HasMany
     {
         return $this->hasMany(Clinic::class);
+    }
+
+    public function dso(): BelongsTo
+    {
+        return $this->belongsTo(Dso::class);
     }
 
     public function locations(): HasManyThrough
@@ -42,6 +60,11 @@ class Organization extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function accountManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'account_manager_user_id');
     }
 
     public function invoices(): HasMany
@@ -62,6 +85,14 @@ class Organization extends Model
     public function activeSubscription(): HasMany
     {
         return $this->hasMany(Subscription::class)->where('status', 'active');
+    }
+
+    public function currentSubscription(): ?Subscription
+    {
+        return $this->subscriptions()
+            ->whereIn('status', ['active', 'trial'])
+            ->latest('start_date')
+            ->first();
     }
 
     public function billingAddressLines(): array

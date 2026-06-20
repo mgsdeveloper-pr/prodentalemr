@@ -5,6 +5,8 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\PanelPermissionMatrix;
 use App\Support\ClinicWorkspace;
+use App\Support\DsoScope;
+use App\Support\SaasEntitlements;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
@@ -46,12 +48,19 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         'verification_user' => 'Verification User',
     ];
 
+    public const DSO_ROLE_LABELS = [
+        'dso_admin' => 'DSO Admin',
+        'dso_manager' => 'DSO Manager',
+        'dso_viewer' => 'DSO Viewer',
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
     protected $fillable = [
+        'dso_id',
         'name',
         'email',
         'phone',
@@ -62,6 +71,9 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         'status',
         'password',
         'last_login_at',
+        'default_workspace',
+        'allowed_workspaces',
+        'feature_overrides',
     ];
 
     /**
@@ -86,12 +98,19 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'last_login_at' => 'datetime',
             'status' => 'boolean',
             'password' => 'hashed',
+            'allowed_workspaces' => 'array',
+            'feature_overrides' => 'array',
         ];
     }
 
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function dso(): BelongsTo
+    {
+        return $this->belongsTo(Dso::class);
     }
 
     public function clinic(): BelongsTo
@@ -123,6 +142,51 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function mailbox(): HasOne
     {
         return $this->hasOne(UserMailbox::class);
+    }
+
+    public function allowedWorkspaces(): array
+    {
+        $workspaces = $this->allowed_workspaces;
+
+        if (is_array($workspaces) && count($workspaces) > 0) {
+            return array_values(array_unique(array_filter($workspaces)));
+        }
+
+        $fallback = [];
+
+        if ($this->canAccessClinicWorkspace()) {
+            $fallback[] = 'clinic';
+        }
+
+        if ($this->canAccessVerificationWorkspace()) {
+            $fallback[] = 'verification';
+        }
+
+        if ($this->hasSaasWorkspaceRole()) {
+            $fallback[] = 'saas';
+        }
+
+        if ($this->hasDsoWorkspaceRole()) {
+            $fallback[] = 'dso';
+        }
+
+        return array_values(array_unique($fallback));
+    }
+
+    public function preferredWorkspace(): ?string
+    {
+        $allowed = $this->allowedWorkspaces();
+
+        if (filled($this->default_workspace) && in_array($this->default_workspace, $allowed, true)) {
+            return $this->default_workspace;
+        }
+
+        return count($allowed) === 1 ? $allowed[0] : null;
+    }
+
+    public function featureOverride(string $feature, mixed $default = null): mixed
+    {
+        return data_get($this->feature_overrides ?? [], $feature, $default);
     }
 
     public static function saasRoleOptions(): array
@@ -165,10 +229,16 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         ];
     }
 
+    public static function dsoRoleOptions(): array
+    {
+        return self::DSO_ROLE_LABELS;
+    }
+
     public static function allRoleOptions(): array
     {
         return [
             'SaaS Roles' => self::saasRoleOptions(),
+            'DSO Roles' => self::dsoRoleOptions(),
             'Verification Roles' => self::verificationRoleOptions(),
             'Clinic Roles' => self::clinicRoleOptions(),
         ];
@@ -199,6 +269,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         $role = $this->getPrimaryRoleName();
 
         return self::SAAS_ROLE_LABELS[$role]
+            ?? self::DSO_ROLE_LABELS[$role]
             ?? self::verificationRoleOptions()[$role]
             ?? self::CLINIC_ROLE_LABELS[$role]
             ?? $role;
@@ -220,6 +291,19 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     {
         return $this->status
             && $this->hasAnyRole(array_keys(self::saasRoleOptions()));
+    }
+
+    public function hasDsoWorkspaceRole(): bool
+    {
+        return $this->status
+            && $this->hasAnyRole(array_keys(self::dsoRoleOptions()));
+    }
+
+    public function canAccessDsoWorkspace(): bool
+    {
+        return $this->status
+            && filled($this->dso_id)
+            && $this->hasDsoWorkspaceRole();
     }
 
     public function isVerificationAdmin(): bool
@@ -346,6 +430,16 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return true;
     }
 
+    public function dsoScopedOrganizationIds(): array
+    {
+        return DsoScope::organizationIdsFor($this);
+    }
+
+    public function dsoScopedClinicIds(): array
+    {
+        return DsoScope::clinicIdsFor($this);
+    }
+
     public function verificationAssignableRoleOptions(): array
     {
         $verificationRoles = self::verificationRoleOptions();
@@ -437,18 +531,22 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return $this->shouldBypassClinicScope();
         }
 
+        if (! SaasEntitlements::clinicModuleAllowed($clinic, $module)) {
+            return false;
+        }
+
         if (in_array($module, self::verificationClinicModules(), true)) {
-            return $clinic->hasVerificationServices()
+            return $clinic->hasActiveVerificationServices()
                 && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
         if (in_array($module, self::clinicOperationsModules(), true)) {
-            return $clinic->hasClinicOperations()
+            return $clinic->hasActiveClinicOperations()
                 && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
         if (in_array($module, self::sharedClinicModules(), true)) {
-            return ($clinic->hasVerificationServices() || $clinic->hasClinicOperations())
+            return ($clinic->hasActiveVerificationServices() || $clinic->hasActiveClinicOperations())
                 && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
         }
 
@@ -463,7 +561,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return $this->shouldBypassClinicScope();
         }
 
-        return $clinic->hasVerificationServices() || $clinic->hasClinicOperations();
+        return $clinic->hasActiveVerificationServices() || $clinic->hasActiveClinicOperations();
     }
 
     protected function serviceGateClinic(): ?Clinic
@@ -1159,6 +1257,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
         return match ($panel->getId()) {
             'admin' => $this->canAccessVerificationWorkspace(),
+            'dso' => $this->canAccessDsoWorkspace(),
             'saas' => $this->hasAnyRole(['saas_admin', 'saas_manager', 'saas_user'])
                 && $this->hasAnyStandardSaasModuleAccess(),
             'clinic' => $this->hasAnyRole([

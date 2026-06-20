@@ -42,7 +42,7 @@ class SetupChecks extends Page
                 'notification-centre' => 'Notification Centre',
                 'payment-credentials' => 'Payment Credentials',
                 'billing-reports' => 'Billing Reports',
-                'tenant-onboarding' => 'Organization Onboarding',
+                'tenant-onboarding' => 'Client Onboarding',
             ],
             'Tenant Management' => [
                 'organizations' => 'Organizations',

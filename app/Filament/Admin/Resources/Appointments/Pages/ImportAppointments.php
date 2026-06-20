@@ -3,8 +3,10 @@
 namespace App\Filament\Admin\Resources\Appointments\Pages;
 
 use App\Filament\Admin\Resources\Appointments\AppointmentResource;
+use App\Models\AppointmentImportBatch;
 use App\Support\AdminClinicScope;
 use App\Support\AppointmentImportService;
+use App\Support\SaasEntitlements;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -16,6 +18,7 @@ use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ImportAppointments extends Page implements HasForms
@@ -30,7 +33,15 @@ class ImportAppointments extends Page implements HasForms
 
     public ?array $data = [];
 
+    public ?array $previewResult = null;
+
     public ?array $lastImportResult = null;
+
+    public static function canAccess(array $parameters = []): bool
+    {
+        return AppointmentResource::canCreate()
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'appointment_import', AdminClinicScope::selectedClinic());
+    }
 
     public function mount(): void
     {
@@ -45,6 +56,11 @@ class ImportAppointments extends Page implements HasForms
     public function getHeading(): string
     {
         return '';
+    }
+
+    public function getBackUrl(): string
+    {
+        return AppointmentResource::getUrl('index');
     }
 
     public function getSelectedClinicScopeLabel(): string
@@ -110,6 +126,57 @@ class ImportAppointments extends Page implements HasForms
         return [];
     }
 
+    public function previewAppointments(AppointmentImportService $importService): void
+    {
+        $clinic = AdminClinicScope::selectedClinic();
+        $uploadedFile = $this->resolveUploadedFile($this->data['import_file'] ?? null);
+        $originalName = $uploadedFile?->getClientOriginalName();
+        $storedPath = null;
+
+        if (! $clinic) {
+            Notification::make()
+                ->title('Select a clinic first')
+                ->body('Choose one clinic from Clinic Scope before previewing appointments.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! $uploadedFile instanceof TemporaryUploadedFile) {
+            Notification::make()
+                ->title('Appointment file is required')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $storedPath = $this->storeUploadedFile($uploadedFile, $originalName);
+            $this->previewResult = $importService->previewFromStoredFile('local', $storedPath, $clinic, $originalName);
+            $this->lastImportResult = null;
+
+            Notification::make()
+                ->title('Preview ready')
+                ->body(($this->previewResult['ready'] ?? 0) . ' ready, ' . ($this->previewResult['failed'] ?? 0) . ' need attention.')
+                ->color(($this->previewResult['failed'] ?? 0) > 0 ? 'warning' : 'success')
+                ->send();
+        } catch (\Throwable $throwable) {
+            $this->previewResult = null;
+
+            Notification::make()
+                ->title('Preview failed')
+                ->body($throwable->getMessage())
+                ->danger()
+                ->send();
+        } finally {
+            if (is_string($storedPath) && Storage::disk('local')->exists($storedPath)) {
+                Storage::disk('local')->delete($storedPath);
+            }
+        }
+    }
+
     public function importAppointments(AppointmentImportService $importService): void
     {
         $clinic = AdminClinicScope::selectedClinic();
@@ -138,17 +205,7 @@ class ImportAppointments extends Page implements HasForms
         }
 
         try {
-            $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: pathinfo($originalName ?? '', PATHINFO_EXTENSION) ?: 'csv');
-            $storedPath = $uploadedFile->storeAs(
-                'imports/appointments',
-                Str::uuid()->toString() . '.' . $extension,
-                'local',
-            );
-
-            if (! is_string($storedPath) || $storedPath === '') {
-                throw new \RuntimeException('Upload could not be stored for import.');
-            }
-
+            $storedPath = $this->storeUploadedFile($uploadedFile, $originalName);
             $result = $importService->importFromStoredFile('local', $storedPath, $clinic, $user, $originalName);
         } catch (\Throwable $throwable) {
             Log::warning('Appointment import failed.', [
@@ -180,12 +237,85 @@ class ImportAppointments extends Page implements HasForms
 
         $this->form->fill();
         $this->lastImportResult = $result;
+        $this->previewResult = null;
+        $this->createImportBatch($result, $clinic, $user, $originalName);
 
         Notification::make()
             ->title('Appointment import completed')
-            ->body(($result['imported'] ?? 0) . ' imported, ' . ($result['failed'] ?? 0) . ' failed.')
+            ->body(($result['imported'] ?? 0) . ' imported, ' . ($result['failed'] ?? 0) . ' failed, ' . ($result['warnings'] ?? 0) . ' warning(s).')
             ->color(($result['failed'] ?? 0) > 0 ? 'warning' : 'success')
             ->send();
+    }
+
+    public function getRecentImportBatches()
+    {
+        $clinic = AdminClinicScope::selectedClinic();
+
+        if (! $clinic) {
+            return collect();
+        }
+
+        return AppointmentImportBatch::query()
+            ->with('user')
+            ->where('clinic_id', $clinic->id)
+            ->latest()
+            ->limit(5)
+            ->get();
+    }
+
+    public function downloadFailedRows(int $batchId): StreamedResponse
+    {
+        $batch = AppointmentImportBatch::query()->findOrFail($batchId);
+        $rows = $batch->failed_row_results ?? [];
+
+        return response()->streamDownload(function () use ($rows): void {
+            $handle = fopen('php://output', 'wb');
+            fputcsv($handle, ['row', 'patient', 'appointment_date', 'service', 'error']);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, [
+                    $row['row'] ?? '',
+                    $row['patient'] ?? '',
+                    $row['date'] ?? '',
+                    $row['service'] ?? '',
+                    $row['message'] ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        }, 'failed-appointment-import-rows-' . $batch->id . '.csv');
+    }
+
+    protected function storeUploadedFile(TemporaryUploadedFile $uploadedFile, ?string $originalName): string
+    {
+        $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: pathinfo($originalName ?? '', PATHINFO_EXTENSION) ?: 'csv');
+        $storedPath = $uploadedFile->storeAs(
+            'imports/appointments',
+            Str::uuid()->toString() . '.' . $extension,
+            'local',
+        );
+
+        if (! is_string($storedPath) || $storedPath === '') {
+            throw new \RuntimeException('Upload could not be stored for import.');
+        }
+
+        return $storedPath;
+    }
+
+    protected function createImportBatch(array $result, $clinic, $user, ?string $originalName): void
+    {
+        AppointmentImportBatch::query()->create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'user_id' => $user?->id,
+            'original_filename' => $originalName,
+            'total_rows' => $result['total'] ?? 0,
+            'imported_rows' => $result['imported'] ?? 0,
+            'failed_rows' => $result['failed'] ?? 0,
+            'warning_rows' => $result['warnings'] ?? 0,
+            'row_results' => $result['row_results'] ?? [],
+            'failed_row_results' => $result['failed_row_results'] ?? [],
+        ]);
     }
 
     protected function resolveUploadedFile(mixed $state): ?TemporaryUploadedFile

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Saas\Resources\SubscriptionPlans\Schemas;
 
+use App\Models\SubscriptionPlan;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
@@ -22,6 +23,16 @@ class SubscriptionPlanInfolist
                                 TextEntry::make('name')
                                     ->label('Plan name')
                                     ->columnSpan(2),
+                                TextEntry::make('plan_type')
+                                    ->label('Plan type')
+                                    ->badge()
+                                    ->formatStateUsing(fn (?string $state): string => SubscriptionPlan::planTypeOptions()[$state] ?? 'Not set')
+                                    ->color('primary'),
+                                TextEntry::make('workspace_mode')
+                                    ->label('Workspace')
+                                    ->badge()
+                                    ->formatStateUsing(fn (?string $state): string => SubscriptionPlan::workspaceModeOptions()[$state] ?? 'Not set')
+                                    ->color('info'),
                                 TextEntry::make('price')
                                     ->money('USD')
                                     ->badge()
@@ -58,6 +69,52 @@ class SubscriptionPlanInfolist
                             ->separator(', ')
                             ->state(fn ($record): array => $record->included_module_labels)
                             ->columnSpanFull(),
+                    ]),
+                Section::make('Included Features')
+                    ->description('Feature switches controlled by this plan.')
+                    ->schema([
+                        TextEntry::make('included_features')
+                            ->label('')
+                            ->badge()
+                            ->separator(', ')
+                            ->state(fn ($record): array => collect($record->included_features ?? [])
+                                ->map(fn (string $feature): string => SubscriptionPlan::featureOptions()[$feature] ?? str($feature)->replace('_', ' ')->headline())
+                                ->values()
+                                ->all())
+                            ->columnSpanFull(),
+                    ]),
+                Section::make('Limits & Add-ons')
+                    ->description('Operational limits and optional service eligibility.')
+                    ->schema([
+                        Grid::make(4)
+                            ->schema([
+                                TextEntry::make('plan_limits.storage_mb')
+                                    ->label('Storage MB')
+                                    ->badge(),
+                                TextEntry::make('plan_limits.monthly_verifications')
+                                    ->label('Monthly verifications')
+                                    ->placeholder('Unlimited')
+                                    ->badge(),
+                                TextEntry::make('plan_limits.mailbox_storage_mb')
+                                    ->label('Mailbox MB')
+                                    ->badge(),
+                                TextEntry::make('plan_limits.import_rows')
+                                    ->label('Import rows')
+                                    ->badge(),
+                                TextEntry::make('plan_limits.attachment_mb')
+                                    ->label('Attachment MB')
+                                    ->badge(),
+                                TextEntry::make('trial_days')
+                                    ->label('Trial days')
+                                    ->placeholder('No trial')
+                                    ->badge(),
+                                IconEntry::make('managed_services_allowed')
+                                    ->label('Managed Services')
+                                    ->boolean(),
+                                IconEntry::make('demo_mode_available')
+                                    ->label('Demo mode')
+                                    ->boolean(),
+                            ]),
                     ]),
             ])
             ->columns(1);

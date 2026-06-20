@@ -38,6 +38,10 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended('/saas');
         }
 
+        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('dso'))) {
+            return redirect()->intended('/dso');
+        }
+
         if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('admin'))) {
             return redirect()->intended('/verification');
         }

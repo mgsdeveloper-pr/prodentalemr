@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Support\SaasMailSettings;
+use App\Support\SaasEntitlementAudit;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
@@ -29,5 +30,7 @@ class AppServiceProvider extends ServiceProvider
         } catch (Throwable) {
             // Fall back silently to the base Laravel mail configuration.
         }
+
+        SaasEntitlementAudit::register();
     }
 }

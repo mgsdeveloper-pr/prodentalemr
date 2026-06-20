@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Pages;
 use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMessage;
 use App\Support\AdminClinicScope;
+use App\Support\SaasEntitlements;
 use App\Support\VerificationInboxService;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -39,7 +40,8 @@ class VerificationInbox extends Page
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
+        return (auth()->user()?->canAccessVerificationWorkspace() ?? false)
+            && SaasEntitlements::userFeatureAllowed(auth()->user(), 'clinic_inbox', AdminClinicScope::selectedClinic());
     }
 
     public function mount(): void

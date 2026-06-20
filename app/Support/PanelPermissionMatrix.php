@@ -68,6 +68,14 @@ class PanelPermissionMatrix
                 'managed_services' => 'Managed Services',
                 'roles_permissions' => 'Roles & Permissions',
             ],
+            'dso' => [
+                'dashboard' => 'Dashboard',
+                'clinics' => 'Clinics',
+                'reports' => 'Reports',
+                'users' => 'Users',
+                'roles_permissions' => 'Roles & Permissions',
+                'settings' => 'Settings',
+            ],
             default => [],
         };
     }
@@ -78,6 +86,7 @@ class PanelPermissionMatrix
             'verification' => User::verificationRoleOptions(),
             'saas' => User::saasRoleOptions(),
             'clinic' => User::clinicRoleOptions(),
+            'dso' => User::dsoRoleOptions(),
             default => [],
         };
     }
@@ -88,6 +97,7 @@ class PanelPermissionMatrix
             'verification' => 'verification_admin',
             'saas' => 'saas_admin',
             'clinic' => 'clinic_admin',
+            'dso' => 'dso_admin',
             default => null,
         };
     }
