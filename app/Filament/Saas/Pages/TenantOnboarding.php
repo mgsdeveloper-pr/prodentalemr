@@ -17,6 +17,7 @@ use App\Support\UsLocationOptions;
 use App\Support\UsTimezoneOptions;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -57,6 +58,8 @@ class TenantOnboarding extends Page implements HasForms
 
     public ?array $data = [];
 
+    public ?string $clientType = null;
+
     protected ?OnboardingDraft $draft = null;
 
     public static function canAccess(): bool
@@ -66,7 +69,12 @@ class TenantOnboarding extends Page implements HasForms
 
     public function mount(): void
     {
+        $this->clientType = in_array(request()->query('client_type'), ['organization', 'single_clinic'], true)
+            ? request()->query('client_type')
+            : null;
+
         $defaults = [
+            'client_type' => $this->clientType ?? 'organization',
             'organization_status' => true,
             'clinic_code' => $this->generateClinicCode(),
             'clinic_timezone' => 'America/New_York',
@@ -95,6 +103,10 @@ class TenantOnboarding extends Page implements HasForms
 
     public function updated($name, $value): void
     {
+        if ($name === 'data.client_type' && in_array($value, ['organization', 'single_clinic'], true)) {
+            $this->clientType = $value;
+        }
+
         if (! str_starts_with((string) $name, 'data.')) {
             return;
         }
@@ -109,8 +121,12 @@ class TenantOnboarding extends Page implements HasForms
             ->components([
                 Wizard::make([
                     Step::make('Organization')
-                        ->description('Create the parent practice group or business record.')
+                        ->description(fn (Get $get): string => $get('client_type') === 'single_clinic'
+                            ? 'Create the business record for this single clinic.'
+                            : 'Create the parent practice group or business record.')
                         ->schema([
+                            Hidden::make('client_type')
+                                ->default($this->clientType ?? 'organization'),
                             Select::make('dso_id')
                                 ->label('DSO / Enterprise account')
                                 ->options(fn (): array => Dso::query()
@@ -119,9 +135,10 @@ class TenantOnboarding extends Page implements HasForms
                                     ->all())
                                 ->searchable()
                                 ->preload()
+                                ->visible(fn (Get $get): bool => $get('client_type') !== 'single_clinic')
                                 ->helperText('Optional. Use this when this customer belongs to a larger DSO.'),
                             TextInput::make('organization_name')
-                                ->label('Organization name')
+                                ->label(fn (Get $get): string => $get('client_type') === 'single_clinic' ? 'Clinic business name' : 'Organization name')
                                 ->required()
                                 ->maxLength(255),
                             TextInput::make('organization_owner_name')
@@ -353,6 +370,10 @@ class TenantOnboarding extends Page implements HasForms
 
         try {
             $result = DB::transaction(function () use ($state): array {
+                if (($state['client_type'] ?? null) === 'single_clinic') {
+                    $state['dso_id'] = null;
+                }
+
                 $plan = (! empty($state['attach_subscription']) && ! empty($state['subscription_plan_id']))
                     ? SubscriptionPlan::find($state['subscription_plan_id'])
                     : null;
@@ -504,6 +525,7 @@ class TenantOnboarding extends Page implements HasForms
     protected function hasMeaningfulDraftData(array $state): bool
     {
         return collect([
+            $state['client_type'] ?? null,
             $state['organization_name'] ?? null,
             $state['organization_owner_name'] ?? null,
             $state['organization_email'] ?? null,
@@ -563,7 +585,8 @@ class TenantOnboarding extends Page implements HasForms
 
     protected function buildSuccessMessage(array $result): string
     {
-        $message = "{$result['organization']->name} is ready. Owner login: {$result['owner']->email}";
+        $label = ($this->data['client_type'] ?? null) === 'single_clinic' ? 'Single clinic' : 'Organization';
+        $message = "{$label} {$result['organization']->name} is ready. Owner login: {$result['owner']->email}";
 
         if ($result['subscription']) {
             $result['subscription']->loadMissing('subscriptionPlan');

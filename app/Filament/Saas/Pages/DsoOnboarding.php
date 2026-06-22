@@ -46,6 +46,8 @@ class DsoOnboarding extends Page implements HasForms
 
     protected static ?int $navigationSort = 1;
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $title = '';
 
     protected static ?string $slug = 'dso-onboarding';

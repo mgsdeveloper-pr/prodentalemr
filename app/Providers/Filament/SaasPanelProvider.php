@@ -13,6 +13,7 @@ use App\Filament\Saas\Pages\RolesAndPermissions;
 use App\Filament\Saas\Pages\SaasSettings;
 use App\Filament\Saas\Pages\SetupChecks;
 use App\Filament\Saas\Pages\TenantOnboarding;
+use App\Filament\Saas\Pages\UserManagement;
 use App\Filament\Saas\Resources\Clinics\ClinicResource;
 use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\Dsos\DsoResource;
@@ -85,9 +86,7 @@ class SaasPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()->label('Organizations'),
                 NavigationGroup::make()->label('Plans'),
-                NavigationGroup::make()->label('Payment Systems'),
-                NavigationGroup::make()->label('Notification'),
-                NavigationGroup::make()->label('User Management'),
+                NavigationGroup::make()->label('Payments'),
                 NavigationGroup::make()->label('Settings'),
             ])
             ->renderHook(
@@ -123,6 +122,7 @@ class SaasPanelProvider extends PanelProvider
                 NotificationCentre::class,
                 PaymentCredentials::class,
                 BillingSettings::class,
+                UserManagement::class,
                 RolesAndPermissions::class,
                 ModuleSettings::class,
                 SetupChecks::class,

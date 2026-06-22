@@ -29,11 +29,11 @@ class BillingSettings extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Payment Systems';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Billing Settings';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 25;
 
     protected static ?string $title = 'Billing Settings';
 

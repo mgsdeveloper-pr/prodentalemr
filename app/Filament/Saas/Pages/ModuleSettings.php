@@ -11,11 +11,11 @@ class ModuleSettings extends ModuleSettingsPage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
-    protected static string|UnitEnum|null $navigationGroup = 'User Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Module Settings';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 60;
 
     protected static ?string $slug = 'module-settings';
 

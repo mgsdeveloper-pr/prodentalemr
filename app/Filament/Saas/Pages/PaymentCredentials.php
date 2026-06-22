@@ -28,11 +28,11 @@ class PaymentCredentials extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCreditCard;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Payment Systems';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Payment Credentials';
 
-    protected static ?int $navigationSort = -1;
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $title = 'Payment Credentials';
 
@@ -41,6 +41,8 @@ class PaymentCredentials extends Page implements HasForms
     protected string $view = 'filament.saas.pages.payment-credentials';
 
     public ?array $data = [];
+
+    public string $activeProvider = 'stripe';
 
     protected SaasSetting $settings;
 
@@ -70,6 +72,7 @@ class PaymentCredentials extends Page implements HasForms
             ->components([
                 Section::make('Stripe')
                     ->description('Connect Stripe first for hosted checkout, invoice payment links, and webhook-based payment confirmation.')
+                    ->visible(fn (): bool => $this->activeProvider === 'stripe')
                     ->schema([
                         Toggle::make('stripe_enabled')
                             ->label('Stripe status')
@@ -111,6 +114,7 @@ class PaymentCredentials extends Page implements HasForms
                     ]),
                 Section::make('PayPal')
                     ->description('Connect PayPal Orders v2 for hosted checkout, capture-on-return, and verified webhooks.')
+                    ->visible(fn (): bool => $this->activeProvider === 'paypal')
                     ->schema([
                         Toggle::make('paypal_enabled')
                             ->label('PayPal status')
@@ -156,14 +160,25 @@ class PaymentCredentials extends Page implements HasForms
         return [
             Action::make('testStripeConnection')
                 ->label('Test Stripe')
+                ->visible(fn (): bool => $this->activeProvider === 'stripe')
                 ->action('testStripeConnection'),
             Action::make('testPayPalConnection')
                 ->label('Test PayPal')
+                ->visible(fn (): bool => $this->activeProvider === 'paypal')
                 ->action('testPayPalConnection'),
             Action::make('save')
                 ->label('Save payment credentials')
                 ->submit('save'),
         ];
+    }
+
+    public function showProvider(string $provider): void
+    {
+        if (! in_array($provider, ['stripe', 'paypal'], true)) {
+            return;
+        }
+
+        $this->activeProvider = $provider;
     }
 
     public function save(): void
