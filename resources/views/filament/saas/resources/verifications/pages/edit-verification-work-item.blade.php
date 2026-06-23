@@ -9,6 +9,8 @@
         $historySection = $this->getHistorySection();
         $frequencyGroups = $this->getFrequencyGroups();
         $serviceHistoryRows = $this->getServiceHistoryRows();
+        $codeCoverageSection = $this->getCodeCoverageSection();
+        $smartVerificationForm = $this->getSmartVerificationForm();
         $closingSection = $this->getClosingSection();
         $controlOptions = $this->getTopControlOptions();
         $queueControlSnapshot = $this->getQueueControlSnapshot();
@@ -131,6 +133,51 @@
             cursor: pointer;
         }
 
+        .verification-smart-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .verification-smart-field-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .verification-smart-field--wide {
+            grid-column: 1 / -1;
+        }
+
+        .verification-template-switcher {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px;
+            border: 1px solid #dbe4ee;
+            border-radius: 14px;
+            background: #ffffff;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+        }
+
+        .verification-template-switcher button {
+            min-width: 118px;
+            padding: 9px 14px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .verification-template-switcher button.is-active {
+            background: #0f766e;
+            color: #ffffff;
+            box-shadow: 0 6px 14px rgba(15, 118, 110, 0.22);
+        }
+
         @media (max-width: 1280px) {
             .verification-workbench-layout {
                 grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
@@ -152,6 +199,11 @@
 
             .verification-workbench-sidebar {
                 position: static;
+            }
+
+            .verification-smart-form-grid,
+            .verification-smart-field-grid {
+                grid-template-columns: minmax(0, 1fr);
             }
         }
     </style>
@@ -215,8 +267,28 @@
             </section>
         @endif
 
+        <div style="display: flex; justify-content: flex-end;">
+            <div class="verification-template-switcher" aria-label="Verification form template">
+                <button
+                    type="button"
+                    wire:click="selectFormTemplate('template_1')"
+                    class="{{ $this->formTemplate === 'template_1' ? 'is-active' : '' }}"
+                >
+                    Template 1
+                </button>
+                <button
+                    type="button"
+                    wire:click="selectFormTemplate('template_2')"
+                    class="{{ $this->formTemplate === 'template_2' ? 'is-active' : '' }}"
+                >
+                    Template 2
+                </button>
+            </div>
+        </div>
+
         <form wire:submit="save">
-            <div class="verification-workbench-layout">
+            <div class="{{ $this->formTemplate === 'template_2' ? '' : 'verification-workbench-layout' }}">
+                @if ($this->formTemplate === 'template_1')
                 <aside class="verification-workbench-sidebar">
                     <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
                         <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
@@ -372,8 +444,88 @@
                     @endif
 
                 </aside>
+                @endif
 
                 <section style="display: flex; flex-direction: column; gap: 18px;">
+                    @if ($this->formTemplate === 'template_2')
+                        @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
+                    @else
+                    <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07); overflow: hidden;">
+                        <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
+                            <div>
+                                <div style="display: inline-flex; align-items: center; width: max-content; padding: 7px 11px; border-radius: 999px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;">
+                                    New Verification Form
+                                </div>
+                                <h2 style="margin: 12px 0 0; font-size: 24px; line-height: 1.15; font-weight: 900; color: #0f172a;">Clinic, patient, service, and payer verification in one clean flow</h2>
+                                <p style="margin: 8px 0 0; max-width: 820px; font-size: 14px; line-height: 1.7; color: #64748b;">
+                                    This newer layout keeps the must-have intake fields upfront. The detailed worksheet remains below while we polish this version.
+                                </p>
+                            </div>
+                            <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #bbf7d0; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 900;">
+                                Existing form still active
+                            </span>
+                        </div>
+
+                        <div style="padding: 20px 22px;" class="verification-smart-form-grid">
+                            @foreach ($smartVerificationForm as $section)
+                                <article style="border: 1px solid #dbe4ee; border-radius: 22px; background: #ffffff; overflow: hidden; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);">
+                                    <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; gap: 12px;">
+                                        <span style="margin-top: 4px; width: 11px; height: 11px; border-radius: 999px; background: {{ $section['accent'] }};"></span>
+                                        <div>
+                                            <h3 style="margin: 0; font-size: 18px; font-weight: 900; color: #0f172a;">{{ $section['title'] }}</h3>
+                                            <p style="margin: 5px 0 0; font-size: 13px; line-height: 1.6; color: #64748b;">{{ $section['description'] }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div style="padding: 18px;" class="verification-smart-field-grid">
+                                        @foreach ($section['fields'] as $field)
+                                            @php
+                                                $isWide = $field['wide'] ?? false;
+                                                $fieldName = $field['field'] ?? null;
+                                                $fieldType = $field['type'] ?? 'text';
+                                                $isReadonly = $field['readonly'] ?? false;
+                                            @endphp
+                                            <div class="{{ $isWide ? 'verification-smart-field--wide' : '' }}">
+                                                <label style="display: block; margin-bottom: 7px; font-size: 11px; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; color: #64748b;">
+                                                    {{ $field['label'] }}
+                                                </label>
+
+                                                @if ($isReadonly)
+                                                    <div style="min-height: 42px; padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; color: #0f172a; font-size: 13px; font-weight: 800; line-height: 1.45;">
+                                                        {{ filled($field['value'] ?? null) ? $field['value'] : '-' }}
+                                                    </div>
+                                                @elseif ($fieldType === 'textarea')
+                                                    <textarea wire:model.blur="data.{{ $fieldName }}" placeholder="{{ $field['placeholder'] ?? '' }}" style="{{ $textareaStyle }}"></textarea>
+                                                @elseif ($fieldType === 'select')
+                                                    <select wire:model.blur="data.{{ $fieldName }}" style="{{ $selectStyle }}">
+                                                        <option value="">Select</option>
+                                                        @foreach (($field['options'] ?? []) as $value => $label)
+                                                            <option value="{{ $value }}">{{ $label }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @elseif ($fieldType === 'date')
+                                                    <input type="date" wire:model.blur="data.{{ $fieldName }}" style="{{ $inputStyle }}">
+                                                @elseif ($fieldType === 'currency')
+                                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 800;">$</span>
+                                                        <input type="number" step="0.01" wire:model.blur="data.{{ $fieldName }}" placeholder="{{ $field['placeholder'] ?? '' }}" style="{{ $inputStyle }}">
+                                                    </div>
+                                                @else
+                                                    <input type="text" wire:model.blur="data.{{ $fieldName }}" placeholder="{{ $field['placeholder'] ?? '' }}" style="{{ $inputStyle }}">
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section style="padding: 14px 18px; border: 1px dashed #cbd5e1; border-radius: 18px; background: #f8fafc;">
+                        <div style="font-size: 12px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Detailed Worksheet</div>
+                        <div style="margin-top: 4px; font-size: 13px; line-height: 1.7; color: #64748b;">The existing full verification form is kept below for now while the new cleaner form is validated.</div>
+                    </section>
+
                     <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
                         <div style="padding: 0; {{ $sectionBarStyle }}">
                             <div style="{{ $sectionBarTitleStyle }}">{{ $coreDetails['title'] }}</div>
@@ -731,6 +883,126 @@
                     <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
                         <div style="padding: 16px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="width: 10px; height: 10px; border-radius: 999px; background: #0ea5e9;"></span>
+                                <div>
+                                    <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #0f172a;">{{ $codeCoverageSection['title'] }}</h3>
+                                    <div style="margin-top: 4px; font-size: 12px; line-height: 1.5; color: #64748b;">Code-level coverage, frequency, history, and conditional payer rules.</div>
+                                </div>
+                            </div>
+                            <span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #dbe4ee; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700;">
+                                {{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} codes filled
+                            </span>
+                        </div>
+
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; min-width: 1120px; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f8fafc;">
+                                        <th style="width: 130px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Code</th>
+                                        <th style="width: 230px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Service</th>
+                                        <th style="width: 160px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Status</th>
+                                        <th style="width: 110px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">%</th>
+                                        <th style="width: 180px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Frequency</th>
+                                        <th style="width: 190px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">History</th>
+                                        <th style="width: 220px; padding: 12px 14px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Rules</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($codeCoverageSection['groups'] as $group)
+                                        <tr>
+                                            <td colspan="7" style="padding: 10px 16px; border-bottom: 1px solid #dbeafe; background: #eef7f1; color: #0f766e; font-size: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+                                                {{ $group['category'] }}
+                                                <span style="margin-left: 8px; color: #64748b; font-weight: 800; letter-spacing: normal; text-transform: none;">{{ $group['completed'] }}/{{ $group['total'] }}</span>
+                                            </td>
+                                        </tr>
+                                        @foreach ($group['rows'] as $row)
+                                            @php
+                                                $index = collect($this->codeCoverageData)->search(fn ($candidate) => (int) ($candidate['sort_order'] ?? 0) === (int) ($row['sort_order'] ?? 0) && (string) ($candidate['category'] ?? '') === (string) ($row['category'] ?? '') && (string) ($candidate['description'] ?? '') === (string) ($row['description'] ?? ''));
+                                                $index = $index === false ? $loop->parent->index . '-' . $loop->index : $index;
+                                                $coverageStatus = data_get($this->codeCoverageData, $index . '.coverage_status');
+                                                $coveragePercent = data_get($this->codeCoverageData, $index . '.coverage_percent');
+                                                $isNotCovered = $coverageStatus === 'Not Covered' || ((string) $coveragePercent !== '' && is_numeric($coveragePercent) && (float) $coveragePercent <= 0);
+                                                $showPreAuthDetails = data_get($this->codeCoverageData, $index . '.pre_auth_required') === 'Yes' && ! $isNotCovered;
+                                                $showDowngradeDetails = data_get($this->codeCoverageData, $index . '.downgrade_applies') === 'Yes' && ! $isNotCovered;
+                                            @endphp
+                                            <tr>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.code" placeholder="Code" style="{{ $inputStyle }}">
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.description" placeholder="Description" style="{{ $inputStyle }}">
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <select wire:model.blur="codeCoverageData.{{ $index }}.coverage_status" style="{{ $selectStyle }}">
+                                                        <option value="">Select</option>
+                                                        <option value="Covered">Covered</option>
+                                                        <option value="Not Covered">Not Covered</option>
+                                                        <option value="Conditional">Conditional</option>
+                                                    </select>
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <input type="number" step="0.01" min="0" max="100" wire:model.blur="codeCoverageData.{{ $index }}.coverage_percent" placeholder="%" style="{{ $inputStyle }}">
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    @if ($isNotCovered)
+                                                        <div style="padding: 11px 12px; border-radius: 10px; background: #f8fafc; color: #94a3b8; font-size: 13px; font-weight: 700;">Not applicable</div>
+                                                    @else
+                                                        <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.frequency" placeholder="2 / 12 MTS" style="{{ $inputStyle }}">
+                                                    @endif
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.service_history" placeholder="No history / date" style="{{ $inputStyle }}">
+                                                </td>
+                                                <td style="padding: 10px 12px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
+                                                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+                                                        <select wire:model.blur="codeCoverageData.{{ $index }}.pre_auth_required" style="{{ $selectStyle }}" @if ($isNotCovered) disabled @endif>
+                                                            <option value="">Pre-auth?</option>
+                                                            <option value="Yes">Pre-auth Yes</option>
+                                                            <option value="No">Pre-auth No</option>
+                                                        </select>
+                                                        <select wire:model.blur="codeCoverageData.{{ $index }}.downgrade_applies" style="{{ $selectStyle }}" @if ($isNotCovered) disabled @endif>
+                                                            <option value="">Downgrade?</option>
+                                                            <option value="Yes">Downgrade Yes</option>
+                                                            <option value="No">Downgrade No</option>
+                                                        </select>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            @if (! $isNotCovered)
+                                                <tr>
+                                                    <td style="padding: 0 12px 12px; border-bottom: 1px solid #eef2f7;"></td>
+                                                    <td colspan="6" style="padding: 0 12px 12px; border-bottom: 1px solid #eef2f7;">
+                                                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+                                                            <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.age_limit" placeholder="Age limit" style="{{ $inputStyle }}">
+                                                            <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.waiting_period" placeholder="Waiting period" style="{{ $inputStyle }}">
+                                                            @if ($showDowngradeDetails)
+                                                                <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.downgrade_to" placeholder="Downgrade to" style="{{ $inputStyle }}">
+                                                            @else
+                                                                <div style="padding: 11px 12px; border-radius: 10px; background: #f8fafc; color: #94a3b8; font-size: 13px; font-weight: 700;">No downgrade detail</div>
+                                                            @endif
+                                                            @if ($showPreAuthDetails)
+                                                                <input type="text" wire:model.blur="codeCoverageData.{{ $index }}.pre_auth_details" placeholder="Pre-auth detail" style="{{ $inputStyle }}">
+                                                            @else
+                                                                <div style="padding: 11px 12px; border-radius: 10px; background: #f8fafc; color: #94a3b8; font-size: 13px; font-weight: 700;">No pre-auth detail</div>
+                                                            @endif
+                                                        </div>
+                                                        <div style="margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+                                                            <textarea wire:model.blur="codeCoverageData.{{ $index }}.payment_guideline" placeholder="Payment guideline or payer rule" style="{{ $textareaStyle }}"></textarea>
+                                                            <textarea wire:model.blur="codeCoverageData.{{ $index }}.notes" placeholder="Additional notes" style="{{ $textareaStyle }}"></textarea>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                        @endforeach
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
+                        <div style="padding: 16px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
                                 <span style="width: 10px; height: 10px; border-radius: 999px; background: #10b981;"></span>
                                 <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">Service History</h3>
                             </div>
@@ -882,6 +1154,7 @@
                             </a>
                         @endif
                     </div>
+                    @endif
                 </section>
             </div>
         </form>

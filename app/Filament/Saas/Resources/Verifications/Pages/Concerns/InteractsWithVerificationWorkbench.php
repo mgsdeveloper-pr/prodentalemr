@@ -19,6 +19,7 @@ trait InteractsWithVerificationWorkbench
         /** @var BillingWorkItem $record */
         $record = $this->getRecord();
         $profile = $record->verificationProfile;
+        $codeRows = method_exists($this, 'getCodeCoverageSection') ? $this->getCodeCoverageSection() : null;
 
         return [
             [
@@ -227,18 +228,20 @@ trait InteractsWithVerificationWorkbench
             ],
             [
                 'label' => 'Codes & Coverage',
-                'completed' => $this->countCompleted([
-                    $profile?->coverage_diagnostic,
-                    $profile?->coverage_preventive,
-                    $profile?->coverage_basic_restorative,
-                    $profile?->coverage_endodontics,
-                    $profile?->coverage_periodontics,
-                    $profile?->coverage_oral_surgery,
-                    $profile?->coverage_major_restorative,
-                    $profile?->coverage_prosthodontics,
-                    $profile?->coverage_implant,
-                ]),
-                'total' => 9,
+                'completed' => $codeRows
+                    ? (int) $codeRows['completed']
+                    : $this->countCompleted([
+                        $profile?->coverage_diagnostic,
+                        $profile?->coverage_preventive,
+                        $profile?->coverage_basic_restorative,
+                        $profile?->coverage_endodontics,
+                        $profile?->coverage_periodontics,
+                        $profile?->coverage_oral_surgery,
+                        $profile?->coverage_major_restorative,
+                        $profile?->coverage_prosthodontics,
+                        $profile?->coverage_implant,
+                    ]),
+                'total' => $codeRows ? (int) $codeRows['total'] : 9,
             ],
             [
                 'label' => 'Queue State',
@@ -598,6 +601,18 @@ trait InteractsWithVerificationWorkbench
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, data_get($answer, 'answer_value'), $answer);
         }
 
+        foreach (data_get($payload, 'coverage_codes', []) as $row) {
+            $identifier = data_get($row, 'code') ?: str((string) data_get($row, 'description', 'coverage_code'))->slug('_')->toString();
+            $entryKey = 'coverage_codes.' . $identifier;
+            $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, collect([
+                data_get($row, 'coverage_status'),
+                filled(data_get($row, 'coverage_percent')) ? data_get($row, 'coverage_percent') . '%' : null,
+                data_get($row, 'frequency'),
+                data_get($row, 'service_history'),
+                data_get($row, 'notes'),
+            ])->filter()->implode(' | '), $row);
+        }
+
         return $entries;
     }
 
@@ -643,6 +658,14 @@ trait InteractsWithVerificationWorkbench
                 'label' => data_get($answer, 'prompt')
                     ? trim((string) data_get($answer, 'prompt')) . (filled(data_get($answer, 'code')) ? ' (' . data_get($answer, 'code') . ')' : '')
                     : str(str_replace('answers.', '', $key))->replace('_', ' ')->headline()->toString(),
+                'value' => $value,
+            ],
+            str_starts_with($key, 'coverage_codes.') => [
+                'group' => 'Coverage Codes',
+                'label' => trim(collect([
+                    data_get($answer, 'code'),
+                    data_get($answer, 'description'),
+                ])->filter()->implode(' - ')) ?: str(str_replace('coverage_codes.', '', $key))->replace('_', ' ')->headline()->toString(),
                 'value' => $value,
             ],
             default => [

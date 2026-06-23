@@ -355,6 +355,11 @@ class BillingWorkItem extends Model
         return $this->hasMany(VerificationFormAnswer::class);
     }
 
+    public function verificationCoverageCodes(): HasMany
+    {
+        return $this->hasMany(VerificationCoverageCode::class);
+    }
+
     public function formSubmissions(): HasMany
     {
         return $this->hasMany(VerificationFormSubmission::class);

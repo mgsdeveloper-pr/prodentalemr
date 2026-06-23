@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\DocumentCenter;
 use App\Filament\Admin\Pages\VerificationClinicAssignments;
+use App\Filament\Admin\Pages\VerificationFormLab;
 use App\Filament\Admin\Pages\RolesAndPermissions;
 use App\Filament\Admin\Pages\UserMailboxPage;
 use App\Filament\Admin\Pages\UserMailboxSettingsPage;
@@ -124,6 +125,7 @@ class AdminPanelProvider extends PanelProvider
                 UserMailboxPage::class,
                 UserMailboxSettingsPage::class,
                 VerificationUnassignedPatients::class,
+                VerificationFormLab::class,
                 VerificationRequestResponse::class,
                 VerificationNotificationControl::class,
                 VerificationInbox::class,

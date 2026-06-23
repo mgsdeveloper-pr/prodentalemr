@@ -7,6 +7,7 @@ use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
 use App\Models\BillingWorkItem;
 use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\User;
+use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormSubmission;
 use App\Models\VerificationFormQuestion;
 use App\Support\VerificationAutoAssigner;
@@ -33,9 +34,12 @@ class EditVerificationWorkItem extends EditRecord
 
     protected array $verificationProfileData = [];
     protected array $verificationFormAnswerData = [];
+    protected array $verificationCoverageCodeData = [];
+    public array $codeCoverageData = [];
     public array $clinicResponseAttachments = [];
     public bool $auditReady = false;
     public bool $openInfoRequestModalOnLoad = false;
+    public string $formTemplate = 'template_1';
     protected bool $shouldSkipWorkflowSyncOnSave = false;
 
     public function mount(int|string $record): void
@@ -51,6 +55,18 @@ class EditVerificationWorkItem extends EditRecord
         $this->openInfoRequestModalOnLoad = request()->boolean('request_clinic')
             && ($this->canRequestClinicInfo()
                 || $this->record->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+
+        $requestedTemplate = request()->string('template')->toString();
+        $this->formTemplate = in_array($requestedTemplate, ['template_1', 'template_2'], true)
+            ? $requestedTemplate
+            : 'template_1';
+    }
+
+    public function selectFormTemplate(string $template): void
+    {
+        abort_unless(in_array($template, ['template_1', 'template_2'], true), 404);
+
+        $this->formTemplate = $template;
     }
 
     public function getTitle(): string
@@ -146,7 +162,7 @@ class EditVerificationWorkItem extends EditRecord
 
     public function updated($name, $value): void
     {
-        if (str_starts_with((string) $name, 'data.')) {
+        if (str_starts_with((string) $name, 'data.') || str_starts_with((string) $name, 'codeCoverageData.')) {
             $this->auditReady = false;
         }
     }
@@ -182,7 +198,12 @@ class EditVerificationWorkItem extends EditRecord
 
         if ($missingFields !== []) {
             foreach ($missingFields as $fieldKey => $label) {
-                $this->addError('data.' . $fieldKey, $label . ' is required before saving.');
+                $isCodeField = str_starts_with((string) $fieldKey, 'codeCoverageData.');
+
+                $this->addError(
+                    $isCodeField ? $fieldKey : 'data.' . $fieldKey,
+                    $isCodeField ? $label . '.' : $label . ' is required before saving.'
+                );
             }
 
             Notification::make()
@@ -249,6 +270,29 @@ class EditVerificationWorkItem extends EditRecord
 
         $this->data['vf_form_type'] = $formType;
         $this->data['outcome_status'] = 'pending';
+        $this->codeCoverageData = collect($this->defaultCodeCoverageTemplate())
+            ->values()
+            ->map(fn (array $row, int $index): array => [
+                'id' => null,
+                'code_system' => 'ada',
+                'category' => $row['category'],
+                'code' => $row['code'],
+                'description' => $row['description'],
+                'coverage_status' => null,
+                'coverage_percent' => null,
+                'frequency' => null,
+                'age_limit' => null,
+                'waiting_period' => null,
+                'service_history' => null,
+                'pre_auth_required' => null,
+                'pre_auth_details' => null,
+                'downgrade_applies' => null,
+                'downgrade_to' => null,
+                'payment_guideline' => null,
+                'notes' => null,
+                'sort_order' => $index + 1,
+            ])
+            ->all();
         $this->clinicResponseAttachments = [];
         $this->data = $this->applyAutofillDefaults($this->data ?? []);
         $this->auditReady = false;
@@ -287,6 +331,99 @@ class EditVerificationWorkItem extends EditRecord
             'writeback_status' => BillingWorkItem::WRITEBACK_STATUS_OPTIONS,
             'assigned_to' => VerificationAutoAssigner::optionList($this->record->clinic_id),
             'reviewed_by' => VerificationAutoAssigner::optionList($this->record->clinic_id),
+        ];
+    }
+
+    public function getSmartVerificationForm(): array
+    {
+        $record = $this->record;
+        $clinicName = $record->clinic?->clinic_name ?: $record->organization?->name ?: '-';
+        $locationName = $record->location?->location_name ?: '-';
+        $providerName = $record->provider?->display_name ?: $record->provider?->user?->name ?: '-';
+        $appointment = $record->appointment;
+        $appointmentTime = $appointment?->start_time;
+
+        if ($appointmentTime instanceof \Illuminate\Support\Carbon || $appointmentTime instanceof \Carbon\CarbonInterface) {
+            $appointmentTime = $appointmentTime->format('h:i A');
+        }
+
+        return [
+            [
+                'title' => 'Clinic & Insurance Participation',
+                'description' => 'Confirm clinic context, provider participation, and payer contact details.',
+                'accent' => '#0f766e',
+                'fields' => [
+                    ['label' => 'Clinic', 'value' => $clinicName, 'readonly' => true],
+                    ['label' => 'Location', 'value' => $locationName, 'readonly' => true],
+                    ['label' => 'Provider', 'value' => $providerName, 'readonly' => true],
+                    ['label' => 'Insurance Provider', 'field' => 'vf_insurance_provider_name'],
+                    ['label' => 'Insurance Phone', 'field' => 'vf_insurance_company_phone_number'],
+                    ['label' => 'Payer ID', 'field' => 'vf_payer_id'],
+                    ['label' => 'Provider Participating?', 'field' => 'vf_network_status', 'type' => 'select', 'options' => ['Yes' => 'Yes', 'No' => 'No', 'Unknown' => 'Unknown']],
+                    ['label' => 'Fee Schedule', 'field' => 'vf_fee_schedule'],
+                    ['label' => 'Claim Mailing Address', 'field' => 'vf_insurance_claim_mailing_address', 'type' => 'textarea', 'wide' => true],
+                ],
+            ],
+            [
+                'title' => 'Patient Information',
+                'description' => 'Capture the patient and subscriber details required to verify benefits.',
+                'accent' => '#2563eb',
+                'fields' => [
+                    ['label' => 'Patient Name', 'field' => 'vf_patient_full_name'],
+                    ['label' => 'Patient DOB', 'field' => 'vf_patient_dob', 'type' => 'date'],
+                    ['label' => 'Member ID', 'field' => 'vf_patient_identifier'],
+                    ['label' => 'Patient ZIP', 'field' => 'vf_patient_zip'],
+                    ['label' => 'Subscriber Name', 'field' => 'vf_subscriber_name'],
+                    ['label' => 'Subscriber DOB', 'field' => 'vf_subscriber_dob', 'type' => 'date'],
+                    ['label' => 'Subscriber ID', 'field' => 'vf_subscriber_id'],
+                    ['label' => 'Relationship', 'field' => 'vf_insured_relation'],
+                    ['label' => 'COB', 'field' => 'vf_cob', 'type' => 'select', 'options' => ['No COB' => 'No COB', 'Primary' => 'Primary', 'Secondary' => 'Secondary', 'Unknown' => 'Unknown']],
+                ],
+            ],
+            [
+                'title' => 'Appointment / Service',
+                'description' => 'Keep the service date and requested verification scope visible at the top of the workflow.',
+                'accent' => '#f59e0b',
+                'fields' => [
+                    ['label' => 'Appointment Date', 'field' => 'vf_appointment_date', 'type' => 'date'],
+                    ['label' => 'Appointment Time', 'field' => 'vf_appointment_time', 'placeholder' => $appointmentTime],
+                    ['label' => 'Service / Procedure', 'field' => 'title', 'placeholder' => $appointment?->appointment_type ?: 'Service being verified'],
+                    ['label' => 'Group Name', 'field' => 'vf_group_name'],
+                    ['label' => 'Group Number', 'field' => 'vf_group_number'],
+                    ['label' => 'Effective Date', 'field' => 'vf_effective_date', 'type' => 'date'],
+                    ['label' => 'Plan Renewal Month', 'field' => 'vf_plan_renewal_month'],
+                    ['label' => 'Future Termination Date', 'field' => 'vf_future_termination_date', 'type' => 'date'],
+                ],
+            ],
+            [
+                'title' => 'Plan Benefits Snapshot',
+                'description' => 'High-value benefit fields that usually decide whether the verification can move forward.',
+                'accent' => '#7c3aed',
+                'fields' => [
+                    ['label' => 'Annual Maximum', 'field' => 'vf_annual_maximum', 'type' => 'currency'],
+                    ['label' => 'Remaining Maximum', 'field' => 'vf_annual_maximum_remaining', 'type' => 'currency'],
+                    ['label' => 'Individual Deductible', 'field' => 'vf_individual_deductible', 'type' => 'currency'],
+                    ['label' => 'Individual Deductible Remaining', 'field' => 'vf_individual_deductible_remaining', 'type' => 'currency'],
+                    ['label' => 'Family Deductible', 'field' => 'vf_family_deductible', 'type' => 'currency'],
+                    ['label' => 'Family Deductible Remaining', 'field' => 'vf_family_deductible_remaining', 'type' => 'currency'],
+                    ['label' => 'Waiting Periods', 'field' => 'vf_waiting_periods', 'type' => 'textarea', 'wide' => true],
+                    ['label' => 'Plan Provisions', 'field' => 'vf_plan_provisions', 'type' => 'textarea', 'wide' => true],
+                ],
+            ],
+            [
+                'title' => 'Verification Information',
+                'description' => 'System generated verification context. Only the user comment stays editable.',
+                'accent' => '#64748b',
+                'fields' => [
+                    ['label' => 'Reference', 'value' => $record->reference_number, 'readonly' => true],
+                    ['label' => 'Status', 'value' => BillingWorkItem::STATUS_OPTIONS[$record->normalized_status] ?? str($record->normalized_status)->headline()->toString(), 'readonly' => true],
+                    ['label' => 'Result', 'value' => BillingWorkItem::OUTCOME_STATUS_OPTIONS[$record->outcome_status] ?? str($record->outcome_status)->headline()->toString(), 'readonly' => true],
+                    ['label' => 'Priority', 'value' => BillingWorkItem::PRIORITY_OPTIONS[$record->priority] ?? str($record->priority)->headline()->toString(), 'readonly' => true],
+                    ['label' => 'Verified By', 'value' => data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-', 'readonly' => true],
+                    ['label' => 'Verification Date', 'value' => data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d'), 'readonly' => true],
+                    ['label' => 'User Comment / Notes', 'field' => 'vf_verification_notes', 'type' => 'textarea', 'wide' => true],
+                ],
+            ],
         ];
     }
 
@@ -486,6 +623,7 @@ class EditVerificationWorkItem extends EditRecord
             'verificationPlanSnapshots',
             'verificationProfile',
             'verificationFormAnswers.question',
+            'verificationCoverageCodes',
         ]);
 
         $profile = $this->record->verificationProfile;
@@ -511,6 +649,8 @@ class EditVerificationWorkItem extends EditRecord
                 $data[$this->customQuestionFieldName($answer->verification_form_question_id)] = $answer->answer_value;
             });
 
+        $this->codeCoverageData = $this->resolveCodeCoverageRows();
+
         return $this->applyAutofillDefaults($data);
     }
 
@@ -524,6 +664,7 @@ class EditVerificationWorkItem extends EditRecord
             ->all();
 
         [$data, $this->verificationProfileData] = static::splitVerificationProfileData($data);
+        $this->verificationCoverageCodeData = $this->normalizeCodeCoverageRows($this->codeCoverageData);
 
         foreach (array_keys($data) as $key) {
             if (str_starts_with((string) $key, 'custom_question_') || str_starts_with((string) $key, 'context_')) {
@@ -538,6 +679,7 @@ class EditVerificationWorkItem extends EditRecord
     {
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->syncVerificationFormAnswers();
+        $this->syncVerificationCoverageCodes();
         $this->persistClinicResponseAttachments();
         if (! $this->shouldSkipWorkflowSyncOnSave) {
             $this->syncWorkflowStatusFromForm();
@@ -643,6 +785,16 @@ class EditVerificationWorkItem extends EditRecord
         ];
 
         $missingFields = [];
+
+        foreach ($this->normalizeCodeCoverageRows($this->codeCoverageData) as $index => $row) {
+            if (! filled($row['code'])) {
+                continue;
+            }
+
+            if (! filled($row['coverage_status']) && ! filled($row['coverage_percent'])) {
+                $missingFields['codeCoverageData.' . $index . '.coverage_status'] = 'Coverage status or percent is required for code ' . $row['code'];
+            }
+        }
 
         $questions = VerificationFormQuestion::query()
             ->where('is_active', true)
@@ -860,6 +1012,236 @@ class EditVerificationWorkItem extends EditRecord
         }
     }
 
+    public function getCodeCoverageSection(): array
+    {
+        $rows = $this->normalizeCodeCoverageRows($this->codeCoverageData);
+
+        return [
+            'title' => 'Codes',
+            'completed' => collect($rows)
+                ->filter(fn (array $row): bool => filled($row['coverage_status'] ?? null) || filled($row['coverage_percent'] ?? null))
+                ->count(),
+            'total' => count($rows),
+            'groups' => collect($rows)
+                ->groupBy(fn (array $row): string => $row['category'] ?: 'Uncategorized')
+                ->map(fn (Collection $categoryRows, string $category): array => [
+                    'category' => $category,
+                    'completed' => $categoryRows
+                        ->filter(fn (array $row): bool => filled($row['coverage_status'] ?? null) || filled($row['coverage_percent'] ?? null))
+                        ->count(),
+                    'total' => $categoryRows->count(),
+                    'rows' => $categoryRows->values()->all(),
+                ])
+                ->values()
+                ->all(),
+        ];
+    }
+
+    protected function resolveCodeCoverageRows(): array
+    {
+        $savedRows = $this->record->verificationCoverageCodes()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        if ($savedRows->isNotEmpty()) {
+            return $savedRows
+                ->map(fn (VerificationCoverageCode $row): array => [
+                    'id' => $row->getKey(),
+                    'code_system' => $row->code_system ?: 'ada',
+                    'category' => $row->category,
+                    'code' => $row->code,
+                    'description' => $row->description,
+                    'coverage_status' => $row->coverage_status,
+                    'coverage_percent' => $row->coverage_percent,
+                    'frequency' => $row->frequency,
+                    'age_limit' => $row->age_limit,
+                    'waiting_period' => $row->waiting_period,
+                    'service_history' => $row->service_history,
+                    'pre_auth_required' => $row->pre_auth_required,
+                    'pre_auth_details' => $row->pre_auth_details,
+                    'downgrade_applies' => $row->downgrade_applies,
+                    'downgrade_to' => $row->downgrade_to,
+                    'payment_guideline' => $row->payment_guideline,
+                    'notes' => $row->notes,
+                    'sort_order' => $row->sort_order,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return collect($this->defaultCodeCoverageTemplate())
+            ->values()
+            ->map(function (array $row, int $index): array {
+                return [
+                    'id' => null,
+                    'code_system' => 'ada',
+                    'category' => $row['category'],
+                    'code' => $row['code'],
+                    'description' => $row['description'],
+                    'coverage_status' => null,
+                    'coverage_percent' => null,
+                    'frequency' => null,
+                    'age_limit' => null,
+                    'waiting_period' => null,
+                    'service_history' => null,
+                    'pre_auth_required' => null,
+                    'pre_auth_details' => null,
+                    'downgrade_applies' => null,
+                    'downgrade_to' => null,
+                    'payment_guideline' => null,
+                    'notes' => null,
+                    'sort_order' => $index + 1,
+                ];
+            })
+            ->all();
+    }
+
+    protected function defaultCodeCoverageTemplate(): array
+    {
+        return [
+            ['category' => 'Diagnostic', 'code' => '', 'description' => 'Diagnostic code'],
+            ['category' => 'Preventive', 'code' => '', 'description' => 'Preventive code'],
+            ['category' => 'Restorative', 'code' => '', 'description' => 'Restorative code'],
+            ['category' => 'Endodontics', 'code' => '', 'description' => 'Endodontic code'],
+            ['category' => 'Periodontics', 'code' => '', 'description' => 'Periodontal code'],
+            ['category' => 'Prosthodontics', 'code' => '', 'description' => 'Prosthodontic code'],
+            ['category' => 'Implants', 'code' => '', 'description' => 'Implant code'],
+            ['category' => 'Oral Surgery', 'code' => '', 'description' => 'Oral surgery code'],
+            ['category' => 'Orthodontics', 'code' => '', 'description' => 'Orthodontic code'],
+        ];
+    }
+
+    protected function normalizeCodeCoverageRows(array $rows): array
+    {
+        return collect($rows)
+            ->values()
+            ->map(function (array $row, int $index): array {
+                $coverageStatus = trim((string) ($row['coverage_status'] ?? ''));
+                $coveragePercent = $row['coverage_percent'] ?? null;
+                $isNotCovered = $coverageStatus === 'Not Covered'
+                    || ((string) $coveragePercent !== '' && is_numeric($coveragePercent) && (float) $coveragePercent <= 0.0);
+
+                if ($isNotCovered) {
+                    $coverageStatus = 'Not Covered';
+                    $coveragePercent = $coveragePercent === null || $coveragePercent === '' ? 0 : $coveragePercent;
+                    $row['frequency'] = null;
+                    $row['age_limit'] = null;
+                    $row['waiting_period'] = null;
+                    $row['pre_auth_required'] = 'No';
+                    $row['pre_auth_details'] = null;
+                    $row['downgrade_applies'] = 'No';
+                    $row['downgrade_to'] = null;
+                    $row['payment_guideline'] = null;
+                }
+
+                if (($row['pre_auth_required'] ?? null) !== 'Yes') {
+                    $row['pre_auth_details'] = null;
+                }
+
+                if (($row['downgrade_applies'] ?? null) !== 'Yes') {
+                    $row['downgrade_to'] = null;
+                }
+
+                return [
+                    'id' => filled($row['id'] ?? null) ? (int) $row['id'] : null,
+                    'code_system' => filled($row['code_system'] ?? null) ? (string) $row['code_system'] : 'ada',
+                    'category' => trim((string) ($row['category'] ?? '')),
+                    'code' => strtoupper(trim((string) ($row['code'] ?? ''))),
+                    'description' => trim((string) ($row['description'] ?? '')),
+                    'coverage_status' => $coverageStatus ?: null,
+                    'coverage_percent' => $coveragePercent === '' ? null : $coveragePercent,
+                    'frequency' => filled($row['frequency'] ?? null) ? trim((string) $row['frequency']) : null,
+                    'age_limit' => filled($row['age_limit'] ?? null) ? trim((string) $row['age_limit']) : null,
+                    'waiting_period' => filled($row['waiting_period'] ?? null) ? trim((string) $row['waiting_period']) : null,
+                    'service_history' => filled($row['service_history'] ?? null) ? trim((string) $row['service_history']) : null,
+                    'pre_auth_required' => filled($row['pre_auth_required'] ?? null) ? (string) $row['pre_auth_required'] : null,
+                    'pre_auth_details' => filled($row['pre_auth_details'] ?? null) ? trim((string) $row['pre_auth_details']) : null,
+                    'downgrade_applies' => filled($row['downgrade_applies'] ?? null) ? (string) $row['downgrade_applies'] : null,
+                    'downgrade_to' => filled($row['downgrade_to'] ?? null) ? trim((string) $row['downgrade_to']) : null,
+                    'payment_guideline' => filled($row['payment_guideline'] ?? null) ? trim((string) $row['payment_guideline']) : null,
+                    'notes' => filled($row['notes'] ?? null) ? trim((string) $row['notes']) : null,
+                    'sort_order' => filled($row['sort_order'] ?? null) ? (int) $row['sort_order'] : $index + 1,
+                ];
+            })
+            ->filter(fn (array $row): bool => filled($row['category']) || filled($row['code']) || filled($row['description']))
+            ->values()
+            ->all();
+    }
+
+    protected function syncVerificationCoverageCodes(): void
+    {
+        $rows = collect($this->verificationCoverageCodeData);
+        $keptIds = [];
+
+        foreach ($rows as $index => $row) {
+            $payload = [
+                'code_system' => $row['code_system'] ?: 'ada',
+                'category' => $row['category'],
+                'code' => $row['code'],
+                'description' => $row['description'],
+                'coverage_status' => $row['coverage_status'],
+                'coverage_percent' => $row['coverage_percent'],
+                'frequency' => $row['frequency'],
+                'age_limit' => $row['age_limit'],
+                'waiting_period' => $row['waiting_period'],
+                'service_history' => $row['service_history'],
+                'pre_auth_required' => $row['pre_auth_required'],
+                'pre_auth_details' => $row['pre_auth_details'],
+                'downgrade_applies' => $row['downgrade_applies'],
+                'downgrade_to' => $row['downgrade_to'],
+                'payment_guideline' => $row['payment_guideline'],
+                'notes' => $row['notes'],
+                'sort_order' => $index + 1,
+            ];
+
+            if (filled($row['id'] ?? null)) {
+                $coverageCode = $this->record->verificationCoverageCodes()->find($row['id']);
+
+                if ($coverageCode) {
+                    $coverageCode->update($payload);
+                    $keptIds[] = $coverageCode->getKey();
+                }
+
+                continue;
+            }
+
+            $coverageCode = $this->record->verificationCoverageCodes()->create($payload);
+            $keptIds[] = $coverageCode->getKey();
+        }
+
+        $this->record->verificationCoverageCodes()
+            ->when($keptIds !== [], fn ($query) => $query->whereNotIn('id', $keptIds))
+            ->delete();
+
+        $this->codeCoverageData = $this->record->verificationCoverageCodes()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (VerificationCoverageCode $row): array => [
+                'id' => $row->getKey(),
+                'code_system' => $row->code_system ?: 'ada',
+                'category' => $row->category,
+                'code' => $row->code,
+                'description' => $row->description,
+                'coverage_status' => $row->coverage_status,
+                'coverage_percent' => $row->coverage_percent,
+                'frequency' => $row->frequency,
+                'age_limit' => $row->age_limit,
+                'waiting_period' => $row->waiting_period,
+                'service_history' => $row->service_history,
+                'pre_auth_required' => $row->pre_auth_required,
+                'pre_auth_details' => $row->pre_auth_details,
+                'downgrade_applies' => $row->downgrade_applies,
+                'downgrade_to' => $row->downgrade_to,
+                'payment_guideline' => $row->payment_guideline,
+                'notes' => $row->notes,
+                'sort_order' => $row->sort_order,
+            ])
+            ->values()
+            ->all();
+    }
+
     protected function customQuestionFieldName(int $questionId): string
     {
         return 'custom_question_' . $questionId;
@@ -875,6 +1257,7 @@ class EditVerificationWorkItem extends EditRecord
         $this->record->load([
             'verificationProfile',
             'verificationFormAnswers.question',
+            'verificationCoverageCodes',
             'assignedTo',
             'reviewedBy',
             'closedBy',
@@ -882,6 +1265,7 @@ class EditVerificationWorkItem extends EditRecord
 
         $profile = $this->record->verificationProfile;
         $answers = $this->record->verificationFormAnswers;
+        $coverageCodes = $this->record->verificationCoverageCodes;
 
         $profileAttributes = $profile?->getAttributes() ?? [];
         unset(
@@ -897,6 +1281,29 @@ class EditVerificationWorkItem extends EditRecord
                 'code' => $answer->question?->code,
                 'prompt' => $answer->question?->prompt,
                 'answer_value' => $answer->answer_value,
+            ])
+            ->values()
+            ->all();
+
+        $coverageCodePayload = $coverageCodes
+            ->sortBy('sort_order')
+            ->map(fn (VerificationCoverageCode $row): array => [
+                'category' => $row->category,
+                'code_system' => $row->code_system,
+                'code' => $row->code,
+                'description' => $row->description,
+                'coverage_status' => $row->coverage_status,
+                'coverage_percent' => $row->coverage_percent,
+                'frequency' => $row->frequency,
+                'age_limit' => $row->age_limit,
+                'waiting_period' => $row->waiting_period,
+                'service_history' => $row->service_history,
+                'pre_auth_required' => $row->pre_auth_required,
+                'pre_auth_details' => $row->pre_auth_details,
+                'downgrade_applies' => $row->downgrade_applies,
+                'downgrade_to' => $row->downgrade_to,
+                'payment_guideline' => $row->payment_guideline,
+                'notes' => $row->notes,
             ])
             ->values()
             ->all();
@@ -923,8 +1330,13 @@ class EditVerificationWorkItem extends EditRecord
             })
             ->count();
 
+        $answeredCoverageCodes = collect($coverageCodePayload)
+            ->filter(fn (array $row): bool => filled($row['code']) && (filled($row['coverage_status']) || filled($row['coverage_percent'])))
+            ->count();
+
         $hasMeaningfulPayload = $filledProfileFields > 0
             || $answeredQuestions > 0
+            || $answeredCoverageCodes > 0
             || filled($this->record->notes)
             || filled($this->record->internal_summary);
 
@@ -945,6 +1357,7 @@ class EditVerificationWorkItem extends EditRecord
                 'summary' => [
                     'filled_profile_fields' => $filledProfileFields,
                     'answered_questions' => $answeredQuestions,
+                    'answered_coverage_codes' => $answeredCoverageCodes,
                 ],
                 'work_item' => [
                     'status' => $this->record->normalized_status,
@@ -957,6 +1370,7 @@ class EditVerificationWorkItem extends EditRecord
                     'internal_summary' => $this->record->internal_summary,
                 ],
                 'verification_profile' => $profileAttributes,
+                'coverage_codes' => $coverageCodePayload,
                 'answers' => $answerPayload,
             ],
         ]);
