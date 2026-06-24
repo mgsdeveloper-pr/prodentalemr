@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VerificationFormQuestion extends Model
 {
+    public const TEMPLATE_OPTIONS = [
+        'template_1' => 'Template 1',
+        'template_2' => 'Template 2',
+    ];
+
     public const SECTION_OPTIONS = [
         'core_details' => 'Core Eligibility Snapshot',
         'coverage_matrix' => 'Category Coverage',
@@ -21,6 +26,19 @@ class VerificationFormQuestion extends Model
         'verification_information' => 'Verification Information',
     ];
 
+    public const TEMPLATE_2_SECTION_OPTIONS = [
+        'template_2_patient_subscriber' => 'Patient & Subscriber Information',
+        'template_2_insurance' => 'Insurance Information',
+        'template_2_maximums_deductibles' => 'Maximums & Deductibles',
+        'template_2_plan_provisions' => 'Plan Provisions',
+        'template_2_service_history' => 'Service History',
+        'template_2_frequency_general' => 'Frequency & Percentage / General',
+        'template_2_frequency_basic' => 'Frequency & Percentage / Basic',
+        'template_2_frequency_major' => 'Frequency & Percentage / Major',
+        'template_2_frequency_orthodontics' => 'Frequency & Percentage / Orthodontics',
+        'template_2_verification_information' => 'Verification Information',
+    ];
+
     public const FORM_TYPE_OPTIONS = [
         'both' => 'Both Forms',
         'full_form' => 'Full Form',
@@ -31,9 +49,14 @@ class VerificationFormQuestion extends Model
         'text' => 'Text',
         'textarea' => 'Textarea',
         'date' => 'Date',
+        'month' => 'Month / Year',
+        'time' => 'Time',
+        'email' => 'Email',
+        'tel' => 'Phone',
         'number' => 'Number',
         'currency' => 'Currency',
         'yes_no' => 'Yes / No',
+        'select' => 'Dropdown',
         'percent' => 'Percent',
     ];
 
@@ -152,6 +175,7 @@ class VerificationFormQuestion extends Model
     protected $fillable = [
         'organization_id',
         'clinic_id',
+        'template_key',
         'prompt',
         'section_key',
         'form_type',
@@ -162,6 +186,10 @@ class VerificationFormQuestion extends Model
         'code',
         'help_text',
         'placeholder',
+        'select_options',
+        'has_note',
+        'note_label',
+        'note_placeholder',
         'sort_order',
         'is_builtin',
         'is_active',
@@ -172,6 +200,7 @@ class VerificationFormQuestion extends Model
         return [
             'is_builtin' => 'boolean',
             'is_active' => 'boolean',
+            'has_note' => 'boolean',
             'sort_order' => 'integer',
         ];
     }
@@ -345,6 +374,23 @@ class VerificationFormQuestion extends Model
         }
 
         return $filtered;
+    }
+
+    public static function sectionOptionsForTemplate(?string $templateKey): array
+    {
+        return $templateKey === 'template_2'
+            ? self::TEMPLATE_2_SECTION_OPTIONS
+            : self::SECTION_OPTIONS;
+    }
+
+    public function getSelectOptionValues(): array
+    {
+        return collect(preg_split('/\r\n|\r|\n/', (string) $this->select_options) ?: [])
+            ->map(fn (string $option): string => trim($option))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public static function codePrefixOptionsForSection(?string $sectionKey = null): array

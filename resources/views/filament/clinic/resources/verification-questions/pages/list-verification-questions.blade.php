@@ -27,7 +27,7 @@
         }
         $verificationNavItems[] = [
             'key' => 'questions',
-            'label' => 'Verification Questions',
+            'label' => 'Template Management',
             'description' => 'Manage prompts and section-specific question content.',
             'url' => \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::getUrl('index'),
         ];
@@ -54,10 +54,10 @@
                         Verification Workspace
                     </div>
                     <h2 style="margin: 14px 0 0; font-size: 30px; line-height: 1.08; font-weight: 800; color: #0f172a;">
-                        Verification Questions
+                        Template Management
                     </h2>
                     <p style="margin: 10px 0 0; max-width: 920px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                        Manage the clinic verification question library section by section so the form, PDF output, and arrangement flow all stay aligned from one shared workspace.
+                        Manage Template 1 and Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                     </p>
                 </div>
 

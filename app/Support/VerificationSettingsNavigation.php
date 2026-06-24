@@ -49,8 +49,8 @@ class VerificationSettingsNavigation
             ],
             [
                 'key' => 'questions',
-                'label' => 'Verification Questions',
-                'description' => 'Manage prompts and section-specific question content.',
+                'label' => 'Template Management',
+                'description' => 'Manage Template 1 and Template 2 questions, datatypes, dropdowns, notes, and section placement.',
                 'url' => VerificationFormQuestionResource::getUrl('index'),
             ],
             [

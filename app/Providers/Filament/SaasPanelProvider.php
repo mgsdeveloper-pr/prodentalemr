@@ -73,6 +73,12 @@ class SaasPanelProvider extends PanelProvider
                     ->url(fn (): string => url('/verification'))
                     ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(\Filament\PanelRegistry::class)->get('admin')))
                     ->sort(900),
+                'clinic_workspace' => MenuItem::make()
+                    ->label('Open Clinic Workspace')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2)
+                    ->url(fn (): string => url('/clinic'))
+                    ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(\Filament\PanelRegistry::class)->get('clinic')))
+                    ->sort(910),
                 'logout' => MenuItem::make()->hidden(),
                 'sign_out' => MenuItem::make()
                     ->label('Sign out')

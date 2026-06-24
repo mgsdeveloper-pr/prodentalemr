@@ -5,6 +5,7 @@ namespace App\Filament\Saas\Resources\Verifications\Pages;
 use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
 use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
 use App\Models\BillingWorkItem;
+use App\Models\InsuranceCarrier;
 use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\User;
 use App\Models\VerificationCoverageCode;
@@ -16,6 +17,7 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -34,12 +36,17 @@ class EditVerificationWorkItem extends EditRecord
 
     protected array $verificationProfileData = [];
     protected array $verificationFormAnswerData = [];
+    protected array $verificationFormAnswerNoteData = [];
     protected array $verificationCoverageCodeData = [];
     public array $codeCoverageData = [];
     public array $clinicResponseAttachments = [];
     public bool $auditReady = false;
     public bool $openInfoRequestModalOnLoad = false;
-    public string $formTemplate = 'template_1';
+    public bool $showAddInsuranceModal = false;
+    public array $newInsuranceCarrier = [];
+    public string $formTemplate = 'template_2';
+    public string $waitingPeriodAnswer = 'no';
+    public array $waitingPeriodDetails = [];
     protected bool $shouldSkipWorkflowSyncOnSave = false;
 
     public function mount(int|string $record): void
@@ -59,7 +66,9 @@ class EditVerificationWorkItem extends EditRecord
         $requestedTemplate = request()->string('template')->toString();
         $this->formTemplate = in_array($requestedTemplate, ['template_1', 'template_2'], true)
             ? $requestedTemplate
-            : 'template_1';
+            : ($this->record->clinic?->getVerificationDefaultFormTemplate() ?? 'template_2');
+
+        $this->initializeWaitingPeriodDetails();
     }
 
     public function selectFormTemplate(string $template): void
@@ -162,9 +171,156 @@ class EditVerificationWorkItem extends EditRecord
 
     public function updated($name, $value): void
     {
-        if (str_starts_with((string) $name, 'data.') || str_starts_with((string) $name, 'codeCoverageData.')) {
+        if (
+            str_starts_with((string) $name, 'data.')
+            || str_starts_with((string) $name, 'codeCoverageData.')
+            || str_starts_with((string) $name, 'waitingPeriod')
+        ) {
             $this->auditReady = false;
         }
+
+        if ($name === 'waitingPeriodAnswer' && $value !== 'yes') {
+            $this->waitingPeriodDetails = $this->defaultWaitingPeriodDetails();
+            $this->data['vf_waiting_periods'] = null;
+        }
+
+        if ($name === 'data.vf_insurance_provider_name') {
+            $this->applySelectedInsuranceCarrier((string) $value);
+        }
+    }
+
+    public function getInsuranceCarrierOptions(): array
+    {
+        $clinicId = filled($this->record->clinic_id) ? (int) $this->record->clinic_id : null;
+
+        return Cache::remember(
+            'verification.insurance-carrier-options.' . ($clinicId ?: 'global'),
+            now()->addMinutes(10),
+            fn (): array => InsuranceCarrier::query()
+                ->with(['overrides' => fn ($query) => $query->when(
+                    filled($clinicId),
+                    fn ($builder) => $builder->where('clinic_id', $clinicId),
+                    fn ($builder) => $builder->whereRaw('1 = 0')
+                )])
+                ->where('is_active', true)
+                ->orderBy('insurance_name')
+                ->get()
+                ->mapWithKeys(function (InsuranceCarrier $carrier) use ($clinicId): array {
+                    $effective = $carrier->effectiveAttributesForClinic($clinicId);
+                    $value = trim((string) $carrier->insurance_name);
+                    $label = trim((string) ($effective['insurance_name'] ?? $carrier->insurance_name));
+
+                    return $value !== '' && ($effective['is_active'] ?? true)
+                        ? [$value => ($label !== '' ? $label : $value)]
+                        : [];
+                })
+                ->all(),
+        );
+    }
+
+    public function canAddInsuranceCarrier(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) (
+            $user?->canPerformVerificationModuleAction('insurance_directory', 'add')
+            || $user?->canPerformSaasModuleAction('insurance_directory', 'add')
+        );
+    }
+
+    public function openAddInsuranceModal(): void
+    {
+        abort_unless($this->canAddInsuranceCarrier(), 403);
+
+        $this->resetErrorBag();
+        $this->newInsuranceCarrier = [
+            'insurance_name' => '',
+            'payer_id' => '',
+            'payer_phone' => '',
+            'claims_address' => '',
+        ];
+        $this->showAddInsuranceModal = true;
+    }
+
+    public function closeAddInsuranceModal(): void
+    {
+        $this->showAddInsuranceModal = false;
+        $this->newInsuranceCarrier = [];
+        $this->resetErrorBag();
+    }
+
+    public function addInsuranceCarrier(): void
+    {
+        abort_unless($this->canAddInsuranceCarrier(), 403);
+
+        $validated = $this->validate([
+            'newInsuranceCarrier.insurance_name' => ['required', 'string', 'max:255'],
+            'newInsuranceCarrier.payer_id' => ['nullable', 'string', 'max:255'],
+            'newInsuranceCarrier.payer_phone' => ['nullable', 'string', 'max:255'],
+            'newInsuranceCarrier.claims_address' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $payload = $validated['newInsuranceCarrier'];
+        $name = trim((string) $payload['insurance_name']);
+
+        $carrier = InsuranceCarrier::query()->firstOrCreate(
+            ['insurance_name' => $name],
+            [
+                'payer_id' => filled($payload['payer_id'] ?? null) ? trim((string) $payload['payer_id']) : null,
+                'payer_phone' => filled($payload['payer_phone'] ?? null) ? trim((string) $payload['payer_phone']) : null,
+                'claims_address' => filled($payload['claims_address'] ?? null) ? trim((string) $payload['claims_address']) : null,
+                'is_active' => true,
+            ],
+        );
+
+        if (! $carrier->wasRecentlyCreated && ! $carrier->is_active) {
+            $carrier->update(['is_active' => true]);
+        }
+
+        Cache::forget('verification.insurance-carrier-options.' . ($this->record->clinic_id ?: 'global'));
+        $this->data['vf_insurance_provider_name'] = $carrier->insurance_name;
+        $this->applySelectedInsuranceCarrier($carrier->insurance_name);
+        $this->closeAddInsuranceModal();
+
+        Notification::make()
+            ->title($carrier->wasRecentlyCreated ? 'Insurance added' : 'Insurance selected')
+            ->body($carrier->insurance_name . ' is now selected for this verification.')
+            ->success()
+            ->send();
+    }
+
+    protected function applySelectedInsuranceCarrier(string $carrierName): void
+    {
+        $carrierName = trim($carrierName);
+
+        if ($carrierName === '') {
+            return;
+        }
+
+        $clinicId = filled($this->record->clinic_id) ? (int) $this->record->clinic_id : null;
+        $carrier = InsuranceCarrier::query()
+            ->with([
+                'networkProfile',
+                'overrides' => fn ($query) => $query->when(
+                    filled($clinicId),
+                    fn ($builder) => $builder->where('clinic_id', $clinicId),
+                    fn ($builder) => $builder->whereRaw('1 = 0')
+                ),
+            ])
+            ->whereRaw('LOWER(insurance_name) = ?', [mb_strtolower($carrierName)])
+            ->first();
+
+        if (! $carrier) {
+            return;
+        }
+
+        $effective = $carrier->effectiveAttributesForClinic($clinicId);
+        $this->data['vf_insurance_provider_name'] = $effective['insurance_name'] ?: $carrier->insurance_name;
+        $this->data['vf_payer_id'] = $effective['payer_id'] ?: null;
+        $this->data['vf_insurance_company_phone_number'] = $effective['payer_phone'] ?: null;
+        $this->data['vf_insurance_claim_mailing_address'] = $effective['claims_address'] ?: null;
+        $this->data['vf_fee_schedule'] = $carrier->networkProfile?->feeScheduleReferenceName();
+        $this->auditReady = false;
     }
 
     public function canRequestClinicInfo(): bool
@@ -294,6 +450,8 @@ class EditVerificationWorkItem extends EditRecord
             ])
             ->all();
         $this->clinicResponseAttachments = [];
+        $this->waitingPeriodAnswer = 'no';
+        $this->waitingPeriodDetails = $this->defaultWaitingPeriodDetails();
         $this->data = $this->applyAutofillDefaults($this->data ?? []);
         $this->auditReady = false;
         $this->resetErrorBag();
@@ -497,6 +655,40 @@ class EditVerificationWorkItem extends EditRecord
             ->all();
     }
 
+    public function getTemplateTwoQuestionsForSection(string $sectionKey): array
+    {
+        $formType = data_get($this->data, 'vf_form_type', 'full_form');
+        $clinicId = $this->record->clinic_id;
+
+        if (! filled($clinicId)) {
+            return [];
+        }
+
+        return VerificationFormQuestion::query()
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', 'template_2')
+            ->where('section_key', $sectionKey)
+            ->where('is_active', true)
+            ->whereIn('form_type', ['both', $formType])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (VerificationFormQuestion $question): array => [
+                'id' => $question->getKey(),
+                'label' => $question->prompt,
+                'field' => $this->customQuestionFieldName($question->getKey()),
+                'note_field' => $this->customQuestionNoteFieldName($question->getKey()),
+                'type' => $question->input_type,
+                'help_text' => $question->help_text,
+                'placeholder' => $question->placeholder,
+                'options' => $question->getSelectOptionValues(),
+                'has_note' => $question->has_note,
+                'note_label' => $question->note_label ?: 'Note',
+                'note_placeholder' => $question->note_placeholder ?: 'Add note',
+            ])
+            ->all();
+    }
+
     protected function withCompletion(array $section): array
     {
         $section['completed'] = collect($section['rows'])
@@ -582,6 +774,7 @@ class EditVerificationWorkItem extends EditRecord
 
         return VerificationFormQuestion::query()
             ->where('is_active', true)
+            ->where('template_key', 'template_1')
             ->where('section_key', $sectionKey)
             ->where('is_builtin', $builtIn)
             ->where('clinic_id', $clinicId)
@@ -647,19 +840,39 @@ class EditVerificationWorkItem extends EditRecord
                 }
 
                 $data[$this->customQuestionFieldName($answer->verification_form_question_id)] = $answer->answer_value;
+                $data[$this->customQuestionNoteFieldName($answer->verification_form_question_id)] = $answer->note_value;
             });
 
         $this->codeCoverageData = $this->resolveCodeCoverageRows();
 
-        return $this->applyAutofillDefaults($data);
+        $data = $this->applyAutofillDefaults($data);
+        $data['vf_network_status'] = $this->resolveNetworkStatus(
+            data_get($data, 'vf_network_status'),
+            data_get($data, 'vf_is_provider_in_network')
+        );
+
+        return $data;
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $waitingPeriodSummary = $this->waitingPeriodAnswer === 'yes'
+            ? $this->formatWaitingPeriodDetails()
+            : null;
+        $data['vf_waiting_periods'] = $waitingPeriodSummary;
+        $this->data['vf_waiting_periods'] = $waitingPeriodSummary;
+
         $this->verificationFormAnswerData = collect($this->data)
-            ->filter(fn ($value, $key): bool => str_starts_with((string) $key, 'custom_question_'))
+            ->filter(fn ($value, $key): bool => str_starts_with((string) $key, 'custom_question_')
+                && ! str_starts_with((string) $key, 'custom_question_note_'))
             ->mapWithKeys(function ($value, $key): array {
                 return [(int) str_replace('custom_question_', '', (string) $key) => $value];
+            })
+            ->all();
+        $this->verificationFormAnswerNoteData = collect($this->data)
+            ->filter(fn ($value, $key): bool => str_starts_with((string) $key, 'custom_question_note_'))
+            ->mapWithKeys(function ($value, $key): array {
+                return [(int) str_replace('custom_question_note_', '', (string) $key) => $value];
             })
             ->all();
 
@@ -673,6 +886,72 @@ class EditVerificationWorkItem extends EditRecord
         }
 
         return $data;
+    }
+
+    protected function initializeWaitingPeriodDetails(): void
+    {
+        $this->waitingPeriodDetails = $this->defaultWaitingPeriodDetails();
+        $savedValue = trim((string) data_get($this->data, 'vf_waiting_periods'));
+
+        if ($savedValue === '') {
+            $this->waitingPeriodAnswer = 'no';
+
+            return;
+        }
+
+        $this->waitingPeriodAnswer = 'yes';
+        foreach (preg_split('/\r\n|\r|\n/', $savedValue) ?: [] as $line) {
+            if (! preg_match('/^([^:]+):\s*([^\s|]*)\s*(Months|Years|None)?(?:\s*\|\s*(.*))?$/i', trim($line), $matches)) {
+                continue;
+            }
+
+            $category = trim($matches[1]);
+            $rowIndex = collect($this->waitingPeriodDetails)
+                ->search(fn (array $row): bool => strcasecmp($row['category'], $category) === 0);
+
+            if ($rowIndex === false) {
+                continue;
+            }
+
+            $this->waitingPeriodDetails[$rowIndex]['period'] = trim($matches[2] ?? '');
+            $this->waitingPeriodDetails[$rowIndex]['unit'] = ucfirst(strtolower(trim($matches[3] ?? 'Months'))) ?: 'Months';
+            $this->waitingPeriodDetails[$rowIndex]['notes'] = trim($matches[4] ?? '');
+        }
+    }
+
+    protected function defaultWaitingPeriodDetails(): array
+    {
+        return collect([
+            'Basic Restorative',
+            'Endodontics',
+            'Periodontics',
+            'Oral Surgery',
+            'Major Restorative',
+            'Orthodontics',
+        ])->map(fn (string $category): array => [
+            'category' => $category,
+            'period' => null,
+            'unit' => 'Months',
+            'notes' => null,
+        ])->all();
+    }
+
+    protected function formatWaitingPeriodDetails(): string
+    {
+        $lines = collect($this->waitingPeriodDetails)
+            ->filter(fn (array $row): bool => filled($row['period'] ?? null) || filled($row['notes'] ?? null))
+            ->map(function (array $row): string {
+                $period = filled($row['period'] ?? null) ? trim((string) $row['period']) : '0';
+                $unit = filled($row['unit'] ?? null) ? trim((string) $row['unit']) : 'Months';
+                $notes = filled($row['notes'] ?? null) ? ' | ' . trim((string) $row['notes']) : '';
+
+                return trim((string) $row['category']) . ': ' . $period . ' ' . $unit . $notes;
+            })
+            ->values();
+
+        return $lines->isNotEmpty()
+            ? $lines->implode(PHP_EOL)
+            : 'Waiting period applies.';
     }
 
     protected function afterSave(): void
@@ -996,8 +1275,19 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function syncVerificationFormAnswers(): void
     {
-        foreach ($this->verificationFormAnswerData as $questionId => $answerValue) {
-            if (blank($answerValue) && $answerValue !== '0' && $answerValue !== 0) {
+        $questionIds = collect(array_keys($this->verificationFormAnswerData))
+            ->merge(array_keys($this->verificationFormAnswerNoteData))
+            ->map(fn ($questionId): int => (int) $questionId)
+            ->unique();
+
+        foreach ($questionIds as $questionId) {
+            $answerValue = $this->verificationFormAnswerData[$questionId] ?? null;
+            $noteValue = $this->verificationFormAnswerNoteData[$questionId] ?? null;
+
+            if (
+                blank($answerValue) && $answerValue !== '0' && $answerValue !== 0
+                && blank($noteValue) && $noteValue !== '0' && $noteValue !== 0
+            ) {
                 $this->record->verificationFormAnswers()
                     ->where('verification_form_question_id', $questionId)
                     ->delete();
@@ -1007,7 +1297,10 @@ class EditVerificationWorkItem extends EditRecord
 
             $this->record->verificationFormAnswers()->updateOrCreate(
                 ['verification_form_question_id' => $questionId],
-                ['answer_value' => $answerValue],
+                [
+                    'answer_value' => $answerValue,
+                    'note_value' => $noteValue,
+                ],
             );
         }
     }
@@ -1247,6 +1540,11 @@ class EditVerificationWorkItem extends EditRecord
         return 'custom_question_' . $questionId;
     }
 
+    protected function customQuestionNoteFieldName(int $questionId): string
+    {
+        return 'custom_question_note_' . $questionId;
+    }
+
     protected function getSubmissionPanel(): string
     {
         return 'verification';
@@ -1281,6 +1579,7 @@ class EditVerificationWorkItem extends EditRecord
                 'code' => $answer->question?->code,
                 'prompt' => $answer->question?->prompt,
                 'answer_value' => $answer->answer_value,
+                'note_value' => $answer->note_value,
             ])
             ->values()
             ->all();
@@ -1321,12 +1620,13 @@ class EditVerificationWorkItem extends EditRecord
         $answeredQuestions = collect($answerPayload)
             ->filter(function (array $row): bool {
                 $value = $row['answer_value'] ?? null;
+                $note = $row['note_value'] ?? null;
 
                 if ($value === 0 || $value === 0.0 || $value === '0') {
                     return true;
                 }
 
-                return filled($value);
+                return filled($value) || filled($note);
             })
             ->count();
 

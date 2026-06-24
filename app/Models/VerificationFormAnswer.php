@@ -11,6 +11,7 @@ class VerificationFormAnswer extends Model
         'billing_work_item_id',
         'verification_form_question_id',
         'answer_value',
+        'note_value',
     ];
 
     public function workItem(): BelongsTo

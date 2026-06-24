@@ -36,6 +36,18 @@ class ClinicPanelProvider extends PanelProvider
             ->homeUrl(fn (): string => ClinicWorkspace::homeUrl(ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) ?: ClinicWorkspace::CLINIC_PMS))
             ->userMenu()
             ->userMenuItems([
+                'saas_workspace' => MenuItem::make()
+                    ->label('Open SaaS Workspace')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedArrowTopRightOnSquare)
+                    ->url(fn (): string => url('/saas'))
+                    ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(\Filament\PanelRegistry::class)->get('saas')))
+                    ->sort(830),
+                'managed_verification_workspace' => MenuItem::make()
+                    ->label('Open Managed Verification')
+                    ->icon(\Filament\Support\Icons\Heroicon::OutlinedClipboardDocumentCheck)
+                    ->url(fn (): string => url('/verification'))
+                    ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(\Filament\PanelRegistry::class)->get('admin')))
+                    ->sort(840),
                 'choose_workspace' => MenuItem::make()
                     ->label('Choose Workspace')
                     ->icon(\Filament\Support\Icons\Heroicon::OutlinedSquares2x2)

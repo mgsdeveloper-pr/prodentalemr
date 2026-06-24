@@ -64,6 +64,7 @@ class VerificationSettings extends Page implements HasForms
         $selectedQuestionIds = $this->clinicRecord?->getVerificationPdfOutputQuestionIds() ?? [];
 
         $this->form->fill([
+            'verification_default_form_template' => $this->clinicRecord?->getVerificationDefaultFormTemplate() ?? 'template_2',
             'verification_pdf_output_mode' => $this->clinicRecord?->getVerificationPdfOutputMode() ?? 'standard',
             'verification_pdf_output_sections' => $this->clinicRecord?->getVerificationPdfOutputSections() ?? [],
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
@@ -95,6 +96,13 @@ class VerificationSettings extends Page implements HasForms
                             ->required()
                             ->native(false)
                             ->live(),
+                        Select::make('verification_default_form_template')
+                            ->label('Default verification form')
+                            ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                            ->default('template_2')
+                            ->required()
+                            ->native(false)
+                            ->helperText('Template 2 is the recommended default. Users can still switch templates inside the verification form.'),
                         CheckboxList::make('verification_pdf_output_sections')
                             ->label('Selected output sections')
                             ->options($this->getPdfSectionLabels())
@@ -176,6 +184,7 @@ class VerificationSettings extends Page implements HasForms
         }
 
         $clinic->update([
+            'verification_default_form_template' => $state['verification_default_form_template'] ?? 'template_2',
             'verification_pdf_output_mode' => $mode,
             'verification_pdf_output_sections' => $mode === 'selected' ? array_values($sections) : [],
             'verification_pdf_output_question_ids' => $mode === 'selected' ? array_values($questionIds) : [],
@@ -184,6 +193,7 @@ class VerificationSettings extends Page implements HasForms
         $this->clinicRecord = $clinic->fresh('organization');
         $selectedQuestionIds = $this->clinicRecord->getVerificationPdfOutputQuestionIds();
         $this->form->fill([
+            'verification_default_form_template' => $this->clinicRecord->getVerificationDefaultFormTemplate(),
             'verification_pdf_output_mode' => $this->clinicRecord->getVerificationPdfOutputMode(),
             'verification_pdf_output_sections' => $this->clinicRecord->getVerificationPdfOutputSections(),
             'verification_pdf_output_question_ids' => $selectedQuestionIds,

@@ -28,7 +28,7 @@
         }
         $verificationNavItems[] = [
             'key' => 'questions',
-            'label' => 'Verification Questions',
+            'label' => 'Template Management',
             'description' => 'Manage prompts and section-specific question content.',
             'url' => \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::getUrl('index'),
         ];

@@ -33,6 +33,7 @@ class Clinic extends Model
         'account_manager_user_id',
         'service_notes',
         'verification_pdf_output_mode',
+        'verification_default_form_template',
         'verification_pdf_output_sections',
         'verification_pdf_output_question_ids',
     ];
@@ -164,6 +165,16 @@ class Clinic extends Model
         return array_key_exists($mode, \App\Support\VerificationResultPdf::OUTPUT_MODE_OPTIONS)
             ? $mode
             : 'standard';
+    }
+
+    public function getVerificationDefaultFormTemplate(): string
+    {
+        return array_key_exists(
+            (string) $this->verification_default_form_template,
+            VerificationFormQuestion::TEMPLATE_OPTIONS
+        )
+            ? (string) $this->verification_default_form_template
+            : 'template_2';
     }
 
     public function getVerificationPdfOutputSections(): array

@@ -524,10 +524,16 @@ trait InteractsWithVerificationWorkbench
             'changes' => $this->buildSubmissionDiffRows($submission),
             'answers' => collect(data_get($payload, 'answers', []))
                 ->map(function ($answer): array {
+                    $answerValue = $this->normalizeSnapshotValue(data_get($answer, 'answer_value'));
+                    $noteValue = $this->normalizeSnapshotValue(data_get($answer, 'note_value'));
+
                     return [
                         'code' => data_get($answer, 'code') ?: '-',
                         'prompt' => data_get($answer, 'prompt') ?: 'Question',
-                        'value' => $this->normalizeSnapshotValue(data_get($answer, 'answer_value')),
+                        'value' => collect([
+                            $answerValue !== '-' ? $answerValue : null,
+                            $noteValue !== '-' ? 'Note: ' . $noteValue : null,
+                        ])->filter()->implode("\n") ?: '-',
                     ];
                 })
                 ->values()

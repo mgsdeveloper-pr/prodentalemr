@@ -306,6 +306,22 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             && $this->hasDsoWorkspaceRole();
     }
 
+    public function canAccessClinicWorkspace(): bool
+    {
+        return $this->status
+            && $this->hasAnyRole([
+                'saas_admin',
+                'saas_manager',
+                'saas_user',
+                'clinic_admin',
+                'clinic_manager',
+                'doctor',
+                'receptionist',
+                'staff',
+            ])
+            && $this->hasAnyEnabledClinicService();
+    }
+
     public function isVerificationAdmin(): bool
     {
         return $this->status
@@ -1260,16 +1276,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             'dso' => $this->canAccessDsoWorkspace(),
             'saas' => $this->hasAnyRole(['saas_admin', 'saas_manager', 'saas_user'])
                 && $this->hasAnyStandardSaasModuleAccess(),
-            'clinic' => $this->hasAnyRole([
-                'saas_admin',
-                'saas_manager',
-                'saas_user',
-                'clinic_admin',
-                'clinic_manager',
-                'doctor',
-                'receptionist',
-                'staff',
-            ]) && $this->hasAnyEnabledClinicService(),
+            'clinic' => $this->canAccessClinicWorkspace(),
             default => false,
         };
     }

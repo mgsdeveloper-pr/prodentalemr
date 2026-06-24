@@ -215,7 +215,9 @@ class ListVerificationQuestions extends ListRecords
 
                 return [
                     'key' => $sectionKey,
-                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey] ?? str($sectionKey)->headline()->toString(),
+                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey]
+                        ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$sectionKey]
+                        ?? str($sectionKey)->headline()->toString(),
                     'count' => $questions->count(),
                     'active_count' => $activeCount,
                     'system_count' => $systemCount,

@@ -19,10 +19,10 @@
                     Verification Workspace
                 </div>
                 <h2 style="margin: 14px 0 0; font-size: 30px; line-height: 1.08; font-weight: 800; color: #0f172a;">
-                    Verification Questions
+                    Template Management
                 </h2>
                 <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                    Manage the verification question library section by section so the form, PDF output, and arrangement flow all stay aligned from one shared workspace.
+                    Manage Template 1 and Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                 </p>
             </div>
 
@@ -89,7 +89,7 @@
         <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06); overflow: hidden;">
             <div style="padding: 20px 24px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
                 <div>
-                    <h3 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">Managed Question Bank</h3>
+                    <h3 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">Managed Template Questions</h3>
                     <p style="margin: 8px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
                     Add reusable questions to the built-in sections. These will appear in the verification console under their assigned section.
                     </p>

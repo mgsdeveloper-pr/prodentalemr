@@ -22,6 +22,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -41,7 +42,11 @@ class VerificationQuestionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Verification Questions';
+    protected static ?string $navigationLabel = 'Template Management';
+
+    protected static ?string $modelLabel = 'Template Question';
+
+    protected static ?string $pluralModelLabel = 'Template Questions';
 
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
@@ -89,6 +94,15 @@ class VerificationQuestionResource extends Resource
                                             ->label('Question preview')
                                             ->content(fn (Get $get): string => filled($get('prompt')) ? (string) $get('prompt') : 'Your drafted question will appear here so you can review the wording before saving it.')
                                             ->columnSpan(12),
+                                        Select::make('template_key')
+                                            ->label('Verification template')
+                                            ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                                            ->default('template_2')
+                                            ->required()
+                                            ->live()
+                                            ->native(false)
+                                            ->afterStateUpdated(fn (Set $set) => $set('section_key', null))
+                                            ->columnSpan(4),
                                         Select::make('form_type')
                                             ->label('Form')
                                             ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS)
@@ -99,7 +113,7 @@ class VerificationQuestionResource extends Resource
                                             ->columnSpan(4),
                                         Select::make('section_key')
                                             ->label('Section')
-                                            ->options(VerificationFormQuestion::SECTION_OPTIONS)
+                                            ->options(fn (Get $get): array => VerificationFormQuestion::sectionOptionsForTemplate($get('template_key')))
                                             ->required()
                                             ->live()
                                             ->native(false)
@@ -117,6 +131,14 @@ class VerificationQuestionResource extends Resource
                                             ->placeholder('Example: Enter payer phone number')
                                             ->maxLength(255)
                                             ->columnSpan(6),
+                                        Textarea::make('select_options')
+                                            ->label('Dropdown options')
+                                            ->placeholder("Enter one option per line\nExample:\nYes\nNo\nNot Applicable")
+                                            ->helperText('Only used when the response type is Dropdown.')
+                                            ->rows(5)
+                                            ->visible(fn (Get $get): bool => $get('input_type') === 'select')
+                                            ->required(fn (Get $get): bool => $get('input_type') === 'select')
+                                            ->columnSpan(6),
                                     ]),
                             ]),
                         Section::make('Display & Guidance')
@@ -130,6 +152,25 @@ class VerificationQuestionResource extends Resource
                                             ->placeholder('Add a short instruction to guide the user when answering this question.')
                                             ->rows(3)
                                             ->columnSpan(12),
+                                        Toggle::make('has_note')
+                                            ->label('Add a separate note area')
+                                            ->helperText('Displays an optional note box beside or below this question in Template 2.')
+                                            ->default(false)
+                                            ->live()
+                                            ->inline(false)
+                                            ->columnSpan(4),
+                                        TextInput::make('note_label')
+                                            ->label('Note label')
+                                            ->placeholder('Example: Additional details')
+                                            ->visible(fn (Get $get): bool => (bool) $get('has_note'))
+                                            ->maxLength(255)
+                                            ->columnSpan(4),
+                                        TextInput::make('note_placeholder')
+                                            ->label('Note placeholder')
+                                            ->placeholder('Example: Add any supporting information')
+                                            ->visible(fn (Get $get): bool => (bool) $get('has_note'))
+                                            ->maxLength(255)
+                                            ->columnSpan(4),
                                         Toggle::make('is_active')
                                             ->label('Active')
                                             ->default(true)
@@ -149,6 +190,7 @@ class VerificationQuestionResource extends Resource
                         Section::make('Field Binding')
                             ->description('Only use these fields when the question should map directly to stored verification values or a matrix-style worksheet row.')
                             ->columnSpan(12)
+                            ->visible(fn (Get $get): bool => $get('template_key') !== 'template_2')
                             ->collapsible()
                             ->collapsed()
                             ->schema([
@@ -213,7 +255,13 @@ class VerificationQuestionResource extends Resource
                     ->wrap(),
                 TextColumn::make('section_key')
                     ->label('Section')
-                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::SECTION_OPTIONS[$state] ?? str($state)->headline()->toString())
+                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::SECTION_OPTIONS[$state]
+                        ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$state]
+                        ?? str($state)->headline()->toString())
+                    ->badge(),
+                TextColumn::make('template_key')
+                    ->label('Template')
+                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::TEMPLATE_OPTIONS[$state] ?? str($state)->headline()->toString())
                     ->badge(),
                 TextColumn::make('form_type')
                     ->label('Form')
@@ -237,11 +285,21 @@ class VerificationQuestionResource extends Resource
                 IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean(),
+                IconColumn::make('has_note')
+                    ->label('Note')
+                    ->boolean(),
             ])
             ->filters([
+                SelectFilter::make('template_key')
+                    ->label('Template')
+                    ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                    ->default('template_2'),
                 SelectFilter::make('section_key')
                     ->label('Section')
-                    ->options(VerificationFormQuestion::SECTION_OPTIONS),
+                    ->options(array_merge(
+                        VerificationFormQuestion::SECTION_OPTIONS,
+                        VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS,
+                    )),
                 SelectFilter::make('form_type')
                     ->label('Form')
                     ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS),

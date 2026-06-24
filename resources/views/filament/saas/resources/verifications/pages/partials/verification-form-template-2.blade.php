@@ -1,5 +1,31 @@
 @php
-    $templateTwoCoverageGroups = collect($codeCoverageSection['groups'] ?? []);
+    $templateTwoBenefitGroups = collect([
+        'General' => [],
+        'Basic' => [],
+        'Major' => [],
+        'Orthodontics' => [],
+    ]);
+
+    foreach ($this->codeCoverageData as $coverageIndex => $coverageRow) {
+        $category = strtolower(trim((string) ($coverageRow['category'] ?? '')));
+
+        $benefitGroup = match (true) {
+            str_contains($category, 'ortho') => 'Orthodontics',
+            str_contains($category, 'prostho'),
+            str_contains($category, 'implant'),
+            str_contains($category, 'major') => 'Major',
+            str_contains($category, 'restor'),
+            str_contains($category, 'endo'),
+            str_contains($category, 'perio'),
+            str_contains($category, 'oral surg'),
+            str_contains($category, 'basic') => 'Basic',
+            default => 'General',
+        };
+
+        $groupRows = $templateTwoBenefitGroups->get($benefitGroup, []);
+        $groupRows[] = ['index' => $coverageIndex, 'row' => $coverageRow];
+        $templateTwoBenefitGroups->put($benefitGroup, $groupRows);
+    }
     $templateTwoInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
     $templateTwoReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
     $annualMaximum = (float) (data_get($this->data, 'vf_annual_maximum') ?: 0);
@@ -8,6 +34,7 @@
     $individualRemaining = (float) (data_get($this->data, 'vf_individual_deductible_remaining') ?: 0);
     $familyDeductible = (float) (data_get($this->data, 'vf_family_deductible') ?: 0);
     $familyRemaining = (float) (data_get($this->data, 'vf_family_deductible_remaining') ?: 0);
+    $insuranceCarrierOptions = $this->getInsuranceCarrierOptions();
 @endphp
 
 <style>
@@ -154,12 +181,38 @@
         background: #fbfdfc;
     }
 
+    .uel2-managed-questions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px dashed var(--uel2-line);
+    }
+
+    .uel2-managed-question {
+        display: grid;
+        gap: 12px;
+        padding: 15px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 16px;
+        background: #fbfdfc;
+    }
+
+    .uel2-question-help {
+        margin: -2px 0 8px;
+        color: var(--uel2-muted);
+        font-size: 12px;
+        line-height: 1.55;
+    }
+
     @media (max-width: 1050px) {
         .uel2-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 720px) {
         .uel2-grid { grid-template-columns: 1fr; }
+        .uel2-managed-questions { grid-template-columns: 1fr; }
         .uel2-half, .uel2-wide { grid-column: 1; }
         .uel2-header { align-items: flex-start; }
         .uel2-table, .uel2-table thead, .uel2-table tbody, .uel2-table tr, .uel2-table th, .uel2-table td {
@@ -193,17 +246,43 @@
                 ['Patient Name', 'vf_patient_full_name', 'text'],
                 ['Date of Birth', 'vf_patient_dob', 'date'],
                 ['Member ID', 'vf_patient_identifier', 'text'],
-                ['Relationship', 'vf_insured_relation', 'text'],
+                ['Relationship', 'vf_insured_relation', 'select', [
+                    'Dependent' => 'Dependent',
+                    'Self' => 'Self',
+                    'Spouse' => 'Spouse',
+                ]],
                 ['Subscriber Name', 'vf_subscriber_name', 'text'],
                 ['Subscriber DOB', 'vf_subscriber_dob', 'date'],
                 ['Subscriber ID', 'vf_subscriber_id', 'text'],
-                ['COB', 'vf_cob', 'text'],
-            ] as [$label, $field, $type])
+                ['COB', 'vf_cob', 'select', [
+                    'No COB' => 'No COB',
+                    'Primary' => 'Primary',
+                    'Secondary' => 'Secondary',
+                ]],
+            ] as $patientField)
+                @php
+                    [$label, $field, $type] = $patientField;
+                    $options = $patientField[3] ?? [];
+                @endphp
                 <div class="uel2-field">
                     <label>{{ $label }}</label>
-                    <input type="{{ $type }}" wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                    @if ($type === 'select')
+                        <select wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                            <option value="">Select</option>
+                            @foreach ($options as $value => $optionLabel)
+                                <option value="{{ $value }}">{{ $optionLabel }}</option>
+                            @endforeach
+                        </select>
+                    @else
+                        <input type="{{ $type }}" wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                    @endif
                 </div>
             @endforeach
+        </div>
+        <div class="uel2-body" style="padding-top:0;">
+            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_patient_subscriber'),
+            ])
         </div>
     </section>
 
@@ -220,23 +299,107 @@
                 ['Effective Date', 'vf_effective_date', 'date'],
                 ['Claims Address', 'vf_insurance_claim_mailing_address', 'text'],
                 ['Phone Number', 'vf_insurance_company_phone_number', 'text'],
-                ['Network Status', 'vf_network_status', 'text'],
+                ['Network Status', 'vf_network_status', 'select', [
+                    'Yes' => 'In Network',
+                    'No' => 'Out of Network',
+                ]],
                 ['Fee Schedule', 'vf_fee_schedule', 'text'],
                 ['Plan Renewal Month', 'vf_plan_renewal_month', 'text'],
                 ['Future Termination Date', 'vf_future_termination_date', 'date'],
                 ['Employer / Group Name', 'vf_group_name', 'text'],
                 ['Group Number', 'vf_group_number', 'text'],
-            ] as [$label, $field, $type])
+            ] as $insuranceField)
+                @php
+                    [$label, $field, $type] = $insuranceField;
+                    $options = $insuranceField[3] ?? [];
+                @endphp
                 <div class="uel2-field {{ $field === 'vf_insurance_claim_mailing_address' ? 'uel2-half' : '' }}">
                     <label>{{ $label }}</label>
-                    <input
-                        type="{{ $type }}"
-                        wire:model.blur="data.{{ $field }}"
-                        @if ($field === 'vf_plan_renewal_month') placeholder="MM/YYYY" inputmode="numeric" @endif
-                        style="{{ $templateTwoInput }}"
-                    >
+                    @if ($field === 'vf_insurance_provider_name')
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <select
+                                wire:model.live="data.{{ $field }}"
+                                style="{{ $templateTwoInput }};min-width:0;flex:1 1 auto;appearance:auto;"
+                            >
+                                <option value="">Select insurance</option>
+                                @if (filled(data_get($this->data, $field)) && ! array_key_exists((string) data_get($this->data, $field), $insuranceCarrierOptions))
+                                    <option value="{{ data_get($this->data, $field) }}">{{ data_get($this->data, $field) }}</option>
+                                @endif
+                                @foreach ($insuranceCarrierOptions as $value => $optionLabel)
+                                    <option value="{{ $value }}">{{ $optionLabel }}</option>
+                                @endforeach
+                            </select>
+                            @if ($this->canAddInsuranceCarrier())
+                                <button
+                                    type="button"
+                                    wire:click="openAddInsuranceModal"
+                                    title="Add insurance not listed"
+                                    aria-label="Add insurance"
+                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #b8d4c9;border-radius:12px;background:#eaf6f1;color:#0b6b4f;font-size:22px;font-weight:800;cursor:pointer;"
+                                >
+                                    +
+                                </button>
+                            @endif
+                        </div>
+                    @elseif ($type === 'select')
+                        <select wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                            <option value="">Select</option>
+                            @foreach ($options as $value => $optionLabel)
+                                <option value="{{ $value }}">{{ $optionLabel }}</option>
+                            @endforeach
+                        </select>
+                    @elseif ($field === 'vf_fee_schedule')
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input
+                                type="text"
+                                wire:model.blur="data.{{ $field }}"
+                                style="{{ $templateTwoInput }};min-width:0;flex:1 1 auto;"
+                            >
+                            @if (filled($feeScheduleReference['url'] ?? null))
+                                @php
+                                    $templateTwoFeeSchedulePayload = json_encode([
+                                        'url' => $feeScheduleReference['url'],
+                                        'name' => $feeScheduleReference['name'],
+                                        'label' => 'Fee Schedule Reference',
+                                        'description' => 'Review the current fee schedule reference without leaving the verification workflow.',
+                                    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+                                @endphp
+                                <button
+                                    type="button"
+                                    onclick='openReferenceViewerModal({!! $templateTwoFeeSchedulePayload !!})'
+                                    title="{{ $feeScheduleReference['name'] }}"
+                                    aria-label="View fee schedule reference"
+                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #b8d4c9;border-radius:12px;background:#ffffff;color:#0b6b4f;font-size:18px;font-weight:900;cursor:pointer;"
+                                >
+                                    &#9432;
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    title="No fee schedule reference added"
+                                    aria-label="No fee schedule reference added"
+                                    disabled
+                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #dbe4ee;border-radius:12px;background:#f8fafc;color:#94a3b8;font-size:18px;font-weight:900;cursor:not-allowed;opacity:.9;"
+                                >
+                                    &#9432;
+                                </button>
+                            @endif
+                        </div>
+                    @else
+                        <input
+                            type="{{ $type }}"
+                            wire:model.blur="data.{{ $field }}"
+                            @if ($field === 'vf_plan_renewal_month') placeholder="MM/YYYY" inputmode="numeric" @endif
+                            style="{{ $templateTwoInput }}"
+                        >
+                    @endif
                 </div>
             @endforeach
+        </div>
+        <div class="uel2-body" style="padding-top:0;">
+            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_insurance'),
+            ])
         </div>
     </section>
 
@@ -270,6 +433,10 @@
                 </div>
             </div>
 
+            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_maximums_deductibles'),
+            ])
+
             <div class="uel2-subsection">
                 <h3>Deductible & Coverage Category</h3>
                 <table class="uel2-table">
@@ -298,26 +465,114 @@
                 </div>
             </div>
 
-            <div class="uel2-subsection" x-data="{ waiting: @js(filled(data_get($this->data, 'vf_waiting_periods'))) }">
+            <div class="uel2-subsection">
                 <h3>Plan Provisions</h3>
                 <table class="uel2-table">
-                    <thead><tr><th style="width:40%;">Question</th><th style="width:20%;" aria-label="Response"></th><th style="width:40%;">Details</th></tr></thead>
+                    <thead><tr><th style="width:68%;">Question</th><th style="width:32%;" aria-label="Response"></th></tr></thead>
                     <tbody>
                         <tr>
-                            <td data-label="Question"><b>Is there any Waiting Period on this plan?</b></td>
-                            <td data-label="Response"><select x-model="waiting" @change="if (!waiting) $wire.set('data.vf_waiting_periods', null)"><option :value="false">No</option><option :value="true">Yes</option></select></td>
-                            <td data-label="Details"><input x-show="waiting" wire:model.blur="data.vf_waiting_periods" placeholder="Add waiting period note"></td>
+                            <td data-label="Question">
+                                <b>Is there any Waiting Period on this plan?</b>
+                                <div style="margin-top:4px;color:#6d7d77;font-size:12px;">If Yes, waiting period details will appear below.</div>
+                            </td>
+                            <td data-label="Response">
+                                <select wire:model.live="waitingPeriodAnswer">
+                                    <option value="no">No</option>
+                                    <option value="yes">Yes</option>
+                                </select>
+                            </td>
                         </tr>
-                        <tr><td data-label="Question"><b>Missing Tooth Clause</b></td><td data-label="Response"></td><td data-label="Details"><input wire:model.blur="data.vf_missing_tooth_clause" placeholder="Add missing tooth clause note"></td></tr>
-                        <tr><td data-label="Question"><b>Crowns are paid on Prep Date or Seat Date?</b></td><td data-label="Response"><select wire:model.blur="data.vf_crowns_paid_on"><option value="">Select</option><option>Prep</option><option>Seat</option><option>Either-Or</option></select></td><td data-label="Details"><input placeholder="Add crown payment guideline note"></td></tr>
-                        <tr><td data-label="Question"><b>Prosthetic Replacement Year / Month</b></td><td data-label="Response"></td><td data-label="Details"><input wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period"></td></tr>
-                        <tr><td data-label="Question"><b>Coordination of Benefits</b></td><td data-label="Response"></td><td data-label="Details"><input wire:model.blur="data.vf_cob" placeholder="Add coordination of benefits note"></td></tr>
+                        @if ($this->waitingPeriodAnswer === 'yes')
+                            <tr>
+                                <td colspan="2" style="padding:14px;">
+                                    <div style="padding:16px;border:1px solid #bfe3d5;border-radius:16px;background:#f7fcfa;">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+                                            <strong style="color:#063f30;font-size:15px;">Waiting Period Details</strong>
+                                            <span class="uel2-pill">Shown only when answer is Yes</span>
+                                        </div>
+                                        <table class="uel2-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Service Category</th>
+                                                    <th>Waiting Period</th>
+                                                    <th>Unit</th>
+                                                    <th>Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach ($this->waitingPeriodDetails as $waitingIndex => $waitingRow)
+                                                    <tr wire:key="waiting-period-{{ $waitingIndex }}">
+                                                        <td data-label="Service Category"><b>{{ $waitingRow['category'] }}</b></td>
+                                                        <td data-label="Waiting Period">
+                                                            <input type="number" min="0" wire:model.blur="waitingPeriodDetails.{{ $waitingIndex }}.period" placeholder="0">
+                                                        </td>
+                                                        <td data-label="Unit">
+                                                            <select wire:model.blur="waitingPeriodDetails.{{ $waitingIndex }}.unit">
+                                                                <option value="Months">Months</option>
+                                                                <option value="Years">Years</option>
+                                                                <option value="None">None</option>
+                                                            </select>
+                                                        </td>
+                                                        <td data-label="Notes">
+                                                            <input wire:model.blur="waitingPeriodDetails.{{ $waitingIndex }}.notes" placeholder="Details">
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
+                        <tr>
+                            <td data-label="Question"><b>Missing Tooth Clause</b></td>
+                            <td data-label="Response">
+                                <select wire:model.blur="data.vf_missing_tooth_clause">
+                                    <option value="">Select</option>
+                                    <option value="No">No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Question"><b>Crowns are paid on Prep Date or Seat Date?</b></td>
+                            <td data-label="Response">
+                                <select wire:model.blur="data.vf_crowns_paid_on">
+                                    <option value="">Select</option>
+                                    <option value="Prep">Prep</option>
+                                    <option value="Seat">Seat</option>
+                                    <option value="Either-Or">Either-Or</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Question"><b>Prosthetic Replacement Year / Month</b></td>
+                            <td data-label="Response">
+                                <input wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td data-label="Question"><b>Coordination of Benefits</b></td>
+                            <td data-label="Response">
+                                <select wire:model.blur="data.vf_cob">
+                                    <option value="">Select</option>
+                                    <option value="Standard">Standard</option>
+                                    <option value="Non-Dup">Non-Dup</option>
+                                    <option value="Birthday Rule">Birthday Rule</option>
+                                    <option value="No COB">No COB</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
                 <div class="uel2-field" style="margin-top:14px;">
                     <label>Plan Provision Notes</label>
                     <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateTwoInput }}"></textarea>
                 </div>
+                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                    'questions' => $this->getTemplateTwoQuestionsForSection('template_2_plan_provisions'),
+                ])
             </div>
         </div>
     </section>
@@ -345,6 +600,9 @@
                 <label>Other Major History Affecting Eligibility</label>
                 <textarea wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateTwoInput }}"></textarea>
             </div>
+            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_service_history'),
+            ])
         </div>
     </section>
 
@@ -354,21 +612,17 @@
             <span class="uel2-pill">{{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
-            @forelse ($templateTwoCoverageGroups as $group)
+            @foreach ($templateTwoBenefitGroups as $benefitGroupName => $benefitRows)
                 <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
-                    <h3>{{ $group['category'] }}</h3>
+                    <h3>{{ $benefitGroupName }}</h3>
                     <table class="uel2-table">
                         <thead><tr><th>Code</th><th>Description</th><th>%</th><th>Frequency</th><th>Pre-Auth</th><th>Notes</th></tr></thead>
                         <tbody>
-                            @foreach ($group['rows'] as $row)
+                            @forelse ($benefitRows as $benefitRow)
                                 @php
-                                    $rowIndex = collect($this->codeCoverageData)->search(
-                                        fn ($candidate) => (int) ($candidate['sort_order'] ?? 0) === (int) ($row['sort_order'] ?? 0)
-                                            && (string) ($candidate['category'] ?? '') === (string) ($row['category'] ?? '')
-                                            && (string) ($candidate['code'] ?? '') === (string) ($row['code'] ?? '')
-                                    );
+                                    $rowIndex = $benefitRow['index'];
+                                    $row = $benefitRow['row'];
                                 @endphp
-                                @if ($rowIndex !== false)
                                     <tr>
                                         <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
                                         <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
@@ -377,16 +631,25 @@
                                         <td data-label="Pre-Auth"><select wire:model.blur="codeCoverageData.{{ $rowIndex }}.pre_auth_required"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
                                         <td data-label="Notes"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.notes" placeholder="Add note"></td>
                                     </tr>
-                                @endif
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="6" style="padding:16px;color:#6d7d77;font-size:13px;">
+                                        No questions have been added to this benefit group yet.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
+                    @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                        'questions' => $this->getTemplateTwoQuestionsForSection(match ($benefitGroupName) {
+                            'Basic' => 'template_2_frequency_basic',
+                            'Major' => 'template_2_frequency_major',
+                            'Orthodontics' => 'template_2_frequency_orthodontics',
+                            default => 'template_2_frequency_general',
+                        }),
+                    ])
                 </div>
-            @empty
-                <div style="padding:18px;border:1px dashed #b8d4c9;border-radius:16px;background:#f7fcfa;color:#5c6f68;font-size:13px;">
-                    No coverage codes are configured for this clinic yet. Add them from the Verification Template Builder.
-                </div>
-            @endforelse
+            @endforeach
         </div>
     </section>
 
@@ -401,6 +664,11 @@
             <div class="uel2-field"><label>Verified By</label><div style="{{ $templateTwoReadonly }}">{{ data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-' }}</div></div>
             <div class="uel2-field"><label>Verification Date</label><div style="{{ $templateTwoReadonly }}">{{ data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d') }}</div></div>
             <div class="uel2-field uel2-wide"><label>Additional Information</label><textarea wire:model.blur="data.vf_verification_notes" placeholder="Add final verification notes" style="{{ $templateTwoInput }}"></textarea></div>
+        </div>
+        <div class="uel2-body" style="padding-top:0;">
+            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_verification_information'),
+            ])
         </div>
         <div class="uel2-actions">
             @if ($canSubmitForm)
@@ -418,3 +686,72 @@
         </div>
     </section>
 </div>
+
+@if ($this->showAddInsuranceModal)
+    <div
+        style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.58);backdrop-filter:blur(4px);"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-insurance-title"
+    >
+        <div style="width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #dce8e3;border-radius:24px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.28);">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid #e8efec;">
+                <div>
+                    <div style="margin-bottom:6px;color:#0b6b4f;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Insurance Directory</div>
+                    <h3 id="add-insurance-title" style="margin:0;color:#0f172a;font-size:24px;font-weight:900;">Add Insurance</h3>
+                    <p style="margin:7px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Create the missing carrier and use it immediately in this verification.</p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="closeAddInsuranceModal"
+                    aria-label="Close"
+                    style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid #dbe4ee;border-radius:999px;background:#fff;color:#475569;font-size:22px;cursor:pointer;"
+                >
+                    &times;
+                </button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:22px;">
+                <div class="uel2-field" style="grid-column:1/-1;">
+                    <label>Insurance Name</label>
+                    <input wire:model.blur="newInsuranceCarrier.insurance_name" placeholder="Enter insurance carrier name" style="{{ $templateTwoInput }}">
+                    @error('newInsuranceCarrier.insurance_name')
+                        <div style="margin-top:6px;color:#be123c;font-size:12px;font-weight:700;">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="uel2-field">
+                    <label>Payer ID</label>
+                    <input wire:model.blur="newInsuranceCarrier.payer_id" placeholder="Enter payer ID" style="{{ $templateTwoInput }}">
+                </div>
+                <div class="uel2-field">
+                    <label>Phone Number</label>
+                    <input wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="Enter payer phone" style="{{ $templateTwoInput }}">
+                </div>
+                <div class="uel2-field" style="grid-column:1/-1;">
+                    <label>Claims Address</label>
+                    <textarea wire:model.blur="newInsuranceCarrier.claims_address" placeholder="Enter claims mailing address" style="{{ $templateTwoInput }}"></textarea>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:16px 22px;border-top:1px solid #e8efec;background:#fbfdfc;">
+                <button
+                    type="button"
+                    wire:click="closeAddInsuranceModal"
+                    style="padding:11px 18px;border:1px solid #dbe4ee;border-radius:12px;background:#fff;color:#475569;font-weight:800;cursor:pointer;"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    wire:click="addInsuranceCarrier"
+                    wire:loading.attr="disabled"
+                    wire:target="addInsuranceCarrier"
+                    style="padding:11px 18px;border:0;border-radius:12px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;"
+                >
+                    <span wire:loading.remove wire:target="addInsuranceCarrier">Add & Select</span>
+                    <span wire:loading wire:target="addInsuranceCarrier">Adding...</span>
+                </button>
+            </div>
+        </div>
+    </div>
+@endif

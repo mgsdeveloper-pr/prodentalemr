@@ -52,7 +52,9 @@ class ListVerificationFormQuestions extends ListRecords
                 $systemCount = $questions->where('is_builtin', true)->count();
 
                 return [
-                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey] ?? str($sectionKey)->headline()->toString(),
+                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey]
+                        ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$sectionKey]
+                        ?? str($sectionKey)->headline()->toString(),
                     'count' => $questions->count(),
                     'active_count' => $activeCount,
                     'system_count' => $systemCount,

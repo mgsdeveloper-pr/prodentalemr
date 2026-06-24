@@ -26,7 +26,7 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::SECTION_OPTIONS)
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? 'template_2'))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -40,7 +40,9 @@ class CreateVerificationQuestion extends CreateRecord
         $key = $this->data['section_key'] ?? null;
 
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::SECTION_OPTIONS[$key] ?? (string) $key)
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::SECTION_OPTIONS[$key]
+                ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$key]
+                ?? (string) $key)
             : 'Choose section';
     }
 
