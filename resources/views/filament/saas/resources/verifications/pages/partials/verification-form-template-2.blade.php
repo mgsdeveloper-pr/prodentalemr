@@ -35,6 +35,31 @@
     $familyDeductible = (float) (data_get($this->data, 'vf_family_deductible') ?: 0);
     $familyRemaining = (float) (data_get($this->data, 'vf_family_deductible_remaining') ?: 0);
     $insuranceCarrierOptions = $this->getInsuranceCarrierOptions();
+    $templateTwoInsuranceGroups = [
+        [
+            ['Insurance Provider', 'vf_insurance_provider_name', 'text'],
+            ['Group Number', 'vf_group_number', 'text'],
+            ['Plan Type', 'vf_plan_type', 'select', [
+                'PPO' => 'PPO',
+                'DHMO' => 'DHMO',
+                'Indemnity' => 'Indemnity',
+            ]],
+            ['Network Status', 'vf_network_status', 'select', [
+                'Yes' => 'In Network',
+                'No' => 'Out of Network',
+            ]],
+            ['Effective Date', 'vf_effective_date', 'date'],
+            ['Future Termination Date', 'vf_future_termination_date', 'date'],
+            ['Plan Renewal Month', 'vf_plan_renewal_month', 'text'],
+        ],
+        [
+            ['Claims Address', 'vf_insurance_claim_mailing_address', 'text'],
+            ['Payer ID', 'vf_payer_id', 'text'],
+            ['Phone Number', 'vf_insurance_company_phone_number', 'text'],
+            ['Fee Schedule', 'vf_fee_schedule', 'text'],
+            ['Employer / Group Name', 'vf_group_name', 'text'],
+        ],
+    ];
 @endphp
 
 <style>
@@ -112,6 +137,18 @@
 
     .uel2-wide { grid-column: 1 / -1; }
     .uel2-half { grid-column: span 2; }
+
+    .uel2-insurance-groups {
+        display: grid;
+        gap: 16px;
+    }
+
+    .uel2-insurance-group {
+        padding: 16px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 18px;
+        background: #fbfdfc;
+    }
 
     .uel2-subsection {
         margin-top: 16px;
@@ -291,24 +328,10 @@
             <div><h2>Insurance Information</h2><p>Carrier, plan, network, and payer details</p></div>
             <span class="uel2-pill">Insurance</span>
         </div>
-        <div class="uel2-body uel2-grid">
-            @foreach ([
-                ['Insurance Provider', 'vf_insurance_provider_name', 'text'],
-                ['Plan Type', 'vf_plan_type', 'text'],
-                ['Payer ID', 'vf_payer_id', 'text'],
-                ['Effective Date', 'vf_effective_date', 'date'],
-                ['Claims Address', 'vf_insurance_claim_mailing_address', 'text'],
-                ['Phone Number', 'vf_insurance_company_phone_number', 'text'],
-                ['Network Status', 'vf_network_status', 'select', [
-                    'Yes' => 'In Network',
-                    'No' => 'Out of Network',
-                ]],
-                ['Fee Schedule', 'vf_fee_schedule', 'text'],
-                ['Plan Renewal Month', 'vf_plan_renewal_month', 'text'],
-                ['Future Termination Date', 'vf_future_termination_date', 'date'],
-                ['Employer / Group Name', 'vf_group_name', 'text'],
-                ['Group Number', 'vf_group_number', 'text'],
-            ] as $insuranceField)
+        <div class="uel2-body uel2-insurance-groups">
+            @foreach ($templateTwoInsuranceGroups as $insuranceGroup)
+                <div class="uel2-insurance-group uel2-grid">
+                @foreach ($insuranceGroup as $insuranceField)
                 @php
                     [$label, $field, $type] = $insuranceField;
                     $options = $insuranceField[3] ?? [];
@@ -344,6 +367,9 @@
                     @elseif ($type === 'select')
                         <select wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
                             <option value="">Select</option>
+                            @if (filled(data_get($this->data, $field)) && ! array_key_exists((string) data_get($this->data, $field), $options))
+                                <option value="{{ data_get($this->data, $field) }}">{{ data_get($this->data, $field) }}</option>
+                            @endif
                             @foreach ($options as $value => $optionLabel)
                                 <option value="{{ $value }}">{{ $optionLabel }}</option>
                             @endforeach
@@ -393,6 +419,8 @@
                             style="{{ $templateTwoInput }}"
                         >
                     @endif
+                </div>
+                @endforeach
                 </div>
             @endforeach
         </div>

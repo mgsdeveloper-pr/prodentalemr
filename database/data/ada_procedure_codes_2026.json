@@ -1,0 +1,5777 @@
+[
+  {
+    "procedure_code": "D0120",
+    "description": "Periodic oral evaluation - established patient",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0140",
+    "description": "Limited oral evaluation - problem focused",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0145",
+    "description": "Oral evaluation for a patient under three years of age and counseling with primary caregiver",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0150",
+    "description": "Comprehensive oral evaluation - new or established patient",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0160",
+    "description": "Detailed and extensive oral evaluation - problem focused, by report",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0170",
+    "description": "Re-evaluation - limited, problem focused (established patient; not post-operative visit)",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0171",
+    "description": "Re-evaluation - post-operative office visit",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0180",
+    "description": "Comprehensive periodontal evaluation - new or established patient",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0190",
+    "description": "Screening of a patient",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0191",
+    "description": "Assessment of a patient",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0210",
+    "description": "Intraoral - complete series of radiographic images",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0220",
+    "description": "Intraoral - periapical first radiographic image",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0230",
+    "description": "Intraoral - periapical each additional radiographic image",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0240",
+    "description": "Intraoral - occlusal radiographic image",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0250",
+    "description": "Extra-oral - 2D projection radiographic image created using a stationary radiation source, and detector",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 1
+  },
+  {
+    "procedure_code": "D0251",
+    "description": "Extra-oral posterior dental radiographic image",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0270",
+    "description": "Bitewing - single radiographic image",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0272",
+    "description": "Bitewings - two radiographic images",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0273",
+    "description": "Bitewings - three radiographic images",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0274",
+    "description": "Bitewings - four radiographic images",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0277",
+    "description": "Vertical bitewings - 7 to 8 radiographic images",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0310",
+    "description": "Sialography",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0320",
+    "description": "Temporomandibular joint arthrogram, including injection",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0321",
+    "description": "Other temporomandibular joint radiographic images, by report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0322",
+    "description": "Tomographic survey",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0330",
+    "description": "Panoramic radiographic image",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0340",
+    "description": "2D cephalometric radiographic image - acquisition, measurement, and analysis",
+    "class": "Preventive/Basic/Orthodontia",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0350",
+    "description": "2D oral/facial photographic image obtained intra-orally or extra-orally",
+    "class": "Not covered/Orthodontia",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0351",
+    "description": "3D photographic image",
+    "class": "Not covered/Orthodontia",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0364",
+    "description": "Cone beam CT capture and interpretation with limited field of view - less than one whole jaw",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0365",
+    "description": "Cone beam CT capture and interpretation with field of view of one full dental arch - mandible",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0366",
+    "description": "Cone beam CT capture and interpretation with field of view of one full dental arch - maxilla, with or without cranium",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 2
+  },
+  {
+    "procedure_code": "D0367",
+    "description": "Cone beam CT capture and interpretation with field of view of both jaws; with or without cranium",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0368",
+    "description": "Cone beam CT capture and interpretation for TMJ series including two or more exposures",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0369",
+    "description": "Maxillofacial MRI capture and interpretation",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0370",
+    "description": "Maxillofacial ultrasound capture and interpretation",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0371",
+    "description": "Sialo endoscopy capture and interpretation",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0380",
+    "description": "Cone beam CT image capture with limited field of view - less than one whole jaw",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0381",
+    "description": "Cone beam CT image capture with field of view of one full dental arch - mandible",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0382",
+    "description": "Cone beam CT image capture with field of view of one full dental arch - maxilla, with or without cranium",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0383",
+    "description": "Cone beam CT image capture with field of view of both jaws, with or without cranium",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0384",
+    "description": "Cone beam CT image capture for TMJ series including two or more exposures",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0385",
+    "description": "Maxillofacial MRI image capture",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0386",
+    "description": "Maxillofacial ultrasound image capture",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0391",
+    "description": "Interpretation of diagnostic image by a practitioner not associated with capture of the image, including report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0393",
+    "description": "Treatment simulation using 3D image volume",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0394",
+    "description": "Digital subtraction of two or more images or image volumes of the same modality",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 3
+  },
+  {
+    "procedure_code": "D0395",
+    "description": "Fusion of two or more 3D image volumes of one or more modalities",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0396",
+    "description": "3D printing of a 3D dental surface scan",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0411",
+    "description": "HbA1c in-office point of service testing",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0412",
+    "description": "blood glucose level test - in- office using a glucose meter",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0414",
+    "description": "Laboratory processing of microbial specimen to include culture and sensitivity studies, preparation, and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0415",
+    "description": "Collection of microorganisms for culture and sensitivity",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0416",
+    "description": "Viral culture",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0417",
+    "description": "Collection and preparation of saliva sample for laboratory analysis",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0418",
+    "description": "Analysis of saliva sample - laboratory",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0419",
+    "description": "Assessment of salivary flow by measurement",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0422",
+    "description": "Collection and preparation of genetic sample material for laboratory analysis and report",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0423",
+    "description": "Genetic test for susceptibility to diseases - specimen analysis",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0425",
+    "description": "Caries susceptibility tests",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0426",
+    "description": "Collection, preparation and analysis of saliva sample - point- of- care",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0431",
+    "description": "Adjunctive pre-diagnostic test that aids in detection of mucosal abnormalities including premalignant and malignant lesions, not to include cytology or biopsy procedures",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0460",
+    "description": "Pulp vitality tests",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0461",
+    "description": "Testing for cracked tooth",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 4
+  },
+  {
+    "procedure_code": "D0470",
+    "description": "Diagnostic casts",
+    "class": "Preventive/Basic/Orthodontia",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0472",
+    "description": "Accession of tissue, gross examination, preparation and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0473",
+    "description": "Accession of tissue, gross and microscopic examination, preparation and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0474",
+    "description": "Accession of tissue, gross and microscopic examination, including assessment of surgical margins for presence of disease, preparation, and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0475",
+    "description": "Decalcification procedure",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0476",
+    "description": "Special stains for microorganisms",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0477",
+    "description": "Special stains, not for microorganisms",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0478",
+    "description": "Immunohistochemical stains",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0479",
+    "description": "Tissue in-situ hybridization, including interpretation",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0480",
+    "description": "Accession of exfoliative cytologic smears, microscopic examination, preparation, and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0481",
+    "description": "Electron microscopy",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0482",
+    "description": "Direct immunofluorescence",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0483",
+    "description": "Indirect immunofluorescence",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0484",
+    "description": "Consultation on slides prepared elsewhere",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 5
+  },
+  {
+    "procedure_code": "D0485",
+    "description": "Consultation, including preparation of slides from biopsy material supplied by referring source",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0486",
+    "description": "Laboratory accession of transepithelial cytologic sample, microscopic examination, preparation, and transmission of written report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0502",
+    "description": "Other oral pathology procedures, by report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0600",
+    "description": "Non-ionizing diagnostic procedure capable of quantifying, monitoring, and recording changes in structure of enamel, dentin, and cementum",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0601",
+    "description": "Caries risk assessment and documentation, with a finding of low risk",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0602",
+    "description": "Caries risk assessment and documentation, with a finding of moderate risk",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0603",
+    "description": "Caries risk assessment and documentation, with a finding of high risk",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0604",
+    "description": "Antigen testing for a public health related pathogen, including coronavirus",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0605",
+    "description": "Antibody testing for a public health related pathogen, including coronavirus",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0701",
+    "description": "Panoramic radiographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0702",
+    "description": "2-D cephalometric radiographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0703",
+    "description": "2-D oral/facial photographic image obtained intra-orally or extra-orally - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0704",
+    "description": "3-D photographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0705",
+    "description": "Extra-oral posterior dental radiographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 6
+  },
+  {
+    "procedure_code": "D0706",
+    "description": "Intraoral - occlusal radiographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D0707",
+    "description": "Intraoral - periapical radiographic image - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D0708",
+    "description": "Intraoral - bitewing radiographic image - image capture only Image",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D0709",
+    "description": "Intraoral - complete series of radiographic images - image capture only",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D0999",
+    "description": "Unspecified diagnostic procedure, by report",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1110",
+    "description": "Prophylaxis - adult",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1120",
+    "description": "Prophylaxis - child",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1206",
+    "description": "Topical application of fluoride varnish",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1208",
+    "description": "Topical application of fluoride - excluding varnish",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1301",
+    "description": "Immunization counseling",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1310",
+    "description": "Nutritional counseling for control of dental disease",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1320",
+    "description": "Tobacco counseling for the control and prevention of oral disease",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1321",
+    "description": "Counseling for the control and prevention of adverse oral, behavioral, and systemic health effects associated with high- risk substance use",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1330",
+    "description": "Oral hygiene instructions",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1351",
+    "description": "Sealant - per tooth",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1352",
+    "description": "Preventive resin restoration in a moderate to high caries risk patient - permanent tooth",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1353",
+    "description": "Sealant repair - per tooth",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1354",
+    "description": "Interim caries arresting medicament application",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1355",
+    "description": "Caries preventive medicament application - per tooth",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1510",
+    "description": "Space Maintainer, Fixed Unilateral- Per Quadrant. Excludes a distal shoe space maintainer",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 7
+  },
+  {
+    "procedure_code": "D1515",
+    "description": "Space maintainer - fixed - bilateral",
+    "class": "Preventive",
+    "is_active": false,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1516",
+    "description": "Space maintainer - fixed - bilateral, maxillary",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1517",
+    "description": "Space maintainer - fixed - bilateral, mandibular",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1520",
+    "description": "Space maintainer - removable, unilateral - per quadrant",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1525",
+    "description": "Space maintainer - removable - bilateral",
+    "class": "Preventive",
+    "is_active": false,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1526",
+    "description": "Space maintainer - removable - bilateral, maxillary",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1527",
+    "description": "Space maintainer - removable - bilateral, mandibular",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1550",
+    "description": "Re-cement or re-bond space maintainer",
+    "class": "Preventive",
+    "is_active": false,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1551",
+    "description": "Re-cement or re-bond bilateral space maintainer - maxillary",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1552",
+    "description": "Re-cement or re-bond bilateral space maintainer - mandibular",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1553",
+    "description": "Re-cement or re-bond unilateral space maintainer - per quadrant",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1555",
+    "description": "Removal of fixed space maintainer",
+    "class": "Preventive",
+    "is_active": false,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1556",
+    "description": "Removal of fixed unilateral space maintainer - per quadrant",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1557",
+    "description": "Removal of fixed bilateral space maintainer - maxillary",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1558",
+    "description": "Removal of fixed bilateral space maintainer - mandibular",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1575",
+    "description": "Distal shoe space maintainer - fixed, - unilateral - per quadrant",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1720",
+    "description": "Influenza vaccination",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D1999",
+    "description": "Unspecified preventive procedure, by report",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D2140",
+    "description": "Amalgam - one surface, primary or permanent",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 8
+  },
+  {
+    "procedure_code": "D2150",
+    "description": "Amalgam - two surface, primary or permanent",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2160",
+    "description": "Amalgam - three surface, primary or permanent",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2161",
+    "description": "Amalgam - four or more surfaces, primary or permanent",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2330",
+    "description": "Resin-Based Composite, One Surface, Anterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2331",
+    "description": "Resin-Based Composite, Two Surfaces, Anterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2332",
+    "description": "Resin-Based Composite, Three Surfaces, Anterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2335",
+    "description": "Resin-Based Composite, Four or More Surfaces, or Involving Incisal Angle (Anterior)",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2390",
+    "description": "Resin-based composite crown, anterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2391",
+    "description": "Resin-based composite - one surface, posterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2392",
+    "description": "Resin-based composite - two surfaces, posterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2393",
+    "description": "Resin-based composite - three surfaces, posterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2394",
+    "description": "Resin-based composite - four or more surfaces, posterior",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2410",
+    "description": "Gold foil - one surface",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2420",
+    "description": "Gold foil - two surfaces",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2430",
+    "description": "Gold foil - three surfaces",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2510",
+    "description": "-Inlay - metallic - one surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2520",
+    "description": "-Inlay - metallic - two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2530",
+    "description": "-Inlay - metallic - three surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2542",
+    "description": "-Onlay - metallic - two surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2543",
+    "description": "-Onlay - metallic - three surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2544",
+    "description": "-Onlay - metallic - four or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2610",
+    "description": "-Inlay - porcelain/ceramic - one surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2620",
+    "description": "-Inlay - porcelain/ceramic - two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2630",
+    "description": "-Inlay - porcelain/ceramic - three surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 9
+  },
+  {
+    "procedure_code": "D2642",
+    "description": "-Onlay - porcelain/ceramic - two surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2643",
+    "description": "-Onlay - porcelain/ceramic - three surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2644",
+    "description": "-Onlay - porcelain/ceramic - four or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2650",
+    "description": "-Inlay - resin-based composite - one surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2651",
+    "description": "-Inlay - resin-based composite - two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2652",
+    "description": "-Inlay - resin-based composite - three surface",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2662",
+    "description": "-Onlay, resin-based composite, two surfaces -Onlay, resin-based composite,",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2663",
+    "description": "three surfaces -Onlay, resin-based composite,",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2664",
+    "description": "four or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2710",
+    "description": "- Crown - resin-based composite (indirect)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2712",
+    "description": "- Crown - 3/4 resin-based composite (indirect) This procedure does not * include facial veneers.",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2720",
+    "description": "- Crown, Resin with High Noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2721",
+    "description": "- Crown, Resin, Predominantly Base Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2722",
+    "description": "- Crown, Resin with Noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2740",
+    "description": "- Porcelain/Ceramic substrate",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2750",
+    "description": "- Porcelain Fused to High noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2751",
+    "description": "- Porcelain Fused to predominantly Base Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2752",
+    "description": "- Porcelain Fused to Noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2753",
+    "description": "- Crown - Porcelain Fused to Titanium and Titanium Alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2780",
+    "description": "- Crown, 3/4 Cast High Noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 10
+  },
+  {
+    "procedure_code": "D2783",
+    "description": "Crown 3/4 Porcelain/Ceramic * This procedure does not include facial veneers.",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2790",
+    "description": "- Crown, Full Cast High Noble Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2791",
+    "description": "- Crown, Full Cast Predominantly Base Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2792",
+    "description": "- Crown, Full Cast Nobel Metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2794",
+    "description": "Crown - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2799",
+    "description": "Provisional crown- further treatment or completion of diagnosis necessary prior to final impression",
+    "class": "Part of Primary Procedure/Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2910",
+    "description": "Re-cement or re-bond inlay, onlay, veneer or partial coverage restoration",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2915",
+    "description": "Re-cement or re-bond indirectly fabricated or prefabricated post and core",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2920",
+    "description": "Re-cement or re-bond crown",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2921",
+    "description": "Reattachment of tooth fragment, incisal edge, or cusp",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2928",
+    "description": "Prefabricated porcelain/ceramic crown - permanent tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2929",
+    "description": "Prefabricated porcelain/ceramic crown - primary tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2930",
+    "description": "Prefabricated stainless steel crown - primary tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2931",
+    "description": "Prefabricated stainless steel crown - permanent tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2932",
+    "description": "Prefabricated resin crown",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2933",
+    "description": "Prefabricated stainless steel crown with resin window",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 11
+  },
+  {
+    "procedure_code": "D2934",
+    "description": "Prefabricated esthetic coated stainless-steel crown - primary tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2940",
+    "description": "Protective restoration",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2941",
+    "description": "Interim therapeutic restoration - primary dentition",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2949",
+    "description": "Restorative foundation for an indirect restoration",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2950",
+    "description": "Core buildup, including pins",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2951",
+    "description": "Pin retention - per tooth, in addition to restoration",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2952",
+    "description": "Post and core in addition to crown, indirectly fabricated",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2953",
+    "description": "Each additional indirectly fabricated post - same tooth",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2954",
+    "description": "Prefabricated post and core in addition to crown",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2955",
+    "description": "Post removal",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2957",
+    "description": "Each additional prefabricated post - same tooth to be used with D2954 *",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2960",
+    "description": "Labial Veneer (resin laminate), direct",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2961",
+    "description": "Labial veneer (resin laminate) - indirect",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 12
+  },
+  {
+    "procedure_code": "D2962",
+    "description": "Labial veneer (porcelain laminate) - indirect",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2971",
+    "description": "Additional procedures to construct new crown under existing partial denture framework",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2975",
+    "description": "Coping",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2976",
+    "description": "Band stabilization - per tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2980",
+    "description": "Crown repair necessitated by restorative material failure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2981",
+    "description": "Inlay repair necessitated by restorative material failure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2982",
+    "description": "Onlay repair necessitated by restorative material failure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2983",
+    "description": "Veneer repair necessitated by restorative material failure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2989",
+    "description": "Excavation of a tooth resulting in the determination of non- restorability",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2990",
+    "description": "Resin infiltration of incipient smooth surface lesions",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2991",
+    "description": "Application of hydroxyapatite regeneration medicament - per tooth",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D2999",
+    "description": "Unspecified restorative procedure, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D3110",
+    "description": "Pulp cap - direct (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D3120",
+    "description": "Pulp cap - indirect (excluding final restoration)",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D3220",
+    "description": "Therapeutic pulpotomy (excluding final restoration) -",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 13
+  },
+  {
+    "procedure_code": "D3221",
+    "description": "Pulpal debridement, primary and permanent teeth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3222",
+    "description": "Partial pulpotomy for apexogenesis - permanent tooth with incomplete root development",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3230",
+    "description": "Pulpal therapy (resorbable filling) - anterior, primary tooth (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3240",
+    "description": "Pulpal therapy (resorbable filling) - posterior, primary tooth (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3310",
+    "description": "- Endodontic therapy, anterior tooth (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3320",
+    "description": "- Endodontic therapy, bicuspid tooth (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3330",
+    "description": "- Endodontic therapy, molar (excluding final restoration)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3331",
+    "description": "Treatment of root canal obstruction; non-surgical access",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3332",
+    "description": "Incomplete endodontic therapy; inoperable, unrestorable or fractured tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3333",
+    "description": "Internal root repair of perforation defects",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3346",
+    "description": "- Retreatment of previous root canal therapy - anterior",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3347",
+    "description": "- Retreatment of previous root canal therapy - bicuspid",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3348",
+    "description": "- Retreatment of previous root canal therapy - molar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3351",
+    "description": "Apexification/recalcification - initial visit (apical closure/calcific repair of perforations, root resorption, etc.)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3352",
+    "description": "Apexification/recalcification - interim medication replacement",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3353",
+    "description": "Apexification/recalcification - final visit (includes completed",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 14
+  },
+  {
+    "procedure_code": "D3355",
+    "description": "Pulpal regeneration - initial visit",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3356",
+    "description": "Pulpal regeneration - interim medication replacement",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3357",
+    "description": "Pulpal regeneration - completion of treatment",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3410",
+    "description": "Apicoectomy - anterior",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3421",
+    "description": "Apicoectomy - bicuspid (first root)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3425",
+    "description": "Apicoectomy - molar (first root)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3426",
+    "description": "Apicoectomy (each additional root)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3427",
+    "description": "Periradicular surgery without apicoectomy",
+    "class": "Basic/Major",
+    "is_active": false,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3428",
+    "description": "Bone graft in conjunction with periradicular surgery - per tooth, single site",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3429",
+    "description": "Bone graft in conjunction with periradicular surgery - each additional contiguous tooth in the same surgical site",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3430",
+    "description": "Retrograde filling - per root",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3431",
+    "description": "Biologic materials to aid in soft and osseous tissue regeneration in conjunction with periradicular surgery",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3432",
+    "description": "Guided tissue regeneration, resorbable barrier, per site, in conjunction with periradicular surgery",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3450",
+    "description": "Root amputation - per root",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3460",
+    "description": "Endodontic endosseous implant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3470",
+    "description": "Intentional re-implantation (including necessary splinting)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3471",
+    "description": "Surgical repair of root resorption - anterior",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3472",
+    "description": "Surgical repair of root resorption - premolar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 15
+  },
+  {
+    "procedure_code": "D3473",
+    "description": "Surgical repair of root resorption - molar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3501",
+    "description": "Surgical repair of root surface without apicoectomy or repair of root resorption - anterior",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3502",
+    "description": "Surgical repair of root surface without apicoectomy or repair of root resorption - premolar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3503",
+    "description": "Surgical repair of root surface without apicoectomy or repair of root resorption - molar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3910",
+    "description": "Surgical procedure for isolation of tooth with rubber dam",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3911",
+    "description": "Intraorifice barrier",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3920",
+    "description": "Hemisection (including any root removal), not including root canal therapy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3921",
+    "description": "Decoronation or submergence of an erupted tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3950",
+    "description": "canal preparation and fitting of preformed dowel or post",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D3999",
+    "description": "unspecified endodontic procedure, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D4210",
+    "description": "Gingivectomy or gingivoplasty - four or more contiguous teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D4211",
+    "description": "It is performed to eliminate suprabony pockets or to restore normal architecture when gingival enlargements or asymmetrical or unaesthetic topography is evident with normal bony configuration.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D4212",
+    "description": "Gingivectomy or gingivoplasty to allow access for restorative procedure, per tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D4223",
+    "description": "Provisional splinting - extracoronal",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4230",
+    "description": "Anatomical crown exposure - four or more contiguous teeth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 16
+  },
+  {
+    "procedure_code": "D4231",
+    "description": "Anatomical crown exposure - one to three teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4240",
+    "description": "Gingival flap procedure, including root planing - four or more contiguous teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4241",
+    "description": "Gingival flap procedure, including root planing - one to three contiguous teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4245",
+    "description": "Apically positioned flap",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4249",
+    "description": "Clinical crown lengthening - hard tissue",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4260",
+    "description": "Osseous surgery (including elevation of a full thickness flap and closure) - four or more contiguous teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4261",
+    "description": "Osseous surgery (including elevation of a full thickness flap and closure) - one to three contiguous teeth or tooth bounded spaces per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4263",
+    "description": "Bone replacement graft - retained natural tooth -first site in quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4264",
+    "description": "Bone replacement graft - retained natural tooth -each additional site in quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4265",
+    "description": "Biologic materials to aid in soft and osseous tissue regeneration",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4266",
+    "description": "Guided tissue regeneration - Natural teeth resorbable barrier, per site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4267",
+    "description": "Guided tissue regeneration - Natural teeth resorbable barrier, per site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4268",
+    "description": "Surgical revision procedure, per tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 17
+  },
+  {
+    "procedure_code": "D4270",
+    "description": "Pedicle soft tissue graft procedure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4273",
+    "description": "Autogenous connective tissue graft procedure (including donor and recipient surgical sites) first tooth, implant, or edentulous tooth position",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4274",
+    "description": "Mesial/distal wedge procedure, single tooth (when not performed in conjunction with surgical procedures in the same anatomical area)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4275",
+    "description": "Non-autogenous connective tissue graft (including recipient site and donor material) first tooth, implant, or edentulous tooth position in graft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4276",
+    "description": "Combined connective tissue and double pedicle graft, per tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4277",
+    "description": "Free soft tissue graft procedure (including recipient and donor surgical sites) first tooth, implant, or edentulous tooth position in graft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4278",
+    "description": "Free soft tissue graft procedure (including recipient and donor surgical sites) each additional contiguous tooth, implant, or edentulous tooth position in same graft site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4283",
+    "description": "Autogenous connective tissue graft procedure (including donor and recipient surgical sites) - each additional contiguous tooth, implant or edentulous tooth position in same graft site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4285",
+    "description": "Non-autogenous connective tissue graft procedure (including recipient surgical site and donor material) - each additional contiguous tooth, implant, or edentulous tooth position in same graft site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 18
+  },
+  {
+    "procedure_code": "D4286",
+    "description": "Removal of non-resorbable barrier",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4320",
+    "description": "Provisional splinting - intracoronal",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4321",
+    "description": "Provisional splinting - extracoronal",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4322",
+    "description": "Splint - intra-coronal; natural teeth or prosthetic crowns",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4341",
+    "description": "Periodontal scaling and root planing - four or more teeth per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4342",
+    "description": "Periodontal scaling and root planing - one to three teeth per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4346",
+    "description": "Scaling in presence of generalized moderate or severe gingival inflammation - full mouth, after oral evaluation",
+    "class": "Preventive; accumulates towards prophy/cleaning",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4355",
+    "description": "Full mouth debridement to enable comprehensive peridontal evaluation and diagnosis on a subsequent visit",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4381",
+    "description": "Localized delivery of antimicrobial agents via a controlled release vehicle into diseased crevicular tissue, per tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4910",
+    "description": "Periodontal maintenance",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4920",
+    "description": "Unscheduled dressing change (by someone other than treating dentist or their staff)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4921",
+    "description": "Gingival irrigation - per quadrant",
+    "class": "Part of primary procedure",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D4999",
+    "description": "Unspecified periodontal procedure, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D5110",
+    "description": "Complete denture - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D5120",
+    "description": "Complete denture - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 19
+  },
+  {
+    "procedure_code": "D5130",
+    "description": "Immediate denture - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5140",
+    "description": "Immediate denture - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5211",
+    "description": "Maxillary partial denture - resin base (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5212",
+    "description": "Mandibular partial denture - resin base (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5213",
+    "description": "Maxillary partial denture - cast metal framework with resin denture bases (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5214",
+    "description": "Mandibular partial denture - cast metal framework with resin denture bases (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5221",
+    "description": "Immediate maxillary partial denture - resin base (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5222",
+    "description": "Immediate mandibular partial denture - resin base (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5223",
+    "description": "Immediate maxillary partial denture - cast metal framework with resin denture bases (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5224",
+    "description": "Immediate mandibular partial denture - cast metal framework with resin denture bases (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5225",
+    "description": "Maxillary partial denture - flexible base (including retentive/clasping materials, rests and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5226",
+    "description": "Mandibular partial denture - flexible base (including",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 20
+  },
+  {
+    "procedure_code": "D5227",
+    "description": "Mandibular partial denture - flexible base (including retentive/clasping materials, rests, and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5228",
+    "description": "Immediate maxillary partial denture - flexible base (including any clasps, rests and teeth)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5281",
+    "description": "Removable unilateral partial denture - one piece cast metal (including clasps and teeth)",
+    "class": "Major",
+    "is_active": false,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5282",
+    "description": "Removable unilateral partial denture - one piece cast metal (including retentive/clasping materials, rests, and teeth), maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5283",
+    "description": "Removable unilateral partial denture - one piece cast metal (including retentive/clasping materials, rests, and teeth), mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5284",
+    "description": "Removable unilateral partial denture - one-piece flexible base (including retentive/clasping materials, rests, and teeth) - per quadrant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5286",
+    "description": "Removable unilateral partial denture - one piece resin (including retentive/clasping materials, rests, and teeth) - per quadrant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5410",
+    "description": "- Adjust complete denture - maxillary.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5411",
+    "description": "- Adjust complete denture - mandibular.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5421",
+    "description": "- Adjust partial denture - maxillary.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5422",
+    "description": "- Adjust partial denture - mandibular",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5511",
+    "description": "- Repair broken complete denture base- mandibular.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5512",
+    "description": "- Repair broken complete denture base- maxillary.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 21
+  },
+  {
+    "procedure_code": "D5611",
+    "description": "- Repair resin partial denture base, mandibular",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5612",
+    "description": "- Repair resin partial denture base, maxillary",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5621",
+    "description": "- Repair cast partial framework, mandibular.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5622",
+    "description": "- Repair cast partial framework, maxillary. - Repair or replace broken retentive/clasping materials",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5630",
+    "description": "per tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5640",
+    "description": "- Replace broken teeth - per tooth.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5650",
+    "description": "- Add tooth to existing partial denture.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5660",
+    "description": "- Add clasp to existing partial denture - per tooth.",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5670",
+    "description": "- Replace all teeth and acrylic on cast metal framework (maxillary)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5671",
+    "description": "- Replace all teeth and acrylic on cast metal framework (mandibular)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5710",
+    "description": "Rebase complete maxillary denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5711",
+    "description": "Rebase complete mandibular denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5720",
+    "description": "Rebase maxillary partial denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5721",
+    "description": "Rebase mandibular partial denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5725",
+    "description": "Rebase hybrid prosthesis",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5730",
+    "description": "- Reline complete maxillary (direct) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5731",
+    "description": "- Reline complete mandibular (direct) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5740",
+    "description": "- Reline maxillary partial (direct) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5741",
+    "description": "- Reline mandibular partial (direct) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5750",
+    "description": "- Reline complete maxillary (indirect) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5751",
+    "description": "- Reline complete mandibular (indirect) denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 22
+  },
+  {
+    "procedure_code": "D5765",
+    "description": "Soft liner for complete or partial removable denture - indirect",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5810",
+    "description": "- Interim complete denture (maxillary)",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5811",
+    "description": "- Interim complete denture (mandibular)",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5820",
+    "description": "- Interim partial denture (including retentive/clasping materials, rests, and teeth)- maxillary",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5821",
+    "description": "- Interim partial denture (including retentive/clasping materials, rests and teeth)- mandibular",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5850",
+    "description": "- Tissue conditioning, maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5851",
+    "description": "- Tissue conditioning, mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5862",
+    "description": "Precision attachment, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5863",
+    "description": "- Overdenture - complete maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5864",
+    "description": "- Overdenture - partial maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5865",
+    "description": "- Overdenture - complete mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5866",
+    "description": "- Overdenture - partial mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5867",
+    "description": "Replacement of replaceable part of semi-precision or precision attachment (male or female component)",
+    "class": "Not covered/Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5875",
+    "description": "Modification of removable prosthesis following implant surgery",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5876",
+    "description": "Add metal substructure to acrylic complete denture - per arch",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5878",
+    "description": "Duplication of complete denture - mandibular",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D5899",
+    "description": "Unspecified removable prosthodontic procedure, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5909",
+    "description": "Maxillary guidance prosthesis with guide flange",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5911",
+    "description": "Facial moulage (sectional)",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5912",
+    "description": "Facial moulage (complete)",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5913",
+    "description": "Nasal prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5914",
+    "description": "Auricular prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5915",
+    "description": "Orbital prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5916",
+    "description": "Ocular prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5919",
+    "description": "Facial prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5922",
+    "description": "Nasal septal prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5923",
+    "description": "Ocular prosthesis, interim",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5924",
+    "description": "Cranial prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5925",
+    "description": "Facial augmentation implant prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5926",
+    "description": "Nasal prosthesis, replacement",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5927",
+    "description": "Auricular prosthesis, replacement",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5928",
+    "description": "Orbital prosthesis, replacement",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5929",
+    "description": "facial prosthesis, replacement",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5930",
+    "description": "Maxillary guidance prosthesis without guide flange",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5931",
+    "description": "Obturator prosthesis, surgical",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5932",
+    "description": "Obturator prosthesis, definitive",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5933",
+    "description": "Obturator prosthesis, modification",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5934",
+    "description": "Mandibular guidance prosthesis with guide flange",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5935",
+    "description": "Mandibular guidance prosthesis without guide flange",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5936",
+    "description": "Obturator prosthesis, interim",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5937",
+    "description": "Trismus appliance (not for TMD treatment)",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5938",
+    "description": "Resection prosthesis, maxillary complete removable",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5939",
+    "description": "Resection prosthesis, mandibular complete removable",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5940",
+    "description": "Resection prosthesis, maxillary partial removable",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5941",
+    "description": "Resection prosthesis, mandibular partial removable",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 24
+  },
+  {
+    "procedure_code": "D5942",
+    "description": "Resection prosthesis, maxillary implant/abutment supported removable prosthesis for edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5943",
+    "description": "Resection prosthesis, mandibular implant/abutment supported removable prosthesis for edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5944",
+    "description": "Resection prosthesis, maxillary implant/abutment supported removable prosthesis for partially edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5945",
+    "description": "Resection prosthesis, mandibular implant/abutment supported removable prosthesis for partially edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5946",
+    "description": "Resection prosthesis, maxillary implant/abutment supported fixed prosthesis for edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5947",
+    "description": "Resection prosthesis, mandibular implant/abutment supported fixed prosthesis for edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5948",
+    "description": "Resection prosthesis, maxillary implant/abutment supported fixed prosthesis for partially edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5949",
+    "description": "Resection prosthesis, mandibular implant/abutment supported fixed prosthesis for partially edentulous arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5951",
+    "description": "Feeding aid",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5952",
+    "description": "Speech aid prosthesis, pediatric",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5953",
+    "description": "Speech aid prosthesis, adult",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5954",
+    "description": "Palatal augmentation prosthesis",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5955",
+    "description": "Palatal lift prosthesis, definitive",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5958",
+    "description": "Palatal lift prosthesis, interim",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5959",
+    "description": "Palatal lift prosthesis, modification",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5960",
+    "description": "Speech aid prosthesis, modification",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5982",
+    "description": "Surgical stent",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5983",
+    "description": "Radiation carrier",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 25
+  },
+  {
+    "procedure_code": "D5984",
+    "description": "Radiation shield",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5985",
+    "description": "Radiation cone locator",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5986",
+    "description": "Fluoride gel carrier",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5987",
+    "description": "Commissure splint",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5988",
+    "description": "Surgical splint",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5991",
+    "description": "Vesiculobullous disease medicament carrier",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5992",
+    "description": "Adjust maxillofacial prosthetic appliance, by report",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5993",
+    "description": "Maintenance and cleaning of a maxillofacial prosthesis (extra- or intra-oral) other than required adjustments, by report",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5994",
+    "description": "Periodontal medicament carrier with peripheral seal - laboratory processed",
+    "class": "Major/Medical",
+    "is_active": false,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5995",
+    "description": "Periodontal medicament carrier with peripheral seal - laboratory processed - maxillary",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5996",
+    "description": "Periodontal medicament carrier with peripheral seal - laboratory processed - mandibular",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D5999",
+    "description": "Unspecified maxillofacial prosthesis, by report",
+    "class": "Major/Medical",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D6010",
+    "description": "Surgical placement of implant body: endosteal implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D6011",
+    "description": "Surgical access to an implant body (second state implant surgery)",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D6012",
+    "description": "Surgical placement of interim implant body for transitional prosthesis: endosteal implant",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D6013",
+    "description": "Surgical placement of mini- implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 26
+  },
+  {
+    "procedure_code": "D6040",
+    "description": "Surgical placement: eposteal implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6049",
+    "description": "Scaling and debridement of a single implant in the presence of peri-implantitis, bleeding upon probing and increased pocket depths, including cleaning of the implant surfaces, without flap entry and closure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6050",
+    "description": "Surgical placement: transosteal implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6051",
+    "description": "Interim abutment",
+    "class": "Part of Primary Procedure",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6052",
+    "description": "Semi-precision attachment abutment",
+    "class": "Major",
+    "is_active": false,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6055",
+    "description": "Connecting bar - implant supported, or abutment supported",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6056",
+    "description": "Prefabricated abutment - includes modification and placement",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6057",
+    "description": "Custom fabricated abutment - includes placement",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6058",
+    "description": "Abutment supported porcelain/ceramic crown",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6059",
+    "description": "Abutment supported porcelain fused to metal crown (high noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6060",
+    "description": "Abutment supported porcelain fused to metal crown (predominantly base metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6061",
+    "description": "Abutment supported porcelain fused to metal crown (noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6062",
+    "description": "Abutment supported cast metal crown (high noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 27
+  },
+  {
+    "procedure_code": "D6063",
+    "description": "Abutment supported cast metal crown (predominantly base metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6064",
+    "description": "Abutment supported cast metal crown (noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6065",
+    "description": "Implant supported porcelain/ceramic crown",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6066",
+    "description": "Implant supported crown - porcelain fused to high noble alloys)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6067",
+    "description": "Implant supported crown - (high noble alloys)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6068",
+    "description": "Abutment supported retainer for porcelain/ceramic FPD",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6069",
+    "description": "Abutment supported retainer for porcelain fused to metal FPD (high noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6070",
+    "description": "Abutment supported retainer for porcelain fused to metal FPD (predominantly base metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6071",
+    "description": "Abutment supported retainer for porcelain fused to metal FPD (noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6072",
+    "description": "Abutment supported retainer for cast metal FPD (high noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6073",
+    "description": "Abutment supported retainer for cast metal FPD (predominantly base metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6074",
+    "description": "Abutment supported retainer for cast metal FPD (noble metal)",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6075",
+    "description": "Implant supported retainer for ceramic FPD",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6076",
+    "description": "Implant supported retainer for FPD - porcelain fused to high noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6077",
+    "description": "Implant supported retainer for metal FPD - high noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 28
+  },
+  {
+    "procedure_code": "D6080",
+    "description": "Implant maintenance procedures when prostheses are removed and reinserted, including cleansing of prostheses, and abutments",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6081",
+    "description": "Scaling and debridement in the presence of inflammation or mucositis of a single implant, including cleaning of the implant surfaces, without flap entry and closure",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6082",
+    "description": "Implant supported crown - porcelain fused to predominantly base alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6083",
+    "description": "Implant supported crown - porcelain fused to noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6084",
+    "description": "Implant supported crown - porcelain fused to titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6085",
+    "description": "Provisional implant crown",
+    "class": "Part of Primary Procedure/Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6086",
+    "description": "Implant supported crown - predominantly base alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6087",
+    "description": "Implant supported crown - noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6088",
+    "description": "Implant supported crown - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6089",
+    "description": "Accessing and retorquing loose implant screw - per screw",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6090",
+    "description": "Repair implant supported prosthesis, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6091",
+    "description": "Replacement of replaceable part of semi-precision or precision attachment (male or female component) of",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 29
+  },
+  {
+    "procedure_code": "D6092",
+    "description": "Re-cement or re-bond implant/abutment supported crown",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6093",
+    "description": "Re-cement or re-bond implant/abutment supported fixed partial denture",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6094",
+    "description": "Abutment supported crown - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6095",
+    "description": "Repair implant abutment, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6096",
+    "description": "Remove broken implant retaining screw",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6097",
+    "description": "Abutment supported crown - porcelain fused to titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6098",
+    "description": "Implant supported retainer - porcelain fused to predominantly base alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6099",
+    "description": "Implant supported retainer for FPD - porcelain fused to noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6100",
+    "description": "Implant removal, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6101",
+    "description": "Debridement of a peri-implant defect or defects surrounding a single implant, and surface cleaning of the exposed implant surfaces, including flap entry and closure",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6102",
+    "description": "Debridement and osseous contouring of a peri-implant defect or defects surrounding a single implant and includes surface cleaning of the exposed implant surfaces, including flap entry and closure",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6103",
+    "description": "Bone graft for repair of peri- implant defect - does not include flap entry and closure",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 30
+  },
+  {
+    "procedure_code": "D6104",
+    "description": "Bone graft at time of implant placement",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6105",
+    "description": "Removal of implant body not requiring bone removal or flap evaluation",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6106",
+    "description": "Guided tissue regeneration - resorbable barrier, per implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6107",
+    "description": "Guided tissue regeneration - non- resorbable barrier, per implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6110",
+    "description": "Implant/abutment supported removable denture for edentulous arch - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6111",
+    "description": "Implant/abutment supported removable denture for edentulous arch - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6112",
+    "description": "Implant/abutment supported removable denture for partially edentulous arch - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6113",
+    "description": "Implant/abutment supported removable denture for partially edentulous arch - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6114",
+    "description": "Implant/abutment supported fixed denture for edentulous arch - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6115",
+    "description": "Implant/abutment supported fixed denture for edentulous arch - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6116",
+    "description": "Implant/abutment supported fixed denture for partially edentulous arch - maxillary",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6117",
+    "description": "Implant/abutment supported fixed denture for partially edentulous arch - mandibular",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6118",
+    "description": "Implant/abutment supported interin fixed denture for edentulous arch - mandibular",
+    "class": "Part of Primary Procedure/Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6119",
+    "description": "Implant/abutment supported interin fixed denture for edentulous arch - maxillary",
+    "class": "Part of Primary Procedure/Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6120",
+    "description": "Implant supported retainer - porcelain fused to titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6121",
+    "description": "Implant supported retainer for metal FPD - predominantly base alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 31
+  },
+  {
+    "procedure_code": "D6122",
+    "description": "Implant supported retainer for metal FPD - noble alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6123",
+    "description": "Implant supported retainer for metal FPD - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6190",
+    "description": "Radiographic/surgical implant index, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6191",
+    "description": "Semi-precision abutment - placement",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6192",
+    "description": "Semi-precision abutment - placement",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6194",
+    "description": "Abutment supported retainer crown for FPD -titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6195",
+    "description": "Abutment supported retainer - porcelain fused to titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6196",
+    "description": "Removal of an indirect restoration on an implant retained abutment",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6197",
+    "description": "Replacement of restorative material used to close an access opening of a screw - retained implant supported prosthesis, per implant",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6198",
+    "description": "remove interim implant component",
+    "class": "Not Covered",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6199",
+    "description": "Unspecified implant procedure, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6205",
+    "description": "Pontic - indirect resin-based composite",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6210",
+    "description": "- Pontic - cast high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6211",
+    "description": "- Pontic - cast predominantly base metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6212",
+    "description": "- Pontic - cast noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6214",
+    "description": "Pontic titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6240",
+    "description": "- Pontic - porcelain fused to high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 32
+  },
+  {
+    "procedure_code": "D6245",
+    "description": "Pontic - porcelain/ceramic",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6250",
+    "description": "- Pontic - resin with high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6251",
+    "description": "- Pontic - resin with predominantly base metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6252",
+    "description": "- Pontic - resin with noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6253",
+    "description": "Provisional pontic- further treatment or completion of diagnosis necessary prior to final impression",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6280",
+    "description": "Implant maintenance procedures when full arch removable implant/abutment supported denture is removed and reinserted, including cleansing of prostheses, and abutments - per arch",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6545",
+    "description": "Retainer - cast metal for resin bonded fixed prosthesis",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6548",
+    "description": "Retainer - porcelain/ceramic for resin bonded fixed prosthesis",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6549",
+    "description": "Resin retainer - for resin bonded fixed prosthesis",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 33
+  },
+  {
+    "procedure_code": "D6600",
+    "description": "Retainer inlay - porcelain/ceramic, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6601",
+    "description": "Retainer inlay - porcelain/ceramic, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6602",
+    "description": "Retainer inlay - cast high noble metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6603",
+    "description": "Retainer inlay - cast high noble metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6604",
+    "description": "Retainer inlay - cast predominantly base metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6605",
+    "description": "Retainer inlay - cast predominantly base metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6606",
+    "description": "Retainer inlay - cast noble metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6607",
+    "description": "Retainer inlay - cast noble metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6608",
+    "description": "Retainer onlay - porcelain/ceramic, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6609",
+    "description": "Retainer onlay - porcelain/ceramic, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6610",
+    "description": "Retainer onlay - cast high noble metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6611",
+    "description": "Retainer onlay - cast high noble metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 34
+  },
+  {
+    "procedure_code": "D6612",
+    "description": "Retainer onlay - cast predominantly base metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6613",
+    "description": "Retainer onlay - cast predominantly base metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6614",
+    "description": "Retainer onlay - cast noble metal, two surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6615",
+    "description": "Retainer onlay - cast noble metal, three or more surfaces",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6634",
+    "description": "Retainer onlay - titanium",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6710",
+    "description": "Retainer crown - indirect resin based composite",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6720",
+    "description": "Retainer crown - resin with high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6721",
+    "description": "Retainer crown - resin with predominantly base metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6722",
+    "description": "Retainer crown - resin with noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6740",
+    "description": "Retainer crown - porcelain/ceramic",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 35
+  },
+  {
+    "procedure_code": "D6750",
+    "description": "Retainer crown - porcelain fused to high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6751",
+    "description": "Retainer crown - porcelain fused to predominantly base metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6752",
+    "description": "Retainer crown - porcelain fused to noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6753",
+    "description": "Retainer crown - porcelain fused to Titanium and Titanium Alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6780",
+    "description": "Retainer crown - \u00be cast high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6781",
+    "description": "Retainer crown - \u00be cast predominantly base metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6782",
+    "description": "Retainer crown - \u00be cast noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6783",
+    "description": "Retainer crown - \u00be porcelain/ceramic",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6784",
+    "description": "Retainer crown \u00be - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6790",
+    "description": "Retainer crown - full cast high noble metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6791",
+    "description": "Retainer crown - full cast predominantly base metal Retainer crown - full cast noble",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6792",
+    "description": "metal",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6793",
+    "description": "Provisional retainer crown- further treatment or completion of diagnosis necessary prior to final impression",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6794",
+    "description": "Retainer crown - titanium and titanium alloys",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6920",
+    "description": "Connector bar",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6930",
+    "description": "Re-cement or re-bond fixed partial denture",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6940",
+    "description": "Stress breaker",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6950",
+    "description": "Precision attachment",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6980",
+    "description": "Fixed partial denture repair necessitated by restorative material failure",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6985",
+    "description": "Pediatric partial denture, fixed",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 36
+  },
+  {
+    "procedure_code": "D6999",
+    "description": "Unspecified fixed prosthodontic procedure, by report",
+    "class": "Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7111",
+    "description": "Extraction, coronal remnants - primary tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7140",
+    "description": "Extraction, erupted tooth or exposed root (elevation and/or forceps removal)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7210",
+    "description": "Extraction, erupted tooth requiring removal of bone and/or sectioning of tooth, and including elevation of mucoperiosteal flap if indicated",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7220",
+    "description": "Removal of impacted tooth - soft tissue",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7230",
+    "description": "Removal of impacted tooth - partially bony",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7240",
+    "description": "Removal of impacted tooth - completely bony",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7241",
+    "description": "Removal of impacted tooth - completely bony, with unusual surgical complications",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7250",
+    "description": "Removal of residual tooth roots (cutting procedure)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7251",
+    "description": "Coronectomy - intentional partial tooth removal",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7260",
+    "description": "Oroantral fistula closure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7261",
+    "description": "Primary closure of a sinus perforation",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7270",
+    "description": "Tooth re-implantation and/or stabilization of accidentally evulsed or displaced tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7272",
+    "description": "Tooth transplantation (includes re-implantation from one site to another and splinting and/or stabilization)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7280",
+    "description": "Exposure of an unerupted tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7282",
+    "description": "Mobilization of erupted or malpositioned tooth to aid eruption",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 37
+  },
+  {
+    "procedure_code": "D7283",
+    "description": "Placement of device to facilitate eruption of impacted tooth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7284",
+    "description": "Excisional biopsy of minor salivary glands",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7285",
+    "description": "Incisional biopsy of oral tissue - hard (bone, tooth)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7286",
+    "description": "Incisional biopsy of oral tissue - soft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7287",
+    "description": "Exfoliative cytological sample collection",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7288",
+    "description": "Brush biopsy - transepithelial sample collection",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7290",
+    "description": "Surgical repositioning of teeth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7291",
+    "description": "Transseptal fiberotomy/supra crestal fiberotomy, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7292",
+    "description": "Placement of temporary anchorage device [screw retained plate] requiring flap; includes device removal",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7293",
+    "description": "Placement of temporary anchorage device requiring flap; includes device removal",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7294",
+    "description": "Placement of temporary anchorage device without flap; includes device removal",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7295",
+    "description": "Harvest of bone for use in autogenous grafting procedure",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7296",
+    "description": "Corticotomy- one to three teeth or tooth spaces, per quadrant",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7297",
+    "description": "Corticotomy- four or more teeth or tooth spaces, per quadrant",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7310",
+    "description": "Alveoloplasty in conjuncture with extractions - four or more teeth or tooth spaces, per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7311",
+    "description": "Alveoloplasty in conjuncture with extractions - one to three teeth or tooth spaces, per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 38
+  },
+  {
+    "procedure_code": "D7320",
+    "description": "Alveoloplasty not in conjunction with extractions - four or more teeth or tooth spaces, per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7321",
+    "description": "Alveoloplasty not in conjunction with extractions - one to three teeth or tooth spaces, per quadrant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7340",
+    "description": "Vestibuloplasty - ridge extension (secondary epithelialization)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7350",
+    "description": "Vestibuloplasty - ridge extension (including soft tissue grafts, muscle reattachment, revision of soft tissue attachment and management of hypertrophied and hyperplastic tissue)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7410",
+    "description": "Excision of benign lesion up to 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7411",
+    "description": "Excision of benign lesion greater than 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7412",
+    "description": "Excision of benign lesion, complicated",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7413",
+    "description": "Excision of malignant lesion up to 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7414",
+    "description": "Excision of malignant lesion greater than 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7415",
+    "description": "Excision of malignant lesion, complicated",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7440",
+    "description": "Excision of malignant tumor - lesion diameter up to 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7441",
+    "description": "Excision of malignant tumor - lesion diameter greater than 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7450",
+    "description": "Removal of benign odontogenic cyst or tumor - lesion diameter up to 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7451",
+    "description": "Removal of benign odontogenic cyst or tumor - lesion diameter greater than 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 39
+  },
+  {
+    "procedure_code": "D7460",
+    "description": "Removal of benign nonodontogenic cyst or tumor - lesion diameter up to 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7461",
+    "description": "Removal of benign nonodontogenic cyst or tumor - lesion diameter greater than 1.25 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7465",
+    "description": "Destruction of lesion(s) by physical or chemical method, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7471",
+    "description": "Removal of lateral exostosis (maxilla or mandible)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7472",
+    "description": "Removal of torus palatinus",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7473",
+    "description": "Removal of torus mandibularis",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7485",
+    "description": "Reduction of osseous tuberosity",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7490",
+    "description": "Radical resection of maxilla or mandible",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7510",
+    "description": "Incision and drainage of abscess - intraoral soft tissue",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7511",
+    "description": "Incision and drainage of abscess - intraoral soft tissue - complicated (includes drainage of multiple fascial spaces)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7520",
+    "description": "Incision and drainage of abscess - extraoral soft tissue",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7521",
+    "description": "Incision and drainage of abscess - extraoral soft tissue - complicated (includes drainage of multiple fascial spaces)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7530",
+    "description": "Removal of foreign body from mucosa, skin, or subcutaneous alveolar tissue",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7540",
+    "description": "Removal of reaction producing foreign bodies, musculoskeletal system",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 40
+  },
+  {
+    "procedure_code": "D7550",
+    "description": "Partial ostectomy/sequestrectomy for removal of non-vital bone",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7560",
+    "description": "Maxillary sinusotomy for removal of tooth fragment or foreign body",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7610",
+    "description": "Maxilla - open reduction (teeth immobilized, if present)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7620",
+    "description": "Maxilla - closed reduction (teeth immobilized, if present)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7630",
+    "description": "Mandible - open reduction (teeth immobilized, if present)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7640",
+    "description": "Mandible - closed reduction (teeth immobilized, if present)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7650",
+    "description": "Malar and/or zygomatic arch - open reduction",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7660",
+    "description": "Malar and/or zygomatic arch - closed reduction",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7670",
+    "description": "Alveolus - closed reduction, may include stabilization of teeth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7671",
+    "description": "Alveolus - open reduction, may include stabilization of teeth",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 41
+  },
+  {
+    "procedure_code": "D7680",
+    "description": "Facial bones - complicated reduction with fixation and multiple surgical approaches",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7710",
+    "description": "Maxilla - open reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7720",
+    "description": "Maxilla - closed reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7730",
+    "description": "Mandible - open reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7740",
+    "description": "Mandible - closed reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7750",
+    "description": "Malar and/or zygomatic arch - open reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7760",
+    "description": "Malar and/or zygomatic arch - closed reduction",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7770",
+    "description": "Alveolus - open reduction stabilization of teeth",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7771",
+    "description": "Alveolus, closed reduction stabilization of teeth",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7780",
+    "description": "Facial bones - complicated reduction with fixation and multiple approaches",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7810",
+    "description": "Open reduction of dislocation",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7820",
+    "description": "Closed reduction of dislocation",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7830",
+    "description": "Manipulation under anesthesia",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7840",
+    "description": "Condylectomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7850",
+    "description": "Surgical discectomy, with/without implant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7852",
+    "description": "Disc repair",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7854",
+    "description": "Synovectomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7856",
+    "description": "Myotomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7858",
+    "description": "Joint reconstruction",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7860",
+    "description": "Arthrotomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7865",
+    "description": "Arthroplasty",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7870",
+    "description": "Arthrocentesis",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7871",
+    "description": "Non-arthroscopic lysis and lavage",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7872",
+    "description": "Arthroscopy - diagnosis, with or without biopsy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 42
+  },
+  {
+    "procedure_code": "D7873",
+    "description": "Arthroscopy: lavage and lysis of adhesions",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7874",
+    "description": "Arthroscopy: disc repositioning and stabilization",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7875",
+    "description": "Arthroscopy: synovectomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7876",
+    "description": "Arthroscopy: discectomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7877",
+    "description": "Arthroscopy: debridement",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7880",
+    "description": "Occlusal orthotic device, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7881",
+    "description": "Occlusal orthotic device adjustment",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7899",
+    "description": "Unspecified TMD therapy, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7910",
+    "description": "Suture of recent small wounds up to 5 cm",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7911",
+    "description": "Complicated suture - up to 5 cm",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7912",
+    "description": "Complicated suture - greater than 5 cm",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7920",
+    "description": "Skin graft (identify defect covered, location and type of graft)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7921",
+    "description": "Collection and application of autologous blood concentrate product",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 43
+  },
+  {
+    "procedure_code": "D7922",
+    "description": "PLACEMENT OF INTRA-SOCKET BIOLOGICAL DRESSING TO AID IN HEMOSTASIS OR CLOT STABILIZATION, PER SITE",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7939",
+    "description": "Indexing for osteotomy using dynamic robotic assisted or dynamic navigation",
+    "class": "Not Covered",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7940",
+    "description": "Osteoplasty - for orthognathic deformities",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7941",
+    "description": "Osteotomy - mandibular rami",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7943",
+    "description": "Osteotomy - mandibular rami with bone graft; includes obtaining the graft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7944",
+    "description": "Osteotomy - segmented or subapical",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7945",
+    "description": "Osteotomy - body of mandible",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7946",
+    "description": "LeFort I (maxilla - total)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7947",
+    "description": "LeFort I (maxilla - segmented)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7948",
+    "description": "LeFort II or LeFort III (osteoplasty of facial bones for midface hypoplasia or retrusion) - without bone graft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7949",
+    "description": "LeFort II or LeFort III - with bone graft",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7950",
+    "description": "Osseous, osteoperiosteal, or cartilage graft of the mandible or maxilla - autogenous or non-autogenous, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7951",
+    "description": "Sinus augmentation with bone or bone substitutes via a lateral open approach",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7952",
+    "description": "Sinus augmentation via a vertical approach",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7953",
+    "description": "Bone replacement graft for ridge preservation - per site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 44
+  },
+  {
+    "procedure_code": "D7955",
+    "description": "Repair of maxillofacial soft and/or hard tissue defect",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7956",
+    "description": "Guided tissue regeneration, edentulous area - resorbable barrier, per site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7957",
+    "description": "Guided tissue regeneration, edentulous area - non- resorbable barrier, per site",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7960",
+    "description": "Frenulectomy - also known as frenectomy or frenotomy - separate procedure not incidental to another procedure",
+    "class": "Basic/Major",
+    "is_active": false,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7961",
+    "description": "Buccal/labial frenectomy (frenulectomy)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7962",
+    "description": "Lingual frenectomy (frenulectomy)",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7963",
+    "description": "Frenuloplasty",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7970",
+    "description": "Excision of hyperplastic tissue - per arch",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7971",
+    "description": "Excision of pericoronal gingiva",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7972",
+    "description": "Surgical reduction of fibrous tuberosity",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7979",
+    "description": "non-surgical sialolithotomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7980",
+    "description": "Surgical sialolithotomy",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7981",
+    "description": "Excision of salivary gland, by report",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7982",
+    "description": "Sialodochoplasty",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7983",
+    "description": "Closure of salivary fistula",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7990",
+    "description": "Emergency tracheotomy",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7991",
+    "description": "Coronoidectomy",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7993",
+    "description": "Surgical placement of craniofacial implant - extra oral",
+    "class": "Basic/Major/Medical",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7994",
+    "description": "Surgical placement: zygomatic implant",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7995",
+    "description": "Synthetic graft - mandible or facial bones, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7996",
+    "description": "Implant-mandible for augmentation purposes (excluding alveolar ridge), by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 45
+  },
+  {
+    "procedure_code": "D7997",
+    "description": "Appliance removal (not by dentist who placed appliance), includes removal of archbar",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D7998",
+    "description": "Intraoral placement of a fixation device not in conjunction with a fracture",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D7999",
+    "description": "Unspecified oral surgery procedure, by report",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8010",
+    "description": "Limited orthodontic treatment of the primary dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8020",
+    "description": "Limited orthodontic treatment of the transitional dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8030",
+    "description": "Limited orthodontic treatment of the adolescent dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8040",
+    "description": "Limited orthodontic treatment of the adult dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8050",
+    "description": "Interceptive orthodontic treatment of the primary dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8060",
+    "description": "Interceptive orthodontic treatment of the transitional dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8070",
+    "description": "Comprehensive orthodontic treatment of the transitional dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8080",
+    "description": "Comprehensive orthodontic treatment of the adolescent dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8090",
+    "description": "Comprehensive orthodontic treatment of the adult dentition",
+    "class": "Routine Orthodontia/Medical Orthodontia",
+    "is_active": false,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8210",
+    "description": "Removable appliance therapy",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8220",
+    "description": "Fixed appliance therapy",
+    "class": "Basic/Orthodontia",
+    "is_active": true,
+    "source_page": 46
+  },
+  {
+    "procedure_code": "D8660",
+    "description": "Pre-orthodontic treatment examination to monitor growth and development",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8670",
+    "description": "Periodic orthodontic treatment visit",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8680",
+    "description": "Orthodontic retention (removal of appliances, construction and placement of retainer(s))",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8681",
+    "description": "Removable orthodontic retainer adjustment",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8690",
+    "description": "Orthodontic treatment (alternative billing to a contract fee)",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8691",
+    "description": "Repair of orthodontic appliance",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8692",
+    "description": "Replacement of lost or broken retainer",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8693",
+    "description": "Re-cement or re-bond fixed retainer",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8694",
+    "description": "Repair of fixed retainers, includes reattachment",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8695",
+    "description": "removal of fixed orthodontic appliance for reasons other than completion of treatment",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8697",
+    "description": "REPAIR OF ORTHODONTIC APPLIANCE MANDIBULAR",
+    "class": "Covered as long as member has orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8698",
+    "description": "RECEMENT OR REBOND FIXED RETAINER MAXILLARY",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8699",
+    "description": "RECEMENT OR REBOND FIXED RETAINER MANDIBULAR",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8701",
+    "description": "REPAIR OR FIXED RETAINER, INCLUDES REATTACHMENT MAXILLARY",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8702",
+    "description": "REPAIR OF FIXED RETAINER, INCLUDES REATTACHMENT MANDIBULAR",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D8703",
+    "description": "REPLACEMENT OF LOST OR BROKEN RETAINER MAXILLARY",
+    "class": "Covered as long as member has orthodontia",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D8704",
+    "description": "REPLACEMENT OF LOST OR BROKEN RETAINER MANDIBULAR",
+    "class": "Covered as long as member has orthodontia",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D8877",
+    "description": "Duplication of complete denture - maxillary",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 23
+  },
+  {
+    "procedure_code": "D8999",
+    "description": "Unspecified orthodontic procedure, by report",
+    "class": "Orthodontia",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9110",
+    "description": "Palliative treatment of dental pain - per visit",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9120",
+    "description": "Fixed partial denture sectioning",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9128",
+    "description": "Photobiomodulation therapy - first 15 minute increment, or any portion thereof",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9129",
+    "description": "Photobiomodulation therapy - each subsequent 15 minute increment, or any portion thereof",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9130",
+    "description": "Temporomandibular joint dysfunction - non-invasive physical therapies",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9210",
+    "description": "Local anesthesia not in conjunction with operative or surgical procedures",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9211",
+    "description": "Regional block anesthesia",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9212",
+    "description": "Trigeminal division block anesthesia",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9215",
+    "description": "Local anesthesia in conjunction with operative or surgical procedures",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9219",
+    "description": "Evaluation for moderate sedation, deep sedation or general anesthesia",
+    "class": "Part of Primary procedure",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9222",
+    "description": "Administration of deep sedation/general anesthesia - first 15 minutes increment, or any portion thereof",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9223",
+    "description": "Administration of deep sedation/general anesthesia - each subsequent 15 minute increment, or any portion thereof",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9224",
+    "description": "Administration of general anesthesia with advanced airway - first 15 minute",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 48
+  },
+  {
+    "procedure_code": "D9225",
+    "description": "Administration of general anesthesia with advanced airway - each subsequent 15 minute increment, or any portion thereof",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9230",
+    "description": "Administration of nitrous oxide",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9239",
+    "description": "Administration of moderate sedation - first 15 minutes, or any portion thereof",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9243",
+    "description": "Administration of moderate sedation - each subsequent 15 minute increment, or any portion thereof",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9244",
+    "description": "In - office Administration of minimal sedation - single drug enternal",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9245",
+    "description": "Administration of moderate sedation - enteral",
+    "class": "Not covered/Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9246",
+    "description": "Administration of moderate sedation - non intravenous parenteral - first 15 minute increment, or any portion thereof",
+    "class": "Not covered/Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9247",
+    "description": "Administration of moderate sedation - non intravenous parenteral - each subsequent 15-minute increment, or any portion thereof",
+    "class": "Not covered/Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9248",
+    "description": "Non-intravenous conscious sedation",
+    "class": "Not covered/Basic/Major",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9310",
+    "description": "Consultation - diagnostic service provided by dentist or physician other than requesting dentist or physician",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9311",
+    "description": "Consultation with a medical health care professional",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9410",
+    "description": "House/extended care facility call",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9420",
+    "description": "Hospital or ambulatory surgical center call",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9430",
+    "description": "Office visit for observation (during regularly scheduled hours) - no other services performed",
+    "class": "Preventive",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9440",
+    "description": "Office visit - after regularly scheduled hours",
+    "class": "Preventive/Basic",
+    "is_active": true,
+    "source_page": 49
+  },
+  {
+    "procedure_code": "D9450",
+    "description": "Case presentation, subsequent to detailed and extensive treatment planning",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9610",
+    "description": "Therapeutic parenteral drug, single administration",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9612",
+    "description": "Therapeutic parenteral drugs, two or more administrations, different medications",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9613",
+    "description": "Infiltration of sustained release therapeutic drug - single or multiple sites",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9630",
+    "description": "Drugs or medicaments dispensed in the office for home use",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9696",
+    "description": "REPAIR OF ORTHODONTIC APPLIANCE MAXILLARY",
+    "class": "Covered as long as member has orthodontia",
+    "is_active": true,
+    "source_page": 47
+  },
+  {
+    "procedure_code": "D9910",
+    "description": "Application of desensitizing medicament",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9911",
+    "description": "Application of desensitizing resin for cervical and/or root surface, per tooth",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9912",
+    "description": "Pre-visit patient screening",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9920",
+    "description": "Behavior management, by report",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9930",
+    "description": "Treatment of complications (post-surgical) - unusual circumstances, by report",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9932",
+    "description": "Cleaning and inspection of removable complete denture, maxillary",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9933",
+    "description": "Cleaning and inspection of removable complete denture, mandibular",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9934",
+    "description": "Cleaning and inspection of removable partial denture, maxillary",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9935",
+    "description": "Cleaning and inspection of removable partial denture, mandibular",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9936",
+    "description": "Cleaning and inspection of occlusal guard - per appliance",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9938",
+    "description": "Fabrication of a custom removable clear plastic temporary aesthetic appliance",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9939",
+    "description": "Placement of a custom removable clear plastic temporary aesthetic appliance",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 50
+  },
+  {
+    "procedure_code": "D9940",
+    "description": "Occlusal guard, by report",
+    "class": "Basic/Major",
+    "is_active": false,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9941",
+    "description": "Fabrication of athletic mouthguard",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9942",
+    "description": "Repair and/or reline of occlusal guard",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9943",
+    "description": "Occlusal guard adjustment",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9944",
+    "description": "occlusal guard - hard appliance, full arch",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9945",
+    "description": "Occlusal guard - soft appliance, full arch",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9946",
+    "description": "Occlusal guard - hard appliance, partial arch",
+    "class": "Basic/Major",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9947",
+    "description": "custom sleep apnea appliance fabrication and placement",
+    "class": "Basic/Major Review Under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9948",
+    "description": "adjustment of custom sleep apnea appliance",
+    "class": "Basic/Major Review Under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9949",
+    "description": "repair of custom sleep apnea appliance",
+    "class": "Basic/Major Review Under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9950",
+    "description": "Occlusion analysis - mounted case",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9951",
+    "description": "Occlusal adjustment - limited",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9952",
+    "description": "Occlusal adjustment - complete",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9953",
+    "description": "Reline custom sleep apnea appliance (Indirect)",
+    "class": "Basic/Major Review under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9954",
+    "description": "Fabrication and delivery of oral appliance therapy (oat) morning repositioning device",
+    "class": "Basic/Major Review under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9955",
+    "description": "Oral appliance therapy (oat) titration visit",
+    "class": "Basic/Major Review under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9956",
+    "description": "Administration of home sleep apnea test",
+    "class": "Basic/Major Review under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9957",
+    "description": "Screening for sleep related breathing disorders",
+    "class": "Basic/Major Review under Medical",
+    "is_active": true,
+    "source_page": 51
+  },
+  {
+    "procedure_code": "D9961",
+    "description": "Duplicate/copy patient's records",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9970",
+    "description": "Enamel micro-abrasion",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9971",
+    "description": "Odontoplasty -per tooth",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9972",
+    "description": "External bleaching - per arch - performed in office",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9973",
+    "description": "External bleaching - per tooth",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9974",
+    "description": "Internal bleaching - per tooth",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9975",
+    "description": "External bleaching for home application, per arch; includes materials and fabrication of custom trays",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9985",
+    "description": "Sales tax",
+    "class": "Preventive/Basic/Major",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9986",
+    "description": "Missed appointment",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9987",
+    "description": "Cancelled appointment",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9990",
+    "description": "Certified translation or sign- language services per visit",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9991",
+    "description": "Dental case management - addressing appointment compliance barriers",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9992",
+    "description": "Dental case management - care coordination",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9993",
+    "description": "Dental case management - motivational interviewing",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9994",
+    "description": "Dental case management - patient education to improve oral health literacy",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9995",
+    "description": "Teledentistry - synchronous; real-time encounter",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9996",
+    "description": "Teledentistry - asynchronous; information stored and forwarded to dentist for subsequent review",
+    "class": "Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9997",
+    "description": "Dental case management patients with special health care needs",
+    "class": "Considered Part of the Primary Procedure/Not covered",
+    "is_active": true,
+    "source_page": 52
+  },
+  {
+    "procedure_code": "D9999",
+    "description": "Unspecified adjunctive procedure, by report",
+    "class": "Basic",
+    "is_active": true,
+    "source_page": 52
+  }
+]
