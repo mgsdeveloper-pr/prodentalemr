@@ -202,13 +202,26 @@ class AdaProcedureCodeImport extends Page implements HasForms
     protected function storeUploadedFile(TemporaryUploadedFile $uploadedFile, ?string $originalName): string
     {
         $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: pathinfo($originalName ?? '', PATHINFO_EXTENSION) ?: 'csv');
-        $storedPath = $uploadedFile->storeAs(
-            'imports/ada-cdt',
-            Str::uuid()->toString() . '.' . $extension,
-            'local',
-        );
+        $directory = 'imports/ada-cdt';
+        $filename = Str::uuid()->toString() . '.' . $extension;
+        $storedPath = $directory . '/' . $filename;
+        $disk = Storage::disk('local');
 
-        if (! is_string($storedPath) || $storedPath === '') {
+        $disk->makeDirectory($directory);
+
+        $stream = fopen($uploadedFile->getRealPath(), 'rb');
+
+        if ($stream === false) {
+            throw new \RuntimeException('Uploaded file could not be opened for import.');
+        }
+
+        $written = $disk->put($storedPath, $stream);
+
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
+
+        if (! $written || ! $disk->exists($storedPath)) {
             throw new \RuntimeException('Upload could not be stored for import.');
         }
 

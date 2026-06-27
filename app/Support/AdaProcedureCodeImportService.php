@@ -187,9 +187,7 @@ class AdaProcedureCodeImportService
 
     protected function normalizeClass(mixed $value): ?string
     {
-        $class = trim((string) $value);
-
-        return $class !== '' ? $class : null;
+        return AdaProcedureCode::normalizeClassValue($value);
     }
 
     protected function normalizeCode(mixed $value): string

@@ -30,4 +30,61 @@ class AdaProcedureCode extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function scopeInClass(Builder $query, ?string $class): Builder
+    {
+        $normalized = static::normalizeClassValue($class);
+
+        if (blank($normalized)) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $builder) use ($normalized): void {
+            $builder
+                ->where('class', $normalized)
+                ->orWhere('class', 'like', $normalized . ' / %')
+                ->orWhere('class', 'like', '% / ' . $normalized . ' / %')
+                ->orWhere('class', 'like', '% / ' . $normalized);
+        });
+    }
+
+    public function getClassTokensAttribute(): array
+    {
+        return static::classTokensFromValue($this->class);
+    }
+
+    public static function normalizeClassValue(mixed $value): ?string
+    {
+        $tokens = static::classTokensFromValue($value);
+
+        return $tokens === [] ? null : implode(' / ', $tokens);
+    }
+
+    public static function classTokensFromValue(mixed $value): array
+    {
+        $raw = trim((string) $value);
+
+        if ($raw === '') {
+            return [];
+        }
+
+        $segments = preg_split('/\s*\/\s*/', $raw) ?: [];
+        $tokens = [];
+
+        foreach ($segments as $segment) {
+            $token = trim(preg_replace('/\s+/', ' ', (string) $segment) ?? '');
+
+            if ($token === '') {
+                continue;
+            }
+
+            $key = mb_strtolower($token);
+
+            if (! array_key_exists($key, $tokens)) {
+                $tokens[$key] = $token;
+            }
+        }
+
+        return array_values($tokens);
+    }
 }

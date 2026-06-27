@@ -119,8 +119,12 @@
                                     <p class="ada-latest-code">{{ $code->procedure_code }}</p>
                                     <p class="ada-latest-desc">{{ $code->description }}</p>
                                 </div>
-                                @if(filled($code->class))
-                                    <x-filament::badge color="gray">{{ $code->class }}</x-filament::badge>
+                                @if($code->class_tokens !== [])
+                                    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                                        @foreach($code->class_tokens as $classToken)
+                                            <x-filament::badge color="gray">{{ $classToken }}</x-filament::badge>
+                                        @endforeach
+                                    </div>
                                 @endif
                             </article>
                         @empty
