@@ -209,17 +209,19 @@ class AdaProcedureCodeImport extends Page implements HasForms
 
         $disk->makeDirectory($directory);
 
-        $stream = fopen($uploadedFile->getRealPath(), 'rb');
+        $sourcePath = $uploadedFile->getRealPath() ?: $uploadedFile->getPathname();
 
-        if ($stream === false) {
+        if (! is_string($sourcePath) || $sourcePath === '' || ! is_file($sourcePath)) {
+            throw new \RuntimeException('Uploaded file could not be located for import.');
+        }
+
+        $contents = file_get_contents($sourcePath);
+
+        if ($contents === false) {
             throw new \RuntimeException('Uploaded file could not be opened for import.');
         }
 
-        $written = $disk->put($storedPath, $stream);
-
-        if (is_resource($stream)) {
-            fclose($stream);
-        }
+        $written = $disk->put($storedPath, $contents);
 
         if (! $written || ! $disk->exists($storedPath)) {
             throw new \RuntimeException('Upload could not be stored for import.');
