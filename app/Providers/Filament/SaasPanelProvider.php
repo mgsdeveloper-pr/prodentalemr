@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Http\Middleware\SaasAccessMiddleware;
 use App\Http\Middleware\PanelAuthenticateRedirect;
 use App\Filament\Saas\Pages\BillingSettings;
+use App\Filament\Saas\Pages\AdaProcedureCodeImport;
 use App\Filament\Saas\Pages\DsoOnboarding;
 use App\Filament\Saas\Pages\ModuleSettings;
 use App\Filament\Saas\Pages\NotificationCentre;
@@ -128,6 +129,7 @@ class SaasPanelProvider extends PanelProvider
                 NotificationCentre::class,
                 PaymentCredentials::class,
                 BillingSettings::class,
+                AdaProcedureCodeImport::class,
                 UserManagement::class,
                 RolesAndPermissions::class,
                 ModuleSettings::class,
