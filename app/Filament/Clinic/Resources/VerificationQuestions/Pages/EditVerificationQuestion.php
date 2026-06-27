@@ -28,7 +28,7 @@ class EditVerificationQuestion extends EditRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? $this->record?->template_key ?? 'template_2'))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? $this->record?->template_key ?? 'template_2', ClinicPanelScope::selectedClinicId()))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -39,12 +39,10 @@ class EditVerificationQuestion extends EditRecord
 
     public function getCurrentSectionLabel(): string
     {
-        $key = $this->data['section_key'] ?? null;
+        $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
 
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::SECTION_OPTIONS[$key]
-                ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$key]
-                ?? (string) $key)
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? $this->record?->template_key ?? 'template_2', ClinicPanelScope::selectedClinicId()))
             : 'Choose section';
     }
 
@@ -91,11 +89,43 @@ class EditVerificationQuestion extends EditRecord
     protected function afterFill(): void
     {
         $this->originalSectionKey = $this->record?->section_key;
+
+        $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor(
+            $this->record?->section_key,
+            $this->record?->template_key,
+            ClinicPanelScope::selectedClinicId(),
+        );
+
+        if (filled($parentSectionKey)) {
+            $this->data['section_key'] = $parentSectionKey;
+            $this->data['sub_section_key'] = $this->record?->section_key;
+        }
+
+        if (VerificationFormQuestion::isFrequencyPercentageSection($this->record?->section_key)) {
+            $this->data['frequency_row_mode'] = filled($this->record?->code) ? 'code' : 'question';
+            $this->data['frequency_response_mode'] = $this->record?->frequency_response_mode ?: 'current';
+            $this->data['frequency_response_fields'] = $this->record?->frequency_response_fields ?: VerificationFormQuestion::defaultFrequencyResponseFields($this->data['frequency_response_mode']);
+        }
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data['sort_order'] = (int) ($data['sort_order'] ?? ($this->record?->sort_order ?? 9990));
+        $data['section_key'] = filled($data['sub_section_key'] ?? null)
+            ? $data['sub_section_key']
+            : $data['section_key'];
+        unset($data['sub_section_key']);
+
+        if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
+            $data['input_type'] = 'frequency_row';
+            $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
+            $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
+            $data['frequency_response_fields'] = $data['frequency_response_fields'] ?: VerificationFormQuestion::defaultFrequencyResponseFields($data['frequency_response_mode']);
+        } else {
+            $data['frequency_response_mode'] = null;
+            $data['frequency_response_fields'] = null;
+        }
+        unset($data['frequency_row_mode']);
 
         return $this->stripOrderingMeta($data);
     }

@@ -4,9 +4,13 @@ namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages;
 
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateSection;
 use App\Support\ClinicPanelScope;
-use Filament\Actions\CreateAction;
 use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Collection;
@@ -18,6 +22,12 @@ class ListVerificationQuestions extends ListRecords
 
     protected string $view = 'filament.clinic.resources.verification-questions.pages.list-verification-questions';
 
+    public string $selectedTemplateKey = 'template_2';
+
+    protected $queryString = [
+        'selectedTemplateKey' => ['except' => 'template_2', 'as' => 'template'],
+    ];
+
     protected function getHeaderActions(): array
     {
         return [
@@ -25,8 +35,111 @@ class ListVerificationQuestions extends ListRecords
                 ->label('Rearrange questions')
                 ->url(VerificationQuestionResource::getUrl('reorder'))
                 ->color('gray'),
-            CreateAction::make(),
+            Action::make('createTemplateSection')
+                ->label('Add Section')
+                ->icon('heroicon-o-folder-plus')
+                ->color('gray')
+                ->visible(fn (): bool => auth()->user()?->canManageClinicTemplateSections() ?? false)
+                ->form([
+                    Select::make('template_key')
+                        ->label('Template')
+                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                        ->default(fn (): string => $this->selectedTemplateKey)
+                        ->required()
+                        ->live(),
+                    Hidden::make('parent_section_key')
+                        ->default(null),
+                    TextInput::make('label')
+                        ->label('Section name')
+                        ->placeholder('Example: Implant Coverage')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->action(fn (array $data) => $this->createTemplateSection($data)),
+            Action::make('createTemplateSubSection')
+                ->label('Add Sub-section')
+                ->icon('heroicon-o-queue-list')
+                ->color('gray')
+                ->visible(fn (): bool => auth()->user()?->canManageClinicTemplateSections() ?? false)
+                ->form([
+                    Select::make('template_key')
+                        ->label('Template')
+                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                        ->default(fn (): string => $this->selectedTemplateKey)
+                        ->required()
+                        ->live(),
+                    Select::make('parent_section_key')
+                        ->label('Parent section')
+                        ->helperText('Choose where this sub-section should sit.')
+                        ->options(fn ($get): array => VerificationFormQuestion::topLevelSectionOptionsForTemplate($get('template_key'), ClinicPanelScope::selectedClinicId()))
+                        ->searchable()
+                        ->required(),
+                    TextInput::make('label')
+                        ->label('Sub-section name')
+                        ->placeholder('Example: Implant Coverage')
+                        ->required()
+                        ->maxLength(255),
+                ])
+                ->action(fn (array $data) => $this->createTemplateSection($data)),
+            CreateAction::make()
+                ->label('New Question')
+                ->icon('heroicon-o-plus')
+                ->color('warning'),
         ];
+    }
+
+    public function getVisibleHeaderActions(): array
+    {
+        return $this->getHeaderActions();
+    }
+
+    public function createTemplateSection(array $data): void
+    {
+        if (! (auth()->user()?->canManageClinicTemplateSections() ?? false)) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return;
+        }
+
+        $clinic = ClinicPanelScope::selectedClinic();
+
+        if (! $clinic) {
+            Notification::make()->title('Select a clinic first')->danger()->send();
+
+            return;
+        }
+
+        $sectionKey = VerificationTemplateSection::makeSectionKey((string) $data['label'], $data['parent_section_key'] ?? null);
+        $baseKey = $sectionKey;
+        $counter = 2;
+
+        while (VerificationTemplateSection::query()
+            ->where('clinic_id', $clinic->id)
+            ->where('template_key', $data['template_key'])
+            ->where('section_key', $sectionKey)
+            ->exists()) {
+            $sectionKey = $baseKey . '_' . $counter++;
+        }
+
+        VerificationTemplateSection::query()->create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'template_key' => $data['template_key'],
+            'section_key' => $sectionKey,
+            'parent_section_key' => $data['parent_section_key'] ?? null,
+            'label' => $data['label'],
+            'sort_order' => ((int) VerificationTemplateSection::query()
+                ->where('clinic_id', $clinic->id)
+                ->where('template_key', $data['template_key'])
+                ->max('sort_order')) + 10,
+            'is_active' => true,
+        ]);
+
+        Notification::make()
+            ->title('Template section created')
+            ->body('The new section is now available while creating questions.')
+            ->success()
+            ->send();
     }
 
     public function getSelectedClinicName(): ?string
@@ -42,6 +155,32 @@ class ListVerificationQuestions extends ListRecords
     public function getEditUrl(int $questionId): string
     {
         return VerificationQuestionResource::getUrl('edit', ['record' => $questionId]);
+    }
+
+    public function updatedSelectedTemplateKey(): void
+    {
+        if (! array_key_exists($this->selectedTemplateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
+            $this->selectedTemplateKey = 'template_2';
+        }
+    }
+
+    public function selectTemplate(string $templateKey): void
+    {
+        if (! array_key_exists($templateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
+            return;
+        }
+
+        $this->selectedTemplateKey = $templateKey;
+    }
+
+    public function getSelectedTemplateLabel(): string
+    {
+        return VerificationFormQuestion::TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
+    }
+
+    public function getTemplateOptions(): array
+    {
+        return VerificationFormQuestion::TEMPLATE_OPTIONS;
     }
 
     public function deleteQuestion(int $questionId): void
@@ -202,26 +341,28 @@ class ListVerificationQuestions extends ListRecords
             return collect();
         }
 
-        return VerificationFormQuestion::query()
+        $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
+            ->where('template_key', $this->selectedTemplateKey)
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->groupBy('section_key')
-            ->map(function (Collection $questions, string $sectionKey): array {
-                $activeCount = $questions->where('is_active', true)->count();
-                $systemCount = $questions->where('is_builtin', true)->count();
+            ->groupBy('section_key');
+
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->selectedTemplateKey, $clinicId))
+            ->map(function (string $sectionTitle, string $sectionKey) use ($questions): array {
+                $sectionQuestions = $questions->get($sectionKey, collect());
+                $activeCount = $sectionQuestions->where('is_active', true)->count();
+                $systemCount = $sectionQuestions->where('is_builtin', true)->count();
 
                 return [
                     'key' => $sectionKey,
-                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey]
-                        ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$sectionKey]
-                        ?? str($sectionKey)->headline()->toString(),
-                    'count' => $questions->count(),
+                    'title' => $sectionTitle,
+                    'count' => $sectionQuestions->count(),
                     'active_count' => $activeCount,
                     'system_count' => $systemCount,
-                    'questions' => $questions->map(function (VerificationFormQuestion $question): array {
+                    'questions' => $sectionQuestions->map(function (VerificationFormQuestion $question): array {
                         return [
                             'id' => $question->getKey(),
                             'prompt' => $question->prompt,

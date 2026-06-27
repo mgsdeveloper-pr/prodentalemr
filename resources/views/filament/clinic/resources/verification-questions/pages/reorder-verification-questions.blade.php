@@ -3,6 +3,8 @@
         $questionSections = $this->getVisibleQuestionSections();
         $sectionOptions = $this->getSectionFilterOptions();
         $selectedClinicName = $this->getSelectedClinicName();
+        $templateOptions = $this->getTemplateOptions();
+        $selectedTemplateLabel = $this->getSelectedTemplateLabel();
         $showPortalCredentials = \App\Support\VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService();
         $verificationNavItems = [
             [
@@ -63,6 +65,18 @@
                 </div>
 
                 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                    <div style="display: inline-flex; gap: 6px; padding: 6px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                        @foreach ($templateOptions as $templateKey => $templateLabel)
+                            <button
+                                type="button"
+                                wire:click="selectTemplate('{{ $templateKey }}')"
+                                style="display: inline-flex; align-items: center; justify-content: center; min-width: 104px; padding: 9px 12px; border-radius: 14px; border: 1px solid {{ $this->selectedTemplateKey === $templateKey ? '#0f766e' : 'transparent' }}; background: {{ $this->selectedTemplateKey === $templateKey ? '#ecfdf5' : 'transparent' }}; color: {{ $this->selectedTemplateKey === $templateKey ? '#0f766e' : '#64748b' }}; font-size: 12px; font-weight: 800; cursor: pointer;"
+                            >
+                                {{ $templateLabel }}
+                            </button>
+                        @endforeach
+                    </div>
+
                     @if ($selectedClinicName)
                         <div style="min-width: 220px; padding: 14px 16px; border-radius: 18px; border: 1px solid #d1fae5; background: #f0fdf4;">
                             <div style="margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #166534;">Clinic Scope</div>

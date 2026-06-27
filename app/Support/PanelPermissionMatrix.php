@@ -20,6 +20,7 @@ class PanelPermissionMatrix
                 'verification' => 'Verification',
                 'portal_credentials' => 'Portal Credentials',
                 'insurance_directory' => 'Insurance Directory',
+                'template_management' => 'Template Management',
                 'reports' => 'Reports',
                 'notifications' => 'Notifications',
                 'users' => 'Users',
@@ -41,6 +42,7 @@ class PanelPermissionMatrix
                 'service_items' => 'Service List',
                 'insurance_directory' => 'Insurance Directory',
                 'portal_credentials' => 'Portal Credentials',
+                'template_management' => 'Template Management',
                 'billing_settings' => 'Billing Settings',
                 'settings' => 'SaaS Settings',
                 'roles_permissions' => 'Roles & Permissions',
@@ -65,6 +67,7 @@ class PanelPermissionMatrix
                 'clinic_operatories' => 'Operatories',
                 'patient_consent_forms' => 'Consent Forms',
                 'verification_requests' => 'Verification Requests',
+                'template_management' => 'Template Management',
                 'managed_services' => 'Managed Services',
                 'roles_permissions' => 'Roles & Permissions',
             ],
@@ -118,5 +121,17 @@ class PanelPermissionMatrix
         }
 
         return $permissions;
+    }
+
+    public static function permissionNamesForModule(string $panel, string $module): array
+    {
+        if (! array_key_exists($module, static::modules($panel))) {
+            return [];
+        }
+
+        return array_map(
+            fn (string $action): string => static::permissionName($panel, $module, $action),
+            array_keys(static::ACTIONS)
+        );
     }
 }

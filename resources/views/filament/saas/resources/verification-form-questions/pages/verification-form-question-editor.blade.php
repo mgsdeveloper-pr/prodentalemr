@@ -1,26 +1,24 @@
 <x-filament-panels::page>
     @php
-        $sectionCards = $this->getSectionCards();
-        $currentSection = $this->data['section_key'] ?? null;
         $currentVisibility = $this->getCurrentVisibilityLabel();
         $currentAnswerType = $this->getCurrentAnswerTypeLabel();
         $promptPreview = $this->getCurrentPromptPreview();
         $orderCards = $this->getSectionQuestionOrderCards();
+        $builderTitle = str_contains(strtolower($this->getSubmitButtonLabel()), 'save') ? 'Update Question' : 'Create Question';
     @endphp
 
     <div style="display: flex; flex-direction: column; gap: 24px;">
-        <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #fffdfa 0%, #ffffff 45%, #f8fafc 100%); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden;">
-            <div style="padding: 24px 28px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr); gap: 24px; align-items: start;">
+        <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden;">
+            <div style="padding: 22px 26px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr); gap: 24px; align-items: start;">
                 <div style="display: flex; flex-direction: column; gap: 14px;">
                     <div style="display: inline-flex; align-items: center; gap: 8px; width: max-content; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f766e; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">
-                        Question Editor
+                        Question Management
                     </div>
 
                     <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <h2 style="margin: 0; font-size: 30px; line-height: 1.1; font-weight: 800; color: #0f172a;">Write the question once, place it in the right verification section, and keep the setup clear.</h2>
-                        <p style="margin: 0; max-width: 760px; font-size: 15px; line-height: 1.75; color: #64748b;">
-                            This Admin editor follows the same workspace we built in Clinic: full-width, section-led, and easy to scan.
-                            Start with the question wording, choose the section where it belongs, and only use field binding if the question maps to stored worksheet data.
+                        <h2 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; color: #0f172a;">Create and organize verification questions</h2>
+                        <p style="margin: 0; max-width: 760px; font-size: 14px; line-height: 1.7; color: #64748b;">
+                            Build the question, choose its template section, and confirm its position against existing questions in one workspace.
                         </p>
                     </div>
                 </div>
@@ -59,12 +57,12 @@
             </div>
         </section>
 
-        <form wire:submit="{{ $this->getSubmitMethodName() }}" style="display: flex; flex-direction: column; gap: 22px;">
-            <div style="display: flex; flex-direction: column; gap: 22px;">
+        <form wire:submit="{{ $this->getSubmitMethodName() }}" style="display: flex; flex-direction: column; gap: 20px;">
+            <div style="display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr); gap: 20px; align-items: start;">
                 <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden;">
                     <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Question Configuration</div>
-                        <div style="margin-top: 6px; font-size: 15px; line-height: 1.7; color: #64748b;">Use the full page to create a clear question, then fine-tune its display and field binding only where needed.</div>
+                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">{{ $builderTitle }}</div>
+                        <div style="margin-top: 6px; font-size: 15px; line-height: 1.7; color: #64748b;">Scope, template, question text, answer type, notes, and status.</div>
                     </div>
                     <div style="padding: 22px;">
                         {{ $this->form }}
@@ -73,39 +71,9 @@
 
                 <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05); overflow: hidden;">
                     <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Section Guide</div>
-                        <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">Place the question in the right verification section</h3>
-                    </div>
-                    <div style="padding: 18px 22px;">
-                        @if (filled($currentSection))
-                            @php
-                                $selectedSection = collect($sectionCards)->firstWhere('key', $currentSection);
-                            @endphp
-                            <div style="padding: 18px 20px; border-radius: 20px; border: 1px solid #f59e0b; background: linear-gradient(180deg, #fffdf7 0%, #fff7ed 100%); box-shadow: 0 10px 24px rgba(245, 158, 11, 0.10);">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-                                    <div>
-                                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #b45309;">Selected Section</div>
-                                        <div style="margin-top: 8px; font-size: 22px; line-height: 1.35; font-weight: 800; color: #0f172a;">
-                                            {{ $selectedSection['label'] ?? $this->getCurrentSectionLabel() }}
-                                        </div>
-                                    </div>
-                                    <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: #ffffff; border: 1px solid #fed7aa; color: #b45309; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
-                                        Active target
-                                    </span>
-                                </div>
-                            </div>
-                        @else
-                            <div style="padding: 16px 18px; border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; font-size: 14px; line-height: 1.7; color: #64748b;">
-                                Choose a section first. Once selected, only that section will stay visible here so the page remains focused and uncluttered.
-                            </div>
-                        @endif
-                    </div>
-                </section>
-
-                <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05); overflow: hidden;">
-                    <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
-                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Section Order</div>
-                        <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">Position this question among existing prompts</h3>
+                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Created Questions</div>
+                        <h3 style="margin: 8px 0 0; font-size: 21px; font-weight: 800; color: #0f172a;">Questions in this section</h3>
+                        <div style="margin-top: 6px; font-size: 14px; line-height: 1.7; color: #64748b;">See what already exists and place this question exactly where it belongs.</div>
                     </div>
                     <div style="padding: 18px 22px; display: grid; gap: 12px;">
                         @if (! filled($this->data['section_key'] ?? null))
@@ -136,10 +104,10 @@
 
                             @if (empty($orderCards))
                                 <div style="padding: 16px 18px; border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; font-size: 14px; line-height: 1.7; color: #64748b;">
-                                    There are no other questions in this section yet. This question will become the first one automatically.
+                                    No questions have been added in this section yet. Save this question and it will appear here.
                                 </div>
                             @else
-                                <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                                <div style="max-height: 520px; overflow-y: auto; padding-right: 4px; display: grid; grid-template-columns: 1fr; gap: 12px;">
                                     @foreach ($orderCards as $card)
                                         <div style="border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff; overflow: hidden;">
                                             <div style="padding: 14px 16px; border-bottom: 1px solid #edf2f7;">
@@ -172,7 +140,9 @@
                     </div>
                 </section>
 
-                <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05); overflow: hidden;">
+            </div>
+
+            <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05); overflow: hidden;">
                     <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
                         <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Save Actions</div>
                     </div>
@@ -190,8 +160,7 @@
                             {{ $this->getSubmitButtonLabel() }}
                         </button>
                     </div>
-                </section>
-            </div>
+            </section>
         </form>
     </div>
 </x-filament-panels::page>

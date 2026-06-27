@@ -37,6 +37,10 @@ class SaasEntitlements
 
     public static function clinicModuleAllowed(?Clinic $clinic, string $module): bool
     {
+        if ($module === 'template_management') {
+            return self::clinicModuleAllowed($clinic, 'verification_requests');
+        }
+
         $plan = self::planForClinic($clinic);
 
         if (! $plan) {

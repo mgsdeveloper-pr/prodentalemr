@@ -26,7 +26,7 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? 'template_2'))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? 'template_2', ClinicPanelScope::selectedClinicId()))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -37,12 +37,10 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getCurrentSectionLabel(): string
     {
-        $key = $this->data['section_key'] ?? null;
+        $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
 
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::SECTION_OPTIONS[$key]
-                ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$key]
-                ?? (string) $key)
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? 'template_2', ClinicPanelScope::selectedClinicId()))
             : 'Choose section';
     }
 
@@ -91,6 +89,21 @@ class CreateVerificationQuestion extends CreateRecord
         $data['clinic_id'] = $data['clinic_id'] ?: ClinicPanelScope::selectedClinicId();
         $data['organization_id'] = $data['organization_id'] ?: ClinicPanelScope::selectedOrganizationId();
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);
+        $data['section_key'] = filled($data['sub_section_key'] ?? null)
+            ? $data['sub_section_key']
+            : $data['section_key'];
+        unset($data['sub_section_key']);
+
+        if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
+            $data['input_type'] = 'frequency_row';
+            $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
+            $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
+            $data['frequency_response_fields'] = $data['frequency_response_fields'] ?: VerificationFormQuestion::defaultFrequencyResponseFields($data['frequency_response_mode']);
+        } else {
+            $data['frequency_response_mode'] = null;
+            $data['frequency_response_fields'] = null;
+        }
+        unset($data['frequency_row_mode']);
 
         return $this->stripOrderingMeta($data);
     }
@@ -105,5 +118,10 @@ class CreateVerificationQuestion extends CreateRecord
             $this->data['order_position'] ?? 'bottom',
             filled($this->data['order_reference_id'] ?? null) ? (int) $this->data['order_reference_id'] : null,
         );
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return VerificationQuestionResource::getUrl('create');
     }
 }

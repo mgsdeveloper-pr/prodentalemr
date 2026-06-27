@@ -35,6 +35,22 @@
                             </select>
                             @break
 
+                        @case('multi_select')
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+                                @foreach ($question['options'] as $option)
+                                    <label style="display:flex;align-items:center;gap:8px;min-height:38px;padding:8px 10px;border:1px solid #dce8e3;border-radius:10px;background:#ffffff;color:#142e25;font-size:13px;font-weight:700;">
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="data.{{ $question['field'] }}"
+                                            value="{{ $option }}"
+                                            style="width:16px;height:16px;accent-color:#0b6b4f;"
+                                        >
+                                        <span>{{ $option }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            @break
+
                         @case('currency')
                             <input
                                 type="number"

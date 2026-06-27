@@ -26,6 +26,17 @@
         $groupRows[] = ['index' => $coverageIndex, 'row' => $coverageRow];
         $templateTwoBenefitGroups->put($benefitGroup, $groupRows);
     }
+
+    $templateTwoVisibleBenefitGroups = $templateTwoBenefitGroups
+        ->filter(fn (array $benefitRows): bool => count($benefitRows) > 0);
+
+    $templateTwoPatientQuestions = $this->getTemplateTwoQuestionsForSection('template_2_patient_subscriber');
+    $templateTwoInsuranceQuestions = $this->getTemplateTwoQuestionsForSection('template_2_insurance');
+    $templateTwoMaximumQuestions = $this->getTemplateTwoQuestionsForSection('template_2_maximums_deductibles');
+    $templateTwoPlanProvisionQuestions = $this->getTemplateTwoQuestionsForSection('template_2_plan_provisions');
+    $templateTwoServiceHistoryQuestions = $this->getTemplateTwoQuestionsForSection('template_2_service_history');
+    $templateTwoVerificationQuestions = $this->getTemplateTwoQuestionsForSection('template_2_verification_information');
+
     $templateTwoInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
     $templateTwoReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
     $annualMaximum = (float) (data_get($this->data, 'vf_annual_maximum') ?: 0);
@@ -316,11 +327,13 @@
                 </div>
             @endforeach
         </div>
-        <div class="uel2-body" style="padding-top:0;">
-            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_patient_subscriber'),
-            ])
-        </div>
+        @if (! empty($templateTwoPatientQuestions))
+            <div class="uel2-body" style="padding-top:0;">
+                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                    'questions' => $templateTwoPatientQuestions,
+                ])
+            </div>
+        @endif
     </section>
 
     <section class="uel2-section">
@@ -424,11 +437,13 @@
                 </div>
             @endforeach
         </div>
-        <div class="uel2-body" style="padding-top:0;">
-            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_insurance'),
-            ])
-        </div>
+        @if (! empty($templateTwoInsuranceQuestions))
+            <div class="uel2-body" style="padding-top:0;">
+                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                    'questions' => $templateTwoInsuranceQuestions,
+                ])
+            </div>
+        @endif
     </section>
 
     <section class="uel2-section">
@@ -462,7 +477,7 @@
             </div>
 
             @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_maximums_deductibles'),
+                'questions' => $templateTwoMaximumQuestions,
             ])
 
             <div class="uel2-subsection">
@@ -599,7 +614,7 @@
                     <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateTwoInput }}"></textarea>
                 </div>
                 @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                    'questions' => $this->getTemplateTwoQuestionsForSection('template_2_plan_provisions'),
+                    'questions' => $templateTwoPlanProvisionQuestions,
                 ])
             </div>
         </div>
@@ -629,57 +644,45 @@
                 <textarea wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateTwoInput }}"></textarea>
             </div>
             @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_service_history'),
+                'questions' => $templateTwoServiceHistoryQuestions,
             ])
         </div>
     </section>
 
-    <section class="uel2-section">
-        <div class="uel2-header">
-            <div><h2>Frequency and Percentage</h2><p>Code-level coverage configured through the clinic template builder</p></div>
-            <span class="uel2-pill">{{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} Completed</span>
-        </div>
-        <div class="uel2-body">
-            @foreach ($templateTwoBenefitGroups as $benefitGroupName => $benefitRows)
-                <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
-                    <h3>{{ $benefitGroupName }}</h3>
-                    <table class="uel2-table">
-                        <thead><tr><th>Code</th><th>Description</th><th>%</th><th>Frequency</th><th>Pre-Auth</th><th>Notes</th></tr></thead>
-                        <tbody>
-                            @forelse ($benefitRows as $benefitRow)
-                                @php
-                                    $rowIndex = $benefitRow['index'];
-                                    $row = $benefitRow['row'];
-                                @endphp
-                                    <tr>
-                                        <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
-                                        <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
-                                        <td data-label="%"><input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%"></td>
-                                        <td data-label="Frequency"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency"></td>
-                                        <td data-label="Pre-Auth"><select wire:model.blur="codeCoverageData.{{ $rowIndex }}.pre_auth_required"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
-                                        <td data-label="Notes"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.notes" placeholder="Add note"></td>
-                                    </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" style="padding:16px;color:#6d7d77;font-size:13px;">
-                                        No questions have been added to this benefit group yet.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                    @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                        'questions' => $this->getTemplateTwoQuestionsForSection(match ($benefitGroupName) {
-                            'Basic' => 'template_2_frequency_basic',
-                            'Major' => 'template_2_frequency_major',
-                            'Orthodontics' => 'template_2_frequency_orthodontics',
-                            default => 'template_2_frequency_general',
-                        }),
-                    ])
-                </div>
-            @endforeach
-        </div>
-    </section>
+    @if ($templateTwoVisibleBenefitGroups->isNotEmpty())
+        <section class="uel2-section">
+            <div class="uel2-header">
+                <div><h2>Frequency and Percentage</h2><p>Code-level coverage configured through the clinic template builder</p></div>
+                <span class="uel2-pill">{{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} Completed</span>
+            </div>
+            <div class="uel2-body">
+                @foreach ($templateTwoVisibleBenefitGroups as $benefitGroupName => $benefitRows)
+                    <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
+                        <h3>{{ $benefitGroupName }}</h3>
+                        <table class="uel2-table">
+                            <thead><tr><th>Code</th><th>Description</th><th>%</th><th>Frequency</th><th>Pre-Auth</th><th>Notes</th></tr></thead>
+                            <tbody>
+                                @foreach ($benefitRows as $benefitRow)
+                                    @php
+                                        $rowIndex = $benefitRow['index'];
+                                        $row = $benefitRow['row'];
+                                    @endphp
+                                        <tr>
+                                            <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
+                                            <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
+                                            <td data-label="%"><input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%"></td>
+                                            <td data-label="Frequency"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency"></td>
+                                            <td data-label="Pre-Auth"><select wire:model.blur="codeCoverageData.{{ $rowIndex }}.pre_auth_required"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
+                                            <td data-label="Notes"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.notes" placeholder="Add note"></td>
+                                        </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     <section class="uel2-section">
         <div class="uel2-header">
@@ -693,11 +696,13 @@
             <div class="uel2-field"><label>Verification Date</label><div style="{{ $templateTwoReadonly }}">{{ data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d') }}</div></div>
             <div class="uel2-field uel2-wide"><label>Additional Information</label><textarea wire:model.blur="data.vf_verification_notes" placeholder="Add final verification notes" style="{{ $templateTwoInput }}"></textarea></div>
         </div>
-        <div class="uel2-body" style="padding-top:0;">
-            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $this->getTemplateTwoQuestionsForSection('template_2_verification_information'),
-            ])
-        </div>
+        @if (! empty($templateTwoVerificationQuestions))
+            <div class="uel2-body" style="padding-top:0;">
+                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
+                    'questions' => $templateTwoVerificationQuestions,
+                ])
+            </div>
+        @endif
         <div class="uel2-actions">
             @if ($canSubmitForm)
                 @if ($this->auditReady)

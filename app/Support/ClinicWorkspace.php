@@ -148,6 +148,7 @@ class ClinicWorkspace
     {
         return [
             'verification_requests',
+            'template_management',
             'appointments',
             'portal_credentials',
         ];

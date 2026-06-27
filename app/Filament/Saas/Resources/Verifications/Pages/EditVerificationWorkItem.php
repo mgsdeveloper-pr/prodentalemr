@@ -426,7 +426,7 @@ class EditVerificationWorkItem extends EditRecord
 
         $this->data['vf_form_type'] = $formType;
         $this->data['outcome_status'] = 'pending';
-        $this->codeCoverageData = collect($this->defaultCodeCoverageTemplate())
+        $this->codeCoverageData = collect($this->configuredCodeCoverageTemplate())
             ->values()
             ->map(fn (array $row, int $index): array => [
                 'id' => null,
@@ -434,6 +434,8 @@ class EditVerificationWorkItem extends EditRecord
                 'category' => $row['category'],
                 'code' => $row['code'],
                 'description' => $row['description'],
+                'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
+                'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
                 'coverage_status' => null,
                 'coverage_percent' => null,
                 'frequency' => null,
@@ -669,6 +671,7 @@ class EditVerificationWorkItem extends EditRecord
             ->where('template_key', 'template_2')
             ->where('section_key', $sectionKey)
             ->where('is_active', true)
+            ->where('input_type', '!=', 'frequency_row')
             ->whereIn('form_type', ['both', $formType])
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -799,6 +802,7 @@ class EditVerificationWorkItem extends EditRecord
             'help_text' => $question->help_text,
             'placeholder' => $question->placeholder,
             'code' => $question->code,
+            'options' => $question->getSelectOptionValues(),
             'is_builtin' => $question->is_builtin,
         ];
     }
@@ -839,7 +843,10 @@ class EditVerificationWorkItem extends EditRecord
                     return;
                 }
 
-                $data[$this->customQuestionFieldName($answer->verification_form_question_id)] = $answer->answer_value;
+                $data[$this->customQuestionFieldName($answer->verification_form_question_id)] = $this->decodeCustomQuestionAnswerValue(
+                    $answer->answer_value,
+                    $answer->question->input_type,
+                );
                 $data[$this->customQuestionNoteFieldName($answer->verification_form_question_id)] = $answer->note_value;
             });
 
@@ -1079,6 +1086,7 @@ class EditVerificationWorkItem extends EditRecord
             ->where('is_active', true)
             ->where('clinic_id', $clinicId)
             ->whereIn('form_type', ['both', $formType])
+            ->where('input_type', '!=', 'frequency_row')
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -1284,6 +1292,11 @@ class EditVerificationWorkItem extends EditRecord
             $answerValue = $this->verificationFormAnswerData[$questionId] ?? null;
             $noteValue = $this->verificationFormAnswerNoteData[$questionId] ?? null;
 
+            if (is_array($answerValue)) {
+                $answerValue = array_values(array_filter($answerValue, fn ($value): bool => filled($value)));
+                $answerValue = $answerValue === [] ? null : json_encode($answerValue);
+            }
+
             if (
                 blank($answerValue) && $answerValue !== '0' && $answerValue !== 0
                 && blank($noteValue) && $noteValue !== '0' && $noteValue !== 0
@@ -1338,7 +1351,7 @@ class EditVerificationWorkItem extends EditRecord
             ->get();
 
         if ($savedRows->isNotEmpty()) {
-            return $savedRows
+            $rows = $savedRows
                 ->map(fn (VerificationCoverageCode $row): array => [
                     'id' => $row->getKey(),
                     'code_system' => $row->code_system ?: 'ada',
@@ -1361,48 +1374,124 @@ class EditVerificationWorkItem extends EditRecord
                 ])
                 ->values()
                 ->all();
+
+            return $this->mergeConfiguredCodeCoverageRows($rows);
         }
 
-        return collect($this->defaultCodeCoverageTemplate())
+        return collect($this->configuredCodeCoverageTemplate())
             ->values()
-            ->map(function (array $row, int $index): array {
-                return [
-                    'id' => null,
-                    'code_system' => 'ada',
-                    'category' => $row['category'],
-                    'code' => $row['code'],
-                    'description' => $row['description'],
-                    'coverage_status' => null,
-                    'coverage_percent' => null,
-                    'frequency' => null,
-                    'age_limit' => null,
-                    'waiting_period' => null,
-                    'service_history' => null,
-                    'pre_auth_required' => null,
-                    'pre_auth_details' => null,
-                    'downgrade_applies' => null,
-                    'downgrade_to' => null,
-                    'payment_guideline' => null,
-                    'notes' => null,
-                    'sort_order' => $index + 1,
-                ];
-            })
+            ->map(fn (array $row, int $index): array => $this->makeDefaultCodeCoverageRow($row, $index + 1))
             ->all();
     }
 
-    protected function defaultCodeCoverageTemplate(): array
+    protected function configuredCodeCoverageTemplate(): array
+    {
+        return $this->templateTwoFrequencyQuestionRows();
+    }
+
+    protected function templateTwoFrequencyQuestionRows(): array
+    {
+        $clinicId = $this->record->clinic_id;
+        $formType = data_get($this->data, 'vf_form_type', 'full_form');
+
+        if (! filled($clinicId)) {
+            return [];
+        }
+
+        return VerificationFormQuestion::query()
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', 'template_2')
+            ->whereIn('section_key', [
+                'template_2_frequency_general',
+                'template_2_frequency_basic',
+                'template_2_frequency_major',
+                'template_2_frequency_orthodontics',
+            ])
+            ->where('input_type', 'frequency_row')
+            ->where('is_active', true)
+            ->whereIn('form_type', ['both', $formType])
+            ->orderByRaw("FIELD(section_key, 'template_2_frequency_general', 'template_2_frequency_basic', 'template_2_frequency_major', 'template_2_frequency_orthodontics')")
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (VerificationFormQuestion $question): array => [
+                'category' => VerificationFormQuestion::templateTwoFrequencyCategory($question->section_key),
+                'code' => $question->code ?: '',
+                'description' => $question->prompt,
+                'frequency_response_mode' => $question->frequency_response_mode ?: 'current',
+                'frequency_response_fields' => $question->frequency_response_fields ?: VerificationFormQuestion::defaultFrequencyResponseFields($question->frequency_response_mode ?: 'current'),
+            ])
+            ->all();
+    }
+
+    protected function mergeConfiguredCodeCoverageRows(array $rows): array
+    {
+        $configuredRowsBySignature = collect($this->configuredCodeCoverageTemplate())
+            ->mapWithKeys(fn (array $row): array => [$this->codeCoverageRowSignature($row) => $row]);
+
+        $rows = collect($rows)
+            ->filter(fn (array $row): bool => $configuredRowsBySignature->has($this->codeCoverageRowSignature($row)))
+            ->map(function (array $row) use ($configuredRowsBySignature): array {
+                $defaultRow = $configuredRowsBySignature->get($this->codeCoverageRowSignature($row), []);
+
+                $row['frequency_response_mode'] = $defaultRow['frequency_response_mode'] ?? 'current';
+                $row['frequency_response_fields'] = $defaultRow['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode']);
+
+                return $row;
+            })
+            ->all();
+
+        $existingSignatures = collect($rows)
+            ->map(fn (array $row): string => $this->codeCoverageRowSignature($row))
+            ->all();
+
+        foreach ($this->configuredCodeCoverageTemplate() as $defaultRow) {
+            $signature = $this->codeCoverageRowSignature($defaultRow);
+
+            if (in_array($signature, $existingSignatures, true)) {
+                continue;
+            }
+
+            $rows[] = $this->makeDefaultCodeCoverageRow($defaultRow, count($rows) + 1);
+            $existingSignatures[] = $signature;
+        }
+
+        return $rows;
+    }
+
+    protected function makeDefaultCodeCoverageRow(array $row, int $sortOrder): array
     {
         return [
-            ['category' => 'Diagnostic', 'code' => '', 'description' => 'Diagnostic code'],
-            ['category' => 'Preventive', 'code' => '', 'description' => 'Preventive code'],
-            ['category' => 'Restorative', 'code' => '', 'description' => 'Restorative code'],
-            ['category' => 'Endodontics', 'code' => '', 'description' => 'Endodontic code'],
-            ['category' => 'Periodontics', 'code' => '', 'description' => 'Periodontal code'],
-            ['category' => 'Prosthodontics', 'code' => '', 'description' => 'Prosthodontic code'],
-            ['category' => 'Implants', 'code' => '', 'description' => 'Implant code'],
-            ['category' => 'Oral Surgery', 'code' => '', 'description' => 'Oral surgery code'],
-            ['category' => 'Orthodontics', 'code' => '', 'description' => 'Orthodontic code'],
+            'id' => null,
+            'code_system' => 'ada',
+            'category' => $row['category'],
+            'code' => $row['code'],
+            'description' => $row['description'],
+            'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
+            'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
+            'coverage_status' => null,
+            'coverage_percent' => null,
+            'frequency' => null,
+            'age_limit' => null,
+            'waiting_period' => null,
+            'service_history' => null,
+            'pre_auth_required' => null,
+            'pre_auth_details' => null,
+            'downgrade_applies' => null,
+            'downgrade_to' => null,
+            'payment_guideline' => null,
+            'notes' => null,
+            'sort_order' => $sortOrder,
         ];
+    }
+
+    protected function codeCoverageRowSignature(array $row): string
+    {
+        return implode('|', [
+            Str::lower(trim((string) ($row['category'] ?? ''))),
+            Str::lower(trim((string) ($row['code'] ?? ''))),
+            Str::lower(trim((string) ($row['description'] ?? ''))),
+        ]);
     }
 
     protected function normalizeCodeCoverageRows(array $rows): array
@@ -1442,6 +1531,8 @@ class EditVerificationWorkItem extends EditRecord
                     'category' => trim((string) ($row['category'] ?? '')),
                     'code' => strtoupper(trim((string) ($row['code'] ?? ''))),
                     'description' => trim((string) ($row['description'] ?? '')),
+                    'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
+                    'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
                     'coverage_status' => $coverageStatus ?: null,
                     'coverage_percent' => $coveragePercent === '' ? null : $coveragePercent,
                     'frequency' => filled($row['frequency'] ?? null) ? trim((string) $row['frequency']) : null,
@@ -1507,7 +1598,7 @@ class EditVerificationWorkItem extends EditRecord
             ->when($keptIds !== [], fn ($query) => $query->whereNotIn('id', $keptIds))
             ->delete();
 
-        $this->codeCoverageData = $this->record->verificationCoverageCodes()
+        $this->codeCoverageData = $this->mergeConfiguredCodeCoverageRows($this->record->verificationCoverageCodes()
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
@@ -1532,7 +1623,7 @@ class EditVerificationWorkItem extends EditRecord
                 'sort_order' => $row->sort_order,
             ])
             ->values()
-            ->all();
+            ->all());
     }
 
     protected function customQuestionFieldName(int $questionId): string
@@ -1578,7 +1669,10 @@ class EditVerificationWorkItem extends EditRecord
                 'question_id' => $answer->verification_form_question_id,
                 'code' => $answer->question?->code,
                 'prompt' => $answer->question?->prompt,
-                'answer_value' => $answer->answer_value,
+                'answer_value' => $this->formatCustomQuestionAnswerValue(
+                    $answer->answer_value,
+                    $answer->question?->input_type,
+                ),
                 'note_value' => $answer->note_value,
             ])
             ->values()
@@ -1698,6 +1792,44 @@ class EditVerificationWorkItem extends EditRecord
             'Is the provider in network with this plan?' => 'yes_no',
             default => $question->input_type,
         };
+    }
+
+    protected function decodeCustomQuestionAnswerValue(mixed $value, ?string $inputType): mixed
+    {
+        if ($inputType !== 'multi_select') {
+            return $value;
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (blank($value)) {
+            return [];
+        }
+
+        $decoded = json_decode((string) $value, true);
+
+        if (is_array($decoded)) {
+            return array_values($decoded);
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', (string) $value))));
+    }
+
+    protected function formatCustomQuestionAnswerValue(mixed $value, ?string $inputType): mixed
+    {
+        if ($inputType !== 'multi_select') {
+            return $value;
+        }
+
+        $decoded = $this->decodeCustomQuestionAnswerValue($value, $inputType);
+
+        if (! is_array($decoded)) {
+            return $decoded;
+        }
+
+        return implode(', ', array_values(array_filter($decoded, fn ($option): bool => filled($option))));
     }
 
     protected function applyAutofillDefaults(array $data): array

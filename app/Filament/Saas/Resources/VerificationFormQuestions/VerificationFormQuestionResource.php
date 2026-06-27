@@ -5,6 +5,7 @@ namespace App\Filament\Saas\Resources\VerificationFormQuestions;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\CreateVerificationFormQuestion;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\EditVerificationFormQuestion;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\ListVerificationFormQuestions;
+use App\Models\AdaProcedureCode;
 use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\VerificationFormQuestion;
@@ -12,6 +13,7 @@ use App\Support\AdminClinicScope;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -64,25 +66,10 @@ class VerificationFormQuestionResource extends Resource
                         Hidden::make('order_position')
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
-                        Section::make('Question Basics')
-                            ->description('Create the question in the same order your team thinks about it: choose the form, place it in the right section, decide the response type, then add display guidance.')
+                        Section::make('Step 1 - Scope & Template')
+                            ->description('Choose where this question belongs before writing it. This keeps Template 1 and Template 2 questions cleanly separated.')
                             ->columnSpan(12)
                             ->schema([
-                                Placeholder::make('clinic_scope')
-                                    ->label('Clinic scope')
-                                    ->content(function (Get $get): string {
-                                        $clinicId = $get('clinic_id') ?: AdminClinicScope::selectedClinicId();
-
-                                        if (! filled($clinicId)) {
-                                            return 'Select a clinic from the Workspace menu first.';
-                                        }
-
-                                        $clinic = Clinic::query()->with('organization')->find($clinicId);
-
-                                        return $clinic?->clinic_name
-                                            ? $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')
-                                            : 'Select a clinic from the Workspace menu first.';
-                                    }),
                                 Grid::make(12)
                                     ->schema([
                                         Select::make('organization_id')
@@ -123,73 +110,197 @@ class VerificationFormQuestionResource extends Resource
                                                 }
                                             })
                                             ->columnSpan(4),
-                                        TextInput::make('prompt')
-                                            ->label('Question')
-                                            ->placeholder('Example: Is the provider in network with this plan?')
-                                            ->live(onBlur: true)
-                                            ->required()
-                                            ->maxLength(255)
-                                            ->columnSpan(12),
-                                        Placeholder::make('prompt_preview')
-                                            ->label('Question preview')
-                                            ->content(fn (Get $get): string => filled($get('prompt')) ? (string) $get('prompt') : 'Your drafted question will appear here so you can review the wording before saving it.')
-                                            ->columnSpan(12),
                                         Select::make('template_key')
-                                            ->label('Verification template')
+                                            ->label('Template')
                                             ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
                                             ->default('template_2')
                                             ->required()
                                             ->live()
                                             ->native(false)
-                                            ->afterStateUpdated(fn (Set $set) => $set('section_key', null))
+                                            ->afterStateUpdated(function (Set $set): void {
+                                                $set('section_key', null);
+                                                $set('sub_section_key', null);
+                                            })
+                                            ->columnSpan(4),
+                                        Select::make('section_key')
+                                            ->label('Template section')
+                                            ->options(fn (Get $get): array => VerificationFormQuestion::topLevelSectionOptionsForTemplate($get('template_key'), filled($get('clinic_id')) ? (int) $get('clinic_id') : null))
+                                            ->required()
+                                            ->live()
+                                            ->native(false)
+                                            ->afterStateUpdated(function (Set $set): void {
+                                                $set('sub_section_key', null);
+                                                $set('input_type', 'text');
+                                            })
+                                            ->columnSpan(4),
+                                        Select::make('sub_section_key')
+                                            ->label('Template sub-section')
+                                            ->options(fn (Get $get): array => VerificationFormQuestion::childSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
+                                                $get('section_key'),
+                                            ))
+                                            ->visible(fn (Get $get): bool => count(VerificationFormQuestion::childSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
+                                                $get('section_key'),
+                                            )) > 0)
+                                            ->required(fn (Get $get): bool => count(VerificationFormQuestion::childSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
+                                                $get('section_key'),
+                                            )) > 0)
+                                            ->live()
+                                            ->native(false)
+                                            ->afterStateUpdated(function ($state, Get $get, Set $set): void {
+                                                $sectionKey = filled($state) ? $state : $get('section_key');
+
+                                                if (VerificationFormQuestion::isFrequencyPercentageSection($sectionKey)) {
+                                                    $set('input_type', 'frequency_row');
+                                                }
+                                            })
                                             ->columnSpan(4),
                                         Select::make('form_type')
-                                            ->label('Form')
+                                            ->label('Visible on')
                                             ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS)
                                             ->default('both')
                                             ->required()
                                             ->live()
                                             ->native(false)
                                             ->columnSpan(4),
-                                        Select::make('section_key')
-                                            ->label('Section')
-                                            ->options(fn (Get $get): array => VerificationFormQuestion::sectionOptionsForTemplate($get('template_key')))
-                                            ->required()
+                                    ]),
+                            ]),
+                        Section::make('Step 2 - Question & Response')
+                            ->description('Write the question exactly how the verification team should see it, then choose how the answer should be captured.')
+                            ->columnSpan(12)
+                            ->schema([
+                                Grid::make(12)
+                                    ->schema([
+                                        Select::make('frequency_row_mode')
+                                            ->label('Frequency row type')
+                                            ->options([
+                                                'question' => 'Formal Question',
+                                                'code' => 'Code (ADA/CDT code)',
+                                            ])
+                                            ->default('question')
                                             ->live()
                                             ->native(false)
-                                            ->columnSpan(4),
+                                            ->dehydrated(false)
+                                            ->afterStateUpdated(function ($state, Set $set): void {
+                                                if ($state === 'question') {
+                                                    $set('code', null);
+                                                }
+                                            })
+                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(3),
+                                        Select::make('code')
+                                            ->label('ADA/CDT Code')
+                                            ->placeholder('Example: D0120')
+                                            ->helperText('Used only when this frequency row is an ADA/CDT code.')
+                                            ->searchable()
+                                            ->native(false)
+                                            ->options(fn (): array => AdaProcedureCode::query()
+                                                ->active()
+                                                ->orderBy('procedure_code')
+                                                ->limit(50)
+                                                ->pluck('procedure_code', 'procedure_code')
+                                                ->all())
+                                            ->getSearchResultsUsing(fn (string $search): array => AdaProcedureCode::query()
+                                                ->active()
+                                                ->where(function ($query) use ($search): void {
+                                                    $query
+                                                        ->where('procedure_code', 'like', "%{$search}%")
+                                                        ->orWhere('description', 'like', "%{$search}%");
+                                                })
+                                                ->orderBy('procedure_code')
+                                                ->limit(50)
+                                                ->pluck('procedure_code', 'procedure_code')
+                                                ->all())
+                                            ->getOptionLabelUsing(fn ($value): ?string => $value)
+                                            ->afterStateUpdated(function ($state, Set $set): void {
+                                                $description = AdaProcedureCode::query()
+                                                    ->active()
+                                                    ->where('procedure_code', $state)
+                                                    ->value('description');
+
+                                                if (filled($description)) {
+                                                    $set('prompt', $description);
+                                                }
+                                            })
+                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('frequency_row_mode') === 'code')
+                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('frequency_row_mode') === 'code')
+                                            ->columnSpan(3),
+                                        TextInput::make('prompt')
+                                            ->label(fn (Get $get): string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                ? ($get('frequency_row_mode') === 'code' ? 'Description' : 'Question')
+                                                : 'Question text')
+                                            ->placeholder(fn (Get $get): string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                ? ($get('frequency_row_mode') === 'code' ? 'Example: Regular Checkup' : 'Example: Is this service covered?')
+                                                : 'Example: Is there any waiting period on this plan?')
+                                            ->live(onBlur: true)
+                                            ->required()
+                                            ->maxLength(255)
+                                            ->columnSpan(fn (Get $get): int => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')) ? 5 : 8),
                                         Select::make('input_type')
-                                            ->label('Type of response')
+                                            ->label('Answer type')
                                             ->options(VerificationFormQuestion::INPUT_TYPE_OPTIONS)
                                             ->default('text')
                                             ->required()
                                             ->live()
+                                            ->helperText(fn (Get $get): ?string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                ? 'Frequency rows always answer through %, Frequency, Pre-Auth, and Notes in the verification form.'
+                                                : null)
                                             ->native(false)
+                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
                                             ->columnSpan(4),
+                                        Select::make('frequency_response_mode')
+                                            ->label('Response option')
+                                            ->options(VerificationFormQuestion::FREQUENCY_RESPONSE_MODE_OPTIONS)
+                                            ->default('current')
+                                            ->live()
+                                            ->native(false)
+                                            ->afterStateUpdated(fn ($state, Set $set) => $set('frequency_response_fields', VerificationFormQuestion::defaultFrequencyResponseFields($state)))
+                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(4),
+                                        CheckboxList::make('frequency_response_fields')
+                                            ->label('Optional response fields')
+                                            ->helperText('The verification form always collects % and Frequency. Select the additional fields this row should ask for.')
+                                            ->options(fn (Get $get): array => VerificationFormQuestion::frequencyResponseFieldOptions($get('frequency_response_mode')))
+                                            ->default(fn (Get $get): array => VerificationFormQuestion::defaultFrequencyResponseFields($get('frequency_response_mode')))
+                                            ->columns(3)
+                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(12),
                                         TextInput::make('placeholder')
-                                            ->label('Placeholder')
-                                            ->placeholder('Example: Enter payer phone number')
+                                            ->label('Answer placeholder')
+                                            ->placeholder('Example: Add waiting period note')
                                             ->maxLength(255)
-                                            ->columnSpan(6),
+                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(12),
                                         Textarea::make('select_options')
                                             ->label('Dropdown options')
                                             ->placeholder("Enter one option per line\nExample:\nYes\nNo\nNot Applicable")
-                                            ->helperText('Only used when the response type is Dropdown.')
+                                            ->helperText('Only used when the response type is Dropdown or Multi Response.')
                                             ->rows(5)
-                                            ->visible(fn (Get $get): bool => $get('input_type') === 'select')
-                                            ->required(fn (Get $get): bool => $get('input_type') === 'select')
-                                            ->columnSpan(6),
+                                            ->visible(fn (Get $get): bool => in_array($get('input_type'), ['select', 'multi_select'], true)
+                                                && ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->required(fn (Get $get): bool => in_array($get('input_type'), ['select', 'multi_select'], true)
+                                                && ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(12),
                                     ]),
                             ]),
-                        Section::make('Display & Guidance')
-                            ->description('Add the optional guidance and control settings after the main question structure is in place.')
+                        Section::make('Step 3 - Notes, Guidance & Status')
+                            ->description('Use these only when the question needs instructions, an extra note field, or active/inactive control.')
                             ->columnSpan(12)
                             ->schema([
                                 Grid::make(12)
                                     ->schema([
                                         Textarea::make('help_text')
-                                            ->label('Help text')
-                                            ->placeholder('Add a short instruction to guide the user when answering this question.')
+                                            ->label('Instruction text')
+                                            ->placeholder('Optional: Add a short instruction shown near this question.')
                                             ->rows(3)
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
@@ -223,7 +334,7 @@ class VerificationFormQuestionResource extends Resource
                                             ->columnSpan(3),
                                         Placeholder::make('question_guidance')
                                             ->label('What this means')
-                                            ->content('Use Active for live questions. Use System question only when the prompt should stay tied to the built-in verification worksheet structure.')
+                                            ->content('Use Active for live questions. Use System question only for locked questions tied to the built-in verification worksheet.')
                                             ->columnSpan(6),
                                     ]),
                             ]),
@@ -300,9 +411,7 @@ class VerificationFormQuestionResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('section_key')
                     ->label('Section')
-                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::SECTION_OPTIONS[$state]
-                        ?? VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS[$state]
-                        ?? str($state)->headline()->toString())
+                    ->formatStateUsing(fn (?string $state, VerificationFormQuestion $record): string => VerificationFormQuestion::sectionLabel($state, $record->template_key, $record->clinic_id))
                     ->badge(),
                 TextColumn::make('template_key')
                     ->label('Template')
@@ -341,10 +450,7 @@ class VerificationFormQuestionResource extends Resource
                     ->default('template_2'),
                 SelectFilter::make('section_key')
                     ->label('Section')
-                    ->options(array_merge(
-                        VerificationFormQuestion::SECTION_OPTIONS,
-                        VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS,
-                    )),
+                    ->options(fn (): array => static::sectionFilterOptions()),
                 SelectFilter::make('organization_id')
                     ->label('Organization')
                     ->options(fn (): array => Organization::query()->orderBy('name')->pluck('name', 'id')->all()),
@@ -365,22 +471,27 @@ class VerificationFormQuestionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        $user = auth()->user();
+
+        return (bool) ($user?->canManageVerificationSettings()
+            || $user?->canAccessVerificationModule('template_management')
+            || $user?->canAccessSaasModule('template_management')
+            || $user?->isSaasAdmin());
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
     }
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
     }
 
     public static function canDelete(Model $record): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
     }
 
     public static function getPages(): array
@@ -390,5 +501,27 @@ class VerificationFormQuestionResource extends Resource
             'create' => CreateVerificationFormQuestion::route('/create'),
             'edit' => EditVerificationFormQuestion::route('/{record}/edit'),
         ];
+    }
+
+    protected static function sectionFilterOptions(): array
+    {
+        $options = VerificationFormQuestion::SECTION_OPTIONS + VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS;
+
+        VerificationFormQuestion::query()
+            ->select(['section_key', 'template_key', 'clinic_id'])
+            ->whereNotNull('section_key')
+            ->distinct()
+            ->get()
+            ->each(function (VerificationFormQuestion $question) use (&$options): void {
+                $options[$question->section_key] = VerificationFormQuestion::sectionLabel(
+                    $question->section_key,
+                    $question->template_key,
+                    $question->clinic_id,
+                );
+            });
+
+        asort($options);
+
+        return $options;
     }
 }

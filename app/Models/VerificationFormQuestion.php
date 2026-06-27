@@ -32,6 +32,7 @@ class VerificationFormQuestion extends Model
         'template_2_maximums_deductibles' => 'Maximums & Deductibles',
         'template_2_plan_provisions' => 'Plan Provisions',
         'template_2_service_history' => 'Service History',
+        'template_2_frequency_percentage' => 'Frequency & Percentage',
         'template_2_frequency_general' => 'Frequency & Percentage / General',
         'template_2_frequency_basic' => 'Frequency & Percentage / Basic',
         'template_2_frequency_major' => 'Frequency & Percentage / Major',
@@ -57,7 +58,39 @@ class VerificationFormQuestion extends Model
         'currency' => 'Currency',
         'yes_no' => 'Yes / No',
         'select' => 'Dropdown',
+        'multi_select' => 'Multi Response',
         'percent' => 'Percent',
+        'frequency_row' => 'Frequency / Percentage Row',
+    ];
+
+    public const FREQUENCY_RESPONSE_MODE_OPTIONS = [
+        'current' => 'Current Response',
+        'advanced' => 'Advanced Response',
+    ];
+
+    public const FREQUENCY_BASE_RESPONSE_FIELDS = [
+        'coverage_percent' => '%',
+        'frequency' => 'Frequency',
+    ];
+
+    public const FREQUENCY_CURRENT_OPTIONAL_FIELDS = [
+        'coverage_status' => 'Status',
+        'service_history' => 'History',
+        'pre_auth_required' => 'Pre-Auth',
+        'notes' => 'Notes',
+    ];
+
+    public const FREQUENCY_ADVANCED_OPTIONAL_FIELDS = [
+        'coverage_status' => 'Status',
+        'service_history' => 'History',
+        'pre_auth_required' => 'Pre-Auth',
+        'downgrade_applies' => 'Downgrade',
+        'age_limit' => 'Age Limit',
+        'waiting_period' => 'Waiting Period',
+        'pre_auth_details' => 'Pre-Auth Detail',
+        'downgrade_to' => 'Downgrade Detail',
+        'payment_guideline' => 'Payment Guideline / Payer Rule',
+        'notes' => 'Additional Notes',
     ];
 
     public const CODE_PREFIX_OPTIONS = [
@@ -187,6 +220,8 @@ class VerificationFormQuestion extends Model
         'help_text',
         'placeholder',
         'select_options',
+        'frequency_response_mode',
+        'frequency_response_fields',
         'has_note',
         'note_label',
         'note_placeholder',
@@ -202,6 +237,7 @@ class VerificationFormQuestion extends Model
             'is_active' => 'boolean',
             'has_note' => 'boolean',
             'sort_order' => 'integer',
+            'frequency_response_fields' => 'array',
         ];
     }
 
@@ -376,11 +412,161 @@ class VerificationFormQuestion extends Model
         return $filtered;
     }
 
-    public static function sectionOptionsForTemplate(?string $templateKey): array
+    public static function sectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
     {
-        return $templateKey === 'template_2'
+        $builtInOptions = $templateKey === 'template_2'
             ? self::TEMPLATE_2_SECTION_OPTIONS
             : self::SECTION_OPTIONS;
+
+        if (! filled($clinicId)) {
+            return $builtInOptions;
+        }
+
+        $customSections = VerificationTemplateSection::query()
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('is_active', true)
+            ->orderByRaw('parent_section_key is not null')
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get();
+
+        $customLabels = $customSections
+            ->pluck('label', 'section_key')
+            ->all();
+
+        $customSectionOptions = $customSections
+            ->mapWithKeys(function (VerificationTemplateSection $section) use ($builtInOptions, $customLabels): array {
+                $parentLabel = filled($section->parent_section_key)
+                    ? ($builtInOptions[$section->parent_section_key] ?? $customLabels[$section->parent_section_key] ?? null)
+                    : null;
+
+                return [
+                    $section->section_key => filled($parentLabel)
+                        ? "{$parentLabel} / {$section->label}"
+                        : $section->label,
+                ];
+            })
+            ->all();
+
+        return $builtInOptions + $customSectionOptions;
+    }
+
+    public static function topLevelSectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
+    {
+        return collect(static::sectionOptionsForTemplate($templateKey, $clinicId))
+            ->reject(fn (string $label): bool => str_contains($label, ' / '))
+            ->all();
+    }
+
+    public static function childSectionOptionsForTemplate(?string $templateKey, ?int $clinicId, ?string $parentSectionKey): array
+    {
+        if (blank($parentSectionKey)) {
+            return [];
+        }
+
+        $builtInChildren = match ($parentSectionKey) {
+            'template_2_frequency_percentage' => [
+                'template_2_frequency_general' => 'General',
+                'template_2_frequency_basic' => 'Basic',
+                'template_2_frequency_major' => 'Major',
+                'template_2_frequency_orthodontics' => 'Orthodontics',
+            ],
+            default => [],
+        };
+
+        if (! filled($clinicId)) {
+            return $builtInChildren;
+        }
+
+        $customChildren = VerificationTemplateSection::query()
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('parent_section_key', $parentSectionKey)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->pluck('label', 'section_key')
+            ->all();
+
+        return $builtInChildren + $customChildren;
+    }
+
+    public static function parentSectionKeyFor(?string $sectionKey, ?string $templateKey = null, ?int $clinicId = null): ?string
+    {
+        if (blank($sectionKey)) {
+            return null;
+        }
+
+        $builtInParents = [
+            'template_2_frequency_general' => 'template_2_frequency_percentage',
+            'template_2_frequency_basic' => 'template_2_frequency_percentage',
+            'template_2_frequency_major' => 'template_2_frequency_percentage',
+            'template_2_frequency_orthodontics' => 'template_2_frequency_percentage',
+        ];
+
+        if (array_key_exists($sectionKey, $builtInParents)) {
+            return $builtInParents[$sectionKey];
+        }
+
+        if (! filled($clinicId)) {
+            return null;
+        }
+
+        return VerificationTemplateSection::query()
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('section_key', $sectionKey)
+            ->value('parent_section_key');
+    }
+
+    public static function isFrequencyPercentageSection(?string $sectionKey): bool
+    {
+        return in_array($sectionKey, [
+            'template_2_frequency_percentage',
+            'template_2_frequency_general',
+            'template_2_frequency_basic',
+            'template_2_frequency_major',
+            'template_2_frequency_orthodontics',
+        ], true);
+    }
+
+    public static function templateTwoFrequencyCategory(?string $sectionKey): string
+    {
+        return match ($sectionKey) {
+            'template_2_frequency_basic' => 'Basic',
+            'template_2_frequency_major' => 'Major',
+            'template_2_frequency_orthodontics' => 'Orthodontics',
+            default => 'General',
+        };
+    }
+
+    public static function frequencyResponseFieldOptions(?string $mode): array
+    {
+        return $mode === 'advanced'
+            ? self::FREQUENCY_ADVANCED_OPTIONAL_FIELDS
+            : self::FREQUENCY_CURRENT_OPTIONAL_FIELDS;
+    }
+
+    public static function defaultFrequencyResponseFields(?string $mode): array
+    {
+        return $mode === 'advanced'
+            ? ['coverage_status', 'service_history', 'pre_auth_required', 'downgrade_applies', 'age_limit', 'waiting_period', 'pre_auth_details', 'downgrade_to', 'payment_guideline', 'notes']
+            : ['pre_auth_required', 'notes'];
+    }
+
+    public static function sectionLabel(?string $sectionKey, ?string $templateKey = null, ?int $clinicId = null): string
+    {
+        if (blank($sectionKey)) {
+            return 'Unassigned Section';
+        }
+
+        $options = static::sectionOptionsForTemplate($templateKey, $clinicId);
+
+        return $options[$sectionKey]
+            ?? self::SECTION_OPTIONS[$sectionKey]
+            ?? self::TEMPLATE_2_SECTION_OPTIONS[$sectionKey]
+            ?? str($sectionKey)->headline()->toString();
     }
 
     public function getSelectOptionValues(): array

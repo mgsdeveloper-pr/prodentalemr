@@ -596,24 +596,7 @@
                                                 @endif
                                             </td>
                                             <td style="padding: 10px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
-                                                @if ($type === 'date')
-                                                    <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                                @elseif ($type === 'currency')
-                                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                        <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                    </div>
-                                                @elseif ($type === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                @elseif ($type === 'yes_no')
-                                                    <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                        <option value="">Select</option>
-                                                        <option value="Yes">Yes</option>
-                                                        <option value="No">No</option>
-                                                    </select>
-                                                @else
-                                                    <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                @endif
+                                                @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                             </td>
                                         </tr>
                                     @endforeach
@@ -665,24 +648,7 @@
                                                 @endif
                                             </td>
                                             <td colspan="2" style="padding: 10px 16px; border-bottom: 1px solid #eef2f7;">
-                                                @if ($type === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                @elseif ($type === 'date')
-                                                    <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                                @elseif ($type === 'yes_no')
-                                                    <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                        <option value="">Select</option>
-                                                        <option value="Yes">Yes</option>
-                                                        <option value="No">No</option>
-                                                    </select>
-                                                @elseif ($type === 'currency')
-                                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                        <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                    </div>
-                                                @else
-                                                    <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                @endif
+                                                @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                             </td>
                                         </tr>
                                     @endforeach
@@ -725,24 +691,7 @@
                                                 @endif
                                             </td>
                                             <td style="padding: 10px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
-                                                @if ($type === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                @elseif ($type === 'date')
-                                                    <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                                @elseif ($type === 'yes_no')
-                                                    <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                        <option value="">Select</option>
-                                                        <option value="Yes">Yes</option>
-                                                        <option value="No">No</option>
-                                                    </select>
-                                                @elseif ($type === 'currency')
-                                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                        <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                    </div>
-                                                @else
-                                                    <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                @endif
+                                                @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                             </td>
                                         </tr>
                                     @endforeach
@@ -774,7 +723,6 @@
                                         </tr>
                                     @endforeach
                                     @foreach ($historyDynamicRows as $row)
-                                        @php $field = $row['field']; $type = $row['type']; @endphp
                                         <tr>
                                             <td style="width: 44%; padding: 12px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top; font-size: 14px; font-weight: 600; color: #0f172a;">
                                                 {{ $row['label'] }}
@@ -785,24 +733,7 @@
                                                 @endif
                                             </td>
                                             <td style="padding: 10px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
-                                                @if ($type === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                @elseif ($type === 'date')
-                                                    <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                                @elseif ($type === 'yes_no')
-                                                    <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                        <option value="">Select</option>
-                                                        <option value="Yes">Yes</option>
-                                                        <option value="No">No</option>
-                                                    </select>
-                                                @elseif ($type === 'currency')
-                                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                                        <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                        <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                    </div>
-                                                @else
-                                                    <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                @endif
+                                                @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                             </td>
                                         </tr>
                                     @endforeach
@@ -841,7 +772,6 @@
                                                 'Major' => 'frequency_major',
                                                 'Orthodontics Benefit' => 'frequency_orthodontics_benefit',
                                             }] as $row)
-                                                @php $field = $row['field']; $type = $row['type']; @endphp
                                                 <tr>
                                                     <td style="width: 44%; padding: 12px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top; font-size: 14px; font-weight: 600; color: #0f172a;">
                                                         {{ $row['label'] }}
@@ -852,24 +782,7 @@
                                                         @endif
                                                     </td>
                                                     <td style="padding: 10px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
-                                                        @if ($type === 'textarea')
-                                                            <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                        @elseif ($type === 'date')
-                                                            <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                                        @elseif ($type === 'yes_no')
-                                                            <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                                <option value="">Select</option>
-                                                                <option value="Yes">Yes</option>
-                                                                <option value="No">No</option>
-                                                            </select>
-                                                        @elseif ($type === 'currency')
-                                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                                <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                            </div>
-                                                        @else
-                                                            <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                        @endif
+                                                        @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                                     </td>
                                                 </tr>
                                             @endforeach
@@ -1040,11 +953,7 @@
                                                 {{ $row['label'] }}
                                             </td>
                                             <td style="padding: 10px 16px; border-bottom: 1px solid #eef2f7; vertical-align: top;">
-                                                @if ($row['type'] === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $row['field'] }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                                @else
-                                                    <input type="text" wire:model.blur="data.{{ $row['field'] }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                                @endif
+                                                @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                             </td>
                                         </tr>
                                     @endforeach
@@ -1089,9 +998,7 @@
                                 @endforeach
                                 @foreach ($verificationDynamicRows as $row)
                                     @php
-                                        $field = $row['field'];
-                                        $type = $row['type'];
-                                        $isFullWidth = $type === 'textarea';
+                                        $isFullWidth = in_array($row['type'], ['textarea', 'multi_select'], true);
                                     @endphp
                                     <div style="{{ $isFullWidth ? 'grid-column: 1 / -1;' : '' }}">
                                         <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #64748b;">
@@ -1102,24 +1009,7 @@
                                                 {{ $row['help_text'] }}
                                             </div>
                                         @endif
-                                        @if ($type === 'textarea')
-                                            <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
-                                        @elseif ($type === 'date')
-                                            <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
-                                        @elseif ($type === 'yes_no')
-                                            <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
-                                                <option value="">Select</option>
-                                                <option value="Yes">Yes</option>
-                                                <option value="No">No</option>
-                                            </select>
-                                        @elseif ($type === 'currency')
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <span style="display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 42px; border: 1px solid #d6dde8; border-radius: 10px; background: #f8fafc; color: #475569; font-size: 13px; font-weight: 700;">$</span>
-                                                <input type="number" step="0.01" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                            </div>
-                                        @else
-                                            <input type="{{ in_array($type, ['number', 'percent'], true) ? 'number' : 'text' }}" @if ($type === 'percent') step="0.01" @endif wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $inputStyle }}">
-                                        @endif
+                                        @include('filament.saas.resources.verifications.pages.partials.custom-question-response', ['row' => $row])
                                     </div>
                                 @endforeach
                             </div>

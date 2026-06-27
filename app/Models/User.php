@@ -511,6 +511,17 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ]);
     }
 
+    public function canManageClinicTemplateSections(): bool
+    {
+        return $this->status
+            && $this->clinicServiceModuleEnabled('verification_requests')
+            && (
+                $this->canPerformClinicModuleAction('template_management', 'add')
+                || $this->canPerformClinicModuleAction('template_management', 'update')
+                || $this->isSaasAdmin()
+            );
+    }
+
     public function canAccessClinicModule(string $module): bool
     {
         if (! $this->status || ! $this->hasAnyRole([
@@ -1192,6 +1203,18 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return $this->status
             && (
                 $this->canPerformVerificationModuleAction('settings', 'update')
+                || $this->isSaasAdmin()
+            );
+    }
+
+    public function canManageVerificationTemplateSections(): bool
+    {
+        return $this->status
+            && (
+                $this->canPerformVerificationModuleAction('template_management', 'add')
+                || $this->canPerformVerificationModuleAction('template_management', 'update')
+                || $this->canPerformSaasModuleAction('template_management', 'add')
+                || $this->canPerformSaasModuleAction('template_management', 'update')
                 || $this->isSaasAdmin()
             );
     }

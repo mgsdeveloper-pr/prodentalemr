@@ -12,9 +12,31 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 {
     public ?string $selectedSectionKey = null;
 
+    public string $selectedTemplateKey = 'template_2';
+
     public function getSelectedClinicName(): ?string
     {
         return ClinicPanelScope::selectedClinic()?->clinic_name;
+    }
+
+    public function selectTemplate(string $templateKey): void
+    {
+        if (! array_key_exists($templateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
+            return;
+        }
+
+        $this->selectedTemplateKey = $templateKey;
+        $this->selectedSectionKey = null;
+    }
+
+    public function getTemplateOptions(): array
+    {
+        return VerificationFormQuestion::TEMPLATE_OPTIONS;
+    }
+
+    public function getSelectedTemplateLabel(): string
+    {
+        return VerificationFormQuestion::TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
     }
 
     public function repositionQuestion(int $questionId, string $direction): void
@@ -47,6 +69,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
             ->where('section_key', $question->section_key)
+            ->where('template_key', $question->template_key)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get(['id']);
@@ -123,19 +146,24 @@ trait InteractsWithVerificationQuestionLibraryOrdering
             return collect();
         }
 
-        return VerificationFormQuestion::query()
+        $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
+            ->where('template_key', $this->selectedTemplateKey)
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->groupBy('section_key')
-            ->map(function (Collection $questions, string $sectionKey): array {
+            ->groupBy('section_key');
+
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->selectedTemplateKey, $clinicId))
+            ->map(function (string $sectionTitle, string $sectionKey) use ($questions): array {
+                $sectionQuestions = $questions->get($sectionKey, collect());
+
                 return [
                     'key' => $sectionKey,
-                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey] ?? str($sectionKey)->headline()->toString(),
-                    'count' => $questions->count(),
-                    'questions' => $questions->map(function (VerificationFormQuestion $question): array {
+                    'title' => $sectionTitle,
+                    'count' => $sectionQuestions->count(),
+                    'questions' => $sectionQuestions->map(function (VerificationFormQuestion $question): array {
                         return [
                             'id' => $question->getKey(),
                             'prompt' => $question->prompt,

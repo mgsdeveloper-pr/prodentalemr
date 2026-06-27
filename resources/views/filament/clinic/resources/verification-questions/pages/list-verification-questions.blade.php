@@ -2,6 +2,8 @@
     @php
         $questionSections = $this->getQuestionSections();
         $selectedClinicName = $this->getSelectedClinicName();
+        $templateOptions = $this->getTemplateOptions();
+        $selectedTemplateLabel = $this->getSelectedTemplateLabel();
         $showPortalCredentials = \App\Support\VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService();
         $verificationNavItems = [
             [
@@ -62,6 +64,18 @@
                 </div>
 
                 <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                    <div style="display: inline-flex; gap: 6px; padding: 6px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                        @foreach ($templateOptions as $templateKey => $templateLabel)
+                            <button
+                                type="button"
+                                wire:click="selectTemplate('{{ $templateKey }}')"
+                                style="display: inline-flex; align-items: center; justify-content: center; min-width: 104px; padding: 9px 12px; border-radius: 14px; border: 1px solid {{ $this->selectedTemplateKey === $templateKey ? '#0f766e' : 'transparent' }}; background: {{ $this->selectedTemplateKey === $templateKey ? '#ecfdf5' : 'transparent' }}; color: {{ $this->selectedTemplateKey === $templateKey ? '#0f766e' : '#64748b' }}; font-size: 12px; font-weight: 800; cursor: pointer;"
+                            >
+                                {{ $templateLabel }}
+                            </button>
+                        @endforeach
+                    </div>
+
                     @if ($selectedClinicName)
                         <div style="min-width: 220px; padding: 14px 16px; border-radius: 18px; border: 1px solid #d1fae5; background: #f0fdf4;">
                             <div style="margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #166534;">Clinic Scope</div>
@@ -69,17 +83,25 @@
                         </div>
                     @endif
 
-                    <a
-                        href="{{ $this->getCreateUrl() }}"
-                        style="display: inline-flex; align-items: center; justify-content: center; padding: 12px 16px; border-radius: 16px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); color: #ffffff; font-size: 13px; font-weight: 800; text-decoration: none; box-shadow: 0 10px 22px rgba(249, 115, 22, 0.22);"
-                    >
-                        New Question
-                    </a>
+                    @foreach ($this->getVisibleHeaderActions() as $action)
+                        {{ $action }}
+                    @endforeach
                 </div>
             </div>
 
             @if ($selectedClinicName)
                 <div style="padding: 22px 24px; display: grid; gap: 18px;">
+                    <section style="border: 1px solid #bfdbfe; border-radius: 22px; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 78%); padding: 18px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #1d4ed8;">Active Template</div>
+                            <div style="margin-top: 6px; font-size: 20px; font-weight: 900; color: #0f172a;">{{ $selectedTemplateLabel }}</div>
+                            <div style="margin-top: 4px; font-size: 13px; color: #64748b;">Only {{ $selectedTemplateLabel }} sections and questions are shown below.</div>
+                        </div>
+                        <span style="display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 999px; border: 1px solid #bfdbfe; background: #ffffff; color: #1d4ed8; font-size: 12px; font-weight: 900;">
+                            {{ $questionSections->sum('count') }} questions
+                        </span>
+                    </section>
+
                     @foreach ($questionSections as $section)
                         <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); overflow: hidden;">
                             <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);">
@@ -98,7 +120,7 @@
                             </div>
 
                             <div style="padding: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
-                                @foreach ($section['questions'] as $question)
+                                @forelse ($section['questions'] as $question)
                                     <article style="border: 1px solid #e2e8f0; border-radius: 20px; background: {{ $question['is_active'] ? '#ffffff' : '#fff7f7' }}; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04); overflow: hidden;">
                                         <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
                                             <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
@@ -141,7 +163,11 @@
                                             </button>
                                         </div>
                                     </article>
-                                @endforeach
+                                @empty
+                                    <div style="grid-column: 1 / -1; padding: 20px; border-radius: 18px; border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 14px; line-height: 1.7;">
+                                        No questions are configured in this section yet. Use <strong>New Question</strong> and choose this section to add one.
+                                    </div>
+                                @endforelse
                             </div>
                         </section>
                     @endforeach

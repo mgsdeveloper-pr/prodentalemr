@@ -95,7 +95,7 @@
                     </p>
                 </div>
                 <div>
-                    @foreach ($this->getHeaderActions() as $action)
+                    @foreach ($this->getVisibleHeaderActions() as $action)
                         {{ $action }}
                     @endforeach
                 </div>

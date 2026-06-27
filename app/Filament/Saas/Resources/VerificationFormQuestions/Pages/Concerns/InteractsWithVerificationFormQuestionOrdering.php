@@ -25,11 +25,21 @@ trait InteractsWithVerificationFormQuestionOrdering
     public function getSectionQuestionOrderCards(): array
     {
         $clinicId = $this->resolveOrderingClinicId();
-        $sectionKey = $this->data['section_key'] ?? null;
+        $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? 'template_1';
 
         if (! $clinicId || ! filled($sectionKey)) {
             return [];
+        }
+
+        $sectionKeys = [$sectionKey];
+
+        if (($this->data['sub_section_key'] ?? null) === null) {
+            $childSectionKeys = array_keys(
+                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey)
+            );
+
+            $sectionKeys = array_values(array_unique([...$sectionKeys, ...$childSectionKeys]));
         }
 
         $recordId = method_exists($this, 'getRecord') && $this->getRecord()
@@ -39,7 +49,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         return VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
             ->where('template_key', $templateKey)
-            ->where('section_key', $sectionKey)
+            ->whereIn('section_key', $sectionKeys)
             ->when($recordId, fn ($query) => $query->whereKeyNot($recordId))
             ->orderBy('sort_order')
             ->orderBy('id')
