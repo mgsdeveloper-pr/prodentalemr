@@ -27,13 +27,6 @@ use App\Filament\Saas\Resources\SubscriptionPlans\SubscriptionPlanResource;
 use App\Filament\Saas\Resources\Subscriptions\SubscriptionResource;
 use App\Filament\Saas\Resources\Users\UserResource;
 use App\Filament\Saas\Widgets\BillingHealthOverview;
-use App\Filament\Saas\Widgets\IncompleteOnboarding;
-use App\Filament\Saas\Widgets\InvoiceStatusOverview;
-use App\Filament\Saas\Widgets\PaymentMethodsOverview;
-use App\Filament\Saas\Widgets\RecentBillingActivity;
-use App\Filament\Saas\Widgets\RecentInvoices;
-use App\Filament\Saas\Widgets\RecentPayments;
-use App\Filament\Saas\Widgets\SaasNotificationsOverview;
 use App\Filament\Saas\Widgets\SaasBusinessOverview;
 use App\Models\SaasSetting;
 use Filament\Navigation\MenuItem;
@@ -139,13 +132,6 @@ class SaasPanelProvider extends PanelProvider
             ->widgets([
                 SaasBusinessOverview::class,
                 BillingHealthOverview::class,
-                InvoiceStatusOverview::class,
-                PaymentMethodsOverview::class,
-                RecentBillingActivity::class,
-                RecentInvoices::class,
-                RecentPayments::class,
-                IncompleteOnboarding::class,
-                SaasNotificationsOverview::class,
             ])
             ->middleware([
                 EncryptCookies::class,
