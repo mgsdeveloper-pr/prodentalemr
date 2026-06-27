@@ -541,13 +541,15 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return false;
         }
 
+        $permission = PanelPermissionMatrix::permissionName('clinic', $module, 'view');
+
         if ($this->isSaasAdmin()) {
-            return $this->hasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, 'view'));
+            return $this->safeHasPermissionTo($permission);
         }
 
         return filled($this->organization_id)
             && filled($this->clinic_id)
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, 'view'));
+            && $this->safeHasPermissionTo($permission);
     }
 
     protected function clinicServiceModuleEnabled(string $module): bool
@@ -629,20 +631,20 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     public function canPerformClinicModuleAction(string $module, string $action): bool
     {
         return $this->canAccessClinicModule($module)
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, $action));
+            && $this->safeHasPermissionTo(PanelPermissionMatrix::permissionName('clinic', $module, $action));
     }
 
     public function canAccessSaasModule(string $module): bool
     {
         return $this->status
             && $this->hasAnyRole(['saas_admin', 'saas_manager', 'saas_user'])
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('saas', $module, 'view'));
+            && $this->safeHasPermissionTo(PanelPermissionMatrix::permissionName('saas', $module, 'view'));
     }
 
     public function canPerformSaasModuleAction(string $module, string $action): bool
     {
         return $this->canAccessSaasModule($module)
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('saas', $module, $action));
+            && $this->safeHasPermissionTo(PanelPermissionMatrix::permissionName('saas', $module, $action));
     }
 
     public function canAccessClinicPatients(): bool
@@ -1259,13 +1261,22 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
     {
         return $this->status
             && $this->hasAnyRole(array_keys(self::verificationPanelAccessRoleOptions()))
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('verification', $module, 'view'));
+            && $this->safeHasPermissionTo(PanelPermissionMatrix::permissionName('verification', $module, 'view'));
     }
 
     public function canPerformVerificationModuleAction(string $module, string $action): bool
     {
         return $this->canAccessVerificationModule($module)
-            && $this->hasPermissionTo(PanelPermissionMatrix::permissionName('verification', $module, $action));
+            && $this->safeHasPermissionTo(PanelPermissionMatrix::permissionName('verification', $module, $action));
+    }
+
+    protected function safeHasPermissionTo(string $permission): bool
+    {
+        try {
+            return $this->hasPermissionTo($permission);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function hasAnyStandardSaasModuleAccess(): bool
