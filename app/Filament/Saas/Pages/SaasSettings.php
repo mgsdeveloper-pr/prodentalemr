@@ -52,6 +52,61 @@ class SaasSettings extends Page implements HasForms
         $this->form->fill($this->settings->toArray());
     }
 
+    public function getSettingsTools(): array
+    {
+        return [
+            [
+                'eyebrow' => 'Payments',
+                'title' => 'Payment Credentials',
+                'description' => 'Configure Stripe and PayPal one provider at a time.',
+                'url' => PaymentCredentials::getUrl(),
+                'tone' => 'amber',
+            ],
+            [
+                'eyebrow' => 'Billing',
+                'title' => 'Billing Settings',
+                'description' => 'Manage invoice rules, finance defaults, and automation.',
+                'url' => BillingSettings::getUrl(),
+                'tone' => 'blue',
+            ],
+            [
+                'eyebrow' => 'Codes',
+                'title' => 'ADA/CDT Codes',
+                'description' => 'Import and maintain the master ADA/CDT code library.',
+                'url' => AdaProcedureCodeImport::getUrl(),
+                'tone' => 'emerald',
+            ],
+            [
+                'eyebrow' => 'Monitoring',
+                'title' => 'Setup Checks',
+                'description' => 'Review configuration issues and module readiness quickly.',
+                'url' => SetupChecks::getUrl(),
+                'tone' => 'rose',
+            ],
+            [
+                'eyebrow' => 'Alerts',
+                'title' => 'Notification Centre',
+                'description' => 'Control operational alerts, recipients, and reminders.',
+                'url' => NotificationCentre::getUrl(),
+                'tone' => 'violet',
+            ],
+            [
+                'eyebrow' => 'Access',
+                'title' => 'User Management',
+                'description' => 'Manage SaaS users and operational access in one place.',
+                'url' => UserManagement::getUrl(),
+                'tone' => 'slate',
+            ],
+            [
+                'eyebrow' => 'Permissions',
+                'title' => 'Roles & Permissions',
+                'description' => 'Review role access and permission assignments.',
+                'url' => RolesAndPermissions::getUrl(),
+                'tone' => 'cyan',
+            ],
+        ];
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema
