@@ -14,7 +14,13 @@
         $recentPayments = $this->getRecentPayments();
     @endphp
 
-    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+    @include('filament.shared.partials.page-hero', [
+        'eyebrow' => 'Billing Reports',
+        'title' => 'Billing & Collection Reports',
+        'description' => 'Monitor invoice status, revenue trend, payment mix, and recent collections from one finance workspace.',
+    ])
+
+    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-4" style="margin-top: 24px;">
         @foreach ($summaryCards as $card)
             <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
                 <p class="text-sm text-gray-500">{{ $card['label'] }}</p>

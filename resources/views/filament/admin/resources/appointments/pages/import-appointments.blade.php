@@ -2,38 +2,39 @@
     @php
         $acceptedColumns = $this->getAcceptedColumns();
         $requiredColumns = ['patient name', 'appointment_date', 'service'];
+        $heroRightContent = '
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+                <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#f8fafc;border:1px solid #dbe4ee;color:#334155;font-size:13px;font-weight:800;">
+                    ' . e($this->getSelectedClinicScopeLabel()) . '
+                </div>
+                <a
+                    href="' . e(asset('samples/appointment-import-sample.csv')) . '"
+                    download
+                    style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:900;text-decoration:none;box-shadow:0 8px 18px rgba(37,99,235,0.08);"
+                >
+                    Download Sample File
+                </a>
+            </div>
+        ';
     @endphp
 
     <div style="display:flex;flex-direction:column;gap:22px;">
+        @include('filament.shared.partials.page-hero', [
+            'eyebrow' => 'Verification Intake',
+            'title' => 'Import Appointments',
+            'description' => 'Preview, validate, and import schedule rows for the selected clinic.',
+            'rightContent' => $heroRightContent,
+        ])
+
         <form wire:submit="importAppointments" style="border:1px solid #dbe4ee;border-radius:26px;background:#ffffff;box-shadow:0 16px 34px rgba(15,23,42,0.06);overflow:hidden;">
             <div style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:0;">
                 <div style="padding:26px 28px;border-right:1px solid #edf2f7;">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:20px;">
-                        <div>
-                            <h2 style="margin:0;font-size:30px;line-height:1.1;font-weight:900;color:#0f172a;">Appointment Import</h2>
-                            <p style="margin:8px 0 0;max-width:720px;font-size:14px;line-height:1.7;color:#64748b;">
-                                Preview, validate, and import schedule rows for the selected clinic.
-                            </p>
-                        </div>
-
-                        <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:#f8fafc;border:1px solid #dbe4ee;color:#334155;font-size:13px;font-weight:800;">
-                            {{ $this->getSelectedClinicScopeLabel() }}
-                        </div>
-                    </div>
-
                     <div style="border:1px solid #e5e7eb;border-radius:20px;background:#ffffff;padding:16px;margin-bottom:18px;">
                         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                             <div>
                                 <div style="font-size:12px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Accepted Columns</div>
                                 <div style="margin-top:4px;font-size:13px;line-height:1.5;color:#64748b;">Start with the sample file, update the rows, then preview it below.</div>
                             </div>
-                            <a
-                                href="{{ asset('samples/appointment-import-sample.csv') }}"
-                                download
-                                style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:900;text-decoration:none;box-shadow:0 8px 18px rgba(37,99,235,0.08);"
-                            >
-                                Download Sample File
-                            </a>
                         </div>
                         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
                             @foreach ($acceptedColumns as $column)

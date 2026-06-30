@@ -63,19 +63,16 @@ class EditVerificationWorkItem extends EditRecord
             && ($this->canRequestClinicInfo()
                 || $this->record->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
 
-        $requestedTemplate = request()->string('template')->toString();
-        $this->formTemplate = in_array($requestedTemplate, ['template_1', 'template_2'], true)
-            ? $requestedTemplate
-            : ($this->record->clinic?->getVerificationDefaultFormTemplate() ?? 'template_2');
+        $this->formTemplate = VerificationFormQuestion::defaultTemplateKey();
 
         $this->initializeWaitingPeriodDetails();
     }
 
     public function selectFormTemplate(string $template): void
     {
-        abort_unless(in_array($template, ['template_1', 'template_2'], true), 404);
+        abort_unless($template === VerificationFormQuestion::defaultTemplateKey(), 404);
 
-        $this->formTemplate = $template;
+        $this->formTemplate = VerificationFormQuestion::defaultTemplateKey();
     }
 
     public function getTitle(): string
@@ -777,7 +774,7 @@ class EditVerificationWorkItem extends EditRecord
 
         return VerificationFormQuestion::query()
             ->where('is_active', true)
-            ->where('template_key', 'template_1')
+            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('section_key', $sectionKey)
             ->where('is_builtin', $builtIn)
             ->where('clinic_id', $clinicId)

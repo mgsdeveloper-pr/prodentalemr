@@ -19,10 +19,10 @@
                     Verification Workspace
                 </div>
                 <h2 style="margin: 14px 0 0; font-size: 30px; line-height: 1.08; font-weight: 800; color: #0f172a;">
-                    Template Management
+                    Template Builder
                 </h2>
                 <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                    Manage Template 1 and Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
+                    Manage Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                 </p>
             </div>
 

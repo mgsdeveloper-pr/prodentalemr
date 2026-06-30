@@ -2,21 +2,12 @@
     @php($status = $this->getConnectionStatus())
 
     <div style="display: flex; flex-direction: column; gap: 24px;">
-        <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden;">
-            <div class="user-mailbox-header" style="padding: 22px 24px; border-bottom: 1px solid #edf2f7; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: flex-start; gap: 18px;">
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
-                        Universal Mailbox
-                    </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end; justify-self: end;">
-                    <div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid {{ $status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca') }}; background: {{ $status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2') }}; color: {{ $status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c') }};">
-                        <span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span>
-                        <span style="font-size: 13px; font-weight: 800;">{{ $status['label'] }}</span>
-                    </div>
-                </div>
-            </div>
-        </section>
+        @include('filament.shared.partials.page-hero', [
+            'eyebrow' => 'Universal Mailbox',
+            'title' => 'Mailbox',
+            'description' => 'Review live inbox, spam, and sent mail from your connected mailbox in one workspace.',
+            'rightContent' => '<div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid ' . ($status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca')) . '; background: ' . ($status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2')) . '; color: ' . ($status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c')) . ';"><span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span><span style="font-size: 13px; font-weight: 800;">' . e($status['label']) . '</span></div>',
+        ])
 
         <section style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding-inline: 4px;">
             @foreach ($this->getToolbarActions() as $action)

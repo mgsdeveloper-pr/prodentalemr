@@ -43,7 +43,7 @@ class ListVerificationQuestions extends ListRecords
                 ->form([
                     Select::make('template_key')
                         ->label('Template')
-                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                        ->options(VerificationFormQuestion::templateOptionsForUi())
                         ->default(fn (): string => $this->selectedTemplateKey)
                         ->required()
                         ->live(),
@@ -64,7 +64,7 @@ class ListVerificationQuestions extends ListRecords
                 ->form([
                     Select::make('template_key')
                         ->label('Template')
-                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                        ->options(VerificationFormQuestion::templateOptionsForUi())
                         ->default(fn (): string => $this->selectedTemplateKey)
                         ->required()
                         ->live(),
@@ -159,14 +159,14 @@ class ListVerificationQuestions extends ListRecords
 
     public function updatedSelectedTemplateKey(): void
     {
-        if (! array_key_exists($this->selectedTemplateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
-            $this->selectedTemplateKey = 'template_2';
-        }
+        $this->selectedTemplateKey = VerificationFormQuestion::normalizeTemplateKey($this->selectedTemplateKey);
     }
 
     public function selectTemplate(string $templateKey): void
     {
-        if (! array_key_exists($templateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
+        $templateKey = VerificationFormQuestion::normalizeTemplateKey($templateKey);
+
+        if (! array_key_exists($templateKey, VerificationFormQuestion::templateOptionsForUi())) {
             return;
         }
 
@@ -175,12 +175,12 @@ class ListVerificationQuestions extends ListRecords
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
     }
 
     public function getTemplateOptions(): array
     {
-        return VerificationFormQuestion::TEMPLATE_OPTIONS;
+        return VerificationFormQuestion::templateOptionsForUi();
     }
 
     public function deleteQuestion(int $questionId): void

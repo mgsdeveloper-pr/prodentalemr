@@ -8,8 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VerificationFormQuestion extends Model
 {
+    public const DEFAULT_TEMPLATE_KEY = 'template_2';
+
     public const TEMPLATE_OPTIONS = [
-        'template_1' => 'Template 1',
+        'template_2' => 'Template 2',
+    ];
+
+    public const ACTIVE_TEMPLATE_OPTIONS = [
         'template_2' => 'Template 2',
     ];
 
@@ -204,6 +209,23 @@ class VerificationFormQuestion extends Model
             'Verification Notes' => 'Verification Notes',
         ],
     ];
+
+    public static function defaultTemplateKey(): string
+    {
+        return self::DEFAULT_TEMPLATE_KEY;
+    }
+
+    public static function templateOptionsForUi(): array
+    {
+        return self::ACTIVE_TEMPLATE_OPTIONS;
+    }
+
+    public static function normalizeTemplateKey(?string $templateKey): string
+    {
+        return array_key_exists($templateKey, self::ACTIVE_TEMPLATE_OPTIONS)
+            ? $templateKey
+            : self::DEFAULT_TEMPLATE_KEY;
+    }
 
     protected $fillable = [
         'organization_id',

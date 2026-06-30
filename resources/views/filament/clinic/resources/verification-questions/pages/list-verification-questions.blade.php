@@ -29,8 +29,8 @@
         }
         $verificationNavItems[] = [
             'key' => 'questions',
-            'label' => 'Template Management',
-            'description' => 'Manage prompts and section-specific question content.',
+            'label' => 'Template Builder',
+            'description' => 'Build Template 2 prompts, sections, and section-specific question content.',
             'url' => \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::getUrl('index'),
         ];
         $verificationNavItems[] = [
@@ -56,10 +56,10 @@
                         Verification Workspace
                     </div>
                     <h2 style="margin: 14px 0 0; font-size: 30px; line-height: 1.08; font-weight: 800; color: #0f172a;">
-                        Template Management
+                        Template Builder
                     </h2>
                     <p style="margin: 10px 0 0; max-width: 920px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                        Manage Template 1 and Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
+                        Manage Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                     </p>
                 </div>
 
@@ -95,7 +95,7 @@
                         <div>
                             <div style="font-size: 12px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #1d4ed8;">Active Template</div>
                             <div style="margin-top: 6px; font-size: 20px; font-weight: 900; color: #0f172a;">{{ $selectedTemplateLabel }}</div>
-                            <div style="margin-top: 4px; font-size: 13px; color: #64748b;">Only {{ $selectedTemplateLabel }} sections and questions are shown below.</div>
+                            <div style="margin-top: 4px; font-size: 13px; color: #64748b;">Only Template 2 sections and questions are shown below.</div>
                         </div>
                         <span style="display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 999px; border: 1px solid #bfdbfe; background: #ffffff; color: #1d4ed8; font-size: 12px; font-weight: 900;">
                             {{ $questionSections->sum('count') }} questions

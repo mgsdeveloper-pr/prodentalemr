@@ -162,6 +162,7 @@ trait InteractsWithVerificationWorkbench
         /** @var BillingWorkItem $record */
         $record = $this->getRecord();
         $profile = $record->verificationProfile;
+        $codeRows = method_exists($this, 'getCodeCoverageSection') ? $this->getCodeCoverageSection() : null;
 
         return [
             [
@@ -263,16 +264,23 @@ trait InteractsWithVerificationWorkbench
         $patientName = $profile?->patient_full_name ?: ($record->patient?->full_name ?: null);
         $subscriberName = $profile?->subscriber_name ?: ($record->insurancePolicy?->subscriber_name ?: null);
         $insuredRelation = $profile?->insured_relation ?: ($record->insurancePolicy?->subscriber_relationship ?: null);
+        $providerName = $record->provider?->display_name ?: ($profile?->provider_name ?: '-');
+        $insuranceName = $profile?->insurance_provider_name ?: ($record->insurancePolicy?->insurance_company ?: '-');
+        $insurancePhone = $profile?->insurance_company_phone_number ?: ($record->insurancePolicy?->payer_phone ?: '-');
 
         return [
             'patient' => $patientName ?: '-',
             'dob' => optional($profile?->patient_dob)->format('m/d/Y') ?: (optional($record->patient?->dob)->format('m/d/Y') ?: '-'),
             'member_id' => $profile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-'),
-            'insurance_name' => $profile?->insurance_provider_name ?: ($record->insurancePolicy?->insurance_company ?: '-'),
+            'subscriber_name' => $subscriberName ?: '-',
+            'subscriber_dob' => optional($profile?->subscriber_dob)->format('m/d/Y') ?: (optional($record->insurancePolicy?->subscriber_dob)->format('m/d/Y') ?: '-'),
+            'insurance_name' => $insuranceName,
             'coverage_role' => $this->resolveCoverageRole($patientName, $subscriberName, $insuredRelation),
+            'group_number' => $profile?->group_number ?: ($record->insurancePolicy?->group_number ?: '-'),
+            'provider_name' => $providerName,
             'provider_npi' => $record->provider?->npi_number ?: '-',
             'practice_npi' => $record->organization?->npi_number ?? $record->clinic?->npi_number ?? '-',
-            'phone' => $profile?->insurance_company_phone_number ?: ($record->insurancePolicy?->payer_phone ?: '-'),
+            'phone' => $insurancePhone,
         ];
     }
 

@@ -15,7 +15,7 @@ return new class extends Migration
         });
 
         Schema::table('verification_form_questions', function (Blueprint $table): void {
-            $table->string('template_key')->default('template_1')->after('clinic_id');
+            $table->string('template_key')->default('template_2')->after('clinic_id');
             $table->text('select_options')->nullable()->after('placeholder');
             $table->boolean('has_note')->default(false)->after('select_options');
             $table->string('note_label')->nullable()->after('has_note');

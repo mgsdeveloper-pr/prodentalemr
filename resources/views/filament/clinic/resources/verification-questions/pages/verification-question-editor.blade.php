@@ -4,57 +4,48 @@
         $currentAnswerType = $this->getCurrentAnswerTypeLabel();
         $promptPreview = $this->getCurrentPromptPreview();
         $builderTitle = str_contains(strtolower($this->getSubmitButtonLabel()), 'save') ? 'Update Question' : 'Create Question';
-    @endphp
-
-    <div style="display: flex; flex-direction: column; gap: 24px;">
-        <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden;">
-            <div style="padding: 22px 26px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr); gap: 24px; align-items: start;">
-                <div style="display: flex; flex-direction: column; gap: 14px;">
-                    <div style="display: inline-flex; align-items: center; gap: 8px; width: max-content; padding: 8px 12px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f766e; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">
-                        Question Management
+        $heroRightContent = '
+            <div style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; padding: 20px 22px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); display: flex; flex-direction: column; gap: 16px; min-width: min(420px, 100%);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+                    <div>
+                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8;">Clinic scope</div>
+                        <div style="margin-top: 6px; font-size: 20px; font-weight: 800; color: #0f172a;">' . e($this->getSelectedClinicName()) . '</div>
                     </div>
-
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <h2 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; color: #0f172a;">Create and organize verification questions</h2>
-                        <p style="margin: 0; max-width: 760px; font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Build the question, choose its template section, and confirm its position against existing questions in one workspace.
-                        </p>
-                    </div>
+                    <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
+                        ' . e($this->getSubmitButtonLabel()) . '
+                    </span>
                 </div>
 
-                <div style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; padding: 20px 22px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); display: flex; flex-direction: column; gap: 16px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-                        <div>
-                            <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8;">Clinic scope</div>
-                            <div style="margin-top: 6px; font-size: 20px; font-weight: 800; color: #0f172a;">{{ $this->getSelectedClinicName() }}</div>
-                        </div>
-                        <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
-                            {{ $this->getSubmitButtonLabel() }}
-                        </span>
-                    </div>
+                <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                    <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Live preview</div>
+                    <div style="font-size: 18px; line-height: 1.5; font-weight: 800; color: #0f172a;">' . e($promptPreview) . '</div>
+                </div>
 
+                <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
                     <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
-                        <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Live preview</div>
-                        <div style="font-size: 18px; line-height: 1.5; font-weight: 800; color: #0f172a;">{{ $promptPreview }}</div>
+                        <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Section</div>
+                        <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">' . e($this->getCurrentSectionLabel()) . '</div>
                     </div>
-
-                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
-                        <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Section</div>
-                            <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">{{ $this->getCurrentSectionLabel() }}</div>
-                        </div>
-                        <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Visibility</div>
-                            <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">{{ $currentVisibility }}</div>
-                        </div>
-                        <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Answer type</div>
-                            <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">{{ $currentAnswerType }}</div>
-                        </div>
+                    <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                        <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Visibility</div>
+                        <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">' . e($currentVisibility) . '</div>
+                    </div>
+                    <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                        <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Answer type</div>
+                        <div style="margin-top: 8px; font-size: 14px; line-height: 1.5; font-weight: 800; color: #0f172a;">' . e($currentAnswerType) . '</div>
                     </div>
                 </div>
             </div>
-        </section>
+        ';
+    @endphp
+
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+        @include('filament.shared.partials.page-hero', [
+            'eyebrow' => 'Question Management',
+            'title' => 'Create and organize verification questions',
+            'description' => 'Build the question, choose its template section, and confirm its position against existing questions in one workspace.',
+            'rightContent' => $heroRightContent,
+        ])
 
         <form wire:submit="{{ $this->getSubmitMethodName() }}" style="display: flex; flex-direction: column; gap: 20px;">
             <div style="display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr); gap: 20px; align-items: start;">

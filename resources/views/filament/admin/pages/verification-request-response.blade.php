@@ -4,56 +4,43 @@
     @php($selectedWorkItem = $this->getSelectedWorkItem())
 
     <div style="display: flex; flex-direction: column; gap: 24px;">
-        <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden;">
-            <div style="padding: 24px;">
-                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap;">
-                    <div style="display: flex; flex-direction: column; gap: 12px;">
-                        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
-                            Verification Flow
-                        </div>
-                        <div>
-                            <h2 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">Request &amp; Response</h2>
-                            <p style="margin: 10px 0 0; max-width: 920px; font-size: 15px; line-height: 1.75; color: #64748b;">
-                                Review every information request sent to clinics and every response received back in one clean operational log.
-                            </p>
-                            <p style="margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #0f172a;">
-                                Scope: {{ \App\Support\AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics' }}
-                            </p>
-                        </div>
-                    </div>
+        @include('filament.shared.partials.page-hero', [
+            'eyebrow' => 'Verification Flow',
+            'title' => 'Request & Response',
+            'description' => 'Review every information request sent to clinics and every response received back in one clean operational log.',
+            'scopeLabel' => 'Scope',
+            'scopeValue' => \App\Support\AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics',
+            'rightContent' => '
+                <div x-data="{ open: false }" style="position: relative;">
+                    <button
+                        type="button"
+                        x-on:click="open = ! open"
+                        x-on:click.outside="open = false"
+                        style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 18px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);"
+                    >
+                        <span style="display: inline-flex; flex-direction: column; gap: 4px;">
+                            <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
+                            <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
+                            <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
+                        </span>
+                    </button>
 
-                    <div x-data="{ open: false }" style="position: relative;">
-                        <button
-                            type="button"
-                            x-on:click="open = ! open"
-                            x-on:click.outside="open = false"
-                            style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 18px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);"
+                    <div
+                        x-show="open"
+                        x-transition
+                        style="position: absolute; right: 0; top: calc(100% + 10px); min-width: 180px; padding: 10px; border-radius: 18px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14); z-index: 20;"
+                    >
+                        <a
+                            href="' . route('admin.verification-request-response.export', ['status' => $this->statusFilter, 'search' => $this->search]) . '"
+                            x-on:click="open = false"
+                            style="display: inline-flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700; text-decoration: none;"
                         >
-                            <span style="display: inline-flex; flex-direction: column; gap: 4px;">
-                                <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
-                                <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
-                                <span style="display: block; width: 16px; height: 2px; border-radius: 999px; background: currentColor;"></span>
-                            </span>
-                        </button>
-
-                        <div
-                            x-show="open"
-                            x-transition
-                            style="position: absolute; right: 0; top: calc(100% + 10px); min-width: 180px; padding: 10px; border-radius: 18px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14); z-index: 20;"
-                        >
-                            <a
-                                href="{{ route('admin.verification-request-response.export', ['status' => $this->statusFilter, 'search' => $this->search]) }}"
-                                x-on:click="open = false"
-                                style="display: inline-flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700; text-decoration: none;"
-                            >
-                                <x-heroicon-o-arrow-down-tray style="width: 16px; height: 16px;" />
-                                <span>Export</span>
-                            </a>
-                        </div>
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17.5V19a2 2 0 002 2h12a2 2 0 002-2v-1.5"/></svg>
+                            <span>Export</span>
+                        </a>
                     </div>
-                </div>
-            </div>
-        </section>
+                </div>',
+        ])
 
         <section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
             @foreach ($summary as $card)

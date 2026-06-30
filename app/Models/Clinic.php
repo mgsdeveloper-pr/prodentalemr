@@ -171,7 +171,7 @@ class Clinic extends Model
     {
         return array_key_exists(
             (string) $this->verification_default_form_template,
-            VerificationFormQuestion::TEMPLATE_OPTIONS
+            VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS
         )
             ? (string) $this->verification_default_form_template
             : 'template_2';

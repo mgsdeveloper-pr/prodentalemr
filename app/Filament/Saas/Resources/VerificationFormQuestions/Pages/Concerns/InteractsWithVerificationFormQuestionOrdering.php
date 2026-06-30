@@ -26,7 +26,7 @@ trait InteractsWithVerificationFormQuestionOrdering
     {
         $clinicId = $this->resolveOrderingClinicId();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
-        $templateKey = $this->data['template_key'] ?? 'template_1';
+        $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
         if (! $clinicId || ! filled($sectionKey)) {
             return [];
@@ -152,7 +152,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', $this->data['template_key'] ?? 'template_1')
+            ->where('template_key', $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey())
             ->where('section_key', $sectionKey)
             ->when($excludeRecordId, fn ($query) => $query->whereKeyNot($excludeRecordId))
             ->orderBy('sort_order')

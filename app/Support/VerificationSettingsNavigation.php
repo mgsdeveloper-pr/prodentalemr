@@ -49,8 +49,8 @@ class VerificationSettingsNavigation
             ],
             [
                 'key' => 'questions',
-                'label' => 'Template Management',
-                'description' => 'Manage Template 1 and Template 2 questions, datatypes, dropdowns, notes, and section placement.',
+                'label' => 'Template Builder',
+                'description' => 'Build Template 2 sections, sub-sections, question types, notes, and section placement.',
                 'url' => VerificationFormQuestionResource::getUrl('index'),
             ],
             [

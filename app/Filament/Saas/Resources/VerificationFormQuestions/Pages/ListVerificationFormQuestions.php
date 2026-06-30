@@ -54,8 +54,8 @@ class ListVerificationFormQuestions extends ListRecords
                         ->live(),
                     Select::make('template_key')
                         ->label('Template')
-                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
-                        ->default('template_2')
+                        ->options(VerificationFormQuestion::templateOptionsForUi())
+                        ->default(VerificationFormQuestion::defaultTemplateKey())
                         ->required()
                         ->live(),
                     Hidden::make('parent_section_key')
@@ -91,8 +91,8 @@ class ListVerificationFormQuestions extends ListRecords
                         ->live(),
                     Select::make('template_key')
                         ->label('Template')
-                        ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
-                        ->default('template_2')
+                        ->options(VerificationFormQuestion::templateOptionsForUi())
+                        ->default(VerificationFormQuestion::defaultTemplateKey())
                         ->required()
                         ->live(),
                     Select::make('parent_section_key')

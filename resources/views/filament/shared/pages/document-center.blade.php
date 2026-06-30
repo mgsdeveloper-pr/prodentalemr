@@ -8,38 +8,30 @@
     @endphp
 
     <div style="display:flex;flex-direction:column;gap:22px;">
-        <section style="border:1px solid #dbe4ee;border-radius:26px;background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 18px 40px rgba(15,23,42,0.06);padding:26px 28px;">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;">
-                <div>
-                    <div style="display:inline-flex;align-items:center;width:max-content;padding:8px 12px;border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;color:#4338ca;font-size:12px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
-                        Document Control
-                    </div>
-                    <h2 style="margin:14px 0 0;font-size:32px;line-height:1.08;font-weight:900;color:#0f172a;">Document Center</h2>
-                    <p style="margin:10px 0 0;max-width:760px;font-size:15px;line-height:1.7;color:#64748b;">
-                        Review uploaded verification files, clinic responses, and patient documents from one clean operational view.
-                    </p>
-                </div>
-
+        @include('filament.shared.partials.page-hero', [
+            'eyebrow' => 'Document Control',
+            'title' => 'Document Center',
+            'description' => 'Review uploaded verification files, clinic responses, and patient documents from one clean operational view.',
+            'rightContent' => '
                 <div style="display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:10px;min-width:min(520px,100%);">
                     <div style="border:1px solid #dbeafe;border-radius:18px;background:#eff6ff;padding:14px;">
                         <div style="font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#1d4ed8;">Total</div>
-                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#1d4ed8;">{{ $stats['total'] }}</div>
+                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#1d4ed8;">' . e($stats['total']) . '</div>
                     </div>
                     <div style="border:1px solid #fde68a;border-radius:18px;background:#fffbeb;padding:14px;">
                         <div style="font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#b45309;">Verification</div>
-                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#b45309;">{{ $stats['verification'] }}</div>
+                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#b45309;">' . e($stats['verification']) . '</div>
                     </div>
                     <div style="border:1px solid #bbf7d0;border-radius:18px;background:#f0fdf4;padding:14px;">
                         <div style="font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#166534;">Patient</div>
-                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#166534;">{{ $stats['patient'] }}</div>
+                        <div style="margin-top:8px;font-size:26px;font-weight:900;color:#166534;">' . e($stats['patient']) . '</div>
                     </div>
                     <div style="border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;padding:14px;">
                         <div style="font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Storage</div>
-                        <div style="margin-top:8px;font-size:22px;font-weight:900;color:#0f172a;">{{ $stats['storage'] }}</div>
+                        <div style="margin-top:8px;font-size:22px;font-weight:900;color:#0f172a;">' . e($stats['storage']) . '</div>
                     </div>
-                </div>
-            </div>
-        </section>
+                </div>',
+        ])
 
         <section style="border:1px solid #dbe4ee;border-radius:26px;background:#ffffff;box-shadow:0 16px 34px rgba(15,23,42,0.06);overflow:hidden;">
             <div style="padding:18px 22px;border-bottom:1px solid #edf2f7;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">

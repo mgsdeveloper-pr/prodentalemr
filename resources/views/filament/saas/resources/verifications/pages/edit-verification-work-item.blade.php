@@ -80,13 +80,36 @@
             'Patient: ' . ($quickReference['patient'] ?? ''),
             'DOB: ' . ($quickReference['dob'] ?? ''),
             'Member ID: ' . ($quickReference['member_id'] ?? ''),
-            'Insurance: ' . ($quickReference['insurance_name'] ?? ''),
+            'Subscriber: ' . ($quickReference['subscriber_name'] ?? ''),
+            'Subscriber DOB: ' . ($quickReference['subscriber_dob'] ?? ''),
+            'Insurance / TPA: ' . ($quickReference['insurance_name'] ?? ''),
+            'Insurance / TPA Phone: ' . ($quickReference['phone'] ?? ''),
             'Coverage Status: ' . ($quickReference['coverage_role'] ?? ''),
-            'Insurance Phone: ' . ($quickReference['phone'] ?? ''),
+            'Group Number: ' . ($quickReference['group_number'] ?? ''),
+            'Doctor: ' . ($quickReference['provider_name'] ?? ''),
             'Provider NPI: ' . ($quickReference['provider_npi'] ?? ''),
             'Practice NPI: ' . ($quickReference['practice_npi'] ?? ''),
         ]));
     @endphp
+
+    <script>
+        (() => {
+            const collapseVerificationSidebar = () => {
+                const root = document.documentElement;
+
+                root.classList.add('app-sidebar-collapsed');
+                root.classList.add('verification-sidebar-collapsed');
+
+                localStorage.setItem('app-sidebar-collapsed', '1');
+                localStorage.setItem('verification-sidebar-collapsed', '1');
+
+                window.dispatchEvent(new Event('resize'));
+            };
+
+            collapseVerificationSidebar();
+            document.addEventListener('livewire:navigated', collapseVerificationSidebar);
+        })();
+    </script>
 
     <style>
         .verification-workbench-header {
@@ -267,243 +290,13 @@
             </section>
         @endif
 
-        <div style="display: flex; justify-content: flex-end;">
-            <div class="verification-template-switcher" aria-label="Verification form template">
-                <button
-                    type="button"
-                    wire:click="selectFormTemplate('template_1')"
-                    class="{{ $this->formTemplate === 'template_1' ? 'is-active' : '' }}"
-                >
-                    Template 1
-                </button>
-                <button
-                    type="button"
-                    wire:click="selectFormTemplate('template_2')"
-                    class="{{ $this->formTemplate === 'template_2' ? 'is-active' : '' }}"
-                >
-                    Template 2
-                </button>
-            </div>
-        </div>
-
         <form wire:submit="save">
-            <div class="{{ $this->formTemplate === 'template_2' ? '' : 'verification-workbench-layout' }}">
-                @if ($this->formTemplate === 'template_1')
-                <aside class="verification-workbench-sidebar">
-                    <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                        <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                            <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">
-                                Quick Reference
-                            </h3>
-                            <button type="button" class="verification-workbench-copy" onclick="copyVerificationQuickReference(@js($quickReferenceCopyText), this)">Copy all</button>
-                        </div>
-                        <div style="padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px;">
-                            <div style="grid-column: 1 / -1;">
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Patient</div>
-                                <div style="font-size: 14px; font-weight: 800; color: #111827;">{{ $quickReference['patient'] }}</div>
-                            </div>
-                            <div>
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">DOB</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['dob'] }}</div>
-                            </div>
-                            <div>
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Member ID</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['member_id'] }}</div>
-                            </div>
-                            <div style="grid-column: 1 / -1;">
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Insurance</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['insurance_name'] }}</div>
-                            </div>
-                            <div style="grid-column: 1 / -1;">
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Coverage Status</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['coverage_role'] }}</div>
-                            </div>
-                            <div style="grid-column: 1 / -1;">
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Insurance Phone</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['phone'] }}</div>
-                            </div>
-                            <div>
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Provider NPI</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['provider_npi'] }}</div>
-                            </div>
-                            <div>
-                                <div style="margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">Practice NPI</div>
-                                <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $quickReference['practice_npi'] }}</div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: linear-gradient(180deg, #0f172a 0%, #13293d 100%); overflow: hidden; box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);">
-                        <div style="padding: 18px 18px 0;">
-                            <h3 style="margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #a5f3fc;">
-                                Queue Snapshot
-                            </h3>
-                        </div>
-                        <div style="padding: 0 18px 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
-                            @foreach ($summaryCards as $card)
-                                <div style="border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; background: rgba(255,255,255,0.06); padding: 12px;">
-                                    <div style="margin-bottom: 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #cbd5e1;">
-                                        {{ $card['label'] }}
-                                    </div>
-                                    <span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; {{ $toneStyles[$card['tone']] ?? $toneStyles['slate'] }}">
-                                        {{ $card['value'] }}
-                                    </span>
-                                </div>
-                            @endforeach
-                        </div>
-                    </section>
-
-                    @if ($showClinicResponseCard)
-                        <section style="border: 1px solid #fde68a; border-radius: 24px; background: linear-gradient(180deg, #fffef7 0%, #fffbeb 100%); overflow: hidden; box-shadow: 0 8px 24px rgba(180, 83, 9, 0.08);">
-                            <div style="padding: 18px 20px; border-bottom: 1px solid #fde68a;">
-                                <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #b45309;">
-                                    Clinic Response Needed
-                                </h3>
-                            </div>
-                            <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-                                <div style="border: 1px solid #fed7aa; border-radius: 16px; background: #ffffff; padding: 14px;">
-                                    <div style="margin-bottom: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #92400e;">
-                                        Verification Team Request
-                                    </div>
-                                    <div style="font-size: 13px; line-height: 1.7; color: #7c2d12;">
-                                        {{ $record->info_request_reason ?: 'The verification team requested additional clinic information before they can continue.' }}
-                                    </div>
-                                    <div style="margin-top: 10px; font-size: 12px; color: #9a3412;">
-                                        Requested by {{ $record->infoRequestedBy?->name ?: 'Verification team' }}
-                                        @if ($record->updated_at)
-                                            on {{ $record->updated_at->format('M d, Y h:i A') }}
-                                        @endif
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #92400e;">
-                                        Clinic Response Note
-                                    </label>
-                                    <textarea
-                                        wire:model.blur="data.notes"
-                                        placeholder="Explain what you updated or clarified for the verification team. Example: Uploaded the current insurance card and corrected the subscriber DOB."
-                                        style="{{ $textareaStyle }}"
-                                    ></textarea>
-                                    <div style="margin-top: 8px; font-size: 12px; line-height: 1.6; color: #92400e;">
-                                        This note will go back with the request when you click <strong>Respond to Request</strong>.
-                                    </div>
-                                    @error('data.notes')
-                                        <div style="margin-top: 8px; font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div>
-                                    <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #92400e;">
-                                        Supporting Attachments
-                                    </label>
-                                    <input
-                                        type="file"
-                                        wire:model="clinicResponseAttachments"
-                                        multiple
-                                        accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                                        style="display: block; width: 100%; padding: 10px 12px; border: 1px dashed #f59e0b; border-radius: 14px; background: #ffffff; color: #7c2d12; font-size: 13px;"
-                                    />
-                                    <div style="margin-top: 8px; font-size: 12px; line-height: 1.6; color: #92400e;">
-                                        Upload the insurance card, screenshot, or any supporting document that helps the verification team continue.
-                                    </div>
-                                    @error('clinicResponseAttachments.*')
-                                        <div style="margin-top: 8px; font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-                        </section>
-                    @endif
-
-                    @if ($attachments->isNotEmpty() || $showClinicResponseCard)
-                        <section style="border: 1px solid #e5e7eb; border-radius: 24px; background: #ffffff; overflow: hidden; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);">
-                            <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
-                                <h3 style="margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: #7c3aed;">
-                                    Supporting Attachments
-                                </h3>
-                            </div>
-                            <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-                                @forelse ($attachments as $attachment)
-                                    <article style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 14px;">
-                                        <div style="margin-bottom: 4px; font-size: 13px; font-weight: 800; color: #111827;">{{ $attachment['title'] }}</div>
-                                        <div style="margin-bottom: 10px; font-size: 12px; line-height: 1.6; color: #64748b;">{{ $attachment['subtitle'] }}</div>
-                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                                            <span style="font-size: 12px; color: #94a3b8;">{{ $attachment['uploaded_at'] }}</span>
-                                            <a href="{{ $attachment['download_url'] }}" style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #cbd5e1; background: #ffffff; color: #334155; font-size: 12px; font-weight: 700; text-decoration: none;">
-                                                Download
-                                            </a>
-                                        </div>
-                                    </article>
-                                @empty
-                                    <div style="font-size: 13px; line-height: 1.7; color: #64748b;">
-                                        No supporting attachments have been added yet. Uploading files here will attach them to the verification timeline for the service team.
-                                    </div>
-                                @endforelse
-                            </div>
-                        </section>
-                    @endif
-
-                </aside>
-                @endif
-
-                <section style="display: flex; flex-direction: column; gap: 18px;">
-                    @if ($this->formTemplate === 'template_2')
-                        @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
-                    @else
-                    <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07); overflow: hidden;">
-                        <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-                            <div>
-                                <div style="display: inline-flex; align-items: center; width: max-content; padding: 7px 11px; border-radius: 999px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;">
-                                    New Verification Form
-                                </div>
-                                <h2 style="margin: 12px 0 0; font-size: 24px; line-height: 1.15; font-weight: 900; color: #0f172a;">Clinic, patient, service, and payer verification in one clean flow</h2>
-                                <p style="margin: 8px 0 0; max-width: 820px; font-size: 14px; line-height: 1.7; color: #64748b;">
-                                    This newer layout keeps the must-have intake fields upfront. The detailed worksheet remains below while we polish this version.
-                                </p>
-                            </div>
-                            <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; border: 1px solid #bbf7d0; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 900;">
-                                Existing form still active
-                            </span>
-                        </div>
-
-                        <div style="padding: 20px 22px;" class="verification-smart-form-grid">
-                            @foreach ($smartVerificationForm as $section)
-                                <article style="border: 1px solid #dbe4ee; border-radius: 22px; background: #ffffff; overflow: hidden; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);">
-                                    <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; gap: 12px;">
-                                        <span style="margin-top: 4px; width: 11px; height: 11px; border-radius: 999px; background: {{ $section['accent'] }};"></span>
-                                        <div>
-                                            <h3 style="margin: 0; font-size: 18px; font-weight: 900; color: #0f172a;">{{ $section['title'] }}</h3>
-                                            <p style="margin: 5px 0 0; font-size: 13px; line-height: 1.6; color: #64748b;">{{ $section['description'] }}</p>
-                                        </div>
-                                    </div>
-
-                                    <div style="padding: 18px;" class="verification-smart-field-grid">
-                                        @foreach ($section['fields'] as $field)
-                                            @php
-                                                $isWide = $field['wide'] ?? false;
-                                                $fieldName = $field['field'] ?? null;
-                                                $fieldType = $field['type'] ?? 'text';
-                                                $isReadonly = $field['readonly'] ?? false;
-                                            @endphp
-                                            <div class="{{ $isWide ? 'verification-smart-field--wide' : '' }}">
-                                                <label style="display: block; margin-bottom: 7px; font-size: 11px; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; color: #64748b;">
-                                                    {{ $field['label'] }}
-                                                </label>
-
-                                                @if ($isReadonly)
-                                                    <div style="min-height: 42px; padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; color: #0f172a; font-size: 13px; font-weight: 800; line-height: 1.45;">
-                                                        {{ filled($field['value'] ?? null) ? $field['value'] : '-' }}
-                                                    </div>
-                                                @elseif ($fieldType === 'textarea')
-                                                    <textarea wire:model.blur="data.{{ $fieldName }}" placeholder="{{ $field['placeholder'] ?? '' }}" style="{{ $textareaStyle }}"></textarea>
-                                                @elseif ($fieldType === 'select')
-                                                    <select wire:model.blur="data.{{ $fieldName }}" style="{{ $selectStyle }}">
-                                                        <option value="">Select</option>
-                                                        @foreach (($field['options'] ?? []) as $value => $label)
-                                                            <option value="{{ $value }}">{{ $label }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @elseif ($fieldType === 'date')
+            <section style="display: flex; flex-direction: column; gap: 18px;">
+                @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
+            </section>
+        </form>
+    </div>
+        {{--
                                                     <input type="date" wire:model.blur="data.{{ $fieldName }}" style="{{ $inputStyle }}">
                                                 @elseif ($fieldType === 'currency')
                                                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -1049,6 +842,8 @@
             </div>
         </form>
     </div>
+
+        --}}
 
     @if ($showInfoRequestField)
         <div id="info-request-modal" style="position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.62);">

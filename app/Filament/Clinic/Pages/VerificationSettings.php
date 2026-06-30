@@ -98,11 +98,11 @@ class VerificationSettings extends Page implements HasForms
                             ->live(),
                         Select::make('verification_default_form_template')
                             ->label('Default verification form')
-                            ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
+                            ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
                             ->default('template_2')
                             ->required()
                             ->native(false)
-                            ->helperText('Template 2 is the recommended default. Users can still switch templates inside the verification form.'),
+                            ->helperText('Template 2 is the recommended default and the active verification form experience.'),
                         CheckboxList::make('verification_pdf_output_sections')
                             ->label('Selected output sections')
                             ->options($this->getPdfSectionLabels())

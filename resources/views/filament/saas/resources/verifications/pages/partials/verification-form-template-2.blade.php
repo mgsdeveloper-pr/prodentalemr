@@ -36,6 +36,18 @@
     $templateTwoPlanProvisionQuestions = $this->getTemplateTwoQuestionsForSection('template_2_plan_provisions');
     $templateTwoServiceHistoryQuestions = $this->getTemplateTwoQuestionsForSection('template_2_service_history');
     $templateTwoVerificationQuestions = $this->getTemplateTwoQuestionsForSection('template_2_verification_information');
+    $templateTwoSectionProgress = collect($this->getVerificationSectionProgress());
+    $templateTwoContextRows = $this->getContextRows();
+    $templateTwoSidebarBlocks = [
+        'Practice' => $templateTwoContextRows['practice'] ?? [],
+        'Provider' => [
+            ['label' => 'Doctor', 'value' => $quickReference['provider_name'] ?? '-'],
+            ['label' => 'Provider NPI', 'value' => $quickReference['provider_npi'] ?? '-'],
+            ['label' => 'Practice NPI', 'value' => $quickReference['practice_npi'] ?? '-'],
+            ['label' => 'Insurance Phone', 'value' => $quickReference['phone'] ?? '-'],
+        ],
+        'Patient' => $templateTwoContextRows['patient'] ?? [],
+    ];
 
     $templateTwoInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
     $templateTwoReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
@@ -71,6 +83,152 @@
             ['Employer / Group Name', 'vf_group_name', 'text'],
         ],
     ];
+    $templateTwoCountFilled = function (array $fields): int {
+        return collect($fields)
+            ->filter(fn ($field): bool => filled(data_get($this->data, $field)))
+            ->count();
+    };
+    $templateTwoSectionCounts = [
+        'patient' => [
+            'completed' => $templateTwoCountFilled([
+                'vf_patient_full_name',
+                'vf_patient_dob',
+                'vf_patient_identifier',
+                'vf_insured_relation',
+                'vf_subscriber_name',
+                'vf_subscriber_dob',
+                'vf_subscriber_id',
+                'vf_cob',
+            ]),
+            'total' => 8,
+        ],
+        'insurance' => [
+            'completed' => $templateTwoCountFilled([
+                'vf_insurance_provider_name',
+                'vf_group_number',
+                'vf_plan_type',
+                'vf_network_status',
+                'vf_effective_date',
+                'vf_future_termination_date',
+                'vf_plan_renewal_month',
+                'vf_insurance_claim_mailing_address',
+                'vf_payer_id',
+                'vf_insurance_company_phone_number',
+                'vf_fee_schedule',
+                'vf_group_name',
+            ]),
+            'total' => 12,
+        ],
+        'maximums' => [
+            'completed' => $templateTwoCountFilled([
+                'vf_annual_maximum',
+                'vf_annual_maximum_remaining',
+                'vf_individual_deductible',
+                'vf_individual_deductible_remaining',
+                'vf_family_deductible',
+                'vf_family_deductible_remaining',
+            ]),
+            'total' => 6,
+        ],
+        'service_history' => [
+            'completed' => $templateTwoCountFilled([
+                'vf_history_exams',
+                'vf_history_prophylaxis',
+                'vf_history_bitewings',
+                'vf_history_full_mouth_xray',
+                'vf_history_basic_or_major',
+            ]),
+            'total' => 5,
+        ],
+        'verification' => [
+            'completed' => collect([
+                $record->reference_number,
+                data_get($this->data, 'vf_insurance_representative_name'),
+                data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name,
+                data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d'),
+                data_get($this->data, 'vf_verification_notes'),
+            ])->filter(fn ($value): bool => filled($value))->count(),
+            'total' => 5,
+        ],
+    ];
+    $templateTwoCoverageCategoryRows = [
+        ['Diagnostic & Preventive', 'vf_coverage_diagnostic_deductible_applies', 'vf_coverage_diagnostic'],
+        ['Basic Restorative', 'vf_coverage_basic_restorative_deductible_applies', 'vf_coverage_basic_restorative'],
+        ['Endodontics', 'vf_coverage_endodontics_deductible_applies', 'vf_coverage_endodontics'],
+        ['Periodontics', 'vf_coverage_periodontics_deductible_applies', 'vf_coverage_periodontics'],
+        ['Oral Surgery', 'vf_coverage_oral_surgery_deductible_applies', 'vf_coverage_oral_surgery'],
+        ['Major Restorative', 'vf_coverage_major_restorative_deductible_applies', 'vf_coverage_major_restorative'],
+        ['Orthodontics', 'vf_coverage_orthodontics_deductible_applies', 'vf_ortho_benefit'],
+    ];
+    $templateTwoCoverageCategoryCompleted = collect($templateTwoCoverageCategoryRows)->reduce(
+        fn (int $carry, array $row): int => $carry + ((filled(data_get($this->data, $row[1])) || filled(data_get($this->data, $row[2]))) ? 1 : 0),
+        0
+    );
+    $templateTwoCoverageCategoryTotal = count($templateTwoCoverageCategoryRows);
+    $templateTwoPlanProvisionFields = [
+        data_get($this->data, 'vf_missing_tooth_clause'),
+        data_get($this->data, 'vf_crowns_paid_on'),
+        data_get($this->data, 'vf_prosthetic_replacement_period'),
+        data_get($this->data, 'vf_cob'),
+        data_get($this->data, 'vf_plan_provisions'),
+        $this->waitingPeriodAnswer === 'yes'
+            ? collect($this->waitingPeriodDetails ?? [])->contains(
+                fn ($detail): bool => filled(data_get($detail, 'period'))
+                    || filled(data_get($detail, 'notes'))
+                    || filled(data_get($detail, 'unit'))
+            )
+            : filled($this->waitingPeriodAnswer ?? null),
+    ];
+    $templateTwoPlanProvisionCompleted = collect($templateTwoPlanProvisionFields)
+        ->filter(fn ($value): bool => filled($value))
+        ->count();
+    $templateTwoPlanProvisionTotal = count($templateTwoPlanProvisionFields);
+    $templateTwoProgressSections = collect([
+        [
+            'label' => 'Patient & Subscriber',
+            'completed' => $templateTwoSectionCounts['patient']['completed'],
+            'total' => $templateTwoSectionCounts['patient']['total'],
+        ],
+        [
+            'label' => 'Insurance Information',
+            'completed' => $templateTwoSectionCounts['insurance']['completed'],
+            'total' => $templateTwoSectionCounts['insurance']['total'],
+        ],
+        [
+            'label' => 'Maximums & Deductibles',
+            'completed' => $templateTwoSectionCounts['maximums']['completed'],
+            'total' => $templateTwoSectionCounts['maximums']['total'],
+        ],
+        [
+            'label' => 'Coverage Category',
+            'completed' => $templateTwoCoverageCategoryCompleted,
+            'total' => $templateTwoCoverageCategoryTotal,
+        ],
+        [
+            'label' => 'Plan Provisions',
+            'completed' => $templateTwoPlanProvisionCompleted,
+            'total' => $templateTwoPlanProvisionTotal,
+        ],
+        [
+            'label' => 'Service History',
+            'completed' => $templateTwoSectionCounts['service_history']['completed'],
+            'total' => $templateTwoSectionCounts['service_history']['total'],
+        ],
+        [
+            'label' => 'Frequency & Percentage',
+            'completed' => (int) ($codeCoverageSection['completed'] ?? 0),
+            'total' => (int) ($codeCoverageSection['total'] ?? 0),
+            'visible' => $templateTwoVisibleBenefitGroups->isNotEmpty(),
+        ],
+        [
+            'label' => 'Verification Information',
+            'completed' => $templateTwoSectionCounts['verification']['completed'],
+            'total' => $templateTwoSectionCounts['verification']['total'],
+        ],
+    ])->filter(fn (array $section): bool => ($section['visible'] ?? true) === true)->values();
+    $templateTwoProgressCompleted = (int) $templateTwoProgressSections->sum('completed');
+    $templateTwoProgressTotal = max(1, (int) $templateTwoProgressSections->sum('total'));
+    $templateTwoProgressPercent = (int) round(($templateTwoProgressCompleted / $templateTwoProgressTotal) * 100);
 @endphp
 
 <style>
@@ -84,6 +242,105 @@
         flex-direction: column;
         gap: 20px;
         color: #142e25;
+    }
+
+    .uel2-layout {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+    }
+
+    .uel2-sidebar {
+        position: sticky;
+        top: 24px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .uel2-content {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 0;
+    }
+
+    .uel2-sidebar-rail {
+        overflow: hidden;
+        border: 1px solid var(--uel2-line);
+        border-radius: 24px;
+        background: linear-gradient(180deg, #ffffff, #fbfdfc);
+        box-shadow: 0 14px 34px rgba(13, 58, 41, 0.07);
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
+        padding-right: 6px;
+        scrollbar-width: thin;
+        scrollbar-color: transparent transparent;
+    }
+
+    .uel2-sidebar-rail::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .uel2-sidebar-rail::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 999px;
+    }
+
+    .uel2-sidebar-rail::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 999px;
+    }
+
+    .uel2-sidebar-rail:hover {
+        scrollbar-color: #94a3b8 transparent;
+    }
+
+    .uel2-sidebar-rail:hover::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+    }
+
+    .uel2-sidebar-rail:hover::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+    }
+
+    .uel2-sidebar-rail__section {
+        padding: 18px;
+        border-bottom: 1px solid #e8f0ec;
+    }
+
+    .uel2-sidebar-rail__section:last-child {
+        border-bottom: 0;
+    }
+
+    .uel2-sidebar-rail__title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .uel2-sidebar-rail__title h2,
+    .uel2-sidebar-rail__title h3 {
+        margin: 0;
+        color: var(--uel2-dark);
+        font-weight: 900;
+    }
+
+    .uel2-sidebar-rail__title h2 { font-size: 18px; }
+    .uel2-sidebar-rail__title h3 {
+        font-size: 12px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--uel2-brand);
+    }
+
+    .uel2-sidebar-rail__copy {
+        color: var(--uel2-muted);
+        font-size: 12px;
+        line-height: 1.55;
     }
 
     .uel2-section {
@@ -124,6 +381,176 @@
     }
 
     .uel2-body { padding: 20px; }
+
+    .uel2-quick-reference {
+        display: grid;
+        gap: 10px;
+    }
+
+    .uel2-progress-card {
+        padding: 16px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 18px;
+        background: linear-gradient(180deg, #ffffff, #f7fbf9);
+    }
+
+    .uel2-progress-bar {
+        overflow: hidden;
+        height: 8px;
+        border-radius: 999px;
+        background: #e8f1ed;
+    }
+
+    .uel2-progress-bar > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2bb673, #0b6b4f);
+    }
+
+    .uel2-progress-total {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+        color: var(--uel2-muted);
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .uel2-progress-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+    }
+
+    .uel2-progress-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: #f8fbfa;
+        border: 1px solid #e4eeea;
+    }
+
+    .uel2-progress-item__meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .uel2-progress-item__dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+        background: #c8d7d1;
+    }
+
+    .uel2-progress-item--done .uel2-progress-item__dot {
+        background: #2bb673;
+        box-shadow: 0 0 0 3px rgba(43, 182, 115, 0.14);
+    }
+
+    .uel2-progress-item__label {
+        min-width: 0;
+        color: var(--uel2-dark);
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+    }
+
+    .uel2-progress-item__count {
+        color: var(--uel2-muted);
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .uel2-quick-reference__grid {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .uel2-quick-reference__item {
+        padding: 0 0 12px;
+    }
+
+    .uel2-quick-reference__label {
+        margin-bottom: 3px;
+        color: var(--uel2-muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .uel2-quick-reference__value {
+        color: var(--uel2-dark);
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .uel2-sidebar-blocks {
+        display: grid;
+        gap: 0;
+    }
+
+    .uel2-sidebar-block {
+        padding: 14px 0;
+        border-bottom: 1px solid #e8f0ec;
+        background: transparent;
+    }
+
+    .uel2-sidebar-block:first-child {
+        padding-top: 0;
+    }
+
+    .uel2-sidebar-block:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+    }
+
+    .uel2-sidebar-block__title {
+        margin-bottom: 12px;
+        color: var(--uel2-brand);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .uel2-sidebar-block__rows {
+        display: grid;
+        gap: 10px;
+    }
+
+    .uel2-sidebar-block__row {
+        display: grid;
+        gap: 2px;
+    }
+
+    .uel2-sidebar-block__label {
+        color: var(--uel2-muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .uel2-sidebar-block__value {
+        color: var(--uel2-dark);
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+    }
 
     .uel2-grid {
         display: grid;
@@ -174,6 +601,18 @@
         font-size: 15px;
         letter-spacing: .04em;
         text-transform: uppercase;
+    }
+
+    .uel2-subsection__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .uel2-subsection__header h3 {
+        margin-bottom: 0;
     }
 
     .uel2-table {
@@ -255,6 +694,11 @@
     }
 
     @media (max-width: 1050px) {
+        .uel2-layout { grid-template-columns: minmax(0, 1fr); }
+        .uel2-sidebar {
+            position: static;
+        }
+        .uel2-sidebar-rail { max-height: none; padding-right: 0; }
         .uel2-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
@@ -263,6 +707,30 @@
         .uel2-managed-questions { grid-template-columns: 1fr; }
         .uel2-half, .uel2-wide { grid-column: 1; }
         .uel2-header { align-items: flex-start; }
+        .uel2-pill { align-self: flex-start; }
+        .uel2-subsection__header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .uel2-sidebar-rail__title {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .uel2-progress-total {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .uel2-progress-item {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+        .uel2-progress-item__meta {
+            width: 100%;
+        }
+        .uel2-progress-item__count {
+            padding-left: 20px;
+        }
         .uel2-table, .uel2-table thead, .uel2-table tbody, .uel2-table tr, .uel2-table th, .uel2-table td {
             display: block;
             width: 100%;
@@ -284,10 +752,99 @@
 </style>
 
 <div class="uel2-page">
+    <div class="uel2-layout">
+        <aside class="uel2-sidebar">
+            <div class="uel2-sidebar-rail">
+                <section class="uel2-sidebar-rail__section">
+                    <div class="uel2-sidebar-rail__title">
+                        <h3>Quick Reference</h3>
+                    </div>
+                    <div class="uel2-quick-reference">
+                        <div class="uel2-quick-reference__grid">
+                            @foreach ([
+                                ['Patient Name', $quickReference['patient'] ?? '-'],
+                                ['Patient DOB', $quickReference['dob'] ?? '-'],
+                                ['Member ID', $quickReference['member_id'] ?? '-'],
+                                ['Subscriber Name', $quickReference['subscriber_name'] ?? '-'],
+                                ['Subscriber DOB', $quickReference['subscriber_dob'] ?? '-'],
+                                ['Coverage Role', $quickReference['coverage_role'] ?? '-'],
+                                ['Insurance / TPA', $quickReference['insurance_name'] ?? '-'],
+                                ['Insurance / TPA Phone', $quickReference['phone'] ?? '-'],
+                                ['Group Number', $quickReference['group_number'] ?? '-'],
+                                ['Doctor Name', $quickReference['provider_name'] ?? '-'],
+                                ['Provider NPI', $quickReference['provider_npi'] ?? '-'],
+                                ['Practice NPI', $quickReference['practice_npi'] ?? '-'],
+                            ] as [$quickReferenceLabel, $quickReferenceValue])
+                                <div class="uel2-quick-reference__item">
+                                    <div class="uel2-quick-reference__label">{{ $quickReferenceLabel }}</div>
+                                    <div class="uel2-quick-reference__value">{{ filled($quickReferenceValue) ? $quickReferenceValue : '-' }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </section>
+
+                <section class="uel2-sidebar-rail__section">
+                    <div class="uel2-sidebar-rail__title">
+                        <div>
+                            <h2>Verification Progress</h2>
+                            <div class="uel2-sidebar-rail__copy">Track completion across the workup</div>
+                        </div>
+                        <span class="uel2-pill">{{ $templateTwoProgressCompleted }}/{{ $templateTwoProgressSections->sum('total') }}</span>
+                    </div>
+                    <div class="uel2-progress-card">
+                        <div class="uel2-progress-bar">
+                            <span style="width: {{ min(100, max(0, $templateTwoProgressPercent)) }}%;"></span>
+                        </div>
+                        <div class="uel2-progress-total">
+                            <span>{{ $templateTwoProgressPercent }}% complete</span>
+                            <span>{{ $templateTwoProgressCompleted }} / {{ $templateTwoProgressSections->sum('total') }} fields</span>
+                        </div>
+                    </div>
+
+                    <div class="uel2-progress-list">
+                        @foreach ($templateTwoProgressSections as $templateTwoProgressItem)
+                            @php
+                                $templateTwoProgressDone = (int) ($templateTwoProgressItem['completed'] ?? 0) >= (int) ($templateTwoProgressItem['total'] ?? 0)
+                                    && (int) ($templateTwoProgressItem['total'] ?? 0) > 0;
+                            @endphp
+                            <div class="uel2-progress-item {{ $templateTwoProgressDone ? 'uel2-progress-item--done' : '' }}">
+                                <div class="uel2-progress-item__meta">
+                                    <span class="uel2-progress-item__dot"></span>
+                                    <span class="uel2-progress-item__label">{{ $templateTwoProgressItem['label'] ?? 'Section' }}</span>
+                                </div>
+                                <span class="uel2-progress-item__count">{{ (int) ($templateTwoProgressItem['completed'] ?? 0) }}/{{ (int) ($templateTwoProgressItem['total'] ?? 0) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+
+                <section class="uel2-sidebar-rail__section">
+                    <div class="uel2-sidebar-blocks">
+                        @foreach ($templateTwoSidebarBlocks as $templateTwoBlockTitle => $templateTwoBlockRows)
+                            <div class="uel2-sidebar-block">
+                                <div class="uel2-sidebar-block__title">{{ $templateTwoBlockTitle }}</div>
+                                <div class="uel2-sidebar-block__rows">
+                                    @foreach ($templateTwoBlockRows as $templateTwoBlockRow)
+                                        <div class="uel2-sidebar-block__row">
+                                            <div class="uel2-sidebar-block__label">{{ $templateTwoBlockRow['label'] ?? '' }}</div>
+                                            <div class="uel2-sidebar-block__value">{{ filled($templateTwoBlockRow['value'] ?? null) ? $templateTwoBlockRow['value'] : '-' }}</div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <div class="uel2-content">
+
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Patient & Subscriber Information</h2><p>Core eligibility identifiers</p></div>
-            <span class="uel2-pill">Patient Details</span>
+            <span class="uel2-pill">{{ $templateTwoSectionCounts['patient']['completed'] }}/{{ $templateTwoSectionCounts['patient']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
             @foreach ([
@@ -339,7 +896,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Insurance Information</h2><p>Carrier, plan, network, and payer details</p></div>
-            <span class="uel2-pill">Insurance</span>
+            <span class="uel2-pill">{{ $templateTwoSectionCounts['insurance']['completed'] }}/{{ $templateTwoSectionCounts['insurance']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-insurance-groups">
             @foreach ($templateTwoInsuranceGroups as $insuranceGroup)
@@ -449,7 +1006,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Maximums & Deductibles</h2><p>Annual maximum, remaining maximum, and deductible status</p></div>
-            <span class="uel2-pill">Individual / Family</span>
+            <span class="uel2-pill">{{ $templateTwoSectionCounts['maximums']['completed'] }}/{{ $templateTwoSectionCounts['maximums']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
             <div class="uel2-grid">
@@ -481,19 +1038,14 @@
             ])
 
             <div class="uel2-subsection">
-                <h3>Deductible & Coverage Category</h3>
+                <div class="uel2-subsection__header">
+                    <h3>Deductible & Coverage Category</h3>
+                    <span class="uel2-pill">{{ $templateTwoCoverageCategoryCompleted }}/{{ $templateTwoCoverageCategoryTotal }} Completed</span>
+                </div>
                 <table class="uel2-table">
                     <thead><tr><th>Category</th><th>DED Applied?</th><th>Category %</th></tr></thead>
                     <tbody>
-                        @foreach ([
-                            ['Diagnostic & Preventive', 'vf_coverage_diagnostic_deductible_applies', 'vf_coverage_diagnostic'],
-                            ['Basic Restorative', 'vf_coverage_basic_restorative_deductible_applies', 'vf_coverage_basic_restorative'],
-                            ['Endodontics', 'vf_coverage_endodontics_deductible_applies', 'vf_coverage_endodontics'],
-                            ['Periodontics', 'vf_coverage_periodontics_deductible_applies', 'vf_coverage_periodontics'],
-                            ['Oral Surgery', 'vf_coverage_oral_surgery_deductible_applies', 'vf_coverage_oral_surgery'],
-                            ['Major Restorative', 'vf_coverage_major_restorative_deductible_applies', 'vf_coverage_major_restorative'],
-                            ['Orthodontics', 'vf_coverage_orthodontics_deductible_applies', 'vf_ortho_benefit'],
-                        ] as [$label, $deductibleField, $coverageField])
+                        @foreach ($templateTwoCoverageCategoryRows as [$label, $deductibleField, $coverageField])
                             <tr>
                                 <td data-label="Category"><b>{{ $label }}</b></td>
                                 <td data-label="DED Applied?"><select wire:model.blur="data.{{ $deductibleField }}"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
@@ -509,7 +1061,10 @@
             </div>
 
             <div class="uel2-subsection">
-                <h3>Plan Provisions</h3>
+                <div class="uel2-subsection__header">
+                    <h3>Plan Provisions</h3>
+                    <span class="uel2-pill">{{ $templateTwoPlanProvisionCompleted }}/{{ $templateTwoPlanProvisionTotal }} Completed</span>
+                </div>
                 <table class="uel2-table">
                     <thead><tr><th style="width:68%;">Question</th><th style="width:32%;" aria-label="Response"></th></tr></thead>
                     <tbody>
@@ -623,7 +1178,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Service History</h2><p>Last service dates and next eligibility</p></div>
-            <span class="uel2-pill">Eligibility History</span>
+            <span class="uel2-pill">{{ $templateTwoSectionCounts['service_history']['completed'] }}/{{ $templateTwoSectionCounts['service_history']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
             <table class="uel2-table">
@@ -687,7 +1242,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Verification Information</h2><p>Representative, reference number, and final notes</p></div>
-            <span class="uel2-pill">Final Review</span>
+            <span class="uel2-pill">{{ $templateTwoSectionCounts['verification']['completed'] }}/{{ $templateTwoSectionCounts['verification']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
             <div class="uel2-field"><label>Reference Number</label><div style="{{ $templateTwoReadonly }}">{{ $record->reference_number }}</div></div>
@@ -718,6 +1273,8 @@
             @endif
         </div>
     </section>
+        </div>
+    </div>
 </div>
 
 @if ($this->showAddInsuranceModal)

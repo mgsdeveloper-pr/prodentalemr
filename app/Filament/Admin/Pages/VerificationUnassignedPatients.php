@@ -37,6 +37,11 @@ class VerificationUnassignedPatients extends Page implements HasTable
 
     protected string $view = 'filament.admin.pages.verification-unassigned-patients';
 
+    public function getHeading(): string
+    {
+        return '';
+    }
+
     public static function canAccess(): bool
     {
         $user = auth()->user();

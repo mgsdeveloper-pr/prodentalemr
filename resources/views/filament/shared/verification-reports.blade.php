@@ -19,6 +19,14 @@
         $priorityWiseVisualization = $isVerificationUserReportMode ? $this->getPriorityWiseVisualization() : [];
     @endphp
 
+    @include('filament.shared.partials.page-hero', [
+        'eyebrow' => 'Verification Reports',
+        'title' => $isVerificationUserReportMode ? 'Verification Performance Snapshot' : 'Verification Reports',
+        'description' => $isVerificationUserReportMode
+            ? 'Month-wise, clinic-wise, and priority-wise reporting for the assigned verification work scope.'
+            : 'Track verification volume, outcomes, SLA performance, and team activity from one reporting workspace.',
+    ])
+
     <style>
         .verification-reports-grid {
             display: grid;
@@ -264,7 +272,7 @@
         }
     </style>
 
-    <div class="verification-reports-grid">
+    <div class="verification-reports-grid" style="margin-top: 24px;">
         @if ($isVerificationUserReportMode)
             <section class="verification-reports-simple">
                 <div class="verification-reports-card">

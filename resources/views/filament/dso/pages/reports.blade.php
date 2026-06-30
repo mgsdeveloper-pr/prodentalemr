@@ -7,10 +7,6 @@
     <style>
         .dso-report { display: grid; gap: 24px; max-width: none; }
         .dso-report-card { border: 1px solid #dbe4ee; border-radius: 24px; background: #fff; box-shadow: 0 18px 42px rgba(15,23,42,.06); overflow: hidden; }
-        .dso-report-hero { padding: 28px 32px; background: linear-gradient(135deg,#fff,#f8fbff); display:flex; justify-content:space-between; gap:20px; align-items:flex-start; }
-        .dso-pill { display:inline-flex; padding:8px 14px; border-radius:999px; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:850; letter-spacing:.12em; text-transform:uppercase; }
-        .dso-title { margin:14px 0 8px; color:#020617; font-size:38px; line-height:1; font-weight:900; letter-spacing:-.05em; }
-        .dso-copy { color:#52637a; font-size:16px; line-height:1.7; }
         .dso-select { border:1px solid #cbd5e1; border-radius:16px; background:#fff; color:#0f172a; font-weight:750; padding:12px 14px; min-width:220px; }
         .dso-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
         .dso-stat { border:1px solid var(--border,#dbe4ee); border-radius:22px; background:var(--bg,#fff); padding:20px; }
@@ -22,26 +18,25 @@
         .dso-name { color:#0f172a; font-weight:850; }
         .dso-muted { margin-top:4px; color:#64748b; font-size:13px; }
         .dso-empty { padding:42px 24px; color:#64748b; text-align:center; }
-        @media (max-width:1000px){ .dso-report-hero{flex-direction:column;} .dso-stats{grid-template-columns:1fr;} .dso-report-card{overflow-x:auto;} .dso-table{min-width:760px;} }
+        @media (max-width:1000px){ .dso-stats{grid-template-columns:1fr;} .dso-report-card{overflow-x:auto;} .dso-table{min-width:760px;} }
     </style>
 
-    <div class="dso-report">
-        <section class="dso-report-card">
-            <div class="dso-report-hero">
-                <div>
-                    <div class="dso-pill">Reports</div>
-                    <h1 class="dso-title">DSO Reports</h1>
-                    <div class="dso-copy">Clinic-wise, month-wise, and service-wise reporting across the selected DSO network scope.</div>
-                    <div class="dso-muted">Range: {{ $this->getRangeLabel() }}</div>
-                </div>
-                <select class="dso-select" wire:model.live="range">
-                    <option value="current_month">Current Month</option>
-                    <option value="last_month">Last Month</option>
-                    <option value="week">This Week</option>
-                </select>
-            </div>
-        </section>
+    @include('filament.shared.partials.page-hero', [
+        'eyebrow' => 'Reports',
+        'title' => 'DSO Reports',
+        'description' => 'Clinic-wise, month-wise, and service-wise reporting across the selected DSO network scope.',
+        'scopeLabel' => 'Range',
+        'scopeValue' => $this->getRangeLabel(),
+        'rightContent' => '
+            <select class="dso-select" wire:model.live="range">
+                <option value="current_month">Current Month</option>
+                <option value="last_month">Last Month</option>
+                <option value="week">This Week</option>
+            </select>
+        ',
+    ])
 
+    <div class="dso-report" style="margin-top: 24px;">
         <section class="dso-stats">
             <div class="dso-stat" style="--bg:#eff6ff;--border:#bfdbfe;--accent:#1d4ed8;">
                 <div class="dso-stat-label">Clinic Operations</div>

@@ -67,7 +67,7 @@ class VerificationFormQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps Template 1 and Template 2 questions cleanly separated.')
+                            ->description('Choose where this question belongs before writing it. This keeps the Template 2 builder clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Grid::make(12)
@@ -112,8 +112,8 @@ class VerificationFormQuestionResource extends Resource
                                             ->columnSpan(4),
                                         Select::make('template_key')
                                             ->label('Template')
-                                            ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
-                                            ->default('template_2')
+                                            ->options(VerificationFormQuestion::templateOptionsForUi())
+                                            ->default(VerificationFormQuestion::defaultTemplateKey())
                                             ->required()
                                             ->live()
                                             ->native(false)
@@ -415,7 +415,7 @@ class VerificationFormQuestionResource extends Resource
                     ->badge(),
                 TextColumn::make('template_key')
                     ->label('Template')
-                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::TEMPLATE_OPTIONS[$state] ?? str($state)->headline()->toString())
+                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$state] ?? str($state)->headline()->toString())
                     ->badge(),
                 TextColumn::make('form_type')
                     ->label('Form')
@@ -446,8 +446,8 @@ class VerificationFormQuestionResource extends Resource
             ->filters([
                 SelectFilter::make('template_key')
                     ->label('Template')
-                    ->options(VerificationFormQuestion::TEMPLATE_OPTIONS)
-                    ->default('template_2'),
+                    ->options(VerificationFormQuestion::templateOptionsForUi())
+                    ->default(VerificationFormQuestion::defaultTemplateKey()),
                 SelectFilter::make('section_key')
                     ->label('Section')
                     ->options(fn (): array => static::sectionFilterOptions()),

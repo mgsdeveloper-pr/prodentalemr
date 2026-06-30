@@ -21,7 +21,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function selectTemplate(string $templateKey): void
     {
-        if (! array_key_exists($templateKey, VerificationFormQuestion::TEMPLATE_OPTIONS)) {
+        if (! array_key_exists($templateKey, VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)) {
             return;
         }
 
@@ -31,12 +31,12 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function getTemplateOptions(): array
     {
-        return VerificationFormQuestion::TEMPLATE_OPTIONS;
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS;
     }
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
     }
 
     public function repositionQuestion(int $questionId, string $direction): void
