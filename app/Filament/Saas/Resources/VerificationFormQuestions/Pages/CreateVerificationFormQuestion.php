@@ -43,7 +43,7 @@ class CreateVerificationFormQuestion extends CreateRecord
     {
         $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : AdminClinicScope::selectedClinicId();
 
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? 'template_2', $clinicId))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -58,7 +58,7 @@ class CreateVerificationFormQuestion extends CreateRecord
         $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : AdminClinicScope::selectedClinicId();
 
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? 'template_2', $clinicId))
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
             : 'Choose section';
     }
 

@@ -240,14 +240,29 @@
         --uel2-muted: #6d7d77;
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: 0;
         color: #142e25;
+    }
+
+    .uel2-shell {
+        border: 1px solid #d6e6df;
+        border-radius: 30px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 252, 249, 0.98) 100%);
+        box-shadow: 0 18px 40px rgba(13, 58, 41, 0.08);
+        overflow: hidden;
+    }
+
+    .uel2-shell__inner {
+        padding: 20px;
+        background:
+            linear-gradient(180deg, rgba(238, 247, 243, 0.92) 0%, rgba(248, 252, 250, 0.96) 100%);
     }
 
     .uel2-layout {
         display: grid;
         grid-template-columns: 300px minmax(0, 1fr);
-        gap: 20px;
+        gap: 16px;
         align-items: start;
     }
 
@@ -261,21 +276,21 @@
     .uel2-content {
         display: flex;
         flex-direction: column;
-        gap: 20px;
+        gap: 16px;
         min-width: 0;
     }
 
     .uel2-sidebar-rail {
-        overflow: hidden;
         border: 1px solid var(--uel2-line);
         border-radius: 24px;
-        background: linear-gradient(180deg, #ffffff, #fbfdfc);
-        box-shadow: 0 14px 34px rgba(13, 58, 41, 0.07);
+        background: linear-gradient(180deg, #ffffff, #f9fcfb);
+        box-shadow: 0 10px 24px rgba(13, 58, 41, 0.05);
         max-height: calc(100vh - 32px);
         overflow-y: auto;
         padding-right: 6px;
+        overscroll-behavior: contain;
         scrollbar-width: thin;
-        scrollbar-color: transparent transparent;
+        scrollbar-color: #94a3b8 #edf2f7;
     }
 
     .uel2-sidebar-rail::-webkit-scrollbar {
@@ -284,21 +299,13 @@
     }
 
     .uel2-sidebar-rail::-webkit-scrollbar-track {
-        background: transparent;
+        background: #edf2f7;
         border-radius: 999px;
     }
 
     .uel2-sidebar-rail::-webkit-scrollbar-thumb {
-        background: transparent;
-        border-radius: 999px;
-    }
-
-    .uel2-sidebar-rail:hover {
-        scrollbar-color: #94a3b8 transparent;
-    }
-
-    .uel2-sidebar-rail:hover::-webkit-scrollbar-thumb {
         background: #94a3b8;
+        border-radius: 999px;
     }
 
     .uel2-sidebar-rail:hover::-webkit-scrollbar-thumb:hover {
@@ -348,7 +355,7 @@
         border: 1px solid var(--uel2-line);
         border-radius: 22px;
         background: #ffffff;
-        box-shadow: 0 14px 34px rgba(13, 58, 41, 0.07);
+        box-shadow: 0 10px 24px rgba(13, 58, 41, 0.05);
     }
 
     .uel2-header {
@@ -694,6 +701,9 @@
     }
 
     @media (max-width: 1050px) {
+        .uel2-shell__inner {
+            padding: 16px;
+        }
         .uel2-layout { grid-template-columns: minmax(0, 1fr); }
         .uel2-sidebar {
             position: static;
@@ -752,9 +762,11 @@
 </style>
 
 <div class="uel2-page">
-    <div class="uel2-layout">
-        <aside class="uel2-sidebar">
-            <div class="uel2-sidebar-rail">
+    <section class="uel2-shell">
+        <div class="uel2-shell__inner">
+            <div class="uel2-layout">
+                <aside class="uel2-sidebar">
+                    <div class="uel2-sidebar-rail">
                 <section class="uel2-sidebar-rail__section">
                     <div class="uel2-sidebar-rail__title">
                         <h3>Quick Reference</h3>
@@ -836,10 +848,10 @@
                         @endforeach
                     </div>
                 </section>
-            </div>
-        </aside>
+                    </div>
+                </aside>
 
-        <div class="uel2-content">
+                <div class="uel2-content">
 
     <section class="uel2-section">
         <div class="uel2-header">
@@ -1273,8 +1285,10 @@
             @endif
         </div>
     </section>
+                </div>
+            </div>
         </div>
-    </div>
+    </section>
 </div>
 
 @if ($this->showAddInsuranceModal)

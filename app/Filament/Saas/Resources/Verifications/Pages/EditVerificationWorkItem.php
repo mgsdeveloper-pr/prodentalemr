@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
@@ -44,7 +45,7 @@ class EditVerificationWorkItem extends EditRecord
     public bool $openInfoRequestModalOnLoad = false;
     public bool $showAddInsuranceModal = false;
     public array $newInsuranceCarrier = [];
-    public string $formTemplate = 'template_2';
+    public string $formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
     public string $waitingPeriodAnswer = 'no';
     public array $waitingPeriodDetails = [];
     protected bool $shouldSkipWorkflowSyncOnSave = false;
@@ -70,14 +71,26 @@ class EditVerificationWorkItem extends EditRecord
 
     public function selectFormTemplate(string $template): void
     {
-        abort_unless($template === VerificationFormQuestion::defaultTemplateKey(), 404);
+        $template = VerificationFormQuestion::normalizeTemplateKey($template);
 
-        $this->formTemplate = VerificationFormQuestion::defaultTemplateKey();
+        abort_unless(array_key_exists($template, VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS), 404);
+
+        $this->formTemplate = $template;
     }
 
     public function getTitle(): string
     {
         return 'Verification Form';
+    }
+
+    public function getHeading(): string | Htmlable | null
+    {
+        return null;
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [];
     }
 
     public function getViewUrl(): string
@@ -398,6 +411,32 @@ class EditVerificationWorkItem extends EditRecord
         $this->redirect($redirectUrl, navigate: FilamentView::hasSpaMode($redirectUrl));
     }
 
+    public function saveAsDraft(): void
+    {
+        abort_unless($this->canSubmitForm(), 403);
+
+        $this->data['outcome_status'] = 'pending';
+        $this->record->outcome_status = 'pending';
+
+        $this->shouldSkipWorkflowSyncOnSave = true;
+        $this->save(false, false);
+        $this->shouldSkipWorkflowSyncOnSave = false;
+
+        if ($this->record->normalized_status !== BillingWorkItem::STATUS_INCOMPLETE) {
+            $this->record->transitionStatus(BillingWorkItem::STATUS_INCOMPLETE);
+        } else {
+            $this->record->refresh();
+        }
+
+        $this->auditReady = false;
+
+        Notification::make()
+            ->title('Draft saved')
+            ->body('The verification form was saved as draft and marked incomplete.')
+            ->success()
+            ->send();
+    }
+
     public function clearVerificationForm(): void
     {
         abort_unless($this->canSubmitForm(), 403);
@@ -656,6 +695,11 @@ class EditVerificationWorkItem extends EditRecord
 
     public function getTemplateTwoQuestionsForSection(string $sectionKey): array
     {
+        return $this->getManagedTemplateQuestionsForSection($sectionKey, $this->formTemplate);
+    }
+
+    public function getManagedTemplateQuestionsForSection(string $sectionKey, ?string $templateKey = null): array
+    {
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
         $clinicId = $this->record->clinic_id;
 
@@ -663,16 +707,34 @@ class EditVerificationWorkItem extends EditRecord
             return [];
         }
 
-        return VerificationFormQuestion::query()
+        $templateKey = VerificationFormQuestion::normalizeTemplateKey($templateKey ?: $this->formTemplate);
+        $resolvedSectionKey = $this->resolveTemplateSectionKey($sectionKey, $templateKey);
+
+        $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', 'template_2')
-            ->where('section_key', $sectionKey)
+            ->where('template_key', $templateKey)
+            ->where('section_key', $resolvedSectionKey)
             ->where('is_active', true)
             ->where('input_type', '!=', 'frequency_row')
             ->whereIn('form_type', ['both', $formType])
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get()
+            ->get();
+
+        if ($questions->isEmpty() && $templateKey === 'template_3') {
+            $questions = VerificationFormQuestion::query()
+                ->where('clinic_id', $clinicId)
+                ->where('template_key', 'template_2')
+                ->where('section_key', $this->resolveTemplateSectionKey($sectionKey, 'template_2'))
+                ->where('is_active', true)
+                ->where('input_type', '!=', 'frequency_row')
+                ->whereIn('form_type', ['both', $formType])
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+        }
+
+        return $questions
             ->map(fn (VerificationFormQuestion $question): array => [
                 'id' => $question->getKey(),
                 'label' => $question->prompt,
@@ -1395,22 +1457,38 @@ class EditVerificationWorkItem extends EditRecord
             return [];
         }
 
-        return VerificationFormQuestion::query()
+        $templateKey = VerificationFormQuestion::normalizeTemplateKey($this->formTemplate);
+        $sectionKeys = $this->frequencySectionKeysForTemplate($templateKey);
+        $orderExpression = $this->frequencySectionOrderExpression($sectionKeys);
+
+        $questions = VerificationFormQuestion::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', 'template_2')
-            ->whereIn('section_key', [
-                'template_2_frequency_general',
-                'template_2_frequency_basic',
-                'template_2_frequency_major',
-                'template_2_frequency_orthodontics',
-            ])
+            ->where('template_key', $templateKey)
+            ->whereIn('section_key', $sectionKeys)
             ->where('input_type', 'frequency_row')
             ->where('is_active', true)
             ->whereIn('form_type', ['both', $formType])
-            ->orderByRaw("FIELD(section_key, 'template_2_frequency_general', 'template_2_frequency_basic', 'template_2_frequency_major', 'template_2_frequency_orthodontics')")
+            ->orderByRaw($orderExpression)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get()
+            ->get();
+
+        if ($questions->isEmpty() && $templateKey === 'template_3') {
+            $fallbackSectionKeys = $this->frequencySectionKeysForTemplate('template_2');
+            $questions = VerificationFormQuestion::query()
+                ->where('clinic_id', $clinicId)
+                ->where('template_key', 'template_2')
+                ->whereIn('section_key', $fallbackSectionKeys)
+                ->where('input_type', 'frequency_row')
+                ->where('is_active', true)
+                ->whereIn('form_type', ['both', $formType])
+                ->orderByRaw($this->frequencySectionOrderExpression($fallbackSectionKeys))
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get();
+        }
+
+        return $questions
             ->map(fn (VerificationFormQuestion $question): array => [
                 'category' => VerificationFormQuestion::templateTwoFrequencyCategory($question->section_key),
                 'code' => $question->code ?: '',
@@ -1419,6 +1497,44 @@ class EditVerificationWorkItem extends EditRecord
                 'frequency_response_fields' => $question->frequency_response_fields ?: VerificationFormQuestion::defaultFrequencyResponseFields($question->frequency_response_mode ?: 'current'),
             ])
             ->all();
+    }
+
+    protected function resolveTemplateSectionKey(string $sectionKey, string $templateKey): string
+    {
+        $normalizedTemplate = VerificationFormQuestion::normalizeTemplateKey($templateKey);
+
+        if ($normalizedTemplate === 'template_3' && str_starts_with($sectionKey, 'template_2_')) {
+            return 'template_3_' . substr($sectionKey, strlen('template_2_'));
+        }
+
+        if ($normalizedTemplate === 'template_2' && str_starts_with($sectionKey, 'template_3_')) {
+            return 'template_2_' . substr($sectionKey, strlen('template_3_'));
+        }
+
+        return $sectionKey;
+    }
+
+    protected function frequencySectionKeysForTemplate(string $templateKey): array
+    {
+        $prefix = VerificationFormQuestion::normalizeTemplateKey($templateKey) === 'template_3'
+            ? 'template_3_'
+            : 'template_2_';
+
+        return [
+            $prefix . 'frequency_general',
+            $prefix . 'frequency_basic',
+            $prefix . 'frequency_major',
+            $prefix . 'frequency_orthodontics',
+        ];
+    }
+
+    protected function frequencySectionOrderExpression(array $sectionKeys): string
+    {
+        $quoted = collect($sectionKeys)
+            ->map(fn (string $key): string => "'" . str_replace("'", "\\'", $key) . "'")
+            ->implode(', ');
+
+        return "FIELD(section_key, {$quoted})";
     }
 
     protected function mergeConfiguredCodeCoverageRows(array $rows): array

@@ -22,10 +22,10 @@ class ListVerificationQuestions extends ListRecords
 
     protected string $view = 'filament.clinic.resources.verification-questions.pages.list-verification-questions';
 
-    public string $selectedTemplateKey = 'template_2';
+    public string $selectedTemplateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
 
     protected $queryString = [
-        'selectedTemplateKey' => ['except' => 'template_2', 'as' => 'template'],
+        'selectedTemplateKey' => ['except' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, 'as' => 'template'],
     ];
 
     protected function getHeaderActions(): array

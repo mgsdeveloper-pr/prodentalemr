@@ -26,7 +26,7 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? 'template_2', ClinicPanelScope::selectedClinicId()))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), ClinicPanelScope::selectedClinicId()))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -40,7 +40,7 @@ class CreateVerificationQuestion extends CreateRecord
         $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
 
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? 'template_2', ClinicPanelScope::selectedClinicId()))
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), ClinicPanelScope::selectedClinicId()))
             : 'Choose section';
     }
 

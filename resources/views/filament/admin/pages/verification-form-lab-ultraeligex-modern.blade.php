@@ -1,4 +1,3 @@
-<x-filament-panels::page>
     <style>
         :root {
             --uel-brand: #0b6b4f;
@@ -801,4 +800,3 @@
 
         document.addEventListener('DOMContentLoaded', toggleUelWaitingPeriods);
     </script>
-</x-filament-panels::page>

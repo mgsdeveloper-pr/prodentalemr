@@ -111,20 +111,134 @@
         })();
     </script>
 
+    @php
+        ob_start();
+    @endphp
+        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">
+            @if ($canSubmitForm)
+                <button type="button" wire:click="saveAsDraft" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Save as Draft
+                </button>
+                @if ($this->auditReady)
+                    <button type="button" wire:click="save" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
+                        {{ $this->getSaveButtonLabel() }}
+                    </button>
+                @else
+                    <button type="button" wire:click="auditVerification" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        {{ $this->getSaveButtonLabel() }}
+                    </button>
+                @endif
+                @if ($canRequestClinicInfo)
+                    <button type="button" onclick="openWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 164px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                        Request to Clinic
+                    </button>
+                @endif
+                <button type="button" wire:click="saveAndBack" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer;">
+                    Back
+                </button>
+                <button type="button" onclick="if (! confirm('Clear the verification answers and reset this form?')) return false;" wire:click="clearVerificationForm" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Clear Form
+                </button>
+            @else
+                <a href="{{ $this->getIndexUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
+                    Back
+                </a>
+            @endif
+        </div>
+    @php
+        $verificationFormHeroActions = trim(ob_get_clean());
+        $isTemplateThreeVerificationForm = $this->formTemplate === 'template_3';
+    @endphp
+
     <style>
-        .verification-workbench-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 18px;
-            padding: 8px 0 2px;
+        .vt3-compact-workbar {
+            position: sticky;
+            top: 12px;
+            z-index: 25;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 18px 24px;
+            align-items: end;
+            padding: 18px 22px;
+            border: 1px solid #d7e5df;
+            border-radius: 28px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 252, 250, 0.98) 100%);
+            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+            backdrop-filter: blur(12px);
         }
 
-        .verification-workbench-header__actions {
+        .vt3-compact-workbar__eyebrow {
+            margin-bottom: 10px;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: #0f766e;
+        }
+
+        .vt3-compact-workbar__title-row {
             display: flex;
             flex-wrap: wrap;
+            align-items: center;
+            gap: 10px 12px;
+        }
+
+        .vt3-compact-workbar__title-row h1 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 1.08;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .vt3-compact-workbar__token {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 7px 12px;
+            border-radius: 999px;
+            border: 1px solid #dbe7e2;
+            background: #ffffff;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .vt3-compact-workbar__patient {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .vt3-compact-workbar__breadcrumbs {
+            margin-top: 10px;
+            display: inline-flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .vt3-compact-workbar__breadcrumbs span:last-child {
+            color: #0f172a;
+        }
+
+        .vt3-compact-workbar__actions {
+            display: flex;
+            flex-wrap: nowrap;
             gap: 10px;
+            align-items: center;
             justify-content: flex-end;
+            align-self: end;
+            max-width: none;
+            white-space: nowrap;
+        }
+
+        .vt3-form-stage {
+            gap: 16px !important;
         }
 
         .verification-workbench-layout {
@@ -140,20 +254,6 @@
             gap: 18px;
             position: sticky;
             top: 24px;
-        }
-
-        .verification-workbench-copy {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 7px 12px;
-            border-radius: 999px;
-            border: 1px solid #dbe4ee;
-            background: #ffffff;
-            color: #475569;
-            font-size: 11px;
-            font-weight: 800;
-            cursor: pointer;
         }
 
         .verification-smart-form-grid {
@@ -208,12 +308,14 @@
         }
 
         @media (max-width: 1120px) {
-            .verification-workbench-header {
-                flex-direction: column;
+            .vt3-compact-workbar {
+                grid-template-columns: minmax(0, 1fr);
+                align-items: start;
             }
 
-            .verification-workbench-header__actions {
+            .vt3-compact-workbar__actions {
                 justify-content: flex-start;
+                max-width: none;
             }
 
             .verification-workbench-layout {
@@ -232,50 +334,47 @@
     </style>
 
     <div style="display: flex; flex-direction: column; gap: 22px;">
-        <section class="verification-workbench-header">
-            <div>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px;">
-                    <span style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ffffff; border: 1px solid #dbe4ee; color: #334155; font-size: 12px; font-weight: 700;">
-                        {{ $record->reference_number }}
-                    </span>
-                    <span style="font-size: 13px; font-weight: 600; color: #64748b;">
-                        {{ $record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? 'Verification Request') }}
-                    </span>
+        @if ($isTemplateThreeVerificationForm)
+            <section class="vt3-compact-workbar">
+                <div>
+                    <div class="vt3-compact-workbar__eyebrow">Verification Worksheet</div>
+                    <div class="vt3-compact-workbar__title-row">
+                        <h1>{{ $this->getTitle() }}</h1>
+                        <span class="vt3-compact-workbar__token">{{ $record->reference_number }}</span>
+                        <span class="vt3-compact-workbar__patient">Patient: {{ $record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? 'Verification Request') }}</span>
+                    </div>
+                    <div class="vt3-compact-workbar__breadcrumbs">
+                        <span>Verification Requests</span>
+                        <span>&rsaquo;</span>
+                        <span>{{ $record->reference_number }}</span>
+                        <span>&rsaquo;</span>
+                        <span>Edit</span>
+                    </div>
                 </div>
-                <p style="margin: 0; max-width: 880px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                    {{ $this->getFormDescription() }}
-                </p>
-            </div>
-
-            <div class="verification-workbench-header__actions">
-                @if ($canSubmitForm)
-                    @if ($this->auditReady)
-                        <button type="button" wire:click="save" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
-                            {{ $this->getSaveButtonLabel() }}
-                        </button>
-                    @else
-                        <button type="button" wire:click="auditVerification" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
-                            {{ $this->getSaveButtonLabel() }}
-                        </button>
-                    @endif
-                    @if ($canRequestClinicInfo)
-                        <button type="button" onclick="openWorkflowModal('info-request-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 164px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 13px; font-weight: 800; cursor: pointer;">
-                            Request to Clinic
-                        </button>
-                    @endif
-                    <button type="button" wire:click="saveAndBack" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer;">
-                        Back
-                    </button>
-                    <button type="button" onclick="if (! confirm('Clear the verification answers and reset this form?')) return false;" wire:click="clearVerificationForm" style="display: inline-flex; align-items: center; justify-content: center; min-width: 144px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
-                        Clear Form
-                    </button>
-                @else
-                    <a href="{{ $this->getIndexUrl() }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 13px; font-weight: 700; text-decoration: none;">
-                        Back
-                    </a>
-                @endif
-            </div>
-        </section>
+                <div class="vt3-compact-workbar__actions">{!! $verificationFormHeroActions !!}</div>
+            </section>
+        @else
+            @include('filament.shared.partials.page-hero', [
+                'eyebrow' => 'Verification Flow',
+                'title' => $this->getTitle(),
+                'description' => $this->getFormDescription(),
+                'extraContent' => '
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#64748b;font-size:12px;font-weight:700;width:fit-content;">
+                            <span>Verification Requests</span>
+                            <span style="color:#94a3b8;">&rsaquo;</span>
+                            <span>'.e($record->reference_number).'</span>
+                            <span style="color:#94a3b8;">&rsaquo;</span>
+                            <span>Edit</span>
+                        </div>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+                            <span style="display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;background:#ffffff;border:1px solid #dbe4ee;color:#334155;font-size:12px;font-weight:700;">'.e($record->reference_number).'</span>
+                            <span style="font-size:13px;font-weight:700;color:#0f172a;">Patient: '.e($record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? 'Verification Request')).'</span>
+                        </div>
+                    </div>',
+                'rightContent' => $verificationFormHeroActions,
+            ])
+        @endif
 
         @if ($errors->any())
             <section style="border: 1px solid #fecdd3; border-radius: 20px; background: #fff1f2; padding: 16px 18px;">
@@ -291,8 +390,12 @@
         @endif
 
         <form wire:submit="save">
-            <section style="display: flex; flex-direction: column; gap: 18px;">
-                @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
+            <section class="{{ $isTemplateThreeVerificationForm ? 'vt3-form-stage' : '' }}" style="display: flex; flex-direction: column; gap: 18px;">
+                @if ($this->formTemplate === 'template_3')
+                    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
+                @else
+                    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
+                @endif
             </section>
         </form>
     </div>

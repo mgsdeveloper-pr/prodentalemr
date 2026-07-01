@@ -8,14 +8,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VerificationFormQuestion extends Model
 {
-    public const DEFAULT_TEMPLATE_KEY = 'template_2';
+    public const DEFAULT_TEMPLATE_KEY = 'template_3';
 
     public const TEMPLATE_OPTIONS = [
-        'template_2' => 'Template 2',
+        'template_3' => 'Verification Workbench',
+        'template_2' => 'Template 2 (Legacy)',
     ];
 
     public const ACTIVE_TEMPLATE_OPTIONS = [
-        'template_2' => 'Template 2',
+        'template_3' => 'Verification Workbench',
+        'template_2' => 'Template 2 (Legacy)',
     ];
 
     public const SECTION_OPTIONS = [
@@ -35,6 +37,7 @@ class VerificationFormQuestion extends Model
         'template_2_patient_subscriber' => 'Patient & Subscriber Information',
         'template_2_insurance' => 'Insurance Information',
         'template_2_maximums_deductibles' => 'Maximums & Deductibles',
+        'template_2_coverage_category' => 'Deductible & Coverage Category',
         'template_2_plan_provisions' => 'Plan Provisions',
         'template_2_service_history' => 'Service History',
         'template_2_frequency_percentage' => 'Frequency & Percentage',
@@ -43,6 +46,21 @@ class VerificationFormQuestion extends Model
         'template_2_frequency_major' => 'Frequency & Percentage / Major',
         'template_2_frequency_orthodontics' => 'Frequency & Percentage / Orthodontics',
         'template_2_verification_information' => 'Verification Information',
+    ];
+
+    public const TEMPLATE_3_SECTION_OPTIONS = [
+        'template_3_patient_subscriber' => 'Patient & Subscriber Information',
+        'template_3_insurance' => 'Insurance Information',
+        'template_3_maximums_deductibles' => 'Maximums & Deductibles',
+        'template_3_coverage_category' => 'Deductible & Coverage Category',
+        'template_3_plan_provisions' => 'Plan Provisions',
+        'template_3_service_history' => 'Service History',
+        'template_3_frequency_percentage' => 'Frequency & Percentage',
+        'template_3_frequency_general' => 'Frequency & Percentage / General',
+        'template_3_frequency_basic' => 'Frequency & Percentage / Basic',
+        'template_3_frequency_major' => 'Frequency & Percentage / Major',
+        'template_3_frequency_orthodontics' => 'Frequency & Percentage / Orthodontics',
+        'template_3_verification_information' => 'Verification Information',
     ];
 
     public const FORM_TYPE_OPTIONS = [
@@ -218,6 +236,11 @@ class VerificationFormQuestion extends Model
     public static function templateOptionsForUi(): array
     {
         return self::ACTIVE_TEMPLATE_OPTIONS;
+    }
+
+    public static function isWorksheetTemplate(?string $templateKey): bool
+    {
+        return in_array(self::normalizeTemplateKey($templateKey), ['template_2', 'template_3'], true);
     }
 
     public static function normalizeTemplateKey(?string $templateKey): string
@@ -436,9 +459,13 @@ class VerificationFormQuestion extends Model
 
     public static function sectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
     {
-        $builtInOptions = $templateKey === 'template_2'
-            ? self::TEMPLATE_2_SECTION_OPTIONS
-            : self::SECTION_OPTIONS;
+        $templateKey = static::normalizeTemplateKey($templateKey);
+
+        $builtInOptions = match ($templateKey) {
+            'template_2' => self::TEMPLATE_2_SECTION_OPTIONS,
+            'template_3' => self::TEMPLATE_3_SECTION_OPTIONS,
+            default => self::SECTION_OPTIONS,
+        };
 
         if (! filled($clinicId)) {
             return $builtInOptions;
@@ -446,7 +473,7 @@ class VerificationFormQuestion extends Model
 
         $customSections = VerificationTemplateSection::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->where('is_active', true)
             ->orderByRaw('parent_section_key is not null')
             ->orderBy('sort_order')
@@ -494,6 +521,12 @@ class VerificationFormQuestion extends Model
                 'template_2_frequency_major' => 'Major',
                 'template_2_frequency_orthodontics' => 'Orthodontics',
             ],
+            'template_3_frequency_percentage' => [
+                'template_3_frequency_general' => 'General',
+                'template_3_frequency_basic' => 'Basic',
+                'template_3_frequency_major' => 'Major',
+                'template_3_frequency_orthodontics' => 'Orthodontics',
+            ],
             default => [],
         };
 
@@ -503,7 +536,7 @@ class VerificationFormQuestion extends Model
 
         $customChildren = VerificationTemplateSection::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->where('parent_section_key', $parentSectionKey)
             ->where('is_active', true)
             ->orderBy('sort_order')
@@ -525,6 +558,10 @@ class VerificationFormQuestion extends Model
             'template_2_frequency_basic' => 'template_2_frequency_percentage',
             'template_2_frequency_major' => 'template_2_frequency_percentage',
             'template_2_frequency_orthodontics' => 'template_2_frequency_percentage',
+            'template_3_frequency_general' => 'template_3_frequency_percentage',
+            'template_3_frequency_basic' => 'template_3_frequency_percentage',
+            'template_3_frequency_major' => 'template_3_frequency_percentage',
+            'template_3_frequency_orthodontics' => 'template_3_frequency_percentage',
         ];
 
         if (array_key_exists($sectionKey, $builtInParents)) {
@@ -537,7 +574,7 @@ class VerificationFormQuestion extends Model
 
         return VerificationTemplateSection::query()
             ->where('clinic_id', $clinicId)
-            ->where('template_key', $templateKey ?: 'template_2')
+            ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->where('section_key', $sectionKey)
             ->value('parent_section_key');
     }
@@ -550,15 +587,23 @@ class VerificationFormQuestion extends Model
             'template_2_frequency_basic',
             'template_2_frequency_major',
             'template_2_frequency_orthodontics',
+            'template_3_frequency_percentage',
+            'template_3_frequency_general',
+            'template_3_frequency_basic',
+            'template_3_frequency_major',
+            'template_3_frequency_orthodontics',
         ], true);
     }
 
     public static function templateTwoFrequencyCategory(?string $sectionKey): string
     {
         return match ($sectionKey) {
-            'template_2_frequency_basic' => 'Basic',
-            'template_2_frequency_major' => 'Major',
-            'template_2_frequency_orthodontics' => 'Orthodontics',
+            'template_2_frequency_basic',
+            'template_3_frequency_basic' => 'Basic',
+            'template_2_frequency_major',
+            'template_3_frequency_major' => 'Major',
+            'template_2_frequency_orthodontics',
+            'template_3_frequency_orthodontics' => 'Orthodontics',
             default => 'General',
         };
     }
@@ -588,6 +633,7 @@ class VerificationFormQuestion extends Model
         return $options[$sectionKey]
             ?? self::SECTION_OPTIONS[$sectionKey]
             ?? self::TEMPLATE_2_SECTION_OPTIONS[$sectionKey]
+            ?? self::TEMPLATE_3_SECTION_OPTIONS[$sectionKey]
             ?? str($sectionKey)->headline()->toString();
     }
 

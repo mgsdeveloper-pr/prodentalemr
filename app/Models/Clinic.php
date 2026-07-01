@@ -174,7 +174,7 @@ class Clinic extends Model
             VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS
         )
             ? (string) $this->verification_default_form_template
-            : 'template_2';
+            : VerificationFormQuestion::defaultTemplateKey();
     }
 
     public function getVerificationPdfOutputSections(): array

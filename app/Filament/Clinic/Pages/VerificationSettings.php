@@ -64,7 +64,7 @@ class VerificationSettings extends Page implements HasForms
         $selectedQuestionIds = $this->clinicRecord?->getVerificationPdfOutputQuestionIds() ?? [];
 
         $this->form->fill([
-            'verification_default_form_template' => $this->clinicRecord?->getVerificationDefaultFormTemplate() ?? 'template_2',
+            'verification_default_form_template' => $this->clinicRecord?->getVerificationDefaultFormTemplate() ?? VerificationFormQuestion::defaultTemplateKey(),
             'verification_pdf_output_mode' => $this->clinicRecord?->getVerificationPdfOutputMode() ?? 'standard',
             'verification_pdf_output_sections' => $this->clinicRecord?->getVerificationPdfOutputSections() ?? [],
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
@@ -99,10 +99,10 @@ class VerificationSettings extends Page implements HasForms
                         Select::make('verification_default_form_template')
                             ->label('Default verification form')
                             ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
-                            ->default('template_2')
+                            ->default(VerificationFormQuestion::defaultTemplateKey())
                             ->required()
                             ->native(false)
-                            ->helperText('Template 2 is the recommended default and the active verification form experience.'),
+                            ->helperText('Verification Workbench is the recommended default and the active verification form experience.'),
                         CheckboxList::make('verification_pdf_output_sections')
                             ->label('Selected output sections')
                             ->options($this->getPdfSectionLabels())
@@ -184,7 +184,7 @@ class VerificationSettings extends Page implements HasForms
         }
 
         $clinic->update([
-            'verification_default_form_template' => $state['verification_default_form_template'] ?? 'template_2',
+            'verification_default_form_template' => $state['verification_default_form_template'] ?? VerificationFormQuestion::defaultTemplateKey(),
             'verification_pdf_output_mode' => $mode,
             'verification_pdf_output_sections' => $mode === 'selected' ? array_values($sections) : [],
             'verification_pdf_output_question_ids' => $mode === 'selected' ? array_values($questionIds) : [],

@@ -316,7 +316,7 @@ class VerificationQuestionResource extends Resource
                         Section::make('Field Binding')
                             ->description('Only use these fields when the question should map directly to stored verification values or a matrix-style worksheet row.')
                             ->columnSpan(12)
-                            ->visible(fn (Get $get): bool => $get('template_key') !== 'template_2')
+                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isWorksheetTemplate($get('template_key')))
                             ->collapsible()
                             ->collapsed()
                             ->schema([
