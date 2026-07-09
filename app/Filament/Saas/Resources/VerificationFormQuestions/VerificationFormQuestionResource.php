@@ -67,7 +67,7 @@ class VerificationFormQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Template 2 builder clean and organized.')
+                            ->description('Choose where this question belongs before writing it. This keeps the Verification Workbench clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Grid::make(12)
@@ -83,7 +83,8 @@ class VerificationFormQuestionResource extends Resource
                                             ->required()
                                             ->columnSpan(4),
                                         Select::make('clinic_id')
-                                            ->label('Clinic')
+                                            ->label('Clinic override')
+                                            ->helperText('Leave blank for a master question. Select a clinic only when the question should be customized for that clinic.')
                                             ->options(function (Get $get): array {
                                                 $organizationId = $get('organization_id');
 
@@ -95,7 +96,6 @@ class VerificationFormQuestionResource extends Resource
                                             })
                                             ->native(false)
                                             ->searchable()
-                                            ->required()
                                             ->live()
                                             ->default(fn (): ?int => AdminClinicScope::selectedClinicId())
                                             ->afterStateUpdated(function ($state, Set $set): void {
@@ -176,6 +176,47 @@ class VerificationFormQuestionResource extends Resource
                             ->schema([
                                 Grid::make(12)
                                     ->schema([
+                                        Select::make('question_kind')
+                                            ->label('Question placement')
+                                            ->options(VerificationFormQuestion::QUESTION_KIND_OPTIONS)
+                                            ->default(VerificationFormQuestion::QUESTION_KIND_NORMAL)
+                                            ->required()
+                                            ->live()
+                                            ->native(false)
+                                            ->afterStateUpdated(function ($state, Set $set): void {
+                                                if ($state !== VerificationFormQuestion::QUESTION_KIND_CONDITIONAL) {
+                                                    $set('parent_question_id', null);
+                                                    $set('trigger_answer', null);
+                                                }
+                                            })
+                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(3),
+                                        Select::make('parent_question_id')
+                                            ->label('Show after question')
+                                            ->helperText('Conditional questions are shown only when this parent Yes/No question matches the trigger.')
+                                            ->options(fn (Get $get, ?VerificationFormQuestion $record = null): array => VerificationFormQuestion::parentQuestionOptionsFor(
+                                                $get('template_key'),
+                                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
+                                                filled($get('organization_id')) ? (int) $get('organization_id') : null,
+                                                $get('sub_section_key') ?: $get('section_key'),
+                                                $record?->getKey(),
+                                            ))
+                                            ->searchable()
+                                            ->native(false)
+                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('question_kind') === VerificationFormQuestion::QUESTION_KIND_CONDITIONAL)
+                                            ->required(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('question_kind') === VerificationFormQuestion::QUESTION_KIND_CONDITIONAL)
+                                            ->columnSpan(6),
+                                        Select::make('trigger_answer')
+                                            ->label('Show when answer is')
+                                            ->options(VerificationFormQuestion::CONDITIONAL_TRIGGER_OPTIONS)
+                                            ->native(false)
+                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('question_kind') === VerificationFormQuestion::QUESTION_KIND_CONDITIONAL)
+                                            ->required(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                                && $get('question_kind') === VerificationFormQuestion::QUESTION_KIND_CONDITIONAL)
+                                            ->columnSpan(3),
                                         Select::make('frequency_row_mode')
                                             ->label('Frequency row type')
                                             ->options([
@@ -305,7 +346,7 @@ class VerificationFormQuestionResource extends Resource
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
                                             ->label('Add a separate note area')
-                                            ->helperText('Displays an optional note box beside or below this question in Template 2.')
+                                            ->helperText('Displays an optional note box beside or below this question in the Verification Workbench.')
                                             ->default(false)
                                             ->live()
                                             ->inline(false)
@@ -332,10 +373,16 @@ class VerificationFormQuestionResource extends Resource
                                             ->default(false)
                                             ->inline(false)
                                             ->columnSpan(3),
+                                        Toggle::make('is_required_for_audit')
+                                            ->label('Required for Audit')
+                                            ->helperText('Audit will block completion until this answer is filled. Conditional questions are checked only when visible.')
+                                            ->default(false)
+                                            ->inline(false)
+                                            ->columnSpan(3),
                                         Placeholder::make('question_guidance')
                                             ->label('What this means')
                                             ->content('Use Active for live questions. Use System question only for locked questions tied to the built-in verification worksheet.')
-                                            ->columnSpan(6),
+                                            ->columnSpan(3),
                                     ]),
                             ]),
                         Section::make('Field Binding')
@@ -386,7 +433,25 @@ class VerificationFormQuestionResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
-                $query = AdminClinicScope::apply($query, 'clinic_id');
+                $selectedClinic = AdminClinicScope::selectedClinic();
+
+                if ($selectedClinic) {
+                    $query->where(function (Builder $scopeQuery) use ($selectedClinic): void {
+                        $scopeQuery
+                            ->where('clinic_id', $selectedClinic->id)
+                            ->orWhere(function (Builder $masterQuery) use ($selectedClinic): void {
+                                $masterQuery
+                                    ->whereNull('clinic_id')
+                                    ->where(function (Builder $organizationQuery) use ($selectedClinic): void {
+                                        $organizationQuery
+                                            ->whereNull('organization_id')
+                                            ->orWhere('organization_id', $selectedClinic->organization_id);
+                                    });
+                            });
+                    });
+                } else {
+                    $query = AdminClinicScope::apply($query, 'clinic_id');
+                }
 
                 return $query
                     ->with(['organization', 'clinic'])
@@ -441,6 +506,9 @@ class VerificationFormQuestionResource extends Resource
                     ->boolean(),
                 IconColumn::make('has_note')
                     ->label('Note')
+                    ->boolean(),
+                IconColumn::make('is_required_for_audit')
+                    ->label('Audit')
                     ->boolean(),
             ])
             ->filters([
@@ -506,7 +574,6 @@ class VerificationFormQuestionResource extends Resource
     protected static function sectionFilterOptions(): array
     {
         $options = VerificationFormQuestion::SECTION_OPTIONS
-            + VerificationFormQuestion::TEMPLATE_2_SECTION_OPTIONS
             + VerificationFormQuestion::TEMPLATE_3_SECTION_OPTIONS;
 
         VerificationFormQuestion::query()

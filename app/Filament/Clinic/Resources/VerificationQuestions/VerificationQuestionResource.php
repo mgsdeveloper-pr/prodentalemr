@@ -71,7 +71,7 @@ class VerificationQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Template 2 builder clean and organized.')
+                            ->description('Choose where this question belongs before writing it. This keeps the Verification Workbench clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Placeholder::make('clinic_scope')
@@ -280,7 +280,7 @@ class VerificationQuestionResource extends Resource
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
                                             ->label('Add a separate note area')
-                                            ->helperText('Displays an optional note box beside or below this question in Template 2.')
+                                            ->helperText('Displays an optional note box beside or below this question in the Verification Workbench.')
                                             ->default(false)
                                             ->live()
                                             ->inline(false)
@@ -307,10 +307,16 @@ class VerificationQuestionResource extends Resource
                                             ->default(false)
                                             ->inline(false)
                                             ->columnSpan(3),
+                                        Toggle::make('is_required_for_audit')
+                                            ->label('Required for Audit')
+                                            ->helperText('Audit will block completion until this answer is filled. Conditional questions are checked only when visible.')
+                                            ->default(false)
+                                            ->inline(false)
+                                            ->columnSpan(3),
                                         Placeholder::make('question_guidance')
                                             ->label('What this means')
                                             ->content('Use Active for live questions. Use System question only for locked questions tied to the built-in verification worksheet.')
-                                            ->columnSpan(6),
+                                            ->columnSpan(3),
                                     ]),
                             ]),
                         Section::make('Field Binding')
@@ -411,6 +417,9 @@ class VerificationQuestionResource extends Resource
                     ->boolean(),
                 IconColumn::make('has_note')
                     ->label('Note')
+                    ->boolean(),
+                IconColumn::make('is_required_for_audit')
+                    ->label('Audit')
                     ->boolean(),
             ])
             ->filters([

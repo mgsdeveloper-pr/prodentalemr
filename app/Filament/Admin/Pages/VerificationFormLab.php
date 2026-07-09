@@ -475,18 +475,18 @@ class VerificationFormLab extends Page
     public function getPreviewAnchor(): string
     {
         return match ($this->normalizeLabScopeKey($this->getSelectedScopeKey())) {
-            'template_2_patient_subscriber' => '#uel-patient',
-            'template_2_insurance' => '#uel-insurance',
-            'template_2_maximums_deductibles',
-            'template_2_coverage_category' => '#uel-maximums',
-            'template_2_plan_provisions' => '#uel-maximums',
-            'template_2_service_history' => '#uel-history',
-            'template_2_frequency_percentage',
-            'template_2_frequency_general',
-            'template_2_frequency_basic',
-            'template_2_frequency_major',
-            'template_2_frequency_orthodontics' => '#uel-codes',
-            'template_2_verification_information' => '#uel-verify',
+            'template_3_patient_subscriber' => '#uel-patient',
+            'template_3_insurance' => '#uel-insurance',
+            'template_3_maximums_deductibles',
+            'template_3_coverage_category' => '#uel-maximums',
+            'template_3_plan_provisions' => '#uel-maximums',
+            'template_3_service_history' => '#uel-history',
+            'template_3_frequency_percentage',
+            'template_3_frequency_general',
+            'template_3_frequency_basic',
+            'template_3_frequency_major',
+            'template_3_frequency_orthodontics' => '#uel-codes',
+            'template_3_verification_information' => '#uel-verify',
             default => '#uel-patient',
         };
     }
@@ -571,7 +571,7 @@ class VerificationFormLab extends Page
     public function getSelectedSectionBehaviors(): array
     {
         return match ($this->normalizeLabScopeKey($this->getSelectedScopeKey())) {
-            'template_2_patient_subscriber' => [
+            'template_3_patient_subscriber' => [
                 [
                     'title' => 'Identity capture',
                     'description' => 'Best for patient name, member ID, subscriber name, and subscriber DOB using clean one-line fields.',
@@ -585,7 +585,7 @@ class VerificationFormLab extends Page
                     'description' => 'Anything created here should feed the left quick-reference sidebar in the live verification form.',
                 ],
             ],
-            'template_2_insurance' => [
+            'template_3_insurance' => [
                 [
                     'title' => 'Database-assisted answers',
                     'description' => 'Insurance Provider, Plan Type, and Fee Schedule should prefer dropdown-driven values wherever the database already has them.',
@@ -599,7 +599,7 @@ class VerificationFormLab extends Page
                     'description' => 'If the insurer is not found, the clinic should still be able to add it without leaving the workflow.',
                 ],
             ],
-            'template_2_maximums_deductibles' => [
+            'template_3_maximums_deductibles' => [
                 [
                     'title' => 'One-line financial answers',
                     'description' => 'Keep annual max, remaining max, and deductible values as simple currency or number answers.',
@@ -613,7 +613,7 @@ class VerificationFormLab extends Page
                     'description' => 'This section should stay fast to enter, with optional notes only where the clinic truly needs context.',
                 ],
             ],
-            'template_2_plan_provisions' => [
+            'template_3_plan_provisions' => [
                 [
                     'title' => 'Conditional follow-up',
                     'description' => 'Yes/No and dropdown answers here can trigger a follow-up detail input or follow-up table when the answer requires extra explanation.',
@@ -627,7 +627,7 @@ class VerificationFormLab extends Page
                     'description' => 'Even if multiple internal response controls exist, the verification form should still resolve into one clear final answer row.',
                 ],
             ],
-            'template_2_service_history' => [
+            'template_3_service_history' => [
                 [
                     'title' => 'History-first capture',
                     'description' => 'Use a single combined answer field for code, service history, or last service date when the team only needs one line.',
@@ -641,11 +641,11 @@ class VerificationFormLab extends Page
                     'description' => 'This section supports decision-making, so the placeholders should guide what kind of history the clinic should enter.',
                 ],
             ],
-            'template_2_frequency_percentage',
-            'template_2_frequency_general',
-            'template_2_frequency_basic',
-            'template_2_frequency_major',
-            'template_2_frequency_orthodontics' => [
+            'template_3_frequency_percentage',
+            'template_3_frequency_general',
+            'template_3_frequency_basic',
+            'template_3_frequency_major',
+            'template_3_frequency_orthodontics' => [
                 [
                     'title' => 'Two row modes',
                     'description' => 'Each row can be either a Formal Question or an ADA/CDT Code, never both at once.',
@@ -659,7 +659,7 @@ class VerificationFormLab extends Page
                     'description' => 'If a sub-section has no configured questions, the whole group should stay hidden in the live verification form.',
                 ],
             ],
-            'template_2_verification_information' => [
+            'template_3_verification_information' => [
                 [
                     'title' => 'System-led output',
                     'description' => 'This section should remain mostly generated by the system, with only deliberate human notes left open for editing.',
@@ -684,13 +684,7 @@ class VerificationFormLab extends Page
 
     protected function normalizeLabScopeKey(?string $scopeKey): ?string
     {
-        if (! is_string($scopeKey) || $scopeKey === '') {
-            return $scopeKey;
-        }
-
-        return str_starts_with($scopeKey, 'template_3_')
-            ? 'template_2_' . substr($scopeKey, strlen('template_3_'))
-            : $scopeKey;
+        return $scopeKey;
     }
 
     /**

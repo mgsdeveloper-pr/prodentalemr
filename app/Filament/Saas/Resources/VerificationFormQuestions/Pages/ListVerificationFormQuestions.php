@@ -15,6 +15,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class ListVerificationFormQuestions extends ListRecords
@@ -44,13 +45,13 @@ class ListVerificationFormQuestions extends ListRecords
                         ->required(),
                     Select::make('clinic_id')
                         ->label('Clinic')
+                        ->helperText('Leave blank to create a master section for this organization.')
                         ->options(fn ($get): array => Clinic::query()
                             ->when($get('organization_id'), fn ($query, $organizationId) => $query->where('organization_id', $organizationId))
                             ->orderBy('clinic_name')
                             ->pluck('clinic_name', 'id')
                             ->all())
                         ->searchable()
-                        ->required()
                         ->live(),
                     Select::make('template_key')
                         ->label('Template')
@@ -81,13 +82,13 @@ class ListVerificationFormQuestions extends ListRecords
                         ->required(),
                     Select::make('clinic_id')
                         ->label('Clinic')
+                        ->helperText('Leave blank to create a master sub-section for this organization.')
                         ->options(fn ($get): array => Clinic::query()
                             ->when($get('organization_id'), fn ($query, $organizationId) => $query->where('organization_id', $organizationId))
                             ->orderBy('clinic_name')
                             ->pluck('clinic_name', 'id')
                             ->all())
                         ->searchable()
-                        ->required()
                         ->live(),
                     Select::make('template_key')
                         ->label('Template')
@@ -129,9 +130,11 @@ class ListVerificationFormQuestions extends ListRecords
             return;
         }
 
-        $clinic = Clinic::query()->find((int) $data['clinic_id']);
+        $clinic = filled($data['clinic_id'] ?? null)
+            ? Clinic::query()->find((int) $data['clinic_id'])
+            : null;
 
-        if (! $clinic) {
+        if (filled($data['clinic_id'] ?? null) && ! $clinic) {
             Notification::make()->title('Select a valid clinic')->danger()->send();
 
             return;
@@ -142,7 +145,8 @@ class ListVerificationFormQuestions extends ListRecords
         $counter = 2;
 
         while (VerificationTemplateSection::query()
-            ->where('clinic_id', $clinic->id)
+            ->where('organization_id', $clinic?->organization_id ?? (int) $data['organization_id'])
+            ->where('clinic_id', $clinic?->id)
             ->where('template_key', $data['template_key'])
             ->where('section_key', $sectionKey)
             ->exists()) {
@@ -150,14 +154,15 @@ class ListVerificationFormQuestions extends ListRecords
         }
 
         VerificationTemplateSection::query()->create([
-            'organization_id' => $clinic->organization_id,
-            'clinic_id' => $clinic->id,
+            'organization_id' => $clinic?->organization_id ?? (int) $data['organization_id'],
+            'clinic_id' => $clinic?->id,
             'template_key' => $data['template_key'],
             'section_key' => $sectionKey,
             'parent_section_key' => $data['parent_section_key'] ?? null,
             'label' => $data['label'],
             'sort_order' => ((int) VerificationTemplateSection::query()
-                ->where('clinic_id', $clinic->id)
+                ->where('organization_id', $clinic?->organization_id ?? (int) $data['organization_id'])
+                ->where('clinic_id', $clinic?->id)
                 ->where('template_key', $data['template_key'])
                 ->max('sort_order')) + 10,
             'is_active' => true,
@@ -178,8 +183,26 @@ class ListVerificationFormQuestions extends ListRecords
             return [];
         }
 
+        $clinic = Clinic::query()
+            ->select(['id', 'organization_id'])
+            ->find($clinicId);
+
         return VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->where(function (Builder $query) use ($clinicId, $clinic): void {
+                $query->where('clinic_id', $clinicId)
+                    ->orWhere(function (Builder $masterQuery) use ($clinic): void {
+                        $masterQuery
+                            ->whereNull('clinic_id')
+                            ->where(function (Builder $organizationQuery) use ($clinic): void {
+                                $organizationQuery->whereNull('organization_id');
+
+                                if (filled($clinic?->organization_id)) {
+                                    $organizationQuery->orWhere('organization_id', $clinic->organization_id);
+                                }
+                            });
+                    });
+            })
+            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->with('clinic.organization')
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -203,6 +226,7 @@ class ListVerificationFormQuestions extends ListRecords
                             'prompt' => filled($question->code) ? "{$question->code} {$question->prompt}" : $question->prompt,
                             'is_active' => $question->is_active,
                             'is_builtin' => $question->is_builtin,
+                            'scope' => filled($question->clinic_id) ? 'Clinic' : 'Master',
                             'form_type' => VerificationFormQuestion::FORM_TYPE_OPTIONS[$question->form_type] ?? str($question->form_type)->headline()->toString(),
                         ];
                     })->all(),

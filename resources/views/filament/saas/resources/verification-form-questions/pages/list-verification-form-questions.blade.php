@@ -22,7 +22,7 @@
                     Template Builder
                 </h2>
                 <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                    Manage Template 2 section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
+                    Manage the Verification Workbench section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                 </p>
             </div>
 
@@ -55,6 +55,7 @@
                                             <div style="font-size:14px;font-weight:700;color:#0f172a;">{{ $question['prompt'] }}</div>
                                             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                                                 <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;border:1px solid #dbe4ee;background:#f8fafc;color:#475569;font-size:11px;font-weight:700;">{{ $question['form_type'] }}</span>
+                                                <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;border:1px solid #ccfbf1;background:#f0fdfa;color:#0f766e;font-size:11px;font-weight:700;">{{ $question['scope'] }}</span>
                                                 @if ($question['is_builtin'])
                                                     <span style="display:inline-flex;align-items:center;padding:4px 9px;border-radius:999px;border:1px solid #dbeafe;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700;">System</span>
                                                 @endif

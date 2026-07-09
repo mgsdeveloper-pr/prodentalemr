@@ -104,7 +104,9 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['clinic_id'] = $data['clinic_id'] ?: AdminClinicScope::selectedClinicId();
+        $data['clinic_id'] = filled($data['clinic_id'] ?? null)
+            ? (int) $data['clinic_id']
+            : null;
 
         if (filled($data['clinic_id']) && ! filled($data['organization_id'])) {
             $data['organization_id'] = Clinic::query()->whereKey($data['clinic_id'])->value('organization_id');
@@ -118,10 +120,20 @@ class CreateVerificationFormQuestion extends CreateRecord
 
         if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
             $data['input_type'] = 'frequency_row';
+            $data['question_kind'] = VerificationFormQuestion::QUESTION_KIND_NORMAL;
+            $data['parent_question_id'] = null;
+            $data['trigger_answer'] = null;
             $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
             $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
             $data['frequency_response_fields'] = $data['frequency_response_fields'] ?: VerificationFormQuestion::defaultFrequencyResponseFields($data['frequency_response_mode']);
         } else {
+            $data['question_kind'] = $data['question_kind'] ?? VerificationFormQuestion::QUESTION_KIND_NORMAL;
+
+            if ($data['question_kind'] !== VerificationFormQuestion::QUESTION_KIND_CONDITIONAL) {
+                $data['parent_question_id'] = null;
+                $data['trigger_answer'] = null;
+            }
+
             $data['frequency_response_mode'] = null;
             $data['frequency_response_fields'] = null;
         }

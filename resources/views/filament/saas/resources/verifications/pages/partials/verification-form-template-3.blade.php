@@ -1,5 +1,5 @@
 <div class="vt3-shell">
-    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
+    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3-content')
 </div>
 
 <style>
@@ -258,6 +258,34 @@
     .vt3-shell .uel2-grid textarea {
         min-height: 40px;
         border-radius: 12px;
+    }
+
+    .vt3-shell .uel2-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .vt3-shell .uel2-actions > button,
+    .vt3-shell .uel2-actions > a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1;
+        box-shadow: none;
+        transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .vt3-shell .uel2-actions > button:hover,
+    .vt3-shell .uel2-actions > a:hover {
+        transform: translateY(-1px);
     }
 
     .vt3-shell .uel2-managed-question {

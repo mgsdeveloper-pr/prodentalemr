@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('organization_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('clinic_id')->constrained()->cascadeOnDelete();
-            $table->string('template_key')->default('template_2');
+            $table->string('template_key')->default('template_3');
             $table->string('section_key');
             $table->string('parent_section_key')->nullable();
             $table->string('label');

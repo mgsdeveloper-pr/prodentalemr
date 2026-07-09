@@ -1,5 +1,5 @@
 @php
-    $templateTwoBenefitGroups = collect([
+    $templateThreeBenefitGroups = collect([
         'General' => [],
         'Basic' => [],
         'Major' => [],
@@ -22,35 +22,35 @@
             default => 'General',
         };
 
-        $groupRows = $templateTwoBenefitGroups->get($benefitGroup, []);
+        $groupRows = $templateThreeBenefitGroups->get($benefitGroup, []);
         $groupRows[] = ['index' => $coverageIndex, 'row' => $coverageRow];
-        $templateTwoBenefitGroups->put($benefitGroup, $groupRows);
+        $templateThreeBenefitGroups->put($benefitGroup, $groupRows);
     }
 
-    $templateTwoVisibleBenefitGroups = $templateTwoBenefitGroups
+    $templateThreeVisibleBenefitGroups = $templateThreeBenefitGroups
         ->filter(fn (array $benefitRows): bool => count($benefitRows) > 0);
 
-    $templateTwoPatientQuestions = $this->getTemplateTwoQuestionsForSection('template_2_patient_subscriber');
-    $templateTwoInsuranceQuestions = $this->getTemplateTwoQuestionsForSection('template_2_insurance');
-    $templateTwoMaximumQuestions = $this->getTemplateTwoQuestionsForSection('template_2_maximums_deductibles');
-    $templateTwoPlanProvisionQuestions = $this->getTemplateTwoQuestionsForSection('template_2_plan_provisions');
-    $templateTwoServiceHistoryQuestions = $this->getTemplateTwoQuestionsForSection('template_2_service_history');
-    $templateTwoVerificationQuestions = $this->getTemplateTwoQuestionsForSection('template_2_verification_information');
-    $templateTwoSectionProgress = collect($this->getVerificationSectionProgress());
-    $templateTwoContextRows = $this->getContextRows();
-    $templateTwoSidebarBlocks = [
-        'Practice' => $templateTwoContextRows['practice'] ?? [],
+    $templateThreePatientQuestions = $this->getTemplateThreeQuestionsForSection('template_3_patient_subscriber');
+    $templateThreeInsuranceQuestions = $this->getTemplateThreeQuestionsForSection('template_3_insurance');
+    $templateThreeMaximumQuestions = $this->getTemplateThreeQuestionsForSection('template_3_maximums_deductibles');
+    $templateThreePlanProvisionQuestions = $this->getTemplateThreeQuestionsForSection('template_3_plan_provisions');
+    $templateThreeServiceHistoryQuestions = $this->getTemplateThreeQuestionsForSection('template_3_service_history');
+    $templateThreeVerificationQuestions = $this->getTemplateThreeQuestionsForSection('template_3_verification_information');
+    $templateThreeSectionProgress = collect($this->getVerificationSectionProgress());
+    $templateThreeContextRows = $this->getContextRows();
+    $templateThreeSidebarBlocks = [
+        'Practice' => $templateThreeContextRows['practice'] ?? [],
         'Provider' => [
             ['label' => 'Doctor', 'value' => $quickReference['provider_name'] ?? '-'],
             ['label' => 'Provider NPI', 'value' => $quickReference['provider_npi'] ?? '-'],
             ['label' => 'Practice NPI', 'value' => $quickReference['practice_npi'] ?? '-'],
             ['label' => 'Insurance Phone', 'value' => $quickReference['phone'] ?? '-'],
         ],
-        'Patient' => $templateTwoContextRows['patient'] ?? [],
+        'Patient' => $templateThreeContextRows['patient'] ?? [],
     ];
 
-    $templateTwoInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
-    $templateTwoReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
+    $templateThreeInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
+    $templateThreeReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
     $annualMaximum = (float) (data_get($this->data, 'vf_annual_maximum') ?: 0);
     $annualRemaining = (float) (data_get($this->data, 'vf_annual_maximum_remaining') ?: 0);
     $individualDeductible = (float) (data_get($this->data, 'vf_individual_deductible') ?: 0);
@@ -58,7 +58,7 @@
     $familyDeductible = (float) (data_get($this->data, 'vf_family_deductible') ?: 0);
     $familyRemaining = (float) (data_get($this->data, 'vf_family_deductible_remaining') ?: 0);
     $insuranceCarrierOptions = $this->getInsuranceCarrierOptions();
-    $templateTwoInsuranceGroups = [
+    $templateThreeInsuranceGroups = [
         [
             ['Insurance Provider', 'vf_insurance_provider_name', 'text'],
             ['Group Number', 'vf_group_number', 'text'],
@@ -83,14 +83,14 @@
             ['Employer / Group Name', 'vf_group_name', 'text'],
         ],
     ];
-    $templateTwoCountFilled = function (array $fields): int {
+    $templateThreeCountFilled = function (array $fields): int {
         return collect($fields)
             ->filter(fn ($field): bool => filled(data_get($this->data, $field)))
             ->count();
     };
-    $templateTwoSectionCounts = [
+    $templateThreeSectionCounts = [
         'patient' => [
-            'completed' => $templateTwoCountFilled([
+            'completed' => $templateThreeCountFilled([
                 'vf_patient_full_name',
                 'vf_patient_dob',
                 'vf_patient_identifier',
@@ -98,12 +98,12 @@
                 'vf_subscriber_name',
                 'vf_subscriber_dob',
                 'vf_subscriber_id',
-                'vf_cob',
+                'vf_coverage_role',
             ]),
             'total' => 8,
         ],
         'insurance' => [
-            'completed' => $templateTwoCountFilled([
+            'completed' => $templateThreeCountFilled([
                 'vf_insurance_provider_name',
                 'vf_group_number',
                 'vf_plan_type',
@@ -120,7 +120,7 @@
             'total' => 12,
         ],
         'maximums' => [
-            'completed' => $templateTwoCountFilled([
+            'completed' => $templateThreeCountFilled([
                 'vf_annual_maximum',
                 'vf_annual_maximum_remaining',
                 'vf_individual_deductible',
@@ -131,7 +131,7 @@
             'total' => 6,
         ],
         'service_history' => [
-            'completed' => $templateTwoCountFilled([
+            'completed' => $templateThreeCountFilled([
                 'vf_history_exams',
                 'vf_history_prophylaxis',
                 'vf_history_bitewings',
@@ -151,7 +151,7 @@
             'total' => 5,
         ],
     ];
-    $templateTwoCoverageCategoryRows = [
+    $templateThreeCoverageCategoryRows = [
         ['Diagnostic & Preventive', 'vf_coverage_diagnostic_deductible_applies', 'vf_coverage_diagnostic'],
         ['Basic Restorative', 'vf_coverage_basic_restorative_deductible_applies', 'vf_coverage_basic_restorative'],
         ['Endodontics', 'vf_coverage_endodontics_deductible_applies', 'vf_coverage_endodontics'],
@@ -160,16 +160,70 @@
         ['Major Restorative', 'vf_coverage_major_restorative_deductible_applies', 'vf_coverage_major_restorative'],
         ['Orthodontics', 'vf_coverage_orthodontics_deductible_applies', 'vf_ortho_benefit'],
     ];
-    $templateTwoCoverageCategoryCompleted = collect($templateTwoCoverageCategoryRows)->reduce(
+    $templateThreeCoverageCategoryCompleted = collect($templateThreeCoverageCategoryRows)->reduce(
         fn (int $carry, array $row): int => $carry + ((filled(data_get($this->data, $row[1])) || filled(data_get($this->data, $row[2]))) ? 1 : 0),
         0
     );
-    $templateTwoCoverageCategoryTotal = count($templateTwoCoverageCategoryRows);
-    $templateTwoPlanProvisionFields = [
+    $templateThreeCoverageCategoryTotal = count($templateThreeCoverageCategoryRows);
+    $templateThreeFormatDateValue = static function ($value): ?string {
+        if (blank($value)) {
+            return null;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    };
+
+    $templateThreeStoredDates = [
+        'vf_patient_dob' => $templateThreeFormatDateValue(optional($record->verificationProfile)->patient_dob ?: optional($record->patient)->dob),
+        'vf_subscriber_dob' => $templateThreeFormatDateValue(
+            optional($record->verificationProfile)->subscriber_dob
+            ?: optional($record->insurancePolicy)->subscriber_dob
+            ?: optional(optional($record->verificationPlanSnapshots)->first())->subscriber_dob
+        ),
+        'vf_effective_date' => $templateThreeFormatDateValue(
+            optional($record->verificationProfile)->effective_date
+            ?: optional($record->insurancePolicy)->effective_date
+        ),
+        'vf_future_termination_date' => $templateThreeFormatDateValue(
+            optional($record->verificationProfile)->future_termination_date
+            ?: optional($record->insurancePolicy)->termination_date
+        ),
+        'vf_verification_date' => $templateThreeFormatDateValue(optional($record->verificationProfile)->verification_date),
+    ];
+    $templateThreeDateValue = function (string $field) use ($templateThreeFormatDateValue, $templateThreeStoredDates): ?string {
+        $relationship = strtolower(trim((string) data_get($this->data, 'vf_insured_relation')));
+
+        $candidates = $field === 'vf_subscriber_dob' && $relationship === 'self'
+            ? [
+                data_get($this->data, 'vf_patient_dob'),
+                $templateThreeStoredDates['vf_patient_dob'] ?? null,
+                data_get($this->data, 'vf_subscriber_dob'),
+                $templateThreeStoredDates['vf_subscriber_dob'] ?? null,
+            ]
+            : [
+                data_get($this->data, $field),
+                $templateThreeStoredDates[$field] ?? null,
+            ];
+
+        foreach ($candidates as $candidate) {
+            $formatted = $templateThreeFormatDateValue($candidate);
+
+            if (filled($formatted)) {
+                return $formatted;
+            }
+        }
+
+        return null;
+    };
+    $templateThreePlanProvisionFields = [
         data_get($this->data, 'vf_missing_tooth_clause'),
         data_get($this->data, 'vf_crowns_paid_on'),
         data_get($this->data, 'vf_prosthetic_replacement_period'),
-        data_get($this->data, 'vf_cob'),
+        data_get($this->data, 'vf_coordination_of_benefits'),
         data_get($this->data, 'vf_plan_provisions'),
         $this->waitingPeriodAnswer === 'yes'
             ? collect($this->waitingPeriodDetails ?? [])->contains(
@@ -179,56 +233,56 @@
             )
             : filled($this->waitingPeriodAnswer ?? null),
     ];
-    $templateTwoPlanProvisionCompleted = collect($templateTwoPlanProvisionFields)
+    $templateThreePlanProvisionCompleted = collect($templateThreePlanProvisionFields)
         ->filter(fn ($value): bool => filled($value))
         ->count();
-    $templateTwoPlanProvisionTotal = count($templateTwoPlanProvisionFields);
-    $templateTwoProgressSections = collect([
+    $templateThreePlanProvisionTotal = count($templateThreePlanProvisionFields);
+    $templateThreeProgressSections = collect([
         [
             'label' => 'Patient & Subscriber',
-            'completed' => $templateTwoSectionCounts['patient']['completed'],
-            'total' => $templateTwoSectionCounts['patient']['total'],
+            'completed' => $templateThreeSectionCounts['patient']['completed'],
+            'total' => $templateThreeSectionCounts['patient']['total'],
         ],
         [
             'label' => 'Insurance Information',
-            'completed' => $templateTwoSectionCounts['insurance']['completed'],
-            'total' => $templateTwoSectionCounts['insurance']['total'],
+            'completed' => $templateThreeSectionCounts['insurance']['completed'],
+            'total' => $templateThreeSectionCounts['insurance']['total'],
         ],
         [
             'label' => 'Maximums & Deductibles',
-            'completed' => $templateTwoSectionCounts['maximums']['completed'],
-            'total' => $templateTwoSectionCounts['maximums']['total'],
+            'completed' => $templateThreeSectionCounts['maximums']['completed'],
+            'total' => $templateThreeSectionCounts['maximums']['total'],
         ],
         [
             'label' => 'Coverage Category',
-            'completed' => $templateTwoCoverageCategoryCompleted,
-            'total' => $templateTwoCoverageCategoryTotal,
+            'completed' => $templateThreeCoverageCategoryCompleted,
+            'total' => $templateThreeCoverageCategoryTotal,
         ],
         [
             'label' => 'Plan Provisions',
-            'completed' => $templateTwoPlanProvisionCompleted,
-            'total' => $templateTwoPlanProvisionTotal,
+            'completed' => $templateThreePlanProvisionCompleted,
+            'total' => $templateThreePlanProvisionTotal,
         ],
         [
             'label' => 'Service History',
-            'completed' => $templateTwoSectionCounts['service_history']['completed'],
-            'total' => $templateTwoSectionCounts['service_history']['total'],
+            'completed' => $templateThreeSectionCounts['service_history']['completed'],
+            'total' => $templateThreeSectionCounts['service_history']['total'],
         ],
         [
             'label' => 'Frequency & Percentage',
             'completed' => (int) ($codeCoverageSection['completed'] ?? 0),
             'total' => (int) ($codeCoverageSection['total'] ?? 0),
-            'visible' => $templateTwoVisibleBenefitGroups->isNotEmpty(),
+            'visible' => $templateThreeVisibleBenefitGroups->isNotEmpty(),
         ],
         [
             'label' => 'Verification Information',
-            'completed' => $templateTwoSectionCounts['verification']['completed'],
-            'total' => $templateTwoSectionCounts['verification']['total'],
+            'completed' => $templateThreeSectionCounts['verification']['completed'],
+            'total' => $templateThreeSectionCounts['verification']['total'],
         ],
     ])->filter(fn (array $section): bool => ($section['visible'] ?? true) === true)->values();
-    $templateTwoProgressCompleted = (int) $templateTwoProgressSections->sum('completed');
-    $templateTwoProgressTotal = max(1, (int) $templateTwoProgressSections->sum('total'));
-    $templateTwoProgressPercent = (int) round(($templateTwoProgressCompleted / $templateTwoProgressTotal) * 100);
+    $templateThreeProgressCompleted = (int) $templateThreeProgressSections->sum('completed');
+    $templateThreeProgressTotal = max(1, (int) $templateThreeProgressSections->sum('total'));
+    $templateThreeProgressPercent = (int) round(($templateThreeProgressCompleted / $templateThreeProgressTotal) * 100);
 @endphp
 
 <style>
@@ -802,30 +856,30 @@
                             <h2>Verification Progress</h2>
                             <div class="uel2-sidebar-rail__copy">Track completion across the workup</div>
                         </div>
-                        <span class="uel2-pill">{{ $templateTwoProgressCompleted }}/{{ $templateTwoProgressSections->sum('total') }}</span>
+                        <span class="uel2-pill">{{ $templateThreeProgressCompleted }}/{{ $templateThreeProgressSections->sum('total') }}</span>
                     </div>
                     <div class="uel2-progress-card">
                         <div class="uel2-progress-bar">
-                            <span style="width: {{ min(100, max(0, $templateTwoProgressPercent)) }}%;"></span>
+                            <span style="width: {{ min(100, max(0, $templateThreeProgressPercent)) }}%;"></span>
                         </div>
                         <div class="uel2-progress-total">
-                            <span>{{ $templateTwoProgressPercent }}% complete</span>
-                            <span>{{ $templateTwoProgressCompleted }} / {{ $templateTwoProgressSections->sum('total') }} fields</span>
+                            <span>{{ $templateThreeProgressPercent }}% complete</span>
+                            <span>{{ $templateThreeProgressCompleted }} / {{ $templateThreeProgressSections->sum('total') }} fields</span>
                         </div>
                     </div>
 
                     <div class="uel2-progress-list">
-                        @foreach ($templateTwoProgressSections as $templateTwoProgressItem)
+                        @foreach ($templateThreeProgressSections as $templateThreeProgressItem)
                             @php
-                                $templateTwoProgressDone = (int) ($templateTwoProgressItem['completed'] ?? 0) >= (int) ($templateTwoProgressItem['total'] ?? 0)
-                                    && (int) ($templateTwoProgressItem['total'] ?? 0) > 0;
+                                $templateThreeProgressDone = (int) ($templateThreeProgressItem['completed'] ?? 0) >= (int) ($templateThreeProgressItem['total'] ?? 0)
+                                    && (int) ($templateThreeProgressItem['total'] ?? 0) > 0;
                             @endphp
-                            <div class="uel2-progress-item {{ $templateTwoProgressDone ? 'uel2-progress-item--done' : '' }}">
+                            <div class="uel2-progress-item {{ $templateThreeProgressDone ? 'uel2-progress-item--done' : '' }}">
                                 <div class="uel2-progress-item__meta">
                                     <span class="uel2-progress-item__dot"></span>
-                                    <span class="uel2-progress-item__label">{{ $templateTwoProgressItem['label'] ?? 'Section' }}</span>
+                                    <span class="uel2-progress-item__label">{{ $templateThreeProgressItem['label'] ?? 'Section' }}</span>
                                 </div>
-                                <span class="uel2-progress-item__count">{{ (int) ($templateTwoProgressItem['completed'] ?? 0) }}/{{ (int) ($templateTwoProgressItem['total'] ?? 0) }}</span>
+                                <span class="uel2-progress-item__count">{{ (int) ($templateThreeProgressItem['completed'] ?? 0) }}/{{ (int) ($templateThreeProgressItem['total'] ?? 0) }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -833,14 +887,14 @@
 
                 <section class="uel2-sidebar-rail__section">
                     <div class="uel2-sidebar-blocks">
-                        @foreach ($templateTwoSidebarBlocks as $templateTwoBlockTitle => $templateTwoBlockRows)
+                        @foreach ($templateThreeSidebarBlocks as $templateThreeBlockTitle => $templateThreeBlockRows)
                             <div class="uel2-sidebar-block">
-                                <div class="uel2-sidebar-block__title">{{ $templateTwoBlockTitle }}</div>
+                                <div class="uel2-sidebar-block__title">{{ $templateThreeBlockTitle }}</div>
                                 <div class="uel2-sidebar-block__rows">
-                                    @foreach ($templateTwoBlockRows as $templateTwoBlockRow)
+                                    @foreach ($templateThreeBlockRows as $templateThreeBlockRow)
                                         <div class="uel2-sidebar-block__row">
-                                            <div class="uel2-sidebar-block__label">{{ $templateTwoBlockRow['label'] ?? '' }}</div>
-                                            <div class="uel2-sidebar-block__value">{{ filled($templateTwoBlockRow['value'] ?? null) ? $templateTwoBlockRow['value'] : '-' }}</div>
+                                            <div class="uel2-sidebar-block__label">{{ $templateThreeBlockRow['label'] ?? '' }}</div>
+                                            <div class="uel2-sidebar-block__value">{{ filled($templateThreeBlockRow['value'] ?? null) ? $templateThreeBlockRow['value'] : '-' }}</div>
                                         </div>
                                     @endforeach
                                 </div>
@@ -856,7 +910,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Patient & Subscriber Information</h2><p>Core eligibility identifiers</p></div>
-            <span class="uel2-pill">{{ $templateTwoSectionCounts['patient']['completed'] }}/{{ $templateTwoSectionCounts['patient']['total'] }} Completed</span>
+            <span class="uel2-pill">{{ $templateThreeSectionCounts['patient']['completed'] }}/{{ $templateThreeSectionCounts['patient']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
             @foreach ([
@@ -871,10 +925,11 @@
                 ['Subscriber Name', 'vf_subscriber_name', 'text'],
                 ['Subscriber DOB', 'vf_subscriber_dob', 'date'],
                 ['Subscriber ID', 'vf_subscriber_id', 'text'],
-                ['COB', 'vf_cob', 'select', [
+                ['COB', 'vf_coverage_role', 'select', [
                     'No COB' => 'No COB',
                     'Primary' => 'Primary',
                     'Secondary' => 'Secondary',
+                    'Unknown' => 'Unknown',
                 ]],
             ] as $patientField)
                 @php
@@ -884,22 +939,67 @@
                 <div class="uel2-field">
                     <label>{{ $label }}</label>
                     @if ($type === 'select')
-                        <select wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                        <select
+                            @if ($field === 'vf_insured_relation')
+                                wire:model.live="data.{{ $field }}"
+                            @else
+                                wire:model.blur="data.{{ $field }}"
+                            @endif
+                            style="{{ $templateThreeInput }}"
+                        >
                             <option value="">Select</option>
                             @foreach ($options as $value => $optionLabel)
                                 <option value="{{ $value }}">{{ $optionLabel }}</option>
                             @endforeach
                         </select>
+                    @elseif ($type === 'date')
+                        @php
+                            $templateThreeRelationship = strtolower(trim((string) data_get($this->data, 'vf_insured_relation')));
+                            $templateThreeResolvedDateValue = $templateThreeDateValue($field);
+                        @endphp
+                        <input
+                            type="date"
+                            wire:key="template3-patient-date-{{ $field }}-{{ $templateThreeResolvedDateValue ?: 'blank' }}"
+                            @if ($field === 'vf_patient_dob')
+                                wire:change="$set('data.vf_patient_dob', $event.target.value)"
+                            @elseif ($field === 'vf_subscriber_dob' && $templateThreeRelationship !== 'self')
+                                wire:change="$set('data.vf_subscriber_dob', $event.target.value)"
+                            @else
+                                wire:change="$set('data.{{ $field }}', $event.target.value)"
+                            @endif
+                            value="{{ $templateThreeResolvedDateValue }}"
+                            @if ($field === 'vf_subscriber_dob' && $templateThreeRelationship === 'self') readonly @endif
+                            style="{{ $templateThreeInput }}"
+                        >
                     @else
-                        <input type="{{ $type }}" wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                        <input
+                            type="{{ $type }}"
+                            @if (in_array($field, ['vf_patient_full_name', 'vf_subscriber_name'], true))
+                                wire:model.live="data.{{ $field }}"
+                            @else
+                                wire:model.blur="data.{{ $field }}"
+                            @endif
+                            @if ($field === 'vf_subscriber_name' && strtolower(trim((string) data_get($this->data, 'vf_insured_relation'))) === 'self') readonly @endif
+                            style="{{ $templateThreeInput }}"
+                        >
                     @endif
                 </div>
             @endforeach
         </div>
-        @if (! empty($templateTwoPatientQuestions))
+        @php
+            $templateThreeRelationship = strtolower(trim((string) data_get($this->data, 'vf_insured_relation')));
+        @endphp
+        @if (in_array($templateThreeRelationship, ['spouse', 'dependent'], true))
             <div class="uel2-body" style="padding-top:0;">
-                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                    'questions' => $templateTwoPatientQuestions,
+                <div style="border:1px solid #dbe8e2;border-radius:14px;background:#f8fbfa;padding:12px 14px;color:#5f7469;font-size:13px;line-height:1.55;">
+                    Enter subscriber details separately because the policy holder is different from the patient.
+                </div>
+            </div>
+        @endif
+        @if (! empty($templateThreePatientQuestions))
+            <div class="uel2-body" style="padding-top:0;">
+                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                    'questions' => $templateThreePatientQuestions,
                 ])
             </div>
         @endif
@@ -908,10 +1008,10 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Insurance Information</h2><p>Carrier, plan, network, and payer details</p></div>
-            <span class="uel2-pill">{{ $templateTwoSectionCounts['insurance']['completed'] }}/{{ $templateTwoSectionCounts['insurance']['total'] }} Completed</span>
+            <span class="uel2-pill">{{ $templateThreeSectionCounts['insurance']['completed'] }}/{{ $templateThreeSectionCounts['insurance']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-insurance-groups">
-            @foreach ($templateTwoInsuranceGroups as $insuranceGroup)
+            @foreach ($templateThreeInsuranceGroups as $insuranceGroup)
                 <div class="uel2-insurance-group uel2-grid">
                 @foreach ($insuranceGroup as $insuranceField)
                 @php
@@ -924,7 +1024,7 @@
                         <div style="display:flex;align-items:center;gap:8px;">
                             <select
                                 wire:model.live="data.{{ $field }}"
-                                style="{{ $templateTwoInput }};min-width:0;flex:1 1 auto;appearance:auto;"
+                                style="{{ $templateThreeInput }};min-width:0;flex:1 1 auto;appearance:auto;"
                             >
                                 <option value="">Select insurance</option>
                                 @if (filled(data_get($this->data, $field)) && ! array_key_exists((string) data_get($this->data, $field), $insuranceCarrierOptions))
@@ -947,7 +1047,10 @@
                             @endif
                         </div>
                     @elseif ($type === 'select')
-                        <select wire:model.blur="data.{{ $field }}" style="{{ $templateTwoInput }}">
+                        <select
+                            wire:model.blur="data.{{ $field }}"
+                            style="{{ $templateThreeInput }}"
+                        >
                             <option value="">Select</option>
                             @if (filled(data_get($this->data, $field)) && ! array_key_exists((string) data_get($this->data, $field), $options))
                                 <option value="{{ data_get($this->data, $field) }}">{{ data_get($this->data, $field) }}</option>
@@ -961,11 +1064,11 @@
                             <input
                                 type="text"
                                 wire:model.blur="data.{{ $field }}"
-                                style="{{ $templateTwoInput }};min-width:0;flex:1 1 auto;"
+                                style="{{ $templateThreeInput }};min-width:0;flex:1 1 auto;"
                             >
                             @if (filled($feeScheduleReference['url'] ?? null))
                                 @php
-                                    $templateTwoFeeSchedulePayload = json_encode([
+                                    $templateThreeFeeSchedulePayload = json_encode([
                                         'url' => $feeScheduleReference['url'],
                                         'name' => $feeScheduleReference['name'],
                                         'label' => 'Fee Schedule Reference',
@@ -974,7 +1077,7 @@
                                 @endphp
                                 <button
                                     type="button"
-                                    onclick='openReferenceViewerModal({!! $templateTwoFeeSchedulePayload !!})'
+                                    onclick='openReferenceViewerModal({!! $templateThreeFeeSchedulePayload !!})'
                                     title="{{ $feeScheduleReference['name'] }}"
                                     aria-label="View fee schedule reference"
                                     style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #b8d4c9;border-radius:12px;background:#ffffff;color:#0b6b4f;font-size:18px;font-weight:900;cursor:pointer;"
@@ -994,22 +1097,35 @@
                             @endif
                         </div>
                     @else
-                        <input
-                            type="{{ $type }}"
-                            wire:model.blur="data.{{ $field }}"
-                            @if ($field === 'vf_plan_renewal_month') placeholder="MM/YYYY" inputmode="numeric" @endif
-                            style="{{ $templateTwoInput }}"
-                        >
+                        @if ($type === 'date')
+                            @php
+                                $templateThreeInsuranceDateValue = $templateThreeDateValue($field);
+                            @endphp
+                            <input
+                                type="date"
+                                wire:key="template3-insurance-date-{{ $field }}-{{ $templateThreeInsuranceDateValue ?: 'blank' }}"
+                                wire:change="$set('data.{{ $field }}', $event.target.value)"
+                                value="{{ $templateThreeInsuranceDateValue }}"
+                                style="{{ $templateThreeInput }}"
+                            >
+                        @else
+                            <input
+                                type="{{ $type }}"
+                                wire:model.blur="data.{{ $field }}"
+                                @if ($field === 'vf_plan_renewal_month') placeholder="MM/YYYY" inputmode="numeric" @endif
+                                style="{{ $templateThreeInput }}"
+                            >
+                        @endif
                     @endif
                 </div>
                 @endforeach
                 </div>
             @endforeach
         </div>
-        @if (! empty($templateTwoInsuranceQuestions))
+        @if (! empty($templateThreeInsuranceQuestions))
             <div class="uel2-body" style="padding-top:0;">
-                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                    'questions' => $templateTwoInsuranceQuestions,
+                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                    'questions' => $templateThreeInsuranceQuestions,
                 ])
             </div>
         @endif
@@ -1018,46 +1134,46 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Maximums & Deductibles</h2><p>Annual maximum, remaining maximum, and deductible status</p></div>
-            <span class="uel2-pill">{{ $templateTwoSectionCounts['maximums']['completed'] }}/{{ $templateTwoSectionCounts['maximums']['total'] }} Completed</span>
+            <span class="uel2-pill">{{ $templateThreeSectionCounts['maximums']['completed'] }}/{{ $templateThreeSectionCounts['maximums']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
             <div class="uel2-grid">
-                <div class="uel2-field"><label>Annual Maximum on the Plan?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum" style="{{ $templateTwoInput }}"></div>
-                <div class="uel2-field"><label>Annual Maximum Used?</label><div style="{{ $templateTwoReadonly }}">${{ number_format(max(0, $annualMaximum - $annualRemaining), 2) }}</div></div>
-                <div class="uel2-field"><label>Annual Maximum Remaining?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum_remaining" style="{{ $templateTwoInput }}"></div>
+                <div class="uel2-field"><label>Annual Maximum on the Plan?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum" style="{{ $templateThreeInput }}"></div>
+                <div class="uel2-field"><label>Annual Maximum Used?</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $annualMaximum - $annualRemaining), 2) }}</div></div>
+                <div class="uel2-field"><label>Annual Maximum Remaining?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum_remaining" style="{{ $templateThreeInput }}"></div>
             </div>
 
             <div class="uel2-subsection">
                 <h3>Individual Deductible</h3>
                 <div class="uel2-grid">
-                    <div class="uel2-field"><label>Annual Deductible - Individual</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible" style="{{ $templateTwoInput }}"></div>
-                    <div class="uel2-field"><label>Deductible Met - Individual</label><div style="{{ $templateTwoReadonly }}">${{ number_format(max(0, $individualDeductible - $individualRemaining), 2) }}</div></div>
-                    <div class="uel2-field"><label>Individual Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible_remaining" style="{{ $templateTwoInput }}"></div>
+                    <div class="uel2-field"><label>Annual Deductible - Individual</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible" style="{{ $templateThreeInput }}"></div>
+                    <div class="uel2-field"><label>Deductible Met - Individual</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $individualDeductible - $individualRemaining), 2) }}</div></div>
+                    <div class="uel2-field"><label>Individual Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible_remaining" style="{{ $templateThreeInput }}"></div>
                 </div>
             </div>
 
             <div class="uel2-subsection">
                 <h3>Family Deductible</h3>
                 <div class="uel2-grid">
-                    <div class="uel2-field"><label>Annual Deductible - Family</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible" style="{{ $templateTwoInput }}"></div>
-                    <div class="uel2-field"><label>Deductible Met - Family</label><div style="{{ $templateTwoReadonly }}">${{ number_format(max(0, $familyDeductible - $familyRemaining), 2) }}</div></div>
-                    <div class="uel2-field"><label>Family Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible_remaining" style="{{ $templateTwoInput }}"></div>
+                    <div class="uel2-field"><label>Annual Deductible - Family</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible" style="{{ $templateThreeInput }}"></div>
+                    <div class="uel2-field"><label>Deductible Met - Family</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $familyDeductible - $familyRemaining), 2) }}</div></div>
+                    <div class="uel2-field"><label>Family Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible_remaining" style="{{ $templateThreeInput }}"></div>
                 </div>
             </div>
 
-            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $templateTwoMaximumQuestions,
+            @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                'questions' => $templateThreeMaximumQuestions,
             ])
 
             <div class="uel2-subsection">
                 <div class="uel2-subsection__header">
                     <h3>Deductible & Coverage Category</h3>
-                    <span class="uel2-pill">{{ $templateTwoCoverageCategoryCompleted }}/{{ $templateTwoCoverageCategoryTotal }} Completed</span>
+                    <span class="uel2-pill">{{ $templateThreeCoverageCategoryCompleted }}/{{ $templateThreeCoverageCategoryTotal }} Completed</span>
                 </div>
                 <table class="uel2-table">
                     <thead><tr><th>Category</th><th>DED Applied?</th><th>Category %</th></tr></thead>
                     <tbody>
-                        @foreach ($templateTwoCoverageCategoryRows as [$label, $deductibleField, $coverageField])
+                        @foreach ($templateThreeCoverageCategoryRows as [$label, $deductibleField, $coverageField])
                             <tr>
                                 <td data-label="Category"><b>{{ $label }}</b></td>
                                 <td data-label="DED Applied?"><select wire:model.blur="data.{{ $deductibleField }}"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
@@ -1068,14 +1184,14 @@
                 </table>
                 <div class="uel2-field" style="margin-top:14px;">
                     <label>Coverage Notes</label>
-                    <textarea wire:model.blur="data.vf_deductible_applies_notes" placeholder="Add note" style="{{ $templateTwoInput }}"></textarea>
+                    <textarea wire:model.blur="data.vf_deductible_applies_notes" placeholder="Add note" style="{{ $templateThreeInput }}"></textarea>
                 </div>
             </div>
 
             <div class="uel2-subsection">
                 <div class="uel2-subsection__header">
                     <h3>Plan Provisions</h3>
-                    <span class="uel2-pill">{{ $templateTwoPlanProvisionCompleted }}/{{ $templateTwoPlanProvisionTotal }} Completed</span>
+                    <span class="uel2-pill">{{ $templateThreePlanProvisionCompleted }}/{{ $templateThreePlanProvisionTotal }} Completed</span>
                 </div>
                 <table class="uel2-table">
                     <thead><tr><th style="width:68%;">Question</th><th style="width:32%;" aria-label="Response"></th></tr></thead>
@@ -1164,7 +1280,7 @@
                         <tr>
                             <td data-label="Question"><b>Coordination of Benefits</b></td>
                             <td data-label="Response">
-                                <select wire:model.blur="data.vf_cob">
+                                <select wire:model.blur="data.vf_coordination_of_benefits">
                                     <option value="">Select</option>
                                     <option value="Standard">Standard</option>
                                     <option value="Non-Dup">Non-Dup</option>
@@ -1178,10 +1294,10 @@
                 </table>
                 <div class="uel2-field" style="margin-top:14px;">
                     <label>Plan Provision Notes</label>
-                    <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateTwoInput }}"></textarea>
+                    <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateThreeInput }}"></textarea>
                 </div>
-                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                    'questions' => $templateTwoPlanProvisionQuestions,
+                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                    'questions' => $templateThreePlanProvisionQuestions,
                 ])
             </div>
         </div>
@@ -1190,7 +1306,7 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Service History</h2><p>Last service dates and next eligibility</p></div>
-            <span class="uel2-pill">{{ $templateTwoSectionCounts['service_history']['completed'] }}/{{ $templateTwoSectionCounts['service_history']['total'] }} Completed</span>
+            <span class="uel2-pill">{{ $templateThreeSectionCounts['service_history']['completed'] }}/{{ $templateThreeSectionCounts['service_history']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
             <table class="uel2-table">
@@ -1208,22 +1324,22 @@
             </table>
             <div class="uel2-field" style="margin-top:16px;">
                 <label>Other Major History Affecting Eligibility</label>
-                <textarea wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateTwoInput }}"></textarea>
+                <textarea wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateThreeInput }}"></textarea>
             </div>
-            @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                'questions' => $templateTwoServiceHistoryQuestions,
+            @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                'questions' => $templateThreeServiceHistoryQuestions,
             ])
         </div>
     </section>
 
-    @if ($templateTwoVisibleBenefitGroups->isNotEmpty())
+    @if ($templateThreeVisibleBenefitGroups->isNotEmpty())
         <section class="uel2-section">
             <div class="uel2-header">
                 <div><h2>Frequency and Percentage</h2><p>Code-level coverage configured through the clinic template builder</p></div>
                 <span class="uel2-pill">{{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} Completed</span>
             </div>
             <div class="uel2-body">
-                @foreach ($templateTwoVisibleBenefitGroups as $benefitGroupName => $benefitRows)
+                @foreach ($templateThreeVisibleBenefitGroups as $benefitGroupName => $benefitRows)
                     <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
                         <h3>{{ $benefitGroupName }}</h3>
                         <table class="uel2-table">
@@ -1254,24 +1370,33 @@
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Verification Information</h2><p>Representative, reference number, and final notes</p></div>
-            <span class="uel2-pill">{{ $templateTwoSectionCounts['verification']['completed'] }}/{{ $templateTwoSectionCounts['verification']['total'] }} Completed</span>
+            <span class="uel2-pill">{{ $templateThreeSectionCounts['verification']['completed'] }}/{{ $templateThreeSectionCounts['verification']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
-            <div class="uel2-field"><label>Reference Number</label><div style="{{ $templateTwoReadonly }}">{{ $record->reference_number }}</div></div>
-            <div class="uel2-field"><label>Insurance Representative</label><input wire:model.blur="data.vf_insurance_representative_name" style="{{ $templateTwoInput }}"></div>
-            <div class="uel2-field"><label>Verified By</label><div style="{{ $templateTwoReadonly }}">{{ data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-' }}</div></div>
-            <div class="uel2-field"><label>Verification Date</label><div style="{{ $templateTwoReadonly }}">{{ data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d') }}</div></div>
-            <div class="uel2-field uel2-wide"><label>Additional Information</label><textarea wire:model.blur="data.vf_verification_notes" placeholder="Add final verification notes" style="{{ $templateTwoInput }}"></textarea></div>
+            <div class="uel2-field"><label>Reference Number</label><div style="{{ $templateThreeReadonly }}">{{ $record->reference_number }}</div></div>
+            <div class="uel2-field"><label>Insurance Representative</label><input wire:model.blur="data.vf_insurance_representative_name" style="{{ $templateThreeInput }}"></div>
+            <div class="uel2-field"><label>Verified By</label><div style="{{ $templateThreeReadonly }}">{{ data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-' }}</div></div>
+            <div class="uel2-field"><label>Verification Date</label><div style="{{ $templateThreeReadonly }}">{{ data_get($this->data, 'vf_verification_date') ?: now()->format('m-d-Y') }}</div></div>
+            <div class="uel2-field uel2-wide"><label>Additional Information</label><textarea wire:model.blur="data.vf_verification_notes" placeholder="Add final verification notes" style="{{ $templateThreeInput }}"></textarea></div>
         </div>
-        @if (! empty($templateTwoVerificationQuestions))
+        @if (! empty($templateThreeVerificationQuestions))
             <div class="uel2-body" style="padding-top:0;">
-                @include('filament.saas.resources.verifications.pages.partials.template-2-managed-questions', [
-                    'questions' => $templateTwoVerificationQuestions,
+                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                    'questions' => $templateThreeVerificationQuestions,
                 ])
             </div>
         @endif
         <div class="uel2-actions">
             @if ($canSubmitForm)
+                <button
+                    type="button"
+                    @if (($this->formTemplate ?? null) === 'template_3')
+                        onclick="return window.triggerTemplateThreeDraftSave(this);"
+                    @else
+                        wire:click="saveAsDraft"
+                    @endif
+                    style="border:1px solid #dce8e3;border-radius:12px;padding:11px 18px;background:#f8fafc;color:#334155;font-weight:900;cursor:pointer;"
+                >Save as Draft</button>
                 @if ($this->auditReady)
                     <button type="submit" class="uel-button uel-button-primary" style="border:0;border-radius:12px;padding:11px 18px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
                 @else
@@ -1318,22 +1443,22 @@
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:22px;">
                 <div class="uel2-field" style="grid-column:1/-1;">
                     <label>Insurance Name</label>
-                    <input wire:model.blur="newInsuranceCarrier.insurance_name" placeholder="Enter insurance carrier name" style="{{ $templateTwoInput }}">
+                    <input wire:model.blur="newInsuranceCarrier.insurance_name" placeholder="Enter insurance carrier name" style="{{ $templateThreeInput }}">
                     @error('newInsuranceCarrier.insurance_name')
                         <div style="margin-top:6px;color:#be123c;font-size:12px;font-weight:700;">{{ $message }}</div>
                     @enderror
                 </div>
                 <div class="uel2-field">
                     <label>Payer ID</label>
-                    <input wire:model.blur="newInsuranceCarrier.payer_id" placeholder="Enter payer ID" style="{{ $templateTwoInput }}">
+                    <input wire:model.blur="newInsuranceCarrier.payer_id" placeholder="Enter payer ID" style="{{ $templateThreeInput }}">
                 </div>
                 <div class="uel2-field">
                     <label>Phone Number</label>
-                    <input wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="Enter payer phone" style="{{ $templateTwoInput }}">
+                    <input wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="Enter payer phone" style="{{ $templateThreeInput }}">
                 </div>
                 <div class="uel2-field" style="grid-column:1/-1;">
                     <label>Claims Address</label>
-                    <textarea wire:model.blur="newInsuranceCarrier.claims_address" placeholder="Enter claims mailing address" style="{{ $templateTwoInput }}"></textarea>
+                    <textarea wire:model.blur="newInsuranceCarrier.claims_address" placeholder="Enter claims mailing address" style="{{ $templateThreeInput }}"></textarea>
                 </div>
             </div>
 

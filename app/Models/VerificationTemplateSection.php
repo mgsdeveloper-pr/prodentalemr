@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class VerificationTemplateSection extends Model
@@ -17,6 +18,7 @@ class VerificationTemplateSection extends Model
         'label',
         'sort_order',
         'is_builtin',
+        'is_locked_by_admin',
         'is_active',
     ];
 
@@ -24,9 +26,29 @@ class VerificationTemplateSection extends Model
     {
         return [
             'is_builtin' => 'boolean',
+            'is_locked_by_admin' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+    public function scopeVisibleForClinic(Builder $query, ?int $clinicId = null, ?int $organizationId = null): Builder
+    {
+        return $query
+            ->where(function (Builder $query) use ($clinicId): void {
+                $query->whereNull('clinic_id');
+
+                if (filled($clinicId)) {
+                    $query->orWhere('clinic_id', $clinicId);
+                }
+            })
+            ->when(filled($organizationId), function (Builder $query) use ($organizationId): void {
+                $query->where(function (Builder $query) use ($organizationId): void {
+                    $query
+                        ->whereNull('organization_id')
+                        ->orWhere('organization_id', $organizationId);
+                });
+            });
     }
 
     public function clinic(): BelongsTo

@@ -132,7 +132,7 @@
         @include('filament.shared.partials.page-hero', [
             'eyebrow' => 'Form Lab',
             'title' => 'Verification Builder Trial',
-            'description' => 'This is the safe sandbox for the new verification builder. We can trial the modern stack, builder flow, and Template 2 preview here before touching the live verification form.',
+            'description' => 'This is the safe sandbox for the new verification builder. We can trial the modern stack, builder flow, and Verification Workbench preview here before touching the live verification form.',
             'scopeLabel' => 'Current direction',
             'scopeValue' => 'Phase 3 arrangement studio + live preview',
             'rightContent' => $heroRightContent,
@@ -292,7 +292,7 @@
                 <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
                     <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Phase 4 section builder</div>
                     <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">Create template sections and sub-sections from the same lab</h3>
-                    <div style="margin-top: 8px; font-size: 14px; line-height: 1.7; color: #64748b;">This uses the real clinic template section table, so anything created here becomes available immediately in Question Management and the Template 2 workflow.</div>
+                    <div style="margin-top: 8px; font-size: 14px; line-height: 1.7; color: #64748b;">This uses the real clinic template section table, so anything created here becomes available immediately in Question Management and the Verification Workbench workflow.</div>
                 </div>
                 <div style="padding: 20px 22px; display: grid; gap: 18px;">
                     @if (! $this->canManageLabSections())
@@ -344,7 +344,7 @@
             <section class="pd-form-lab-card">
                 <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
                     <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Section map</div>
-                    <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">See the full Template 2 structure before placing questions</h3>
+                    <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">See the full Verification Workbench structure before placing questions</h3>
                 </div>
                 <div style="padding: 20px 22px;">
                     <div class="pd-form-lab-section-tree">
@@ -504,11 +504,11 @@
             <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                 <div>
                     <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #0f766e;">Live preview</div>
-                    <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">Template 2 preview inside the new lab shell</h3>
+                    <h3 style="margin: 8px 0 0; font-size: 22px; font-weight: 800; color: #0f172a;">Verification Workbench preview inside the new lab shell</h3>
                     <div style="margin-top: 8px; font-size: 14px; line-height: 1.7; color: #64748b;">This stays isolated from the live verification workflow so we can keep testing structure, spacing, and builder ideas safely.</div>
                 </div>
                 <span style="display: inline-flex; align-items: center; padding: 9px 14px; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
-                    Template 2 sandbox
+                    Verification Workbench sandbox
                 </span>
             </div>
             <div class="pd-form-lab-preview-body">

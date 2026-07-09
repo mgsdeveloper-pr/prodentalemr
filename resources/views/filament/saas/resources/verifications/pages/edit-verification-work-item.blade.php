@@ -111,12 +111,61 @@
         })();
     </script>
 
+    <script>
+        (() => {
+            window.triggerTemplateThreeDraftSave = (button) => {
+                if (!button) {
+                    return false;
+                }
+
+                const active = document.activeElement;
+
+                if (active && active !== button && typeof active.blur === 'function') {
+                    active.blur();
+                }
+
+                window.clearTimeout(window.__templateThreeDraftSaveTimer);
+
+                window.__templateThreeDraftSaveTimer = window.setTimeout(() => {
+                    const livewireRoot = button.closest('[wire\\:id]') ?? document;
+                    const proxyButton = livewireRoot.querySelector('[data-template-three-draft-proxy]');
+
+                    if (proxyButton) {
+                        proxyButton.click();
+                    }
+                }, 220);
+
+                return false;
+            };
+        })();
+    </script>
+
     @php
         ob_start();
     @endphp
-        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">
+        <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">
             @if ($canSubmitForm)
-                <button type="button" wire:click="saveAsDraft" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;">
+                @if (($this->formTemplate ?? null) === 'template_3')
+                    <button
+                        type="button"
+                        data-template-three-draft-proxy
+                        wire:click="saveAsDraft"
+                        wire:loading.attr="disabled"
+                        wire:target="saveAsDraft"
+                        style="display:none"
+                        tabindex="-1"
+                        aria-hidden="true"
+                    ></button>
+                @endif
+                <button
+                    type="button"
+                    @if (($this->formTemplate ?? null) === 'template_3')
+                        onclick="return window.triggerTemplateThreeDraftSave(this);"
+                    @else
+                        wire:click="saveAsDraft"
+                    @endif
+                    style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;"
+                >
                     Save as Draft
                 </button>
                 @if ($this->auditReady)
@@ -235,6 +284,30 @@
             align-self: end;
             max-width: none;
             white-space: nowrap;
+        }
+
+        .vt3-compact-workbar__actions .vt3-top-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .vt3-compact-workbar__actions .vt3-top-actions > button,
+        .vt3-compact-workbar__actions .vt3-top-actions > a {
+            min-width: 0 !important;
+            padding: 10px 16px !important;
+            border-radius: 12px !important;
+            font-size: 12px !important;
+            font-weight: 800 !important;
+            line-height: 1 !important;
+            box-shadow: none !important;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease !important;
+        }
+
+        .vt3-compact-workbar__actions .vt3-top-actions > button:hover,
+        .vt3-compact-workbar__actions .vt3-top-actions > a:hover {
+            transform: translateY(-1px);
         }
 
         .vt3-form-stage {
@@ -390,12 +463,8 @@
         @endif
 
         <form wire:submit="save">
-            <section class="{{ $isTemplateThreeVerificationForm ? 'vt3-form-stage' : '' }}" style="display: flex; flex-direction: column; gap: 18px;">
-                @if ($this->formTemplate === 'template_3')
-                    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
-                @else
-                    @include('filament.saas.resources.verifications.pages.partials.verification-form-template-2')
-                @endif
+            <section class="vt3-form-stage" style="display: flex; flex-direction: column; gap: 18px;">
+                @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
             </section>
         </form>
     </div>
@@ -912,8 +981,11 @@
                         </div>
                     </section>
 
-                    <div style="display: flex; justify-content: flex-end; gap: 12px; padding-bottom: 6px;">
+                    <div style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 6px;">
                         @if ($canSubmitForm)
+                            <button type="button" onclick="const btn=this; const active=document.activeElement; if(active && active !== btn && typeof active.blur === 'function'){ active.blur(); } setTimeout(() => { $wire.saveAsDraft(); }, 120); return false;" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;">
+                                Save as Draft
+                            </button>
                             @if ($this->auditReady)
                                 <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
                                     {{ $this->getSaveButtonLabel() }}

@@ -12,7 +12,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 {
     public ?string $selectedSectionKey = null;
 
-    public string $selectedTemplateKey = 'template_2';
+    public string $selectedTemplateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
 
     public function getSelectedClinicName(): ?string
     {
@@ -36,7 +36,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Verification Workbench';
     }
 
     public function repositionQuestion(int $questionId, string $direction): void

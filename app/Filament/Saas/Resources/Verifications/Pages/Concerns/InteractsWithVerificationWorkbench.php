@@ -26,7 +26,7 @@ trait InteractsWithVerificationWorkbench
                 'title' => 'Request Snapshot',
                 'items' => [
                     ['label' => 'Patient name', 'value' => $profile?->patient_full_name ?: ($record->patient?->full_name ?: '-')],
-                    ['label' => 'Date of birth', 'value' => optional($profile?->patient_dob)->format('m/d/Y') ?: (optional($record->patient?->dob)->format('m/d/Y') ?: '-')],
+                    ['label' => 'Date of birth', 'value' => optional($profile?->patient_dob)->format('m-d-Y') ?: (optional($record->patient?->dob)->format('m-d-Y') ?: '-')],
                     ['label' => 'Member ID', 'value' => $profile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-')],
                     ['label' => 'Form type', 'value' => \App\Models\VerificationProfile::FORM_TYPE_OPTIONS[$profile?->form_type ?? 'full_form'] ?? 'Full Form'],
                     ['label' => 'Requested by', 'value' => $profile?->requested_by_name ?: '-'],
@@ -40,7 +40,7 @@ trait InteractsWithVerificationWorkbench
                     ['label' => 'Payer ID', 'value' => $profile?->payer_id ?: '-'],
                     ['label' => 'Group name', 'value' => $profile?->group_name ?: '-'],
                     ['label' => 'Group number', 'value' => $profile?->group_number ?: '-'],
-                    ['label' => 'Effective date', 'value' => optional($profile?->effective_date)->format('m/d/Y') ?: '-'],
+                    ['label' => 'Effective date', 'value' => optional($profile?->effective_date)->format('m-d-Y') ?: '-'],
                     ['label' => 'Network status', 'value' => $profile?->network_status ?: '-'],
                 ],
             ],
@@ -137,7 +137,7 @@ trait InteractsWithVerificationWorkbench
             ],
             'patient' => [
                 ['label' => 'Patient', 'value' => $record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?: '-')],
-                ['label' => 'DOB', 'value' => optional($record->verificationProfile?->patient_dob)->format('m/d/Y') ?: (optional($record->patient?->dob)->format('m/d/Y') ?: '-')],
+                ['label' => 'DOB', 'value' => optional($record->verificationProfile?->patient_dob)->format('m-d-Y') ?: (optional($record->patient?->dob)->format('m-d-Y') ?: '-')],
                 ['label' => 'Member ID', 'value' => $record->verificationProfile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-')],
                 ['label' => 'Subscriber', 'value' => $record->verificationProfile?->subscriber_name ?: ($record->insurancePolicy?->subscriber_name ?: '-')],
             ],
@@ -148,7 +148,7 @@ trait InteractsWithVerificationWorkbench
                 ['label' => 'Network', 'value' => $record->verificationProfile?->network_status ?: '-'],
             ],
             'appointment' => [
-                ['label' => 'Appointment date', 'value' => optional($record->appointment?->appointment_date)->format('M d, Y') ?: (optional($record->verificationProfile?->appointment_date)->format('M d, Y') ?: '-')],
+                ['label' => 'Appointment date', 'value' => optional($record->appointment?->appointment_date)->format('m-d-Y') ?: (optional($record->verificationProfile?->appointment_date)->format('m-d-Y') ?: '-')],
                 ['label' => 'Appointment time', 'value' => $record->verificationProfile?->appointment_time ?: ($record->appointment?->start_time ?: '-')],
                 ['label' => 'Provider', 'value' => $record->provider?->display_name ?: ($record->verificationProfile?->provider_name ?: '-')],
                 ['label' => 'Assigned to', 'value' => $record->assignedTo?->name ?: 'Queue'],
@@ -270,10 +270,10 @@ trait InteractsWithVerificationWorkbench
 
         return [
             'patient' => $patientName ?: '-',
-            'dob' => optional($profile?->patient_dob)->format('m/d/Y') ?: (optional($record->patient?->dob)->format('m/d/Y') ?: '-'),
+            'dob' => optional($profile?->patient_dob)->format('m-d-Y') ?: (optional($record->patient?->dob)->format('m-d-Y') ?: '-'),
             'member_id' => $profile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-'),
             'subscriber_name' => $subscriberName ?: '-',
-            'subscriber_dob' => optional($profile?->subscriber_dob)->format('m/d/Y') ?: (optional($record->insurancePolicy?->subscriber_dob)->format('m/d/Y') ?: '-'),
+            'subscriber_dob' => optional($profile?->subscriber_dob)->format('m-d-Y') ?: (optional($record->insurancePolicy?->subscriber_dob)->format('m-d-Y') ?: '-'),
             'insurance_name' => $insuranceName,
             'coverage_role' => $this->resolveCoverageRole($patientName, $subscriberName, $insuredRelation),
             'group_number' => $profile?->group_number ?: ($record->insurancePolicy?->group_number ?: '-'),

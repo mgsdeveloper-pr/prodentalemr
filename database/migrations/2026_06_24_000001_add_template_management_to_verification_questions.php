@@ -10,12 +10,12 @@ return new class extends Migration
     {
         Schema::table('clinics', function (Blueprint $table): void {
             $table->string('verification_default_form_template')
-                ->default('template_2')
+                ->default('template_3')
                 ->after('verification_pdf_output_mode');
         });
 
         Schema::table('verification_form_questions', function (Blueprint $table): void {
-            $table->string('template_key')->default('template_2')->after('clinic_id');
+            $table->string('template_key')->default('template_3')->after('clinic_id');
             $table->text('select_options')->nullable()->after('placeholder');
             $table->boolean('has_note')->default(false)->after('select_options');
             $table->string('note_label')->nullable()->after('has_note');

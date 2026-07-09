@@ -175,7 +175,7 @@ class ListVerificationQuestions extends ListRecords
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Template 2';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Verification Workbench';
     }
 
     public function getTemplateOptions(): array

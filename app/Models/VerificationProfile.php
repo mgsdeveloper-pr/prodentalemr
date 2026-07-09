@@ -32,6 +32,8 @@ class VerificationProfile extends Model
         'subscriber_dob',
         'subscriber_id',
         'insured_relation',
+        'coverage_role',
+        'coordination_of_benefits',
         'cob',
         'insurance_provider_name',
         'insurance_claim_mailing_address',

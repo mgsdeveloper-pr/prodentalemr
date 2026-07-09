@@ -19,6 +19,7 @@ use Filament\Support\Facades\FilamentView;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -197,6 +198,81 @@ class EditVerificationWorkItem extends EditRecord
         if ($name === 'data.vf_insurance_provider_name') {
             $this->applySelectedInsuranceCarrier((string) $value);
         }
+
+        if (
+            $name === 'data.vf_insured_relation'
+            || in_array($name, ['data.vf_patient_full_name', 'data.vf_patient_dob'], true)
+        ) {
+            $this->syncSubscriberFieldsForSelfRelationship();
+        }
+    }
+
+    protected function syncSubscriberFieldsForSelfRelationship(): void
+    {
+        $relationship = strtolower(trim((string) data_get($this->data, 'vf_insured_relation')));
+
+        if ($relationship !== 'self') {
+            return;
+        }
+
+        $this->data['vf_subscriber_name'] = data_get($this->data, 'vf_patient_full_name');
+        $this->data['vf_subscriber_dob'] = data_get($this->data, 'vf_patient_dob');
+        $this->data['vf_subscriber_id'] = data_get($this->data, 'vf_patient_identifier');
+    }
+
+    protected function normalizeSelfSubscriberFields(array $data): array
+    {
+        $relationship = strtolower(trim((string) data_get($data, 'vf_insured_relation')));
+
+        if ($relationship !== 'self') {
+            return $data;
+        }
+
+        $data['vf_subscriber_name'] = data_get($data, 'vf_patient_full_name');
+        $data['vf_subscriber_dob'] = data_get($data, 'vf_patient_dob');
+        $data['vf_subscriber_id'] = data_get($data, 'vf_patient_identifier');
+
+        return $data;
+    }
+
+    protected function verificationDateFields(): array
+    {
+        return [
+            'vf_patient_dob',
+            'vf_subscriber_dob',
+            'vf_appointment_date',
+            'vf_effective_date',
+            'vf_future_termination_date',
+            'vf_verification_date',
+        ];
+    }
+
+    protected function normalizeVerificationDateFieldsForDisplay(array $data): array
+    {
+        $format = 'Y-m-d';
+
+        foreach ($this->verificationDateFields() as $field) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $data[$field] = $this->formatDateValue($data[$field], $format);
+        }
+
+        return $data;
+    }
+
+    protected function normalizeVerificationDateFieldsForStorage(array $data): array
+    {
+        foreach ($this->verificationDateFields() as $field) {
+            if (! array_key_exists($field, $data)) {
+                continue;
+            }
+
+            $data[$field] = $this->formatDateValue($data[$field], 'Y-m-d');
+        }
+
+        return $data;
     }
 
     public function getInsuranceCarrierOptions(): array
@@ -419,7 +495,11 @@ class EditVerificationWorkItem extends EditRecord
         $this->record->outcome_status = 'pending';
 
         $this->shouldSkipWorkflowSyncOnSave = true;
-        $this->save(false, false);
+        if ($this->formTemplate === 'template_3') {
+            $this->persistTemplateThreeDraftWithoutResourceValidation();
+        } else {
+            $this->save(false, false);
+        }
         $this->shouldSkipWorkflowSyncOnSave = false;
 
         if ($this->record->normalized_status !== BillingWorkItem::STATUS_INCOMPLETE) {
@@ -428,6 +508,7 @@ class EditVerificationWorkItem extends EditRecord
             $this->record->refresh();
         }
 
+        $this->refreshVerificationFormStateFromRecord();
         $this->auditReady = false;
 
         Notification::make()
@@ -435,6 +516,40 @@ class EditVerificationWorkItem extends EditRecord
             ->body('The verification form was saved as draft and marked incomplete.')
             ->success()
             ->send();
+    }
+
+    protected function persistTemplateThreeDraftWithoutResourceValidation(): void
+    {
+        $this->resetErrorBag();
+
+        DB::transaction(function (): void {
+            $baseData = array_merge(
+                $this->record->attributesToArray(),
+                $this->data ?? [],
+                ['outcome_status' => 'pending']
+            );
+
+            $this->mutateFormDataBeforeSave($baseData);
+
+            $this->record->forceFill([
+                'outcome_status' => 'pending',
+            ])->save();
+
+            $this->afterSave();
+        });
+    }
+
+    protected function refreshVerificationFormStateFromRecord(): void
+    {
+        $this->record->refresh();
+
+        $refilled = $this->mutateFormDataBeforeFill([]);
+        $this->data = $refilled;
+        $this->syncSubscriberFieldsForSelfRelationship();
+
+        if (isset($this->form) && $this->form) {
+            $this->form->fill($this->data);
+        }
     }
 
     public function clearVerificationForm(): void
@@ -573,7 +688,7 @@ class EditVerificationWorkItem extends EditRecord
                     ['label' => 'Subscriber DOB', 'field' => 'vf_subscriber_dob', 'type' => 'date'],
                     ['label' => 'Subscriber ID', 'field' => 'vf_subscriber_id'],
                     ['label' => 'Relationship', 'field' => 'vf_insured_relation'],
-                    ['label' => 'COB', 'field' => 'vf_cob', 'type' => 'select', 'options' => ['No COB' => 'No COB', 'Primary' => 'Primary', 'Secondary' => 'Secondary', 'Unknown' => 'Unknown']],
+                    ['label' => 'COB', 'field' => 'vf_coverage_role', 'type' => 'select', 'options' => ['No COB' => 'No COB', 'Primary' => 'Primary', 'Secondary' => 'Secondary', 'Unknown' => 'Unknown']],
                 ],
             ],
             [
@@ -698,57 +813,80 @@ class EditVerificationWorkItem extends EditRecord
         return $this->getManagedTemplateQuestionsForSection($sectionKey, $this->formTemplate);
     }
 
+    public function getTemplateThreeQuestionsForSection(string $sectionKey): array
+    {
+        return $this->getManagedTemplateQuestionsForSection($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY);
+    }
+
     public function getManagedTemplateQuestionsForSection(string $sectionKey, ?string $templateKey = null): array
     {
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
         $clinicId = $this->record->clinic_id;
-
-        if (! filled($clinicId)) {
-            return [];
-        }
+        $organizationId = $this->record->organization_id;
 
         $templateKey = VerificationFormQuestion::normalizeTemplateKey($templateKey ?: $this->formTemplate);
         $resolvedSectionKey = $this->resolveTemplateSectionKey($sectionKey, $templateKey);
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null)
             ->where('template_key', $templateKey)
             ->where('section_key', $resolvedSectionKey)
             ->where('is_active', true)
             ->where('input_type', '!=', 'frequency_row')
             ->whereIn('form_type', ['both', $formType])
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('question_kind')
+                    ->orWhere('question_kind', VerificationFormQuestion::QUESTION_KIND_NORMAL);
+            })
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
 
-        if ($questions->isEmpty() && $templateKey === 'template_3') {
-            $questions = VerificationFormQuestion::query()
-                ->where('clinic_id', $clinicId)
-                ->where('template_key', 'template_2')
-                ->where('section_key', $this->resolveTemplateSectionKey($sectionKey, 'template_2'))
-                ->where('is_active', true)
-                ->where('input_type', '!=', 'frequency_row')
-                ->whereIn('form_type', ['both', $formType])
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get();
-        }
-
         return $questions
-            ->map(fn (VerificationFormQuestion $question): array => [
-                'id' => $question->getKey(),
-                'label' => $question->prompt,
-                'field' => $this->customQuestionFieldName($question->getKey()),
-                'note_field' => $this->customQuestionNoteFieldName($question->getKey()),
-                'type' => $question->input_type,
-                'help_text' => $question->help_text,
-                'placeholder' => $question->placeholder,
-                'options' => $question->getSelectOptionValues(),
-                'has_note' => $question->has_note,
-                'note_label' => $question->note_label ?: 'Note',
-                'note_placeholder' => $question->note_placeholder ?: 'Add note',
-            ])
+            ->map(function (VerificationFormQuestion $question) use ($formType, $templateKey, $resolvedSectionKey, $clinicId, $organizationId): array {
+                $row = $this->mapManagedTemplateQuestionToRow($question);
+                $answer = data_get($this->data, $row['field']);
+
+                $row['children'] = VerificationFormQuestion::query()
+                    ->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null)
+                    ->where('template_key', $templateKey)
+                    ->where('section_key', $resolvedSectionKey)
+                    ->where('parent_question_id', $question->getKey())
+                    ->where('question_kind', VerificationFormQuestion::QUESTION_KIND_CONDITIONAL)
+                    ->where('is_active', true)
+                    ->where('input_type', '!=', 'frequency_row')
+                    ->whereIn('form_type', ['both', $formType])
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->get()
+                    ->filter(fn (VerificationFormQuestion $child): bool => $child->matchesTrigger($answer))
+                    ->map(fn (VerificationFormQuestion $child): array => $this->mapManagedTemplateQuestionToRow($child, true))
+                    ->values()
+                    ->all();
+
+                return $row;
+            })
             ->all();
+    }
+
+    protected function mapManagedTemplateQuestionToRow(VerificationFormQuestion $question, bool $isChild = false): array
+    {
+        return [
+            'id' => $question->getKey(),
+            'label' => $question->prompt,
+            'field' => $this->customQuestionFieldName($question->getKey()),
+            'note_field' => $this->customQuestionNoteFieldName($question->getKey()),
+            'type' => $question->input_type,
+            'help_text' => $question->help_text,
+            'placeholder' => $question->placeholder,
+            'options' => $question->getSelectOptionValues(),
+            'has_note' => $question->has_note,
+            'note_label' => $question->note_label ?: 'Note',
+            'note_placeholder' => $question->note_placeholder ?: 'Add note',
+            'is_child' => $isChild,
+            'children' => [],
+        ];
     }
 
     protected function withCompletion(array $section): array
@@ -868,7 +1006,7 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        $this->record->loadMissing([
+        $this->record->load([
             'organization',
             'clinic',
             'location',
@@ -912,6 +1050,8 @@ class EditVerificationWorkItem extends EditRecord
         $this->codeCoverageData = $this->resolveCodeCoverageRows();
 
         $data = $this->applyAutofillDefaults($data);
+        $data = $this->normalizeSelfSubscriberFields($data);
+        $data = $this->normalizeVerificationDateFieldsForDisplay($data);
         $data['vf_network_status'] = $this->resolveNetworkStatus(
             data_get($data, 'vf_network_status'),
             data_get($data, 'vf_is_provider_in_network')
@@ -922,36 +1062,192 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        return $this->prepareTemplateThreeSaveState($data);
+    }
+
+    protected function prepareTemplateThreeSaveState(array $data): array
+    {
+        $payload = $this->buildTemplateThreeSavePayload($data);
+
+        $this->data = $payload['form_data'];
+        $this->verificationProfileData = $payload['profile_data'];
+        $this->verificationFormAnswerData = $payload['answer_data'];
+        $this->verificationFormAnswerNoteData = $payload['answer_note_data'];
+        $this->verificationCoverageCodeData = $payload['coverage_rows'];
+
+        return $payload['work_item_data'];
+    }
+
+    protected function buildTemplateThreeSavePayload(array $data): array
+    {
+        $formData = $this->normalizeTemplateThreeCobFields($this->data ?? []);
+        $workItemData = $this->normalizeTemplateThreeCobFields($data);
+
+        foreach ($formData as $key => $value) {
+            if (
+                str_starts_with((string) $key, 'vf_')
+                || str_starts_with((string) $key, 'custom_question_')
+                || str_starts_with((string) $key, 'context_')
+            ) {
+                $workItemData[$key] = $value;
+            }
+        }
+
+        $formData = $this->normalizeSelfSubscriberFields($formData);
+        $workItemData = $this->normalizeSelfSubscriberFields($workItemData);
+
+        $formData = $this->normalizeVerificationDateFieldsForStorage($formData);
+        $workItemData = $this->normalizeVerificationDateFieldsForStorage($workItemData);
+
         $waitingPeriodSummary = $this->waitingPeriodAnswer === 'yes'
             ? $this->formatWaitingPeriodDetails()
             : null;
-        $data['vf_waiting_periods'] = $waitingPeriodSummary;
-        $this->data['vf_waiting_periods'] = $waitingPeriodSummary;
 
-        $this->verificationFormAnswerData = collect($this->data)
+        $formData['vf_waiting_periods'] = $waitingPeriodSummary;
+        $workItemData['vf_waiting_periods'] = $waitingPeriodSummary;
+
+        [$answerData, $answerNoteData] = $this->extractTemplateThreeCustomAnswerPayloads($formData);
+        [$workItemData, $profileData] = static::splitVerificationProfileData($workItemData);
+
+        foreach (array_keys($workItemData) as $key) {
+            if (str_starts_with((string) $key, 'custom_question_') || str_starts_with((string) $key, 'context_')) {
+                unset($workItemData[$key]);
+            }
+        }
+
+        return [
+            'form_data' => $formData,
+            'work_item_data' => $workItemData,
+            'profile_data' => $this->normalizeVerificationProfileDataForStorage($profileData),
+            'answer_data' => $answerData,
+            'answer_note_data' => $answerNoteData,
+            'coverage_rows' => $this->normalizeCodeCoverageRows($this->codeCoverageData),
+        ];
+    }
+
+    protected function extractTemplateThreeCustomAnswerPayloads(array $formData): array
+    {
+        $answerData = collect($formData)
             ->filter(fn ($value, $key): bool => str_starts_with((string) $key, 'custom_question_')
                 && ! str_starts_with((string) $key, 'custom_question_note_'))
             ->mapWithKeys(function ($value, $key): array {
                 return [(int) str_replace('custom_question_', '', (string) $key) => $value];
             })
             ->all();
-        $this->verificationFormAnswerNoteData = collect($this->data)
+
+        $answerNoteData = collect($formData)
             ->filter(fn ($value, $key): bool => str_starts_with((string) $key, 'custom_question_note_'))
             ->mapWithKeys(function ($value, $key): array {
                 return [(int) str_replace('custom_question_note_', '', (string) $key) => $value];
             })
             ->all();
 
-        [$data, $this->verificationProfileData] = static::splitVerificationProfileData($data);
-        $this->verificationCoverageCodeData = $this->normalizeCodeCoverageRows($this->codeCoverageData);
+        return [$answerData, $answerNoteData];
+    }
 
-        foreach (array_keys($data) as $key) {
-            if (str_starts_with((string) $key, 'custom_question_') || str_starts_with((string) $key, 'context_')) {
-                unset($data[$key]);
+    protected function normalizeVerificationProfileDataForStorage(array $profileData): array
+    {
+        foreach ($this->verificationProfileIntegerFields() as $field) {
+            if (array_key_exists($field, $profileData)) {
+                $profileData[$field] = $this->normalizeNullableInteger($profileData[$field]);
             }
         }
 
+        foreach ($this->verificationProfileDecimalFields() as $field) {
+            if (array_key_exists($field, $profileData)) {
+                $profileData[$field] = $this->normalizeNullableDecimal($profileData[$field]);
+            }
+        }
+
+        return $profileData;
+    }
+
+    protected function verificationProfileIntegerFields(): array
+    {
+        return [
+            'coverage_diagnostic',
+            'coverage_preventive',
+            'coverage_basic_restorative',
+            'coverage_endodontics',
+            'coverage_periodontics',
+            'coverage_oral_surgery',
+            'coverage_major_restorative',
+            'coverage_prosthodontics',
+            'coverage_implant',
+        ];
+    }
+
+    protected function verificationProfileDecimalFields(): array
+    {
+        return [
+            'annual_maximum',
+            'annual_maximum_remaining',
+            'individual_deductible',
+            'individual_deductible_remaining',
+            'family_deductible',
+            'family_deductible_remaining',
+        ];
+    }
+
+    protected function normalizeNullableInteger(mixed $value): ?int
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) round((float) $value);
+        }
+
+        $cleaned = preg_replace('/[^0-9.\-]/', '', (string) $value);
+
+        return is_numeric($cleaned) ? (int) round((float) $cleaned) : null;
+    }
+
+    protected function normalizeNullableDecimal(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return number_format((float) $value, 2, '.', '');
+        }
+
+        $cleaned = preg_replace('/[^0-9.\-]/', '', (string) $value);
+
+        return is_numeric($cleaned) ? number_format((float) $cleaned, 2, '.', '') : null;
+    }
+
+    protected function normalizeTemplateThreeCobFields(array $data): array
+    {
+        if ($this->formTemplate !== 'template_3') {
+            return $data;
+        }
+
+        $legacyCob = data_get($data, 'vf_cob');
+
+        if (blank(data_get($data, 'vf_coverage_role')) && in_array($legacyCob, ['No COB', 'Primary', 'Secondary', 'Unknown'], true)) {
+            $data['vf_coverage_role'] = $legacyCob;
+        }
+
+        if (blank(data_get($data, 'vf_coordination_of_benefits')) && in_array($legacyCob, ['Standard', 'Non-Dup', 'Birthday Rule', 'Other'], true)) {
+            $data['vf_coordination_of_benefits'] = $legacyCob;
+        }
+
+        unset($data['vf_cob']);
+
         return $data;
+    }
+
+    protected function legacyCobValueForCoverageRole(?string $value): ?string
+    {
+        return in_array($value, ['No COB', 'Primary', 'Secondary', 'Unknown'], true) ? $value : null;
+    }
+
+    protected function legacyCobValueForCoordination(?string $value): ?string
+    {
+        return in_array($value, ['Standard', 'Non-Dup', 'Birthday Rule', 'Other'], true) ? $value : null;
     }
 
     protected function initializeWaitingPeriodDetails(): void
@@ -1117,12 +1413,14 @@ class EditVerificationWorkItem extends EditRecord
     protected function missingRequiredVerificationFields(): array
     {
         $clinicId = $this->record->clinic_id;
+        $organizationId = $this->record->organization_id;
 
         if (! filled($clinicId)) {
             return [];
         }
 
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
+        $templateKey = VerificationFormQuestion::normalizeTemplateKey($this->formTemplate);
         $ignoredFields = [
             'notes',
             'internal_summary',
@@ -1131,19 +1429,10 @@ class EditVerificationWorkItem extends EditRecord
 
         $missingFields = [];
 
-        foreach ($this->normalizeCodeCoverageRows($this->codeCoverageData) as $index => $row) {
-            if (! filled($row['code'])) {
-                continue;
-            }
-
-            if (! filled($row['coverage_status']) && ! filled($row['coverage_percent'])) {
-                $missingFields['codeCoverageData.' . $index . '.coverage_status'] = 'Coverage status or percent is required for code ' . $row['code'];
-            }
-        }
-
         $questions = VerificationFormQuestion::query()
+            ->visibleForClinic((int) $clinicId, filled($organizationId) ? (int) $organizationId : null)
+            ->where('template_key', $templateKey)
             ->where('is_active', true)
-            ->where('clinic_id', $clinicId)
             ->whereIn('form_type', ['both', $formType])
             ->where('input_type', '!=', 'frequency_row')
             ->orderBy('section_key')
@@ -1152,22 +1441,21 @@ class EditVerificationWorkItem extends EditRecord
             ->get();
 
         foreach ($questions as $question) {
-            $requiredFields = [];
+            if ($question->isConditionalQuestion()) {
+                $parentQuestion = $questions->firstWhere('id', $question->parent_question_id)
+                    ?? VerificationFormQuestion::query()->find($question->parent_question_id);
 
-            if ($question->is_builtin && $question->section_key === 'coverage_matrix') {
-                $requiredFields = array_filter([
-                    $this->resolveBuiltInField($question),
-                    $question->secondary_field_key,
-                ]);
-            } else {
-                $requiredFields = [
-                    $question->is_builtin && filled($this->resolveBuiltInField($question))
-                        ? $this->resolveBuiltInField($question)
-                        : $this->customQuestionFieldName($question->id),
-                ];
+                if (! $parentQuestion instanceof VerificationFormQuestion
+                    || ! $question->matchesTrigger($this->auditQuestionAnswer($parentQuestion))) {
+                    continue;
+                }
             }
 
-            foreach ($requiredFields as $fieldKey) {
+            if (! $question->is_required_for_audit) {
+                continue;
+            }
+
+            foreach ($this->auditQuestionFieldKeys($question) as $fieldKey) {
                 if (in_array($fieldKey, $ignoredFields, true)) {
                     continue;
                 }
@@ -1182,7 +1470,76 @@ class EditVerificationWorkItem extends EditRecord
             }
         }
 
+        $savedRowsBySignature = collect($this->normalizeCodeCoverageRows($this->codeCoverageData))
+            ->mapWithKeys(fn (array $row, int $index): array => [
+                $this->codeCoverageRowSignature($row) => [
+                    'index' => $index,
+                    'row' => $row,
+                ],
+            ]);
+
+        $requiredFrequencyRows = VerificationFormQuestion::query()
+            ->visibleForClinic((int) $clinicId, filled($organizationId) ? (int) $organizationId : null)
+            ->where('template_key', $templateKey)
+            ->whereIn('section_key', $this->frequencySectionKeysForTemplate($templateKey))
+            ->where('input_type', 'frequency_row')
+            ->where('is_active', true)
+            ->where('is_required_for_audit', true)
+            ->whereIn('form_type', ['both', $formType])
+            ->orderBy('section_key')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($requiredFrequencyRows as $question) {
+            $signature = $this->codeCoverageRowSignature([
+                'category' => VerificationFormQuestion::templateThreeFrequencyCategory($question->section_key),
+                'code' => $question->code ?: '',
+                'description' => $question->prompt,
+            ]);
+
+            $match = $savedRowsBySignature->get($signature);
+            $row = $match['row'] ?? [];
+            $fieldKey = 'codeCoverageData.' . ($match['index'] ?? 'required_' . $question->getKey()) . '.coverage_status';
+            $label = filled($question->code)
+                ? "{$question->code} - {$question->prompt}"
+                : $question->prompt;
+
+            if (! filled($row['coverage_status'] ?? null) && ! filled($row['coverage_percent'] ?? null)) {
+                $missingFields[$fieldKey] = 'Coverage status or percent is required for ' . $label;
+            }
+        }
+
         return $missingFields;
+    }
+
+    protected function auditQuestionFieldKeys(VerificationFormQuestion $question): array
+    {
+        if ($question->is_builtin && $question->section_key === 'coverage_matrix') {
+            return array_values(array_filter([
+                $this->resolveBuiltInField($question),
+                $question->secondary_field_key,
+            ]));
+        }
+
+        return array_values(array_filter([
+            $question->is_builtin && filled($this->resolveBuiltInField($question))
+                ? $this->resolveBuiltInField($question)
+                : $this->customQuestionFieldName($question->id),
+        ]));
+    }
+
+    protected function auditQuestionAnswer(VerificationFormQuestion $question): mixed
+    {
+        foreach ($this->auditQuestionFieldKeys($question) as $fieldKey) {
+            $value = data_get($this->data, $fieldKey);
+
+            if (filled($value)) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     protected function persistClinicResponseAttachments(): void
@@ -1445,24 +1802,21 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function configuredCodeCoverageTemplate(): array
     {
-        return $this->templateTwoFrequencyQuestionRows();
+        return $this->templateThreeFrequencyQuestionRows();
     }
 
-    protected function templateTwoFrequencyQuestionRows(): array
+    protected function templateThreeFrequencyQuestionRows(): array
     {
         $clinicId = $this->record->clinic_id;
+        $organizationId = $this->record->organization_id;
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
-
-        if (! filled($clinicId)) {
-            return [];
-        }
 
         $templateKey = VerificationFormQuestion::normalizeTemplateKey($this->formTemplate);
         $sectionKeys = $this->frequencySectionKeysForTemplate($templateKey);
         $orderExpression = $this->frequencySectionOrderExpression($sectionKeys);
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null)
             ->where('template_key', $templateKey)
             ->whereIn('section_key', $sectionKeys)
             ->where('input_type', 'frequency_row')
@@ -1473,24 +1827,9 @@ class EditVerificationWorkItem extends EditRecord
             ->orderBy('id')
             ->get();
 
-        if ($questions->isEmpty() && $templateKey === 'template_3') {
-            $fallbackSectionKeys = $this->frequencySectionKeysForTemplate('template_2');
-            $questions = VerificationFormQuestion::query()
-                ->where('clinic_id', $clinicId)
-                ->where('template_key', 'template_2')
-                ->whereIn('section_key', $fallbackSectionKeys)
-                ->where('input_type', 'frequency_row')
-                ->where('is_active', true)
-                ->whereIn('form_type', ['both', $formType])
-                ->orderByRaw($this->frequencySectionOrderExpression($fallbackSectionKeys))
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get();
-        }
-
         return $questions
             ->map(fn (VerificationFormQuestion $question): array => [
-                'category' => VerificationFormQuestion::templateTwoFrequencyCategory($question->section_key),
+                'category' => VerificationFormQuestion::templateThreeFrequencyCategory($question->section_key),
                 'code' => $question->code ?: '',
                 'description' => $question->prompt,
                 'frequency_response_mode' => $question->frequency_response_mode ?: 'current',
@@ -1501,30 +1840,16 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function resolveTemplateSectionKey(string $sectionKey, string $templateKey): string
     {
-        $normalizedTemplate = VerificationFormQuestion::normalizeTemplateKey($templateKey);
-
-        if ($normalizedTemplate === 'template_3' && str_starts_with($sectionKey, 'template_2_')) {
-            return 'template_3_' . substr($sectionKey, strlen('template_2_'));
-        }
-
-        if ($normalizedTemplate === 'template_2' && str_starts_with($sectionKey, 'template_3_')) {
-            return 'template_2_' . substr($sectionKey, strlen('template_3_'));
-        }
-
         return $sectionKey;
     }
 
     protected function frequencySectionKeysForTemplate(string $templateKey): array
     {
-        $prefix = VerificationFormQuestion::normalizeTemplateKey($templateKey) === 'template_3'
-            ? 'template_3_'
-            : 'template_2_';
-
         return [
-            $prefix . 'frequency_general',
-            $prefix . 'frequency_basic',
-            $prefix . 'frequency_major',
-            $prefix . 'frequency_orthodontics',
+            'template_3_frequency_general',
+            'template_3_frequency_basic',
+            'template_3_frequency_major',
+            'template_3_frequency_orthodontics',
         ];
     }
 
@@ -1973,6 +2298,7 @@ class EditVerificationWorkItem extends EditRecord
             'vf_subscriber_dob' => $this->formatDateForInput($profile?->subscriber_dob ?: $policy?->subscriber_dob ?: $primaryPlan?->subscriber_dob),
             'vf_subscriber_id' => $profile?->subscriber_id ?: $primaryPlan?->member_id ?: $policy?->member_id ?: $patient?->insurance_number,
             'vf_insured_relation' => $profile?->insured_relation ?: $policy?->subscriber_relationship,
+            'vf_coverage_role' => $profile?->coverage_role ?: $this->legacyCobValueForCoverageRole($profile?->cob),
             'vf_insurance_provider_name' => $profile?->insurance_provider_name ?: $policy?->insurance_company ?: $primaryPlan?->payer_name ?: $patient?->insurance_provider,
             'vf_insurance_claim_mailing_address' => $profile?->insurance_claim_mailing_address ?: $policy?->claims_address,
             'vf_insurance_company_phone_number' => $profile?->insurance_company_phone_number ?: $policy?->payer_phone,
@@ -1984,6 +2310,7 @@ class EditVerificationWorkItem extends EditRecord
             'vf_future_termination_date' => $this->formatDateForInput($profile?->future_termination_date ?: $policy?->termination_date),
             'vf_fee_schedule' => $profile?->fee_schedule,
             'vf_network_status' => $this->resolveNetworkStatus($profile?->network_status, $profile?->is_provider_in_network),
+            'vf_coordination_of_benefits' => $profile?->coordination_of_benefits ?: $this->legacyCobValueForCoordination($profile?->cob),
             'vf_verification_date' => $this->formatDateForInput(
                 $profile?->verification_date
                 ?: $record->started_at
@@ -2015,16 +2342,21 @@ class EditVerificationWorkItem extends EditRecord
 
     protected function formatDateForInput($value): ?string
     {
+        return $this->formatDateValue($value, 'Y-m-d');
+    }
+
+    protected function formatDateValue($value, string $format = 'Y-m-d'): ?string
+    {
         if (blank($value)) {
             return null;
         }
 
         if ($value instanceof \Illuminate\Support\Carbon || $value instanceof \Carbon\CarbonInterface) {
-            return $value->format('Y-m-d');
+            return $value->format($format);
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+            return \Illuminate\Support\Carbon::parse($value)->format($format);
         } catch (\Throwable) {
             return null;
         }
