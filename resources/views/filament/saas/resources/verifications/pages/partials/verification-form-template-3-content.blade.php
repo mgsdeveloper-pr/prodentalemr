@@ -51,6 +51,28 @@
 
     $templateThreeInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
     $templateThreeReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
+    $templateThreeFrequencyFieldLabels = array_merge(
+        \App\Models\VerificationFormQuestion::FREQUENCY_BASE_RESPONSE_FIELDS,
+        \App\Models\VerificationFormQuestion::FREQUENCY_CURRENT_OPTIONAL_FIELDS,
+        \App\Models\VerificationFormQuestion::FREQUENCY_ADVANCED_OPTIONAL_FIELDS,
+    );
+    $templateThreeFrequencySelectFields = [
+        'coverage_status' => ['' => 'Select status', 'Covered' => 'Covered', 'Not Covered' => 'Not Covered', 'Conditional' => 'Conditional'],
+        'pre_auth_required' => ['' => 'Select pre-auth', 'Yes' => 'Yes', 'No' => 'No'],
+        'downgrade_applies' => ['' => 'Select downgrade', 'Yes' => 'Yes', 'No' => 'No'],
+    ];
+    $templateThreeFrequencyTextareaFields = ['payment_guideline', 'notes'];
+    $templateThreeFrequencyPlaceholders = [
+        'coverage_percent' => '%',
+        'frequency' => 'Frequency',
+        'service_history' => 'No history / date',
+        'age_limit' => 'Age limit',
+        'waiting_period' => 'Waiting period',
+        'pre_auth_details' => 'Pre-auth detail',
+        'downgrade_to' => 'Downgrade detail',
+        'payment_guideline' => 'Payment guideline or payer rule',
+        'notes' => 'Additional notes',
+    ];
     $annualMaximum = (float) (data_get($this->data, 'vf_annual_maximum') ?: 0);
     $annualRemaining = (float) (data_get($this->data, 'vf_annual_maximum_remaining') ?: 0);
     $individualDeductible = (float) (data_get($this->data, 'vf_individual_deductible') ?: 0);
@@ -1343,20 +1365,106 @@
                     <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
                         <h3>{{ $benefitGroupName }}</h3>
                         <table class="uel2-table">
-                            <thead><tr><th>Code</th><th>Description</th><th>%</th><th>Frequency</th><th>Pre-Auth</th><th>Notes</th></tr></thead>
+                            <thead><tr><th style="width: 140px;">Code</th><th>Description</th><th style="width: 140px;">%</th><th style="width: 220px;">Frequency</th><th style="width: 48%;">Response Details</th></tr></thead>
                             <tbody>
                                 @foreach ($benefitRows as $benefitRow)
                                     @php
                                         $rowIndex = $benefitRow['index'];
                                         $row = $benefitRow['row'];
+                                        $responseMode = data_get($this->codeCoverageData, $rowIndex . '.frequency_response_mode') ?: data_get($row, 'frequency_response_mode', 'current');
+                                        $configuredFields = data_get($this->codeCoverageData, $rowIndex . '.frequency_response_fields') ?: data_get($row, 'frequency_response_fields');
+                                        $configuredFields = is_array($configuredFields)
+                                            ? $configuredFields
+                                            : \App\Models\VerificationFormQuestion::defaultFrequencyResponseFields($responseMode);
+                                        $fieldOrder = [
+                                            'coverage_status',
+                                            'service_history',
+                                            'pre_auth_required',
+                                            'pre_auth_details',
+                                            'downgrade_applies',
+                                            'downgrade_to',
+                                            'age_limit',
+                                            'waiting_period',
+                                            'payment_guideline',
+                                            'notes',
+                                        ];
+                                        $detailFields = collect($configuredFields)
+                                            ->reject(fn (string $field): bool => in_array($field, ['coverage_percent', 'frequency'], true))
+                                            ->sortBy(fn (string $field): int => array_search($field, $fieldOrder, true) === false ? 999 : array_search($field, $fieldOrder, true))
+                                            ->values()
+                                            ->all();
+                                        $preAuthRequiredForRow = data_get($this->codeCoverageData, $rowIndex . '.pre_auth_required') === 'Yes';
+                                        $downgradeAppliesForRow = data_get($this->codeCoverageData, $rowIndex . '.downgrade_applies') === 'Yes';
+
+                                        if (in_array('pre_auth_required', $detailFields, true) && ! in_array('pre_auth_details', $detailFields, true)) {
+                                            $detailFields[] = 'pre_auth_details';
+                                        }
+
+                                        if (in_array('downgrade_applies', $detailFields, true) && ! in_array('downgrade_to', $detailFields, true)) {
+                                            $detailFields[] = 'downgrade_to';
+                                        }
+
+                                        $detailFields = collect($detailFields)
+                                            ->sortBy(fn (string $field): int => array_search($field, $fieldOrder, true) === false ? 999 : array_search($field, $fieldOrder, true))
+                                            ->values()
+                                            ->all();
                                     @endphp
                                         <tr>
                                             <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
                                             <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
                                             <td data-label="%"><input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%"></td>
                                             <td data-label="Frequency"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency"></td>
-                                            <td data-label="Pre-Auth"><select wire:model.blur="codeCoverageData.{{ $rowIndex }}.pre_auth_required"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
-                                            <td data-label="Notes"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.notes" placeholder="Add note"></td>
+                                            <td data-label="Response Details">
+                                                @if (empty($detailFields))
+                                                    <div style="border:1px dashed #dce8e3;border-radius:12px;background:#f8fafc;color:#64748b;padding:10px 12px;font-size:13px;font-weight:700;">
+                                                        No extra response fields selected.
+                                                    </div>
+                                                @else
+                                                    <div
+                                                        x-data="{ preAuth: @js(data_get($this->codeCoverageData, $rowIndex . '.pre_auth_required')), downgrade: @js(data_get($this->codeCoverageData, $rowIndex . '.downgrade_applies')) }"
+                                                        style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"
+                                                    >
+                                                        @foreach ($detailFields as $field)
+                                                            @php
+                                                                $label = $templateThreeFrequencyFieldLabels[$field] ?? str($field)->headline()->toString();
+                                                                $placeholder = $templateThreeFrequencyPlaceholders[$field] ?? $label;
+                                                            @endphp
+                                                            <div
+                                                                @if ($field === 'pre_auth_details')
+                                                                    x-show="preAuth === 'Yes'"
+                                                                    x-cloak
+                                                                @elseif ($field === 'downgrade_to')
+                                                                    x-show="downgrade === 'Yes'"
+                                                                    x-cloak
+                                                                @endif
+                                                            >
+                                                                <label style="display:block;margin:0 0 5px;color:#50655d;font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;">{{ $label }}</label>
+                                                                @if (isset($templateThreeFrequencySelectFields[$field]))
+                                                                    <select
+                                                                        @if ($field === 'pre_auth_required')
+                                                                            x-model="preAuth"
+                                                                            wire:model.live="codeCoverageData.{{ $rowIndex }}.{{ $field }}"
+                                                                        @elseif ($field === 'downgrade_applies')
+                                                                            x-model="downgrade"
+                                                                            wire:model.live="codeCoverageData.{{ $rowIndex }}.{{ $field }}"
+                                                                        @else
+                                                                            wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}"
+                                                                        @endif
+                                                                    >
+                                                                        @foreach ($templateThreeFrequencySelectFields[$field] as $optionValue => $optionLabel)
+                                                                            <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                @elseif (in_array($field, $templateThreeFrequencyTextareaFields, true))
+                                                                    <textarea wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}" placeholder="{{ $placeholder }}" rows="2"></textarea>
+                                                                @else
+                                                                    <input wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}" placeholder="{{ $placeholder }}">
+                                                                @endif
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </td>
                                         </tr>
                                 @endforeach
                             </tbody>
