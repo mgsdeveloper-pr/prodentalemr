@@ -169,7 +169,7 @@
                     Save as Draft
                 </button>
                 @if ($this->auditReady)
-                    <button type="button" wire:click="save" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
+                    <button type="button" wire:click="{{ ($this->formTemplate ?? null) === 'template_3' ? 'saveTemplateThreeVerification' : 'save' }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
                         {{ $this->getSaveButtonLabel() }}
                     </button>
                 @else
@@ -982,12 +982,12 @@
                     </section>
 
                     <div style="display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 6px;">
-                        @if ($canSubmitForm)
-                            <button type="button" onclick="const btn=this; const active=document.activeElement; if(active && active !== btn && typeof active.blur === 'function'){ active.blur(); } setTimeout(() => { $wire.saveAsDraft(); }, 120); return false;" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;">
-                                Save as Draft
-                            </button>
-                            @if ($this->auditReady)
-                                <button type="submit" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
+            @if ($canSubmitForm)
+                <button type="button" onclick="const btn=this; const active=document.activeElement; if(active && active !== btn && typeof active.blur === 'function'){ active.blur(); } setTimeout(() => { $wire.saveAsDraft(); }, 120); return false;" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border-radius: 14px; border: 1px solid #dbe4ee; background: #f8fafc; color: #334155; font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Save as Draft
+                </button>
+                @if ($this->auditReady)
+                    <button type="button" wire:click="{{ ($this->formTemplate ?? null) === 'template_3' ? 'saveTemplateThreeVerification' : 'save' }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 12px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);">
                                     {{ $this->getSaveButtonLabel() }}
                                 </button>
                             @else

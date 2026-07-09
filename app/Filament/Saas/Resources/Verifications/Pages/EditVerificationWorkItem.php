@@ -420,20 +420,22 @@ class EditVerificationWorkItem extends EditRecord
 
         $this->resetErrorBag();
 
-        try {
-            $this->callHook('beforeValidate');
+        if ($this->formTemplate !== 'template_3') {
+            try {
+                $this->callHook('beforeValidate');
 
-            $this->form->getState(afterValidate: function (): void {
-                $this->callHook('afterValidate');
-            });
-        } catch (ValidationException $exception) {
-            Notification::make()
-                ->title('Audit found issues')
-                ->body('Please resolve the highlighted validation errors before saving.')
-                ->danger()
-                ->send();
+                $this->form->getState(afterValidate: function (): void {
+                    $this->callHook('afterValidate');
+                });
+            } catch (ValidationException $exception) {
+                Notification::make()
+                    ->title('Audit found issues')
+                    ->body('Please resolve the highlighted validation errors before saving.')
+                    ->danger()
+                    ->send();
 
-            throw $exception;
+                throw $exception;
+            }
         }
 
         $missingFields = $this->missingRequiredVerificationFields();
@@ -468,12 +470,38 @@ class EditVerificationWorkItem extends EditRecord
             ->send();
     }
 
+    public function saveTemplateThreeVerification(): void
+    {
+        abort_unless($this->canSubmitForm(), 403);
+
+        if ($this->formTemplate !== 'template_3') {
+            $this->save(false, false);
+
+            return;
+        }
+
+        $this->shouldSkipWorkflowSyncOnSave = false;
+        $this->persistTemplateThreeWithoutResourceValidation();
+        $this->refreshVerificationFormStateFromRecord();
+        $this->auditReady = false;
+
+        Notification::make()
+            ->title('Verification saved')
+            ->body('Template 3 verification answers were saved successfully.')
+            ->success()
+            ->send();
+    }
+
     public function saveAndBack(): void
     {
         abort_unless($this->canSubmitForm(), 403);
 
         $this->shouldSkipWorkflowSyncOnSave = true;
-        $this->save(false, false);
+        if ($this->formTemplate === 'template_3') {
+            $this->persistTemplateThreeWithoutResourceValidation();
+        } else {
+            $this->save(false, false);
+        }
         $this->shouldSkipWorkflowSyncOnSave = false;
 
         Notification::make()
@@ -496,7 +524,7 @@ class EditVerificationWorkItem extends EditRecord
 
         $this->shouldSkipWorkflowSyncOnSave = true;
         if ($this->formTemplate === 'template_3') {
-            $this->persistTemplateThreeDraftWithoutResourceValidation();
+            $this->persistTemplateThreeWithoutResourceValidation(['outcome_status' => 'pending']);
         } else {
             $this->save(false, false);
         }
@@ -518,22 +546,22 @@ class EditVerificationWorkItem extends EditRecord
             ->send();
     }
 
-    protected function persistTemplateThreeDraftWithoutResourceValidation(): void
+    protected function persistTemplateThreeWithoutResourceValidation(array $overrides = []): void
     {
         $this->resetErrorBag();
 
-        DB::transaction(function (): void {
+        DB::transaction(function () use ($overrides): void {
             $baseData = array_merge(
                 $this->record->attributesToArray(),
                 $this->data ?? [],
-                ['outcome_status' => 'pending']
+                $overrides
             );
 
             $this->mutateFormDataBeforeSave($baseData);
 
-            $this->record->forceFill([
-                'outcome_status' => 'pending',
-            ])->save();
+            if ($overrides !== []) {
+                $this->record->forceFill($overrides)->save();
+            }
 
             $this->afterSave();
         });

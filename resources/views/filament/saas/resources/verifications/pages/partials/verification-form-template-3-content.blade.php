@@ -1506,7 +1506,7 @@
                     style="border:1px solid #dce8e3;border-radius:12px;padding:11px 18px;background:#f8fafc;color:#334155;font-weight:900;cursor:pointer;"
                 >Save as Draft</button>
                 @if ($this->auditReady)
-                    <button type="submit" class="uel-button uel-button-primary" style="border:0;border-radius:12px;padding:11px 18px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
+                    <button type="button" wire:click="saveTemplateThreeVerification" class="uel-button uel-button-primary" style="border:0;border-radius:12px;padding:11px 18px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
                 @else
                     <button type="button" wire:click="auditVerification" style="border:1px solid #b8d4c9;border-radius:12px;padding:11px 18px;background:#eaf6f1;color:#0b6b4f;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
                 @endif
