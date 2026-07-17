@@ -1161,7 +1161,9 @@
         <div class="uel2-body">
             <div class="uel2-grid">
                 <div class="uel2-field"><label>Annual Maximum on the Plan?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum" style="{{ $templateThreeInput }}"></div>
-                <div class="uel2-field"><label>Annual Maximum Used?</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $annualMaximum - $annualRemaining), 2) }}</div></div>
+                @if ($this->templateThreeFieldIsVisible('vf_annual_maximum_used_display', false))
+                    <div class="uel2-field"><label>Annual Maximum Used?</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $annualMaximum - $annualRemaining), 2) }}</div></div>
+                @endif
                 <div class="uel2-field"><label>Annual Maximum Remaining?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum_remaining" style="{{ $templateThreeInput }}"></div>
             </div>
 
@@ -1169,7 +1171,9 @@
                 <h3>Individual Deductible</h3>
                 <div class="uel2-grid">
                     <div class="uel2-field"><label>Annual Deductible - Individual</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible" style="{{ $templateThreeInput }}"></div>
-                    <div class="uel2-field"><label>Deductible Met - Individual</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $individualDeductible - $individualRemaining), 2) }}</div></div>
+                    @if ($this->templateThreeFieldIsVisible('vf_individual_deductible_met_display', false))
+                        <div class="uel2-field"><label>Deductible Met - Individual</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $individualDeductible - $individualRemaining), 2) }}</div></div>
+                    @endif
                     <div class="uel2-field"><label>Individual Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible_remaining" style="{{ $templateThreeInput }}"></div>
                 </div>
             </div>
@@ -1178,7 +1182,9 @@
                 <h3>Family Deductible</h3>
                 <div class="uel2-grid">
                     <div class="uel2-field"><label>Annual Deductible - Family</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible" style="{{ $templateThreeInput }}"></div>
-                    <div class="uel2-field"><label>Deductible Met - Family</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $familyDeductible - $familyRemaining), 2) }}</div></div>
+                    @if ($this->templateThreeFieldIsVisible('vf_family_deductible_met_display', false))
+                        <div class="uel2-field"><label>Deductible Met - Family</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $familyDeductible - $familyRemaining), 2) }}</div></div>
+                    @endif
                     <div class="uel2-field"><label>Family Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible_remaining" style="{{ $templateThreeInput }}"></div>
                 </div>
             </div>

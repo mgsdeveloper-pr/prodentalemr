@@ -41,6 +41,7 @@ class EditVerificationWorkItem extends EditRecord
     protected array $verificationFormAnswerData = [];
     protected array $verificationFormAnswerNoteData = [];
     protected array $verificationCoverageCodeData = [];
+    protected array $templateThreeFieldVisibilityCache = [];
     public array $codeCoverageData = [];
     public array $clinicResponseAttachments = [];
     public bool $auditReady = false;
@@ -1886,6 +1887,32 @@ class EditVerificationWorkItem extends EditRecord
         return $sectionKey;
     }
 
+    public function templateThreeFieldIsVisible(string $fieldKey, bool $default = true): bool
+    {
+        if (array_key_exists($fieldKey, $this->templateThreeFieldVisibilityCache)) {
+            return $this->templateThreeFieldVisibilityCache[$fieldKey];
+        }
+
+        $clinicId = $this->record?->clinic_id;
+
+        $question = VerificationFormQuestion::query()
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('field_key', $fieldKey)
+            ->where(function ($query) use ($clinicId): void {
+                $query->whereNull('clinic_id');
+
+                if ($clinicId) {
+                    $query->orWhere('clinic_id', $clinicId);
+                }
+            })
+            ->orderByRaw('CASE WHEN clinic_id IS NULL THEN 1 ELSE 0 END')
+            ->first();
+
+        return $this->templateThreeFieldVisibilityCache[$fieldKey] = $question
+            ? (bool) $question->is_active
+            : $default;
+    }
+
     protected function fixedTemplateThreeFieldKeysForSection(string $sectionKey): array
     {
         return match ($sectionKey) {
@@ -1915,11 +1942,14 @@ class EditVerificationWorkItem extends EditRecord
             ],
             'template_3_maximums_deductibles' => [
                 'vf_annual_maximum',
+                'vf_annual_maximum_used_display',
                 'vf_annual_maximum_remaining',
                 'vf_individual_deductible',
                 'vf_individual_deductible_remaining',
+                'vf_individual_deductible_met_display',
                 'vf_family_deductible',
                 'vf_family_deductible_remaining',
+                'vf_family_deductible_met_display',
                 'vf_deductible_applies_notes',
             ],
             'template_3_coverage_category' => [

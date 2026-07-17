@@ -9,15 +9,23 @@ class VerificationTemplateThreeDefaults
     public static function syncMasterQuestions(): void
     {
         foreach (self::questions() as $question) {
+            $lookup = [
+                'organization_id' => null,
+                'clinic_id' => null,
+                'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+                'section_key' => $question['section_key'],
+            ];
+
+            if (filled($question['field_key'] ?? null)) {
+                $lookup['field_key'] = $question['field_key'];
+            } else {
+                $lookup['prompt'] = $question['prompt'];
+            }
+
             VerificationFormQuestion::query()->updateOrCreate(
+                $lookup,
                 [
-                    'organization_id' => null,
-                    'clinic_id' => null,
-                    'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
-                    'section_key' => $question['section_key'],
                     'prompt' => $question['prompt'],
-                ],
-                [
                     'question_kind' => VerificationFormQuestion::QUESTION_KIND_NORMAL,
                     'form_type' => $question['form_type'] ?? 'both',
                     'input_type' => $question['input_type'] ?? 'text',
@@ -36,7 +44,7 @@ class VerificationTemplateThreeDefaults
                     'is_builtin' => true,
                     'is_locked_by_admin' => true,
                     'is_required_for_audit' => false,
-                    'is_active' => true,
+                    'is_active' => $question['is_active'] ?? true,
                 ],
             );
         }
@@ -91,11 +99,14 @@ class VerificationTemplateThreeDefaults
     {
         return self::section('template_3_maximums_deductibles', [
             ['Annual Maximum on the Plan?', 'vf_annual_maximum', 'currency', 10],
+            ['Annual Maximum Used?', 'vf_annual_maximum_used_display', 'currency', 15, null, false],
             ['Annual Maximum Remaining?', 'vf_annual_maximum_remaining', 'currency', 20],
             ['Annual Deductible - Individual', 'vf_individual_deductible', 'currency', 30],
-            ['Deductible Met - Individual', 'vf_individual_deductible_remaining', 'currency', 40],
+            ['Individual Deductible Remaining', 'vf_individual_deductible_remaining', 'currency', 40],
+            ['Deductible Met - Individual', 'vf_individual_deductible_met_display', 'currency', 45, null, false],
             ['Annual Deductible - Family', 'vf_family_deductible', 'currency', 50],
-            ['Deductible Met - Family', 'vf_family_deductible_remaining', 'currency', 60],
+            ['Family Deductible Remaining', 'vf_family_deductible_remaining', 'currency', 60],
+            ['Deductible Met - Family', 'vf_family_deductible_met_display', 'currency', 65, null, false],
             ['Deductible Notes', 'vf_deductible_applies_notes', 'textarea', 70],
         ]);
     }
@@ -167,6 +178,7 @@ class VerificationTemplateThreeDefaults
                 'input_type' => $question[2],
                 'sort_order' => $question[3],
                 'select_options' => $question[4] ?? null,
+                'is_active' => $question[5] ?? true,
             ];
         }, $questions);
     }
