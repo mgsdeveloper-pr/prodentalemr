@@ -36,7 +36,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Verification Workbench';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Master Template';
     }
 
     public function repositionQuestion(int $questionId, string $direction): void
@@ -53,8 +53,11 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         }
 
         /** @var VerificationFormQuestion|null $question */
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
+
         $question = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
+            ->where('template_key', $this->selectedTemplateKey)
             ->find($questionId);
 
         if (! $question) {
@@ -67,9 +70,10 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('section_key', $question->section_key)
             ->where('template_key', $question->template_key)
+            ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get(['id']);
@@ -146,9 +150,12 @@ trait InteractsWithVerificationQuestionLibraryOrdering
             return collect();
         }
 
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
+
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->selectedTemplateKey)
+            ->where('is_active', true)
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')

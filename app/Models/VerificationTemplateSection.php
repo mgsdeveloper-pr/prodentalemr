@@ -12,6 +12,8 @@ class VerificationTemplateSection extends Model
     protected $fillable = [
         'organization_id',
         'clinic_id',
+        'template_version_id',
+        'source_section_id',
         'template_key',
         'section_key',
         'parent_section_key',
@@ -25,6 +27,8 @@ class VerificationTemplateSection extends Model
     protected function casts(): array
     {
         return [
+            'template_version_id' => 'integer',
+            'source_section_id' => 'integer',
             'is_builtin' => 'boolean',
             'is_locked_by_admin' => 'boolean',
             'is_active' => 'boolean',
@@ -59,6 +63,16 @@ class VerificationTemplateSection extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function templateVersion(): BelongsTo
+    {
+        return $this->belongsTo(VerificationTemplateVersion::class, 'template_version_id');
+    }
+
+    public function sourceSection(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_section_id');
     }
 
     public static function makeSectionKey(string $label, ?string $parentSectionKey = null): string

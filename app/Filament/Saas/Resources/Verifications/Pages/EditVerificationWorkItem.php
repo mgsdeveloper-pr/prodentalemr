@@ -12,6 +12,7 @@ use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormSubmission;
 use App\Models\VerificationFormQuestion;
 use App\Support\VerificationAutoAssigner;
+use App\Support\VerificationTemplateVersionService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
@@ -54,6 +55,7 @@ class EditVerificationWorkItem extends EditRecord
     public function mount(int|string $record): void
     {
         parent::mount($record);
+        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
 
         $this->record->recordActivity('verification_console_opened', 'Verification console opened.', [
             'panel' => $this->getSubmissionPanel(),
@@ -487,7 +489,7 @@ class EditVerificationWorkItem extends EditRecord
 
         Notification::make()
             ->title('Verification saved')
-            ->body('Template 3 verification answers were saved successfully.')
+            ->body('Master Template verification answers were saved successfully.')
             ->success()
             ->send();
     }
@@ -549,6 +551,7 @@ class EditVerificationWorkItem extends EditRecord
     protected function persistTemplateThreeWithoutResourceValidation(array $overrides = []): void
     {
         $this->resetErrorBag();
+        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
 
         DB::transaction(function () use ($overrides): void {
             $baseData = array_merge(
@@ -855,7 +858,7 @@ class EditVerificationWorkItem extends EditRecord
         $templateKey = VerificationFormQuestion::normalizeTemplateKey($templateKey ?: $this->formTemplate);
         $resolvedSectionKey = $this->resolveTemplateSectionKey($sectionKey, $templateKey);
 
-        $questions = VerificationFormQuestion::query()
+        $questionsQuery = VerificationFormQuestion::query()
             ->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null)
             ->where('template_key', $templateKey)
             ->where('section_key', $resolvedSectionKey)
@@ -868,8 +871,20 @@ class EditVerificationWorkItem extends EditRecord
                     ->orWhere('question_kind', VerificationFormQuestion::QUESTION_KIND_NORMAL);
             })
             ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        $fixedTemplateThreeFields = $this->fixedTemplateThreeFieldKeysForSection($resolvedSectionKey);
+
+        if ($templateKey === VerificationFormQuestion::DEFAULT_TEMPLATE_KEY && filled($fixedTemplateThreeFields)) {
+            $questionsQuery->where(function ($query) use ($fixedTemplateThreeFields): void {
+                $query
+                    ->whereNull('field_key')
+                    ->orWhere('field_key', '')
+                    ->orWhereNotIn('field_key', $fixedTemplateThreeFields);
+            });
+        }
+
+        $questions = $questionsQuery->get();
 
         return $questions
             ->map(function (VerificationFormQuestion $question) use ($formType, $templateKey, $resolvedSectionKey, $clinicId, $organizationId): array {
@@ -1869,6 +1884,88 @@ class EditVerificationWorkItem extends EditRecord
     protected function resolveTemplateSectionKey(string $sectionKey, string $templateKey): string
     {
         return $sectionKey;
+    }
+
+    protected function fixedTemplateThreeFieldKeysForSection(string $sectionKey): array
+    {
+        return match ($sectionKey) {
+            'template_3_patient_subscriber' => [
+                'vf_patient_full_name',
+                'vf_patient_dob',
+                'vf_patient_identifier',
+                'vf_subscriber_name',
+                'vf_subscriber_dob',
+                'vf_subscriber_id',
+                'vf_insured_relation',
+                'vf_coverage_role',
+            ],
+            'template_3_insurance' => [
+                'vf_insurance_provider_name',
+                'vf_group_number',
+                'vf_plan_type',
+                'vf_network_status',
+                'vf_effective_date',
+                'vf_future_termination_date',
+                'vf_plan_renewal_month',
+                'vf_insurance_claim_mailing_address',
+                'vf_payer_id',
+                'vf_insurance_company_phone_number',
+                'vf_fee_schedule',
+                'vf_group_name',
+            ],
+            'template_3_maximums_deductibles' => [
+                'vf_annual_maximum',
+                'vf_annual_maximum_remaining',
+                'vf_individual_deductible',
+                'vf_individual_deductible_remaining',
+                'vf_family_deductible',
+                'vf_family_deductible_remaining',
+                'vf_deductible_applies_notes',
+            ],
+            'template_3_coverage_category' => [
+                'vf_coverage_diagnostic_deductible_applies',
+                'vf_coverage_basic_restorative_deductible_applies',
+                'vf_coverage_endodontics_deductible_applies',
+                'vf_coverage_periodontics_deductible_applies',
+                'vf_coverage_oral_surgery_deductible_applies',
+                'vf_coverage_major_restorative_deductible_applies',
+                'vf_coverage_orthodontics_deductible_applies',
+                'vf_coverage_diagnostic',
+                'vf_coverage_preventive',
+                'vf_coverage_basic_restorative',
+                'vf_coverage_endodontics',
+                'vf_coverage_periodontics',
+                'vf_coverage_oral_surgery',
+                'vf_coverage_major_restorative',
+                'vf_coverage_prosthodontics',
+                'vf_coverage_implant',
+                'vf_ortho_lifetime_maximum',
+            ],
+            'template_3_plan_provisions' => [
+                'vf_waiting_periods',
+                'vf_missing_tooth_clause',
+                'vf_crowns_paid_on',
+                'vf_prosthetic_replacement_period',
+                'vf_coordination_of_benefits',
+                'vf_cob',
+                'vf_plan_provisions',
+            ],
+            'template_3_service_history' => [
+                'vf_service_history',
+                'vf_history_exams',
+                'vf_history_prophylaxis',
+                'vf_history_bitewings',
+                'vf_history_full_mouth_xray',
+                'vf_history_basic_or_major',
+            ],
+            'template_3_verification_information' => [
+                'vf_verification_date',
+                'vf_verified_by',
+                'vf_insurance_representative_name',
+                'vf_verification_notes',
+            ],
+            default => [],
+        };
     }
 
     protected function frequencySectionKeysForTemplate(string $templateKey): array

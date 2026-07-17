@@ -91,6 +91,9 @@ class BillingWorkItem extends Model
         'provider_id',
         'patient_insurance_policy_id',
         'patient_insurance_claim_id',
+        'verification_template_version_id',
+        'verification_template_snapshot',
+        'verification_template_snapshot_at',
         'assigned_to',
         'reviewed_by',
         'created_by',
@@ -131,6 +134,8 @@ class BillingWorkItem extends Model
             'cancelled_at' => 'datetime',
             'clinic_responded_at' => 'datetime',
             'sla_pause_started_at' => 'datetime',
+            'verification_template_snapshot' => 'array',
+            'verification_template_snapshot_at' => 'datetime',
         ];
     }
 
@@ -253,6 +258,11 @@ class BillingWorkItem extends Model
     public function managedBillingService(): BelongsTo
     {
         return $this->belongsTo(ManagedBillingService::class);
+    }
+
+    public function verificationTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(VerificationTemplateVersion::class, 'verification_template_version_id');
     }
 
     public function enrollment(): BelongsTo

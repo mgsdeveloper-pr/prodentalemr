@@ -80,9 +80,40 @@
                 >
                 @break
 
+            @case('month')
+            @case('month_year')
+                <input
+                    type="month"
+                    wire:model.blur="data.{{ $question['field'] }}"
+                    placeholder="{{ $question['placeholder'] ?: 'MM/YYYY' }}"
+                    style="{{ $templateThreeInput }}"
+                >
+                @break
+
+            @case('month_only')
+                <select wire:model.blur="data.{{ $question['field'] }}" style="{{ $templateThreeInput }}">
+                    <option value="">Select month</option>
+                    @foreach (['Jan', 'Feb', 'March', 'April', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as $month)
+                        <option value="{{ $month }}">{{ $month }}</option>
+                    @endforeach
+                </select>
+                @break
+
+            @case('year_only')
+                <input
+                    type="number"
+                    min="1900"
+                    max="2100"
+                    step="1"
+                    wire:model.blur="data.{{ $question['field'] }}"
+                    placeholder="{{ $question['placeholder'] ?: 'YYYY' }}"
+                    style="{{ $templateThreeInput }}"
+                >
+                @break
+
             @default
                 <input
-                    type="{{ in_array($question['type'], ['date', 'month', 'time', 'email', 'tel', 'number'], true) ? $question['type'] : 'text' }}"
+                    type="{{ in_array($question['type'], ['date', 'time', 'email', 'tel', 'number'], true) ? $question['type'] : 'text' }}"
                     wire:model.blur="data.{{ $question['field'] }}"
                     placeholder="{{ $question['placeholder'] ?: 'Enter response' }}"
                     style="{{ $templateThreeInput }}"

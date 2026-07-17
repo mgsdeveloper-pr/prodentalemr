@@ -10,6 +10,7 @@ trait InteractsWithVerificationQuestionOrdering
     public function getSectionQuestionOrderCards(): array
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
@@ -32,9 +33,10 @@ trait InteractsWithVerificationQuestionOrdering
             : null;
 
         return VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $templateKey)
             ->whereIn('section_key', $sectionKeys)
+            ->where('is_active', true)
             ->when($recordId, fn ($query) => $query->whereKeyNot($recordId))
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -51,6 +53,59 @@ trait InteractsWithVerificationQuestionOrdering
     {
         $this->data['order_position'] = $mode;
         $this->data['order_reference_id'] = $referenceId;
+    }
+
+    public function reorderExistingSectionQuestions(array $orderedIds): void
+    {
+        $orderedIds = collect($orderedIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($orderedIds->isEmpty()) {
+            return;
+        }
+
+        $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
+        $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
+
+        if (! $clinicId || ! filled($sectionKey)) {
+            return;
+        }
+
+        $sectionKeys = [$sectionKey];
+
+        if (($this->data['sub_section_key'] ?? null) === null) {
+            $childSectionKeys = array_keys(
+                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey)
+            );
+
+            $sectionKeys = array_values(array_unique([...$sectionKeys, ...$childSectionKeys]));
+        }
+
+        $questions = VerificationFormQuestion::query()
+            ->visibleForClinic($clinicId, $organizationId)
+            ->where('template_key', $templateKey)
+            ->whereIn('section_key', $sectionKeys)
+            ->where('is_active', true)
+            ->whereIn('id', $orderedIds)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($orderedIds as $index => $questionId) {
+            $question = $questions->get($questionId);
+
+            if (! $question) {
+                continue;
+            }
+
+            $question->forceFill([
+                'sort_order' => ($index + 1) * 10,
+            ])->saveQuietly();
+        }
     }
 
     public function getPlacementSummaryLabel(): string
@@ -75,7 +130,8 @@ trait InteractsWithVerificationQuestionOrdering
 
     protected function reorderSectionQuestions(VerificationFormQuestion $record, ?string $mode = null, ?int $referenceId = null): void
     {
-        $clinicId = $record->clinic_id;
+        $clinicId = $record->clinic_id ?: ClinicPanelScope::selectedClinicId();
+        $organizationId = $record->organization_id ?: ClinicPanelScope::selectedOrganizationId();
         $sectionKey = $record->section_key;
         $templateKey = $record->template_key;
 
@@ -84,9 +140,10 @@ trait InteractsWithVerificationQuestionOrdering
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $templateKey)
             ->where('section_key', $sectionKey)
+            ->where('is_active', true)
             ->whereKeyNot($record->getKey())
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -131,15 +188,17 @@ trait InteractsWithVerificationQuestionOrdering
     protected function normalizeSectionQuestionOrder(?string $sectionKey, ?int $excludeRecordId = null): void
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
 
         if (! $clinicId || ! filled($sectionKey)) {
             return;
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey())
             ->where('section_key', $sectionKey)
+            ->where('is_active', true)
             ->when($excludeRecordId, fn ($query) => $query->whereKeyNot($excludeRecordId))
             ->orderBy('sort_order')
             ->orderBy('id')

@@ -175,7 +175,7 @@ class ListVerificationQuestions extends ListRecords
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Verification Workbench';
+        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Master Template';
     }
 
     public function getTemplateOptions(): array
@@ -222,6 +222,7 @@ class ListVerificationQuestions extends ListRecords
     public function repositionQuestion(int $questionId, string $direction): void
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
 
         if (! $clinicId) {
             Notification::make()
@@ -234,7 +235,8 @@ class ListVerificationQuestions extends ListRecords
 
         /** @var VerificationFormQuestion|null $question */
         $question = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
+            ->where('template_key', $this->selectedTemplateKey)
             ->find($questionId);
 
         if (! $question) {
@@ -247,7 +249,8 @@ class ListVerificationQuestions extends ListRecords
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
+            ->where('template_key', $question->template_key)
             ->where('section_key', $question->section_key)
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -319,8 +322,11 @@ class ListVerificationQuestions extends ListRecords
 
     protected function normalizeSectionOrder(string $sectionKey, int $clinicId): void
     {
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
+
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
+            ->where('template_key', $this->selectedTemplateKey)
             ->where('section_key', $sectionKey)
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -336,13 +342,14 @@ class ListVerificationQuestions extends ListRecords
     public function getQuestionSections(): Collection
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
 
         if (! $clinicId) {
             return collect();
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->selectedTemplateKey)
             ->orderBy('section_key')
             ->orderBy('sort_order')

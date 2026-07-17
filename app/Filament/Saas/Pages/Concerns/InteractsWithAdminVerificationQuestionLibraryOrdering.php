@@ -12,6 +12,8 @@ trait InteractsWithAdminVerificationQuestionLibraryOrdering
 {
     public ?string $selectedSectionKey = null;
 
+    public string $selectedTemplateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+
     public function getSelectedClinicName(): ?string
     {
         return AdminClinicScope::selectedClinic()?->clinic_name;
@@ -31,8 +33,12 @@ trait InteractsWithAdminVerificationQuestionLibraryOrdering
         }
 
         /** @var VerificationFormQuestion|null $question */
+        $organizationId = AdminClinicScope::selectedClinic()?->organization_id;
+
         $question = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId ? (int) $organizationId : null)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('is_active', true)
             ->find($questionId);
 
         if (! $question) {
@@ -45,8 +51,10 @@ trait InteractsWithAdminVerificationQuestionLibraryOrdering
         }
 
         $questions = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+            ->visibleForClinic($clinicId, $organizationId ? (int) $organizationId : null)
             ->where('section_key', $question->section_key)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get(['id']);
@@ -123,19 +131,27 @@ trait InteractsWithAdminVerificationQuestionLibraryOrdering
             return collect();
         }
 
-        return VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
+        $organizationId = AdminClinicScope::selectedClinic()?->organization_id;
+
+        $questions = VerificationFormQuestion::query()
+            ->visibleForClinic($clinicId, $organizationId ? (int) $organizationId : null)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('is_active', true)
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get()
-            ->groupBy('section_key')
-            ->map(function (Collection $questions, string $sectionKey): array {
+            ->groupBy('section_key');
+
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate(VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $clinicId))
+            ->map(function (string $sectionTitle, string $sectionKey) use ($questions): array {
+                $sectionQuestions = $questions->get($sectionKey, collect());
+
                 return [
                     'key' => $sectionKey,
-                    'title' => VerificationFormQuestion::SECTION_OPTIONS[$sectionKey] ?? str($sectionKey)->headline()->toString(),
-                    'count' => $questions->count(),
-                    'questions' => $questions->map(function (VerificationFormQuestion $question): array {
+                    'title' => $sectionTitle,
+                    'count' => $sectionQuestions->count(),
+                    'questions' => $sectionQuestions->map(function (VerificationFormQuestion $question): array {
                         return [
                             'id' => $question->getKey(),
                             'prompt' => $question->prompt,

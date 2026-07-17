@@ -101,7 +101,7 @@ class VerificationSettings extends Page implements HasForms
                             ->default(VerificationFormQuestion::defaultTemplateKey())
                             ->required()
                             ->native(false)
-                            ->helperText('Verification Workbench is the recommended default and the active verification form experience.'),
+                            ->helperText('Master Template is the recommended default and the active verification form experience.'),
                         CheckboxList::make('verification_pdf_output_sections')
                             ->label('Selected output sections')
                             ->options($this->getPdfSectionLabels())
@@ -416,7 +416,7 @@ class VerificationSettings extends Page implements HasForms
 
     protected function getPdfSectionLabels(): array
     {
-        return collect(VerificationFormQuestion::SECTION_OPTIONS)
+        return collect(VerificationFormQuestion::templateThreeLiveSectionOptions())
             ->mapWithKeys(fn (string $label, string $key): array => [
                 $key => $this->getPdfSectionLabel($key),
             ])
@@ -426,8 +426,7 @@ class VerificationSettings extends Page implements HasForms
     protected function getPdfSectionLabel(string $sectionKey): string
     {
         return self::PDF_SECTION_LABELS[$sectionKey]
-            ?? VerificationFormQuestion::SECTION_OPTIONS[$sectionKey]
-            ?? str($sectionKey)->headline()->toString();
+            ?? VerificationFormQuestion::sectionLabel($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY);
     }
 
     protected function getQuestionOptionsForSection(string $sectionKey): array

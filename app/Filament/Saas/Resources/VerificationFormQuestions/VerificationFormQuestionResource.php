@@ -67,7 +67,7 @@ class VerificationFormQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Verification Workbench clean and organized.')
+                            ->description('Choose where this question belongs before writing it. This keeps the Master Template clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Grid::make(12)
@@ -346,7 +346,7 @@ class VerificationFormQuestionResource extends Resource
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
                                             ->label('Add a separate note area')
-                                            ->helperText('Displays an optional note box beside or below this question in the Verification Workbench.')
+                                            ->helperText('Displays an optional note box beside or below this question in the Master Template.')
                                             ->default(false)
                                             ->live()
                                             ->inline(false)
@@ -528,6 +528,8 @@ class VerificationFormQuestionResource extends Resource
                 SelectFilter::make('form_type')
                     ->label('Form')
                     ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS),
+                TernaryFilter::make('is_active')
+                    ->label('Active question'),
                 TernaryFilter::make('is_builtin')
                     ->label('System question'),
             ])
@@ -573,24 +575,8 @@ class VerificationFormQuestionResource extends Resource
 
     protected static function sectionFilterOptions(): array
     {
-        $options = VerificationFormQuestion::SECTION_OPTIONS
-            + VerificationFormQuestion::TEMPLATE_3_SECTION_OPTIONS;
-
-        VerificationFormQuestion::query()
-            ->select(['section_key', 'template_key', 'clinic_id'])
-            ->whereNotNull('section_key')
-            ->distinct()
-            ->get()
-            ->each(function (VerificationFormQuestion $question) use (&$options): void {
-                $options[$question->section_key] = VerificationFormQuestion::sectionLabel(
-                    $question->section_key,
-                    $question->template_key,
-                    $question->clinic_id,
-                );
-            });
-
-        asort($options);
-
-        return $options;
+        return VerificationFormQuestion::sectionOptionsForTemplate(
+            VerificationFormQuestion::defaultTemplateKey(),
+        );
     }
 }

@@ -50,7 +50,7 @@ class VerificationSettingsNavigation
             [
                 'key' => 'questions',
                 'label' => 'Template Builder',
-                'description' => 'Build Verification Workbench sections, sub-sections, question types, notes, and section placement.',
+                'description' => 'Build Master Template sections, sub-sections, question types, notes, and section placement.',
                 'url' => VerificationFormQuestionResource::getUrl('index'),
             ],
             [

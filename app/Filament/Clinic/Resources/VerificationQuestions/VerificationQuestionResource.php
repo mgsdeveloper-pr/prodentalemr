@@ -71,7 +71,7 @@ class VerificationQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Verification Workbench clean and organized.')
+                            ->description('Choose where this question belongs before writing it. This keeps the Master Template clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Placeholder::make('clinic_scope')
@@ -280,7 +280,7 @@ class VerificationQuestionResource extends Resource
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
                                             ->label('Add a separate note area')
-                                            ->helperText('Displays an optional note box beside or below this question in the Verification Workbench.')
+                                            ->helperText('Displays an optional note box beside or below this question in the Master Template.')
                                             ->default(false)
                                             ->live()
                                             ->inline(false)
@@ -368,11 +368,12 @@ class VerificationQuestionResource extends Resource
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
                 $selectedClinicId = ClinicPanelScope::selectedClinicId();
+                $selectedOrganizationId = ClinicPanelScope::selectedOrganizationId();
 
                 return $query
                     ->when(
                         filled($selectedClinicId),
-                        fn (Builder $builder) => $builder->where('clinic_id', $selectedClinicId),
+                        fn (Builder $builder) => $builder->visibleForClinic($selectedClinicId, $selectedOrganizationId),
                         fn (Builder $builder) => $builder->whereRaw('1 = 0')
                     )
                     ->with(['clinic', 'organization'])

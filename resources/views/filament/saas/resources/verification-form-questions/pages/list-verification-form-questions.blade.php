@@ -22,17 +22,20 @@
                     Template Builder
                 </h2>
                 <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                    Manage the Verification Workbench section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
+                    Manage the Master Template section by section, including response datatypes, dropdown options, placeholders, and optional note areas.
                 </p>
             </div>
 
-            @if ($selectedClinicName)
-                <div style="padding: 18px 24px 0;">
-                    <div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #dbeafe; border-radius: 14px; background: #f8fbff; color: #1e3a8a; font-size: 13px; font-weight: 700;">
-                        Viewing current question set for clinic:
+            <div style="padding: 18px 24px 0;">
+                <div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #dbeafe; border-radius: 14px; background: #f8fbff; color: #1e3a8a; font-size: 13px; font-weight: 700;">
+                    {{ $selectedClinicName ? 'Viewing master + clinic question set for:' : 'Viewing Master Template question set' }}
+                    @if ($selectedClinicName)
                         <span style="color: #0f172a;">{{ $selectedClinicName }}</span>
-                    </div>
+                    @endif
                 </div>
+            </div>
+
+            @if (count($builtInSections))
                 <div style="padding: 22px 24px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;">
                     @foreach ($builtInSections as $section)
                         <section style="border: 1px solid #dbe4ee; border-radius: 20px; background: #ffffff; overflow: hidden;">
@@ -78,9 +81,9 @@
             @else
                 <div style="padding: 22px 24px;">
                     <div style="border: 1px dashed #cbd5e1; border-radius: 20px; background: #f8fafc; padding: 26px; text-align: center;">
-                        <div style="margin-bottom: 8px; font-size: 16px; font-weight: 800; color: #0f172a;">Select a clinic to preview its question set</div>
+                        <div style="margin-bottom: 8px; font-size: 16px; font-weight: 800; color: #0f172a;">No Master Template questions found yet</div>
                         <div style="font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Use the clinic filter in the managed question bank below. Once a clinic is selected, this section will show the current questions for that clinic only.
+                            Use Add Question to create your first master or clinic-specific question. Existing questions can be edited or removed from the managed question bank below.
                         </div>
                     </div>
                 </div>

@@ -8,6 +8,17 @@
     <textarea wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] }}" style="{{ $textareaStyle }}"></textarea>
 @elseif ($type === 'date')
     <input type="date" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
+@elseif (in_array($type, ['month', 'month_year'], true))
+    <input type="month" wire:model.blur="data.{{ $field }}" style="{{ $inputStyle }}">
+@elseif ($type === 'month_only')
+    <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
+        <option value="">Select month</option>
+        @foreach (['Jan', 'Feb', 'March', 'April', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'] as $month)
+            <option value="{{ $month }}">{{ $month }}</option>
+        @endforeach
+    </select>
+@elseif ($type === 'year_only')
+    <input type="number" min="1900" max="2100" step="1" wire:model.blur="data.{{ $field }}" placeholder="{{ $row['placeholder'] ?: 'YYYY' }}" style="{{ $inputStyle }}">
 @elseif ($type === 'yes_no')
     <select wire:model.blur="data.{{ $field }}" style="{{ $selectStyle }}">
         <option value="">Select</option>

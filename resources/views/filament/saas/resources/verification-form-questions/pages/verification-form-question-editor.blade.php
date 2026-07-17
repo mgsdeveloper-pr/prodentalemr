@@ -98,14 +98,37 @@
                                     No questions have been added in this section yet. Save this question and it will appear here.
                                 </div>
                             @else
-                                <div style="max-height: 520px; overflow-y: auto; padding-right: 4px; display: grid; grid-template-columns: 1fr; gap: 12px;">
+                                <div
+                                    x-data="{ draggingId: null }"
+                                    style="max-height: 520px; overflow-y: auto; padding-right: 4px; display: grid; grid-template-columns: 1fr; gap: 12px;"
+                                >
                                     @foreach ($orderCards as $card)
-                                        <div style="border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff; overflow: hidden;">
-                                            <div style="padding: 14px 16px; border-bottom: 1px solid #edf2f7;">
+                                        <div
+                                            draggable="true"
+                                            data-question-id="{{ $card['id'] }}"
+                                            x-on:dragstart="draggingId = '{{ $card['id'] }}'; $event.dataTransfer.effectAllowed = 'move';"
+                                            x-on:dragover.prevent="$event.currentTarget.style.borderColor = '#f59e0b';"
+                                            x-on:dragleave="$event.currentTarget.style.borderColor = '#e2e8f0';"
+                                            x-on:drop.prevent="
+                                                $event.currentTarget.style.borderColor = '#e2e8f0';
+                                                const target = $event.currentTarget;
+                                                const list = target.parentNode;
+                                                const dragged = list.querySelector('[data-question-id=\'' + draggingId + '\']');
+                                                if (dragged && target && dragged !== target) {
+                                                    const rect = target.getBoundingClientRect();
+                                                    const after = $event.clientY > rect.top + (rect.height / 2);
+                                                    list.insertBefore(dragged, after ? target.nextSibling : target);
+                                                    $wire.reorderExistingSectionQuestions(
+                                                        Array.from(list.querySelectorAll('[data-question-id]')).map((item) => item.dataset.questionId)
+                                                    );
+                                                }
+                                                draggingId = null;
+                                            "
+                                            style="border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff; overflow: hidden; cursor: grab;"
+                                        >
+                                            <div style="padding: 14px 16px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; gap: 12px;">
+                                                <span aria-hidden="true" style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 10px; border: 1px solid #dbe4ee; background: #f8fafc; color: #94a3b8; font-size: 16px; line-height: 1;">::</span>
                                                 <div style="font-size: 13px; font-weight: 700; line-height: 1.65; color: #0f172a;">{{ $card['prompt'] }}</div>
-                                                <div style="margin-top: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8;">
-                                                    Current order {{ $card['sort_order'] }}
-                                                </div>
                                             </div>
                                             <div style="padding: 12px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
                                                 <button

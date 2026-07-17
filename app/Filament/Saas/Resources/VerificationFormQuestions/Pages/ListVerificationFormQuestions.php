@@ -8,6 +8,7 @@ use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
+use App\Support\VerificationTemplateThreeDefaults;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\Hidden;
@@ -23,6 +24,13 @@ class ListVerificationFormQuestions extends ListRecords
     protected static string $resource = VerificationFormQuestionResource::class;
 
     protected string $view = 'filament.saas.resources.verification-form-questions.pages.list-verification-form-questions';
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        VerificationTemplateThreeDefaults::syncMasterQuestions();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -179,28 +187,31 @@ class ListVerificationFormQuestions extends ListRecords
     {
         $clinicId = $this->getSelectedClinicId();
 
-        if (! filled($clinicId)) {
-            return [];
-        }
-
         $clinic = Clinic::query()
             ->select(['id', 'organization_id'])
-            ->find($clinicId);
+            ->when(filled($clinicId), fn (Builder $query) => $query->whereKey($clinicId))
+            ->first();
 
         return VerificationFormQuestion::query()
             ->where(function (Builder $query) use ($clinicId, $clinic): void {
-                $query->where('clinic_id', $clinicId)
-                    ->orWhere(function (Builder $masterQuery) use ($clinic): void {
-                        $masterQuery
-                            ->whereNull('clinic_id')
-                            ->where(function (Builder $organizationQuery) use ($clinic): void {
-                                $organizationQuery->whereNull('organization_id');
+                if (filled($clinicId)) {
+                    $query->where('clinic_id', $clinicId)
+                        ->orWhere(function (Builder $masterQuery) use ($clinic): void {
+                            $masterQuery
+                                ->whereNull('clinic_id')
+                                ->where(function (Builder $organizationQuery) use ($clinic): void {
+                                    $organizationQuery->whereNull('organization_id');
 
-                                if (filled($clinic?->organization_id)) {
-                                    $organizationQuery->orWhere('organization_id', $clinic->organization_id);
-                                }
-                            });
-                    });
+                                    if (filled($clinic?->organization_id)) {
+                                        $organizationQuery->orWhere('organization_id', $clinic->organization_id);
+                                    }
+                                });
+                        });
+
+                    return;
+                }
+
+                $query->whereNull('clinic_id');
             })
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->with('clinic.organization')

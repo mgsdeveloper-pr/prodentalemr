@@ -12,11 +12,11 @@ class VerificationFormQuestion extends Model
     public const DEFAULT_TEMPLATE_KEY = 'template_3';
 
     public const TEMPLATE_OPTIONS = [
-        'template_3' => 'Verification Workbench',
+        'template_3' => 'Master Template',
     ];
 
     public const ACTIVE_TEMPLATE_OPTIONS = [
-        'template_3' => 'Verification Workbench',
+        'template_3' => 'Master Template',
     ];
 
     public const QUESTION_KIND_NORMAL = 'normal';
@@ -61,6 +61,32 @@ class VerificationFormQuestion extends Model
         'template_3_verification_information' => 'Verification Information',
     ];
 
+    public const TEMPLATE_3_LIVE_SECTION_KEYS = [
+        'template_3_patient_subscriber',
+        'template_3_insurance',
+        'template_3_maximums_deductibles',
+        'template_3_coverage_category',
+        'template_3_plan_provisions',
+        'template_3_service_history',
+        'template_3_frequency_general',
+        'template_3_frequency_basic',
+        'template_3_frequency_major',
+        'template_3_frequency_orthodontics',
+        'template_3_verification_information',
+    ];
+
+    public const TEMPLATE_3_DEPRECATED_SECTION_LABELS = [
+        'Core Eligibility',
+        'Core Eligibility Snapshot',
+        'Category Coverage',
+        'History',
+        'Frequency & Percentage / Diagnostic & Preventative',
+        'Frequency & Percentage / Orthodontics Benefit',
+        'Template 3 Frequency Basic',
+        'Template 3 Frequency General',
+        'Template 3 Patient Subscriber',
+    ];
+
     public const FORM_TYPE_OPTIONS = [
         'both' => 'Both Forms',
         'full_form' => 'Full Form',
@@ -71,7 +97,9 @@ class VerificationFormQuestion extends Model
         'text' => 'Text',
         'textarea' => 'Textarea',
         'date' => 'Date',
-        'month' => 'Month / Year',
+        'month_year' => 'Month + Year',
+        'month_only' => 'Only Month',
+        'year_only' => 'Only Year',
         'time' => 'Time',
         'email' => 'Email',
         'tel' => 'Phone',
@@ -251,6 +279,8 @@ class VerificationFormQuestion extends Model
     protected $fillable = [
         'organization_id',
         'clinic_id',
+        'template_version_id',
+        'source_question_id',
         'template_key',
         'question_kind',
         'parent_question_id',
@@ -281,6 +311,8 @@ class VerificationFormQuestion extends Model
     protected function casts(): array
     {
         return [
+            'template_version_id' => 'integer',
+            'source_question_id' => 'integer',
             'is_builtin' => 'boolean',
             'is_locked_by_admin' => 'boolean',
             'is_required_for_audit' => 'boolean',
@@ -304,6 +336,16 @@ class VerificationFormQuestion extends Model
     public function childQuestions(): HasMany
     {
         return $this->hasMany(self::class, 'parent_question_id');
+    }
+
+    public function templateVersion(): BelongsTo
+    {
+        return $this->belongsTo(VerificationTemplateVersion::class, 'template_version_id');
+    }
+
+    public function sourceQuestion(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_question_id');
     }
 
     public function organization(): BelongsTo
@@ -527,7 +569,7 @@ class VerificationFormQuestion extends Model
         $templateKey = static::normalizeTemplateKey($templateKey);
 
         $builtInOptions = match ($templateKey) {
-            'template_3' => self::TEMPLATE_3_SECTION_OPTIONS,
+            'template_3' => static::templateThreeLiveSectionOptions(),
             default => self::SECTION_OPTIONS,
         };
 
@@ -539,6 +581,12 @@ class VerificationFormQuestion extends Model
             ->orderBy('sort_order')
             ->orderBy('label')
             ->get();
+
+        if ($templateKey === 'template_3') {
+            $customSections = $customSections
+                ->reject(fn (VerificationTemplateSection $section): bool => static::isDeprecatedTemplateThreeSection($section))
+                ->values();
+        }
 
         $customLabels = $customSections
             ->pluck('label', 'section_key')
@@ -561,11 +609,84 @@ class VerificationFormQuestion extends Model
         return $builtInOptions + $customSectionOptions;
     }
 
+    public static function templateThreeLiveSectionOptions(): array
+    {
+        return collect(self::TEMPLATE_3_SECTION_OPTIONS)
+            ->only(self::TEMPLATE_3_LIVE_SECTION_KEYS)
+            ->all();
+    }
+
+    protected static function isDeprecatedTemplateThreeSection(VerificationTemplateSection $section): bool
+    {
+        $key = (string) $section->section_key;
+        $label = trim((string) $section->label);
+
+        if (array_key_exists($key, self::SECTION_OPTIONS)) {
+            return true;
+        }
+
+        if (in_array($label, self::TEMPLATE_3_DEPRECATED_SECTION_LABELS, true)) {
+            return true;
+        }
+
+        if (str_starts_with($key, 'frequency_')) {
+            return true;
+        }
+
+        if (str_starts_with($label, 'Template 3 ')) {
+            return true;
+        }
+
+        return false;
+    }
+
     public static function topLevelSectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
     {
-        return collect(static::sectionOptionsForTemplate($templateKey, $clinicId))
+        $templateKey = static::normalizeTemplateKey($templateKey);
+
+        $options = $templateKey === 'template_3'
+            ? static::templateThreeBuilderSectionOptions($clinicId)
+            : static::sectionOptionsForTemplate($templateKey, $clinicId);
+
+        return collect($options)
             ->reject(fn (string $label): bool => str_contains($label, ' / '))
             ->all();
+    }
+
+    public static function templateThreeBuilderSectionOptions(?int $clinicId = null): array
+    {
+        $builtInOptions = self::TEMPLATE_3_SECTION_OPTIONS;
+
+        $customSections = VerificationTemplateSection::query()
+            ->visibleForClinic($clinicId)
+            ->where('template_key', self::DEFAULT_TEMPLATE_KEY)
+            ->where('is_active', true)
+            ->orderByRaw('parent_section_key is not null')
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get()
+            ->reject(fn (VerificationTemplateSection $section): bool => static::isDeprecatedTemplateThreeSection($section))
+            ->values();
+
+        $customLabels = $customSections
+            ->pluck('label', 'section_key')
+            ->all();
+
+        $customSectionOptions = $customSections
+            ->mapWithKeys(function (VerificationTemplateSection $section) use ($builtInOptions, $customLabels): array {
+                $parentLabel = filled($section->parent_section_key)
+                    ? ($builtInOptions[$section->parent_section_key] ?? $customLabels[$section->parent_section_key] ?? null)
+                    : null;
+
+                return [
+                    $section->section_key => filled($parentLabel)
+                        ? "{$parentLabel} / {$section->label}"
+                        : $section->label,
+                ];
+            })
+            ->all();
+
+        return $builtInOptions + $customSectionOptions;
     }
 
     public static function childSectionOptionsForTemplate(?string $templateKey, ?int $clinicId, ?string $parentSectionKey): array
@@ -591,6 +712,11 @@ class VerificationFormQuestion extends Model
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('label')
+            ->get()
+            ->when(
+                static::normalizeTemplateKey($templateKey) === 'template_3',
+                fn ($sections) => $sections->reject(fn (VerificationTemplateSection $section): bool => static::isDeprecatedTemplateThreeSection($section))->values()
+            )
             ->pluck('label', 'section_key')
             ->all();
 
@@ -695,9 +821,14 @@ class VerificationFormQuestion extends Model
 
         $options = static::sectionOptionsForTemplate($templateKey, $clinicId);
 
+        if (static::normalizeTemplateKey($templateKey) === 'template_3') {
+            return $options[$sectionKey]
+                ?? self::TEMPLATE_3_SECTION_OPTIONS[$sectionKey]
+                ?? str($sectionKey)->headline()->toString();
+        }
+
         return $options[$sectionKey]
             ?? self::SECTION_OPTIONS[$sectionKey]
-            ?? self::TEMPLATE_3_SECTION_OPTIONS[$sectionKey]
             ?? str($sectionKey)->headline()->toString();
     }
 
