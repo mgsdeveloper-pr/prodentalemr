@@ -28,11 +28,16 @@ class DsoInfolist
                                 IconEntry::make('status')
                                     ->label('Active')
                                     ->boolean(),
+                                TextEntry::make('lifecycle_status')
+                                    ->label('Lifecycle')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'active')->replace('_', ' ')->headline()->toString())
+                                    ->badge()
+                                    ->color('info'),
                                 TextEntry::make('organizations_count')
                                     ->label('Organizations')
                                     ->state(fn ($record): int => $record->organizations()->count())
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('info'),
                                 TextEntry::make('clinics_count')
                                     ->label('Clinics')
                                     ->state(fn ($record): int => $record->clinics()->count())
@@ -47,6 +52,11 @@ class DsoInfolist
                                     ->label('Billing mode')
                                     ->formatStateUsing(fn (?string $state): string => $state ? str($state)->replace('_', ' ')->headline()->toString() : '-')
                                     ->badge(),
+                                TextEntry::make('service_status')
+                                    ->label('Service status')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'not set')->replace('_', ' ')->headline()->toString())
+                                    ->badge()
+                                    ->color(fn (?string $state): string => in_array($state, ['active', 'trial'], true) ? 'success' : 'gray'),
                             ]),
                     ]),
                 Section::make('Contact')
@@ -68,6 +78,10 @@ class DsoInfolist
                                 TextEntry::make('address')
                                     ->placeholder('-')
                                     ->columnSpanFull(),
+                                TextEntry::make('city')->placeholder('-'),
+                                TextEntry::make('state')->placeholder('-'),
+                                TextEntry::make('zip_code')->label('ZIP code')->placeholder('-'),
+                                TextEntry::make('country')->placeholder('-'),
                             ]),
                     ]),
             ])

@@ -28,7 +28,7 @@ class ListInsuranceCarriers extends ListRecords
             CreateAction::make()
                 ->label('Add Insurance')
                 ->icon('heroicon-o-plus')
-                ->color('warning'),
+                ->color('primary'),
             Action::make('manageQuestions')
                 ->label('Verification Questions')
                 ->icon('heroicon-o-rectangle-stack')

@@ -49,6 +49,19 @@ class ClinicServiceForm
                     ->default(0)
                     ->minValue(0)
                     ->step('0.01'),
+                Select::make('default_duration_minutes')
+                    ->label('Default appointment duration')
+                    ->options([
+                        15 => '15 minutes',
+                        30 => '30 minutes',
+                        45 => '45 minutes',
+                        60 => '60 minutes',
+                        90 => '90 minutes',
+                        120 => '120 minutes',
+                    ])
+                    ->default(30)
+                    ->required()
+                    ->native(false),
                 Toggle::make('status')
                     ->label('Active')
                     ->default(true)

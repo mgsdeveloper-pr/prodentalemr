@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class VerificationFormSubmission extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'billing_work_item_id',
         'user_id',

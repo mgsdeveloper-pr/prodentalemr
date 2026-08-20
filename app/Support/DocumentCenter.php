@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemAttachment;
 use App\Models\PatientDocument;
@@ -51,7 +51,7 @@ class DocumentCenter
                 $query->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'));
 
                 if ($panel === 'admin') {
-                    AdminClinicScope::apply($query, 'clinic_id');
+                    AdminClinicScope::applyVerificationRequests($query, 'clinic_id');
                 } else {
                     ClinicPanelScope::apply($query, 'clinic_id');
                 }
@@ -103,7 +103,7 @@ class DocumentCenter
                     'preview_url' => Route::has($previewRoute) ? route($previewRoute, $attachment) : null,
                     'download_url' => Route::has($downloadRoute) ? route($downloadRoute, $attachment) : null,
                     'related_url' => $panel === 'admin' && $workItem
-                        ? VerificationWorkItemResource::getUrl('edit', ['record' => $workItem])
+                        ? VerificationRequestResource::getUrl('edit', ['record' => $workItem])
                         : url('/clinic/request-response'),
                     'is_available' => filled($attachment->file_path) && Storage::disk('local')->exists($attachment->file_path),
                 ];

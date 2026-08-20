@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,7 +12,7 @@ use Illuminate\Support\Facades\Crypt;
 
 class PortalCredential extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected ?string $passwordBeforeUpdate = null;
 

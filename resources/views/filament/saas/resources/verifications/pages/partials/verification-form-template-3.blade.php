@@ -12,6 +12,7 @@
         --vt3-line-strong: #c7d9d0;
         --vt3-muted: #64748b;
         --vt3-shadow: 0 18px 38px rgba(15, 23, 42, 0.08);
+        --vt3-context-offset: calc(var(--pwdl-shell-topbar, 72px) + 12px);
     }
 
     .vt3-shell .uel2-page {
@@ -19,45 +20,47 @@
     }
 
     .vt3-shell .uel2-shell {
-        border: 1px solid var(--vt3-line);
-        border-radius: 34px;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 251, 248, 1) 100%);
-        box-shadow: var(--vt3-shadow);
-        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: none;
+        overflow: visible;
     }
 
     .vt3-shell .uel2-shell__inner {
-        padding: 12px 12px 16px;
-        background: linear-gradient(180deg, rgba(242, 248, 245, 0.95) 0%, rgba(249, 252, 251, 0.98) 100%);
+        padding: 14px;
+        background: #ffffff;
     }
 
     .vt3-shell .uel2-layout {
         display: grid;
-        grid-template-columns: 292px minmax(0, 1fr);
-        gap: 12px;
+        grid-template-columns: 284px minmax(0, 1fr);
+        gap: 14px;
         align-items: start;
     }
 
     .vt3-shell .uel2-sidebar {
         position: sticky;
-        top: 0;
+        top: var(--vt3-context-offset);
         align-self: start;
+        max-height: calc(100dvh - var(--vt3-context-offset) - 12px);
         padding-top: 0;
         margin-top: 0;
     }
 
     .vt3-shell .uel2-sidebar-rail {
-        max-height: max-content;
+        max-height: inherit;
         display: flex;
         flex-direction: column;
         gap: 0;
-        padding: 4px 8px 10px 10px;
-        border: 1px solid var(--vt3-line);
-        border-radius: 28px;
-        background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-        overflow-y: visible;
+        padding: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: none;
+        overflow-y: auto;
         overflow-x: hidden;
+        overscroll-behavior: contain;
         scrollbar-gutter: stable;
         scrollbar-width: thin;
         scrollbar-color: #94a3b8 #edf2f7;
@@ -92,9 +95,9 @@
     }
 
     .vt3-shell .uel2-sidebar-rail__section {
-        padding: 10px 8px 14px;
+        padding: 15px 16px;
         margin-bottom: 0;
-        border-bottom: 1px solid #e5efea;
+        border-bottom: 1px solid #e2e8f0;
     }
 
     .vt3-shell .uel2-sidebar-rail__section:last-child {
@@ -115,7 +118,7 @@
     .vt3-shell .uel2-sidebar-rail__title h3 {
         font-size: 14px;
         line-height: 1.2;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--vt3-deep);
     }
@@ -188,15 +191,15 @@
         display: flex;
         flex-direction: column;
         gap: 14px;
-        padding: 12px;
-        border: 1px solid var(--vt3-line);
-        border-radius: 28px;
-        background: linear-gradient(180deg, rgba(253, 255, 254, 1) 0%, rgba(248, 252, 250, 1) 100%);
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
     }
 
     .vt3-shell .uel2-section {
-        border: 1px solid #dfe9e4;
-        border-radius: 22px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
         background: #ffffff;
         box-shadow: none;
         overflow: hidden;
@@ -207,14 +210,14 @@
     }
 
     .vt3-shell .uel2-header {
-        padding: 14px 18px 12px;
-        border-bottom: 1px solid #e7f0eb;
-        background: linear-gradient(180deg, rgba(250, 253, 251, 1) 0%, rgba(244, 249, 246, 1) 100%);
+        padding: 15px 18px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #ffffff;
     }
 
     .vt3-shell .uel2-header h2,
     .vt3-shell .uel2-header h3 {
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.2;
         color: var(--vt3-deep);
     }
@@ -233,16 +236,16 @@
     }
 
     .vt3-shell .uel2-body {
-        padding: 14px 18px 18px;
+        padding: 16px 18px 18px;
     }
 
     .vt3-shell .uel2-table {
-        border-radius: 16px;
+        border-radius: 12px;
         overflow: hidden;
     }
 
     .vt3-shell .uel2-table thead th {
-        background: #f4faf6;
+        background: #f8fafc;
         color: #5d7368;
     }
 
@@ -289,9 +292,9 @@
     }
 
     .vt3-shell .uel2-managed-question {
-        border-radius: 16px;
-        border-color: #dbe7e2;
-        background: #fbfdfc;
+        border-radius: 12px;
+        border-color: #e2e8f0;
+        background: #ffffff;
     }
 
     .vt3-shell .uel2-field label {
@@ -304,9 +307,9 @@
     }
 
     .vt3-shell .uel2-subsection {
-        border-radius: 18px;
-        border-color: #dfe9e4;
-        background: #fcfefd;
+        border-radius: 12px;
+        border-color: #e2e8f0;
+        background: #ffffff;
         box-shadow: none;
     }
 
@@ -330,10 +333,15 @@
     }
 
     .vt3-shell .uel2-quick-reference__item {
-        padding: 10px 10px 9px;
-        border: 1px solid #e3ede8;
-        border-radius: 14px;
-        background: linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%);
+        padding: 9px 0;
+        border: 0;
+        border-bottom: 1px solid #eef2f7;
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .vt3-shell .uel2-quick-reference__item:last-child {
+        border-bottom: 0;
     }
 
     .vt3-shell .uel2-quick-reference__value,
@@ -408,12 +416,21 @@
 
         .vt3-shell .uel2-sidebar-rail {
             max-height: none;
+            overflow-x: visible;
+            overflow-y: visible;
+            scrollbar-gutter: auto;
         }
 
         .vt3-shell .uel2-content {
             padding: 12px;
         }
 
+        .vt3-shell .uel2-quick-reference__grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 720px) {
         .vt3-shell .uel2-quick-reference__grid {
             grid-template-columns: minmax(0, 1fr);
         }

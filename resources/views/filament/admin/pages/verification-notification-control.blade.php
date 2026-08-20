@@ -2,9 +2,9 @@
     <x-verification-management-shell
         :items="$this->getVerificationNavItems()"
         active="notifications"
-        menu-title="Verification"
-        menu-eyebrow="Admin Settings"
-        menu-description="Configure verification output, question content, notification behavior, and section ordering from one workspace."
+        menu-title="Settings"
+        menu-eyebrow="Verification"
+        menu-description="Clinic, mailbox, output, and administrative configuration."
     >
         <div style="display: flex; flex-direction: column; gap: 24px;">
             <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06); overflow: hidden;">
@@ -15,7 +15,7 @@
                     <div>
                         <h2 style="margin: 0; font-size: 30px; font-weight: 800; color: #0f172a;">Notification Control</h2>
                         <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.7; color: #64748b;">
-                            Configure which verification events generate notifications, who receives them, and how urgent managed-service requests are escalated. Admin sees all, while clinics stay limited to self-service unless explicitly enabled.
+                            Configure which verification events generate notifications, who receives them, and which secure email alerts are enabled. Verification users receive only the clinics they are permitted to access.
                         </p>
                     </div>
                 </div>

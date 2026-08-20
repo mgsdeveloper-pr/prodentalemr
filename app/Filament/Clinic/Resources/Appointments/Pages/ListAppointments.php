@@ -2,8 +2,8 @@
 
 namespace App\Filament\Clinic\Resources\Appointments\Pages;
 
-use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Pages\AppointmentCalendar;
+use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Support\ClinicPanelScope;
 use App\Support\SaasEntitlements;
 use Filament\Actions\Action;
@@ -95,7 +95,7 @@ class ListAppointments extends ListRecords
         ];
     }
 
-    protected function getTableQuery(): Builder | Relation | null
+    protected function getTableQuery(): Builder|Relation|null
     {
         $query = parent::getTableQuery();
 
@@ -132,7 +132,7 @@ class ListAppointments extends ListRecords
     {
         [$start, $end] = $this->dashboardDateRange();
 
-        return $start->format('M d, Y') . ' - ' . $end->format('M d, Y');
+        return $start->format('M d, Y').' - '.$end->format('M d, Y');
     }
 
     protected function applyDashboardDateFilter($query)

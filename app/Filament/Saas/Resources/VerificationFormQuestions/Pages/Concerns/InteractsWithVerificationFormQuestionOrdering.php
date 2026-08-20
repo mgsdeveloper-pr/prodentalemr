@@ -3,7 +3,6 @@
 namespace App\Filament\Saas\Resources\VerificationFormQuestions\Pages\Concerns;
 
 use App\Models\VerificationFormQuestion;
-use App\Support\AdminClinicScope;
 
 trait InteractsWithVerificationFormQuestionOrdering
 {
@@ -16,10 +15,10 @@ trait InteractsWithVerificationFormQuestionOrdering
         }
 
         if (method_exists($this, 'getRecord') && $this->getRecord()) {
-            return (int) $this->getRecord()->clinic_id;
+            return filled($this->getRecord()->clinic_id) ? (int) $this->getRecord()->clinic_id : null;
         }
 
-        return AdminClinicScope::selectedClinicId();
+        return null;
     }
 
     protected function resolveOrderingOrganizationId(): ?int
@@ -31,7 +30,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         }
 
         if (method_exists($this, 'getRecord') && $this->getRecord()) {
-            return (int) $this->getRecord()->organization_id;
+            return filled($this->getRecord()->organization_id) ? (int) $this->getRecord()->organization_id : null;
         }
 
         return null;
@@ -165,7 +164,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         $sectionKey = $record->section_key;
         $templateKey = $record->template_key;
 
-        if (! $clinicId || ! filled($sectionKey)) {
+        if (! filled($sectionKey)) {
             return;
         }
 
@@ -219,7 +218,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         $clinicId = $clinicId ?: $this->resolveOrderingClinicId();
         $organizationId = $this->resolveOrderingOrganizationId();
 
-        if (! $clinicId || ! filled($sectionKey)) {
+        if (! filled($sectionKey)) {
             return;
         }
 

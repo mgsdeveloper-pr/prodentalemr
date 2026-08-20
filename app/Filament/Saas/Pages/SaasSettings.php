@@ -130,6 +130,16 @@ class SaasSettings extends Page implements HasForms
                             ->imageEditor()
                             ->maxSize(2048)
                             ->helperText('Upload a JPG, PNG, or WebP logo for the SaaS panel header and login screen.'),
+                        \Filament\Forms\Components\FileUpload::make('login_image_path')
+                            ->label('Login page image')
+                            ->disk('branding')
+                            ->directory('branding/login')
+                            ->image()
+                            ->imageEditor()
+                            ->imageEditorAspectRatios(['3:4', '4:5', '16:9'])
+                            ->maxSize(6144)
+                            ->helperText('Shown on the desktop login page. Recommended: a bright clinic image, up to 6 MB.')
+                            ->columnSpanFull(),
                         \Filament\Forms\Components\TextInput::make('support_email')
                             ->label('Support email')
                             ->email()

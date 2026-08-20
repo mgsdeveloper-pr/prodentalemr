@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Services\Verification\SLAService;
+use App\Services\Verification\TimelineService;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,14 +15,29 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class BillingWorkItem extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
+
+    public const PROCESSING_MODE_SELF_MANAGED = 'self_managed';
+
+    public const PROCESSING_MODE_MANAGED_SERVICE = 'managed_service';
+
+    public const PROCESSING_MODE_OPTIONS = [
+        self::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed',
+        self::PROCESSING_MODE_MANAGED_SERVICE => 'Managed service',
+    ];
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_REVIEW = 'review';
+
     public const STATUS_AWAITING_CLINIC_RESPONSE = 'awaiting_clinic_response';
+
     public const STATUS_RETURNED_FOR_REWORK = 'returned_for_rework';
+
     public const STATUS_INCOMPLETE = 'incomplete';
+
     public const STATUS_DONE = 'done';
 
     public const STATUS_OPTIONS = [
@@ -50,6 +68,16 @@ class BillingWorkItem extends Model
         'audit_required' => 'Audit Required',
         'written_back' => 'Written Back',
     ];
+
+    public const FINAL_OUTCOME_STATUSES = [
+        'verified',
+        'unable_to_verify',
+    ];
+
+    public function hasFinalOutcome(): bool
+    {
+        return in_array((string) $this->outcome_status, self::FINAL_OUTCOME_STATUSES, true);
+    }
 
     public const PRIORITY_OPTIONS = [
         'low' => 'Low',
@@ -115,6 +143,7 @@ class BillingWorkItem extends Model
         'outcome_status',
         'priority',
         'source',
+        'processing_mode',
         'pms_sync_status',
         'writeback_status',
         'due_at',
@@ -158,6 +187,10 @@ class BillingWorkItem extends Model
                 $workItem->priority = 'normal';
             }
 
+            if (blank($workItem->processing_mode)) {
+                $workItem->processing_mode = self::processingModeForSource($workItem->source);
+            }
+
             if (blank($workItem->reference_number)) {
                 $workItem->reference_number = self::generateReferenceNumber();
             }
@@ -192,7 +225,7 @@ class BillingWorkItem extends Model
             $changes = $workItem->getChanges();
 
             if (array_key_exists('status', $changes)) {
-                $workItem->recordActivity('status_changed', 'Status updated to ' . (self::STATUS_OPTIONS[$workItem->status] ?? $workItem->status) . '.');
+                $workItem->recordActivity('status_changed', 'Status updated to '.(self::STATUS_OPTIONS[$workItem->status] ?? $workItem->status).'.');
             }
 
             if (array_key_exists('assigned_to', $changes)) {
@@ -205,7 +238,7 @@ class BillingWorkItem extends Model
             }
 
             if (array_key_exists('outcome_status', $changes) && filled($workItem->outcome_status)) {
-                $workItem->recordActivity('outcome_changed', 'Outcome updated to ' . (self::OUTCOME_STATUS_OPTIONS[$workItem->outcome_status] ?? $workItem->outcome_status) . '.');
+                $workItem->recordActivity('outcome_changed', 'Outcome updated to '.(self::OUTCOME_STATUS_OPTIONS[$workItem->outcome_status] ?? $workItem->outcome_status).'.');
             }
 
             if (array_key_exists('priority', $changes) && $workItem->priority === 'urgent') {
@@ -224,7 +257,7 @@ class BillingWorkItem extends Model
 
     public static function generateReferenceNumber(): string
     {
-        $prefix = 'BWI-' . now()->format('Ym') . '-';
+        $prefix = 'BWI-'.now()->format('Ym').'-';
 
         $latest = static::withTrashed()
             ->where('reference_number', 'like', "{$prefix}%")
@@ -237,7 +270,7 @@ class BillingWorkItem extends Model
             $sequence = ((int) $matches[1]) + 1;
         }
 
-        return $prefix . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $sequence, 4, '0', STR_PAD_LEFT);
     }
 
     public function organization(): BelongsTo
@@ -340,6 +373,11 @@ class BillingWorkItem extends Model
         return $this->hasMany(BillingWorkItemNote::class);
     }
 
+    public function workNotes(): HasMany
+    {
+        return $this->hasMany(BillingWorkItemNote::class);
+    }
+
     public function attachments(): HasMany
     {
         return $this->hasMany(BillingWorkItemAttachment::class);
@@ -377,23 +415,22 @@ class BillingWorkItem extends Model
 
     public function recordActivity(string $type, string $description, array $meta = []): void
     {
-        $this->activities()->create([
-            'user_id' => auth()->id(),
-            'activity_type' => $type,
-            'description' => $description,
-            'meta' => filled($meta) ? $meta : null,
-        ]);
+        app(TimelineService::class)->record($this, $type, $description, $meta);
     }
 
     protected function displayTitle(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => trim(($this->reference_number ?? 'Work Item') . ' - ' . $this->title),
+            get: fn (): string => trim(($this->reference_number ?? 'Verification Request').' - '.$this->title),
         );
     }
 
     public function clinicWorkspaceEnabled(): bool
     {
+        if (filled($this->processing_mode)) {
+            return $this->processing_mode === self::PROCESSING_MODE_SELF_MANAGED;
+        }
+
         if ($this->source !== 'clinic_request') {
             return true;
         }
@@ -407,28 +444,34 @@ class BillingWorkItem extends Model
             return false;
         }
 
+        if ($this->normalized_status === self::STATUS_DONE) {
+            return false;
+        }
+
         if (! $user->canEditClinicVerificationRequests()) {
             return false;
         }
 
-        if ($this->source !== 'clinic_request') {
-            return true;
+        return $this->workflowMode() === 'self_service' || $user->shouldBypassClinicScope();
+    }
+
+    public function clinicUserCanRespondToVerification(?Authenticatable $user = null): bool
+    {
+        if (! $user instanceof User || ! $user->canEditClinicVerificationRequests()) {
+            return false;
         }
 
-        if ($this->clinicWorkspaceEnabled() || $user->shouldBypassClinicScope()) {
-            return true;
-        }
-
-        return in_array($this->normalized_status, [
-            self::STATUS_AWAITING_CLINIC_RESPONSE,
-            self::STATUS_REVIEW,
-            self::STATUS_DONE,
-        ], true);
+        return $this->workflowMode() === 'managed_service'
+            && $this->normalized_status === self::STATUS_AWAITING_CLINIC_RESPONSE;
     }
 
     public function verificationUserCanEditVerification(?Authenticatable $user = null): bool
     {
         if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($this->normalized_status === self::STATUS_DONE) {
             return false;
         }
 
@@ -453,6 +496,14 @@ class BillingWorkItem extends Model
 
     public function workflowMode(): string
     {
+        if ($this->processing_mode === self::PROCESSING_MODE_SELF_MANAGED) {
+            return 'self_service';
+        }
+
+        if ($this->processing_mode === self::PROCESSING_MODE_MANAGED_SERVICE) {
+            return 'managed_service';
+        }
+
         if ($this->source === 'clinic_self_service') {
             return 'self_service';
         }
@@ -466,6 +517,25 @@ class BillingWorkItem extends Model
         }
 
         return 'verification_only';
+    }
+
+    public static function processingModeForSource(?string $source): string
+    {
+        return $source === 'clinic_self_service'
+            ? self::PROCESSING_MODE_SELF_MANAGED
+            : self::PROCESSING_MODE_MANAGED_SERVICE;
+    }
+
+    public function processingModeLabel(): string
+    {
+        return self::PROCESSING_MODE_OPTIONS[$this->processing_mode]
+            ?? self::PROCESSING_MODE_OPTIONS[self::processingModeForSource($this->source)];
+    }
+
+    public function clinicUserCanOpenVerificationForm(?Authenticatable $user = null): bool
+    {
+        return $this->workflowMode() === 'self_service'
+            && $this->clinicUserCanEditVerification($user);
     }
 
     public function isSelfServiceMode(): bool
@@ -515,7 +585,7 @@ class BillingWorkItem extends Model
     {
         if ($isManager) {
             return match ($this->normalized_status) {
-                self::STATUS_PENDING => in_array($targetStatus, [self::STATUS_IN_PROGRESS, self::STATUS_INCOMPLETE], true),
+                self::STATUS_PENDING => in_array($targetStatus, [self::STATUS_IN_PROGRESS, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE], true),
                 self::STATUS_IN_PROGRESS => in_array($targetStatus, [self::STATUS_REVIEW, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE], true),
                 self::STATUS_REVIEW => in_array($targetStatus, [self::STATUS_DONE, self::STATUS_RETURNED_FOR_REWORK, self::STATUS_AWAITING_CLINIC_RESPONSE, self::STATUS_INCOMPLETE], true),
                 self::STATUS_AWAITING_CLINIC_RESPONSE => in_array($targetStatus, [self::STATUS_IN_PROGRESS, self::STATUS_INCOMPLETE], true),
@@ -597,29 +667,7 @@ class BillingWorkItem extends Model
     protected function slaStatus(): Attribute
     {
         return Attribute::make(
-            get: function (): string {
-                if (! $this->due_at) {
-                    return 'not_set';
-                }
-
-                if ($this->normalized_status === self::STATUS_DONE) {
-                    return 'closed';
-                }
-
-                if ($this->normalized_status === self::STATUS_AWAITING_CLINIC_RESPONSE) {
-                    return 'paused_waiting_clinic';
-                }
-
-                if ($this->due_at->isPast()) {
-                    return 'overdue';
-                }
-
-                if ($this->due_at->isToday()) {
-                    return 'due_today';
-                }
-
-                return 'on_track';
-            },
+            get: fn (): string => app(SLAService::class)->status($this),
         );
     }
 

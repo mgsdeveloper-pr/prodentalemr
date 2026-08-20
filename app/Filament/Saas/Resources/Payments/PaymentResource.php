@@ -27,9 +27,9 @@ class PaymentResource extends Resource
 
     protected static ?string $navigationLabel = 'Payments';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Payments';
+    protected static string|UnitEnum|null $navigationGroup = 'Billing';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 40;
 
     protected static ?string $recordTitleAttribute = 'reference_number';
 
@@ -57,22 +57,22 @@ class PaymentResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canAccessSaasModule('payments') ?? false;
+        return auth()->user()?->can('viewAny', Payment::class) ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('payments', 'add') ?? false;
+        return auth()->user()?->can('create', Payment::class) ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('payments', 'update') ?? false;
+        return auth()->user()?->can('update', $record) ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('payments', 'delete') ?? false;
+        return auth()->user()?->can('delete', $record) ?? false;
     }
 
     public static function getEloquentQuery(): Builder

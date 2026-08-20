@@ -31,11 +31,28 @@ class OrganizationInfolist
                                 IconEntry::make('status')
                                     ->label('Active')
                                     ->boolean(),
+                                TextEntry::make('lifecycle_status')
+                                    ->label('Lifecycle')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'active')->replace('_', ' ')->headline()->toString())
+                                    ->badge()
+                                    ->color('info'),
+                                TextEntry::make('onboarding_status')
+                                    ->label('Onboarding')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'not started')->replace('_', ' ')->headline()->toString())
+                                    ->badge()
+                                    ->color(fn (?string $state): string => match ($state) {
+                                        'completed' => 'success',
+                                        'in_progress' => 'info',
+                                        default => 'warning',
+                                    }),
+                                TextEntry::make('accountManager.name')
+                                    ->label('Account manager')
+                                    ->placeholder('Unassigned'),
                                 TextEntry::make('clinics_count')
                                     ->label('Clinics')
                                     ->state(fn ($record): int => $record->clinics()->count())
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('info'),
                                 TextEntry::make('locations_count')
                                     ->label('Locations')
                                     ->state(fn ($record): int => $record->locations()->count())
@@ -46,6 +63,16 @@ class OrganizationInfolist
                                     ->state(fn ($record): int => $record->users()->count())
                                     ->badge()
                                     ->color('success'),
+                                TextEntry::make('verification_requests_count')
+                                    ->label('Verification requests')
+                                    ->state(fn ($record): int => $record->billingWorkItems()->count())
+                                    ->badge()
+                                    ->color('gray'),
+                                TextEntry::make('subscriptions_count')
+                                    ->label('Subscriptions')
+                                    ->state(fn ($record): int => $record->subscriptions()->count())
+                                    ->badge()
+                                    ->color('gray'),
                             ]),
                     ]),
                 Section::make('Contact & Timeline')
@@ -72,6 +99,12 @@ class OrganizationInfolist
                                     ->placeholder('-'),
                                 TextEntry::make('country')
                                     ->placeholder('-'),
+                                TextEntry::make('created_at')
+                                    ->label('Created')
+                                    ->dateTime('M d, Y h:i A'),
+                                TextEntry::make('updated_at')
+                                    ->label('Last updated')
+                                    ->dateTime('M d, Y h:i A'),
                             ]),
                     ]),
             ])

@@ -33,8 +33,8 @@ class BillingWorkItemForm
             ->components([
                 Hidden::make('created_by')
                     ->default(fn () => auth()->id()),
-                Section::make('Work Item')
-                    ->description('Track outsourced billing work against the exact client, appointment, patient, policy, and claim context.')
+                Section::make('Verification Request')
+                    ->description('Track verification work against the exact client, appointment, patient, policy, and claim context.')
                     ->schema([
                         Grid::make(4)
                             ->schema([

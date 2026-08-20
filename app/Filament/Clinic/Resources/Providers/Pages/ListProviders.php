@@ -14,7 +14,7 @@ class ListProviders extends ListRecords
     {
         return [
             CreateAction::make()
-                ->label('New provider')
+                ->label('Add Provider')
                 ->visible(fn (): bool => auth()->user()?->canCreateClinicProviders() ?? false),
         ];
     }

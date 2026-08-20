@@ -67,7 +67,7 @@
                         </a>
                         <button
                             type="submit"
-                            style="display: inline-flex; align-items: center; justify-content: center; min-width: 168px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(245, 158, 11, 0.24);"
+                            style="display: inline-flex; align-items: center; justify-content: center; min-width: 168px; padding: 11px 18px; border: 1px solid #0f766e; border-radius: 14px; background: #0f766e; color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 8px 18px rgba(15, 118, 110, 0.18);"
                         >
                             {{ $this->getSubmitButtonLabel() }}
                         </button>

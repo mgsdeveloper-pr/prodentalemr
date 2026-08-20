@@ -38,9 +38,32 @@
         .ada-latest-desc { margin:6px 0 0; color:#64748b; font-size:13px; line-height:1.6; }
         .ada-empty { border:1px dashed #cbd5e1; border-radius:18px; padding:18px; color:#64748b; font-size:14px; line-height:1.7; background:#fff; }
         .ada-inline-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap; }
+        .ada-management-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.75fr); gap:22px; align-items:start; }
+        .ada-tools { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+        .ada-search { min-width:280px; flex:1; border:1px solid #cbd5e1; border-radius:14px; padding:10px 12px; color:#0f172a; font-size:14px; outline:none; }
+        .ada-filter-row { display:flex; gap:8px; flex-wrap:wrap; }
+        .ada-filter-button { border:1px solid #dbe4ee; border-radius:999px; background:#fff; color:#334155; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; }
+        .ada-filter-button[data-active="true"] { background:#0f766e; border-color:#0f766e; color:#fff; }
+        .ada-table-wrap { overflow:auto; border:1px solid #dbe4ee; border-radius:18px; }
+        .ada-table { width:100%; border-collapse:collapse; min-width:860px; }
+        .ada-table th { background:#f8fbff; color:#64748b; font-size:11px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; text-align:left; padding:12px 14px; border-bottom:1px solid #dbe4ee; }
+        .ada-table td { color:#0f172a; font-size:13px; line-height:1.45; padding:12px 14px; border-bottom:1px solid #edf2f7; vertical-align:top; }
+        .ada-table tr:last-child td { border-bottom:0; }
+        .ada-status { display:inline-flex; align-items:center; border-radius:999px; padding:5px 9px; font-size:11px; font-weight:900; white-space:nowrap; }
+        .ada-status[data-status="active"] { background:#dcfce7; color:#166534; }
+        .ada-status[data-status="inactive"] { background:#f1f5f9; color:#475569; }
+        .ada-status[data-status="deprecated"] { background:#fef3c7; color:#92400e; }
+        .ada-status[data-status="removed_by_ada"] { background:#fee2e2; color:#991b1b; }
+        .ada-link-button { border:0; background:transparent; color:#0f766e; font-size:12px; font-weight:900; cursor:pointer; padding:0; }
+        .ada-audit-list { display:grid; gap:12px; }
+        .ada-audit-item { border:1px solid #dbe4ee; border-radius:16px; padding:12px 14px; background:#f8fbff; }
+        .ada-audit-title { margin:0; color:#0f172a; font-size:13px; font-weight:900; }
+        .ada-audit-meta { margin:6px 0 0; color:#64748b; font-size:12px; line-height:1.5; }
+        .ada-audit-note { margin:8px 0 0; color:#334155; font-size:13px; line-height:1.5; }
         @media (max-width: 1100px) {
             .ada-import-hero,
-            .ada-import-grid { grid-template-columns:1fr; }
+            .ada-import-grid,
+            .ada-management-grid { grid-template-columns:1fr; }
             .ada-import-title { max-width:none; font-size:34px; }
         }
         @media (max-width: 720px) {
@@ -54,9 +77,9 @@
         <section class="ada-import-hero">
             <div>
                 <span class="ada-import-eyebrow">Master Code Library</span>
-                <h1 class="ada-import-title">Import ADA/CDT codes cleanly.</h1>
+                <h1 class="ada-import-title">Govern ADA/CDT codes cleanly.</h1>
                 <p class="ada-import-copy">
-                    Upload a CSV or Excel file using just <strong>Code</strong> and <strong>Description</strong>. Duplicate codes are skipped automatically so your master library stays clean without extra work.
+                    Upload official additions in bulk, or use governed actions for single-code additions, updates, and ADA removals. Removed codes stay available for history but disappear from active user pickers.
                 </p>
             </div>
 
@@ -73,6 +96,131 @@
                     <p class="ada-stat-note">These active codes are available for clinic and verification template builders.</p>
                 </article>
             </div>
+        </section>
+
+        <section class="ada-management-grid">
+            <div class="ada-card">
+                <div class="ada-card-head">
+                    <p class="ada-card-eyebrow">Code management</p>
+                    <h2 class="ada-card-title">Manage master code lifecycle</h2>
+                    <p class="ada-card-copy">Search the library, review lifecycle state, and confirm which codes remain visible to template builders.</p>
+                </div>
+
+                <div class="ada-card-body">
+                    @php
+                        $counts = $this->getLifecycleCounts();
+                        $filters = [
+                            \App\Models\AdaProcedureCode::LIFECYCLE_ACTIVE => 'Active',
+                            \App\Models\AdaProcedureCode::LIFECYCLE_INACTIVE => 'Inactive',
+                            \App\Models\AdaProcedureCode::LIFECYCLE_DEPRECATED => 'Deprecated',
+                            \App\Models\AdaProcedureCode::LIFECYCLE_REMOVED_BY_ADA => 'Removed by ADA',
+                            'all' => 'All',
+                        ];
+                    @endphp
+
+                    <div class="ada-tools">
+                        <input class="ada-search" type="search" wire:model.live.debounce.400ms="codeSearch" placeholder="Search code, description, class, or source">
+                        <div class="ada-filter-row">
+                            @foreach($filters as $filterKey => $filterLabel)
+                                <button class="ada-filter-button" type="button" wire:click="$set('lifecycleFilter', '{{ $filterKey }}')" data-active="{{ $lifecycleFilter === $filterKey ? 'true' : 'false' }}">
+                                    {{ $filterLabel }} {{ number_format($counts[$filterKey] ?? 0) }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="ada-table-wrap" style="margin-top:16px;">
+                        <table class="ada-table">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Description</th>
+                                    <th>Class</th>
+                                    <th>Status</th>
+                                    <th>Source</th>
+                                    <th>Reviewed</th>
+                                    <th>Audit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($this->getManagedCodes() as $code)
+                                    @php
+                                        $status = $code->lifecycle_status ?: \App\Models\AdaProcedureCode::LIFECYCLE_ACTIVE;
+                                    @endphp
+                                    <tr>
+                                        <td><strong>{{ $code->procedure_code }}</strong></td>
+                                        <td>{{ $code->description }}</td>
+                                        <td>{{ $code->class ?: '-' }}</td>
+                                        <td>
+                                            <span class="ada-status" data-status="{{ $status }}">
+                                                {{ \App\Models\AdaProcedureCode::LIFECYCLE_OPTIONS[$status] ?? 'Active' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {{ $code->source_document ?: '-' }}
+                                            @if($code->source_year)
+                                                <div style="color:#64748b;">{{ $code->source_year }}</div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            {{ $code->last_reviewed_at?->format('M d, Y') ?: '-' }}
+                                        </td>
+                                        <td>
+                                            <button type="button" class="ada-link-button" wire:click="selectAuditCode({{ $code->id }})">
+                                                View audit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7">No ADA/CDT codes match the current filter.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="ada-card">
+                <div class="ada-card-head">
+                    <p class="ada-card-eyebrow">Audit history</p>
+                    <h2 class="ada-card-title">
+                        @if($this->getSelectedAuditCode())
+                            {{ $this->getSelectedAuditCode()->procedure_code }}
+                        @else
+                            Select a code
+                        @endif
+                    </h2>
+                    <p class="ada-card-copy">Manual add, update, and ADA removal events are tracked with source and reason.</p>
+                </div>
+
+                <div class="ada-card-body">
+                    @if($this->getSelectedAuditCode())
+                        <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+                            <button type="button" class="ada-link-button" wire:click="clearAuditCode">Clear</button>
+                        </div>
+
+                        <div class="ada-audit-list">
+                            @forelse($this->getSelectedCodeAuditEntries() as $entry)
+                                <article class="ada-audit-item">
+                                    <p class="ada-audit-title">{{ str($entry->event_type)->replace('_', ' ')->headline() }}</p>
+                                    <p class="ada-audit-meta">
+                                        {{ $entry->created_at?->format('M d, Y h:i A') }} by {{ $entry->actorUser?->name ?? 'System' }}
+                                    </p>
+                                    @if(filled($entry->notes))
+                                        <p class="ada-audit-note">{{ $entry->notes }}</p>
+                                    @endif
+                                </article>
+                            @empty
+                                <div class="ada-empty">No audit events recorded for this code yet.</div>
+                            @endforelse
+                        </div>
+                    @else
+                        <div class="ada-empty">Choose “View audit” from the code table to inspect change history for a code.</div>
+                    @endif
+                </div>
+            </aside>
         </section>
 
         <div class="ada-import-grid">
@@ -118,6 +266,9 @@
                                 <div>
                                     <p class="ada-latest-code">{{ $code->procedure_code }}</p>
                                     <p class="ada-latest-desc">{{ $code->description }}</p>
+                                    <p class="ada-latest-desc" style="margin-top:4px;">
+                                        {{ \App\Models\AdaProcedureCode::LIFECYCLE_OPTIONS[$code->lifecycle_status ?: \App\Models\AdaProcedureCode::LIFECYCLE_ACTIVE] ?? 'Active' }}
+                                    </p>
                                 </div>
                                 @if($code->class_tokens !== [])
                                     <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">

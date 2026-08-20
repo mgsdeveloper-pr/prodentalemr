@@ -11,6 +11,8 @@ use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\VerificationFormQuestion;
+use App\Services\ClientOnboardingService;
 use App\Support\SaasNotifications;
 use App\Support\SaasEntitlements;
 use App\Support\UsLocationOptions;
@@ -18,6 +20,7 @@ use App\Support\UsTimezoneOptions;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -42,13 +45,15 @@ class TenantOnboarding extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Client Onboarding';
+    protected static ?string $navigationLabel = 'Organization Onboarding';
 
-    protected static ?int $navigationSort = 0;
+    protected static ?int $navigationSort = 30;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $title = 'Client Onboarding';
 
@@ -60,6 +65,8 @@ class TenantOnboarding extends Page implements HasForms
 
     public ?string $clientType = null;
 
+    public ?string $verificationModel = null;
+
     protected ?OnboardingDraft $draft = null;
 
     public static function canAccess(): bool
@@ -69,12 +76,28 @@ class TenantOnboarding extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->clientType = in_array(request()->query('client_type'), ['organization', 'single_clinic'], true)
+        $onboarding = app(ClientOnboardingService::class);
+        $this->draft = $onboarding->findForUser(
+            request()->query('onboarding'),
+            auth()->user(),
+            'organization_onboarding',
+        );
+
+        if ($this->draft) {
+            $this->clientType = $this->draft->account_structure;
+            $this->verificationModel = $this->draft->verification_model;
+        }
+
+        $this->clientType = ! $this->draft && in_array(request()->query('client_type'), ['organization', 'single_clinic'], true)
             ? request()->query('client_type')
-            : null;
+            : $this->clientType;
+        $this->verificationModel = ! $this->draft && in_array(request()->query('verification_model'), ClientOnboardingService::VERIFICATION_MODELS, true)
+            ? request()->query('verification_model')
+            : $this->verificationModel;
 
         $defaults = [
             'client_type' => $this->clientType ?? 'organization',
+            'verification_model' => $this->verificationModel ?? 'managed_service',
             'organization_status' => true,
             'clinic_code' => $this->generateClinicCode(),
             'clinic_timezone' => 'America/New_York',
@@ -88,16 +111,18 @@ class TenantOnboarding extends Page implements HasForms
             'service_status' => 'active',
             'workspace_mode' => 'plan_default',
             'managed_services_status' => 'not_enabled',
+            'verification_default_form_template' => VerificationFormQuestion::defaultTemplateKey(),
         ];
-
-        $this->draft = OnboardingDraft::query()
-            ->where('user_id', auth()->id())
-            ->where('type', 'organization_onboarding')
-            ->first();
+        $requestDefaults = [
+            ...($this->clientType ? ['client_type' => $this->clientType] : []),
+            ...($this->verificationModel ? ['verification_model' => $this->verificationModel] : []),
+            ...$this->verificationModelDefaults($this->verificationModel),
+        ];
 
         $this->form->fill([
             ...$defaults,
             ...($this->draft?->data ?? []),
+            ...$requestDefaults,
         ]);
     }
 
@@ -105,6 +130,10 @@ class TenantOnboarding extends Page implements HasForms
     {
         if ($name === 'data.client_type' && in_array($value, ['organization', 'single_clinic'], true)) {
             $this->clientType = $value;
+        }
+
+        if ($name === 'data.verification_model' && in_array($value, ['self_service', 'managed_service', 'hybrid'], true)) {
+            $this->verificationModel = $value;
         }
 
         if (! str_starts_with((string) $name, 'data.')) {
@@ -127,6 +156,8 @@ class TenantOnboarding extends Page implements HasForms
                         ->schema([
                             Hidden::make('client_type')
                                 ->default($this->clientType ?? 'organization'),
+                            Hidden::make('verification_model')
+                                ->default($this->verificationModel ?? 'managed_service'),
                             Select::make('dso_id')
                                 ->label('DSO / Enterprise account')
                                 ->options(fn (): array => Dso::query()
@@ -272,8 +303,8 @@ class TenantOnboarding extends Page implements HasForms
                                 ->required(),
                         ])
                         ->columns(2),
-                    Step::make('Subscription')
-                        ->description('Attach a billing plan during organization onboarding.')
+                    Step::make('Services & Plan')
+                        ->description('Confirm the verification model, template, and billing plan.')
                         ->schema([
                             Toggle::make('attach_subscription')
                                 ->label('Attach a subscription now')
@@ -335,13 +366,19 @@ class TenantOnboarding extends Page implements HasForms
                                 ->visible(fn (Get $get): bool => (bool) $get('attach_subscription'))
                                 ->native(false),
                             Select::make('managed_services_status')
-                                ->label('Managed services')
+                                ->label('Verification service status')
                                 ->default('not_enabled')
                                 ->options([
                                     'not_enabled' => 'Not enabled',
                                     'requested' => 'Requested',
                                     'active' => 'Active',
                                 ])
+                                ->native(false),
+                            Select::make('verification_default_form_template')
+                                ->label('Default verification template')
+                                ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
+                                ->default(VerificationFormQuestion::defaultTemplateKey())
+                                ->required()
                                 ->native(false),
                         ])
                         ->columns(2),
@@ -358,6 +395,34 @@ class TenantOnboarding extends Page implements HasForms
                                     'both' => 'Choose Workspace',
                                 ])
                                 ->native(false),
+                        ])
+                        ->columns(2),
+                    Step::make('Review & Activate')
+                        ->description('Review the client setup before creating the live account.')
+                        ->schema([
+                            Placeholder::make('review_structure')
+                                ->label('Account structure')
+                                ->content(fn (Get $get): string => $get('client_type') === 'single_clinic' ? 'Solo Practice' : 'Multi Location Organization'),
+                            Placeholder::make('review_organization')
+                                ->label('Organization')
+                                ->content(fn (Get $get): string => (string) ($get('organization_name') ?: 'Not provided')),
+                            Placeholder::make('review_clinic')
+                                ->label('First clinic and location')
+                                ->content(fn (Get $get): string => trim(($get('clinic_name') ?: 'Not provided').' / '.($get('location_name') ?: 'Not provided'))),
+                            Placeholder::make('review_admin')
+                                ->label('Primary administrator')
+                                ->content(fn (Get $get): string => trim(($get('owner_name') ?: 'Not provided').' / '.($get('owner_email') ?: 'No email'))),
+                            Placeholder::make('review_verification_model')
+                                ->label('Verification model')
+                                ->content(fn (Get $get): string => $this->verificationModelLabel($get('verification_model'))),
+                            Placeholder::make('review_template')
+                                ->label('Verification template')
+                                ->content(fn (Get $get): string => VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$get('verification_default_form_template')] ?? 'Master Template'),
+                            Placeholder::make('review_plan')
+                                ->label('Subscription')
+                                ->content(fn (Get $get): string => ! $get('attach_subscription')
+                                    ? 'No subscription attached'
+                                    : (SubscriptionPlan::find($get('subscription_plan_id'))?->name ?? 'Plan not selected')),
                         ])
                         ->columns(2),
                 ])->persistStepInQueryString(),
@@ -405,6 +470,7 @@ class TenantOnboarding extends Page implements HasForms
                     'pms_service_status' => ($plan?->includesPms() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
                     'verification_service_status' => ($plan?->includesVerification() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
                     'managed_services_status' => $state['managed_services_status'] ?? 'not_enabled',
+                    'verification_default_form_template' => $state['verification_default_form_template'] ?? VerificationFormQuestion::defaultTemplateKey(),
                     'trial_ends_at' => $plan?->trial_days ? now()->addDays((int) $plan->trial_days)->toDateString() : null,
                     'demo_mode' => (bool) ($plan?->demo_mode_available && ($state['subscription_status'] ?? null) === 'trial'),
                     'account_manager_user_id' => auth()->id(),
@@ -479,7 +545,7 @@ class TenantOnboarding extends Page implements HasForms
             ->send();
 
         SaasNotifications::organizationOnboarded($result['organization'], $result['owner']);
-        $this->deleteDraft();
+        $this->completeDraft($result);
 
         return redirect(OrganizationResource::getUrl('view', ['record' => $result['organization']]));
     }
@@ -494,17 +560,17 @@ class TenantOnboarding extends Page implements HasForms
             return;
         }
 
-        $this->draft ??= OnboardingDraft::query()->firstOrNew([
-            'user_id' => auth()->id(),
-            'type' => 'organization_onboarding',
-        ]);
+        $this->draft ??= app(ClientOnboardingService::class)->start(
+            auth()->user(),
+            $state['client_type'] ?? 'organization',
+            $state['verification_model'] ?? 'managed_service',
+        );
 
-        $this->draft->fill([
-            'last_completed_step' => $this->estimateLastCompletedStep($state),
-            'data' => $state,
-        ]);
-
-        $this->draft->save();
+        app(ClientOnboardingService::class)->save(
+            $this->draft,
+            $state,
+            $this->estimateLastCompletedStep($state),
+        );
 
         if (! $this->draft->notification_sent_at) {
             SaasNotifications::incompleteOnboarding($this->draft);
@@ -520,6 +586,19 @@ class TenantOnboarding extends Page implements HasForms
         SaasNotifications::clearIncompleteOnboarding($this->draft);
         $this->draft->delete();
         $this->draft = null;
+    }
+
+    protected function completeDraft(array $result): void
+    {
+        if (! $this->draft) {
+            return;
+        }
+
+        SaasNotifications::clearIncompleteOnboarding($this->draft);
+        app(ClientOnboardingService::class)->activate(
+            $this->draft,
+            $result['organization'],
+        );
     }
 
     protected function hasMeaningfulDraftData(array $state): bool
@@ -561,6 +640,34 @@ class TenantOnboarding extends Page implements HasForms
             'clinic' => ['clinic'],
             'both' => ['verification', 'clinic'],
             default => SaasEntitlements::workspacesForPlan($plan) ?: ['verification', 'clinic'],
+        };
+    }
+
+    protected function verificationModelDefaults(?string $verificationModel): array
+    {
+        return match ($verificationModel) {
+            'self_service' => [
+                'managed_services_status' => 'not_enabled',
+                'workspace_mode' => 'verification',
+            ],
+            'hybrid' => [
+                'managed_services_status' => 'requested',
+                'workspace_mode' => 'both',
+            ],
+            'managed_service' => [
+                'managed_services_status' => 'active',
+                'workspace_mode' => 'verification',
+            ],
+            default => [],
+        };
+    }
+
+    protected function verificationModelLabel(?string $verificationModel): string
+    {
+        return match ($verificationModel) {
+            'self_service' => 'Self-Managed',
+            'hybrid' => 'Hybrid',
+            default => 'Managed Service',
         };
     }
 

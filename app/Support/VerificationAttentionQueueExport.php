@@ -10,7 +10,7 @@ class VerificationAttentionQueueExport
 {
     public static function query(?string $filter = null): Builder
     {
-        $query = AdminClinicScope::apply(
+        $query = AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
                 ->with(['clinic', 'assignedTo', 'patient', 'verificationProfile'])
                 ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))

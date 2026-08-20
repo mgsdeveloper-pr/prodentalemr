@@ -27,7 +27,7 @@ class UserInfolist
                                     ->label('Role')
                                     ->state(fn (User $record): ?string => $record->getPrimaryRoleLabel())
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('gray'),
                                 IconEntry::make('status')
                                     ->label('Active')
                                     ->boolean(),

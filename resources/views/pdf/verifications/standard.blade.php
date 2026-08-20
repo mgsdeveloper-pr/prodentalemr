@@ -46,7 +46,7 @@
     @foreach ($sections as $section)
         <div class="section">
             <div class="section-head">{{ $section['title'] }}</div>
-            @if ($section['key'] === 'coverage_matrix')
+            @if ($section['key'] === 'template_3_coverage_category')
                 <table class="rows matrix" width="100%">
                     <thead>
                         <tr>

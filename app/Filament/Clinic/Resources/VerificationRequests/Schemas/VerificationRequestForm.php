@@ -46,7 +46,6 @@ class VerificationRequestForm
                 Hidden::make('source')->default('clinic_self_service'),
                 Hidden::make('status')->default('pending'),
                 Hidden::make('outcome_status')->default('pending'),
-                Hidden::make('priority')->default('normal'),
                 Hidden::make('pms_sync_status')->default('pending'),
                 Hidden::make('writeback_status')->default('not_requested'),
                 Hidden::make('managed_billing_service_id'),
@@ -55,76 +54,117 @@ class VerificationRequestForm
                     ->default(fn (): string => BillingWorkItem::generateReferenceNumber()),
                 Hidden::make('patient_id'),
                 Hidden::make('patient_insurance_policy_id'),
+                Hidden::make('appointment_id'),
                 Hidden::make('vf_requested_by_name')->default($user?->name),
                 Hidden::make('vf_requested_by_role_slug')->default($user?->getPrimaryRoleName()),
                 Hidden::make('vf_requested_from_panel')->default('clinic'),
 
-                Grid::make(1)
-                    ->columnSpanFull()
+                Section::make('Clinic Selection Required')
+                    ->description('Choose a clinic from Clinic Scope before creating a verification request.')
+                    ->visible($needsClinicSelection)
                     ->schema([
-                        Select::make('vf_form_type')
-                            ->label('Verification Form')
-                            ->options(VerificationProfile::FORM_TYPE_OPTIONS)
-                            ->default('full_form')
-                            ->native(false)
-                            ->required(),
+                        Placeholder::make('clinic_scope_required')
+                            ->label('')
+                            ->content('No clinic is currently selected. The request form is locked until a clinic is selected.'),
                     ]),
 
-                Section::make('Patient 1')
+                Section::make('Start Request')
+                    ->description('Start from an appointment or patient record when one is available.')
                     ->columnSpanFull()
+                    ->disabled($needsClinicSelection)
                     ->schema([
-                        Select::make('import_patient_id')
-                            ->label('Import Patient')
-                            ->helperText($needsClinicSelection ? 'Select a clinic from the Workspace menu first.' : 'Optional. Pick an existing patient to auto-fill demographics and insurance.')
-                            ->options(fn (Get $get): array => static::patientImportOptions(
-                                $scopedOrganizationId,
-                                $scopedClinicId,
-                                filled($get('location_id')) ? (int) $get('location_id') : null,
-                            ))
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->dehydrated(false)
-                            ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
-                                if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
-                                    return;
-                                }
+                        Grid::make(2)->schema([
+                            Select::make('import_appointment_id')
+                                ->label('Import Appointment')
+                                ->options(fn (Get $get): array => static::appointmentImportOptions(
+                                    $scopedOrganizationId,
+                                    $scopedClinicId,
+                                    filled($get('location_id')) ? (int) $get('location_id') : null,
+                                ))
+                                ->searchable()
+                                ->preload()
+                                ->live()
+                                ->dehydrated(false)
+                                ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
+                                    if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
+                                        return;
+                                    }
 
-                                static::applyImportedPatient(
-                                    (int) $state,
-                                    $get,
-                                    $set,
-                                    (int) $scopedOrganizationId,
-                                    (int) $scopedClinicId,
-                                );
-                            })
-                            ->columnSpanFull(),
-                        Select::make('import_appointment_id')
-                            ->label('Import Appointment')
-                            ->helperText($needsClinicSelection ? 'Select a clinic from the Workspace menu first.' : 'Optional. Pull location, provider, patient, date, and time from an existing appointment.')
-                            ->options(fn (Get $get): array => static::appointmentImportOptions(
-                                $scopedOrganizationId,
-                                $scopedClinicId,
-                                filled($get('location_id')) ? (int) $get('location_id') : null,
-                            ))
-                            ->searchable()
-                            ->preload()
-                            ->live()
-                            ->dehydrated(false)
-                            ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
-                                if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
-                                    return;
-                                }
+                                    static::applyImportedAppointment(
+                                        (int) $state,
+                                        $get,
+                                        $set,
+                                        (int) $scopedOrganizationId,
+                                        (int) $scopedClinicId,
+                                    );
+                                }),
+                            Select::make('import_patient_id')
+                                ->label('Import Patient')
+                                ->options(fn (Get $get): array => static::patientImportOptions(
+                                    $scopedOrganizationId,
+                                    $scopedClinicId,
+                                    filled($get('location_id')) ? (int) $get('location_id') : null,
+                                ))
+                                ->searchable()
+                                ->preload()
+                                ->live()
+                                ->dehydrated(false)
+                                ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
+                                    if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
+                                        return;
+                                    }
 
-                                static::applyImportedAppointment(
-                                    (int) $state,
-                                    $get,
-                                    $set,
-                                    (int) $scopedOrganizationId,
-                                    (int) $scopedClinicId,
-                                );
-                            })
-                            ->columnSpanFull(),
+                                    static::applyImportedPatient(
+                                        (int) $state,
+                                        $get,
+                                        $set,
+                                        (int) $scopedOrganizationId,
+                                        (int) $scopedClinicId,
+                                    );
+                                }),
+                        ]),
+                        Grid::make(3)->schema([
+                            Select::make('vf_form_type')
+                                ->label('Form Type')
+                                ->options(VerificationProfile::FORM_TYPE_OPTIONS)
+                                ->default('full_form')
+                                ->live()
+                                ->native(false)
+                                ->required(),
+                            Select::make('priority')
+                                ->label('Priority')
+                                ->options(BillingWorkItem::PRIORITY_OPTIONS)
+                                ->default('normal')
+                                ->live()
+                                ->native(false)
+                                ->required(),
+                            Select::make('processing_mode')
+                                ->label('Completed By')
+                                ->options(fn (Get $get): array => static::processingModeOptions(
+                                    $scopedOrganizationId,
+                                    $scopedClinicId,
+                                    filled($get('location_id')) ? (int) $get('location_id') : null,
+                                ))
+                                ->default(fn (): string => static::defaultProcessingMode(
+                                    $scopedOrganizationId,
+                                    $scopedClinicId,
+                                    null,
+                                ))
+                                ->helperText(fn (Get $get): string => static::processingModeHelperText(
+                                    $scopedOrganizationId,
+                                    $scopedClinicId,
+                                    filled($get('location_id')) ? (int) $get('location_id') : null,
+                                ))
+                                ->live()
+                                ->native(false)
+                                ->required(),
+                        ]),
+                    ]),
+
+                Section::make('Patient & Appointment')
+                    ->columnSpanFull()
+                    ->disabled($needsClinicSelection)
+                    ->schema([
                         Grid::make(2)
                             ->schema([
                                 Section::make('Appointment Information')
@@ -157,6 +197,7 @@ class VerificationRequestForm
                                                         $set('managed_billing_service_id', null);
                                                         $set('client_service_enrollment_id', null);
                                                         $set('source', 'clinic_self_service');
+                                                        $set('processing_mode', BillingWorkItem::PROCESSING_MODE_SELF_MANAGED);
 
                                                         if (! $location) {
                                                             return;
@@ -166,11 +207,6 @@ class VerificationRequestForm
                                                     })
                                                     ->required()
                                                     ->columnSpanFull(),
-                                                Checkbox::make('priority_flag')
-                                                    ->label('Mark as urgent')
-                                                    ->live()
-                                                    ->dehydrated(false)
-                                                    ->afterStateUpdated(fn (?bool $state, Set $set) => $set('priority', $state ? 'urgent' : 'normal')),
                                                 Select::make('provider_id')
                                                     ->label('Provider')
                                                     ->helperText($needsClinicSelection ? 'Select a clinic from the Workspace menu first.' : null)
@@ -248,6 +284,7 @@ class VerificationRequestForm
 
                 Section::make('Insurance Plans')
                     ->columnSpanFull()
+                    ->disabled($needsClinicSelection)
                     ->schema([
                         Grid::make(2)
                             ->schema([
@@ -269,12 +306,22 @@ class VerificationRequestForm
                                     ->label('Relationship to Patient')
                                     ->options([
                                         'self' => 'Self',
-                                        'child' => 'Child',
+                                        'dependent' => 'Dependent',
                                         'spouse' => 'Spouse',
                                         'other' => 'Other',
                                     ])
+                                    ->live()
+                                    ->afterStateUpdated(function (?string $state, Get $get, Set $set): void {
+                                        $isSelf = $state === 'self';
+                                        $set('vf_subscriber_same_as_patient', $isSelf);
+
+                                        if ($isSelf) {
+                                            static::syncSubscriberFromPatient($get, $set, true);
+                                        }
+                                    })
                                     ->native(false)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->required(),
                             ]),
                         Repeater::make('verification_plan_snapshots')
                             ->label('')
@@ -282,8 +329,7 @@ class VerificationRequestForm
                                 ['plan_priority' => 'primary'],
                             ])
                             ->minItems(1)
-                            ->addActionLabel('Add Primary Plan')
-                            ->collapsed()
+                            ->addActionLabel('Add Another Plan')
                             ->itemLabel(fn (array $state): ?string => match ($state['plan_priority'] ?? 'primary') {
                                 'secondary' => 'Secondary Plan',
                                 'tertiary' => 'Tertiary Plan',
@@ -317,6 +363,27 @@ class VerificationRequestForm
                                             ->native(false),
                                     ]),
                             ]),
+                    ]),
+
+                Section::make('Review Request')
+                    ->description('Confirm the request details before creation.')
+                    ->columnSpanFull()
+                    ->disabled($needsClinicSelection)
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Placeholder::make('review_patient')
+                                ->label('Patient')
+                                ->content(fn (Get $get): string => static::reviewPatientSummary($get)),
+                            Placeholder::make('review_appointment')
+                                ->label('Appointment')
+                                ->content(fn (Get $get): string => static::reviewAppointmentSummary($get)),
+                            Placeholder::make('review_insurance')
+                                ->label('Insurance')
+                                ->content(fn (Get $get): string => static::reviewInsuranceSummary($get)),
+                            Placeholder::make('review_routing')
+                                ->label('Request Routing')
+                                ->content(fn (Get $get): string => static::reviewRoutingSummary($get)),
+                        ]),
                     ]),
             ]);
     }
@@ -454,6 +521,8 @@ class VerificationRequestForm
             $set('provider_id', $appointment->provider_id);
         }
 
+        $set('appointment_id', $appointment->id);
+
         if ($appointment->appointment_date) {
             $set('vf_appointment_date', $appointment->appointment_date->format('Y-m-d'));
         }
@@ -555,6 +624,17 @@ class VerificationRequestForm
         }
 
         if ($primaryPolicy) {
+            $relationship = strtolower(trim((string) ($primaryPolicy->subscriber_relationship ?: '')));
+
+            if ($relationship === 'child') {
+                $relationship = 'dependent';
+            }
+
+            if (in_array($relationship, ['self', 'dependent', 'spouse', 'other'], true)) {
+                $set('vf_insured_relation', $relationship);
+                $set('vf_subscriber_same_as_patient', $relationship === 'self');
+            }
+
             $set('verification_plan_snapshots', [[
                 'plan_priority' => $primaryPolicy->coverage_priority ?: 'primary',
                 'payer_name' => $primaryPolicy->insurance_company,
@@ -566,13 +646,13 @@ class VerificationRequestForm
         }
 
         if (filled($get('vf_subscriber_same_as_patient'))) {
-            static::syncSubscriberFromPatient($get, $set);
+            static::syncSubscriberFromPatient($get, $set, true);
         }
     }
 
-    protected static function syncSubscriberFromPatient(Get $get, Set $set): void
+    protected static function syncSubscriberFromPatient(Get $get, Set $set, bool $force = false): void
     {
-        if (! $get('vf_subscriber_same_as_patient')) {
+        if (! $force && ! $get('vf_subscriber_same_as_patient')) {
             return;
         }
 
@@ -591,6 +671,47 @@ class VerificationRequestForm
         }
 
         $set('verification_plan_snapshots', $plans);
+    }
+
+    protected static function reviewPatientSummary(Get $get): string
+    {
+        return collect([
+            trim((string) ($get('vf_patient_full_name') ?: 'Patient not selected')),
+            filled($get('vf_patient_dob')) ? 'DOB ' . date('m/d/Y', strtotime((string) $get('vf_patient_dob'))) : null,
+        ])->filter()->implode(' | ');
+    }
+
+    protected static function reviewAppointmentSummary(Get $get): string
+    {
+        $provider = filled($get('provider_id'))
+            ? Provider::query()->with('user')->find($get('provider_id'))?->display_name
+            : null;
+
+        return collect([
+            filled($get('vf_appointment_date')) ? date('M d, Y', strtotime((string) $get('vf_appointment_date'))) : 'Date not selected',
+            filled($get('vf_appointment_time')) ? date('g:i A', strtotime((string) $get('vf_appointment_time'))) : null,
+            $provider,
+        ])->filter()->implode(' | ');
+    }
+
+    protected static function reviewInsuranceSummary(Get $get): string
+    {
+        $plan = collect($get('verification_plan_snapshots') ?? [])->first() ?? [];
+
+        return collect([
+            $plan['payer_name'] ?? 'Insurance not selected',
+            filled($plan['member_id'] ?? null) ? 'Member ' . $plan['member_id'] : null,
+            filled($plan['group_number'] ?? null) ? 'Group ' . $plan['group_number'] : null,
+        ])->filter()->implode(' | ');
+    }
+
+    protected static function reviewRoutingSummary(Get $get): string
+    {
+        return collect([
+            BillingWorkItem::PROCESSING_MODE_OPTIONS[$get('processing_mode')] ?? 'Completion team not selected',
+            VerificationProfile::FORM_TYPE_OPTIONS[$get('vf_form_type')] ?? 'Form type not selected',
+            BillingWorkItem::PRIORITY_OPTIONS[$get('priority')] ?? 'Priority not selected',
+        ])->filter()->implode(' | ');
     }
 
     protected static function extractZipFromAddress(?string $address): ?string
@@ -642,6 +763,47 @@ class VerificationRequestForm
         return (bool) ($enrollment?->clinic_workspace_enabled ?? false);
     }
 
+    public static function processingModeOptions(?int $organizationId, ?int $clinicId, ?int $locationId): array
+    {
+        $enrollment = static::resolveVerificationEnrollment($organizationId, $clinicId, $locationId);
+
+        if (! $enrollment) {
+            return [BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed'];
+        }
+
+        if (static::clinicWorkspaceEnabledForEnrollment($enrollment)) {
+            return [
+                BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service',
+                BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed',
+            ];
+        }
+
+        return [BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service'];
+    }
+
+    public static function defaultProcessingMode(?int $organizationId, ?int $clinicId, ?int $locationId): string
+    {
+        return array_key_first(static::processingModeOptions($organizationId, $clinicId, $locationId))
+            ?: BillingWorkItem::PROCESSING_MODE_SELF_MANAGED;
+    }
+
+    public static function processingModeHelperText(?int $organizationId, ?int $clinicId, ?int $locationId): string
+    {
+        if (blank($organizationId) || blank($clinicId)) {
+            return 'Select a clinic from the Workspace menu to determine who will complete the request.';
+        }
+
+        $options = static::processingModeOptions($organizationId, $clinicId, $locationId);
+
+        if (count($options) > 1) {
+            return 'Choose whether the clinic will self-manage this request or send it to Managed Service.';
+        }
+
+        return array_key_exists(BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE, $options)
+            ? 'This request will be completed by the Managed Service team.'
+            : 'This request will be completed by the clinic as Self-Managed.';
+    }
+
     protected static function applyVerificationRouting(Location $location, Set $set): void
     {
         $enrollment = static::resolveVerificationEnrollment(
@@ -654,6 +816,7 @@ class VerificationRequestForm
             $set('managed_billing_service_id', $enrollment->managed_billing_service_id);
             $set('client_service_enrollment_id', $enrollment->id);
             $set('source', 'clinic_request');
+            $set('processing_mode', BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE);
 
             return;
         }
@@ -661,6 +824,7 @@ class VerificationRequestForm
         $set('managed_billing_service_id', static::resolveDefaultVerificationServiceId());
         $set('client_service_enrollment_id', null);
         $set('source', 'clinic_self_service');
+        $set('processing_mode', BillingWorkItem::PROCESSING_MODE_SELF_MANAGED);
     }
 
     protected static function matchedPatientHint(Get $get): ?string

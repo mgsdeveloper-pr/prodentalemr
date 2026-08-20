@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages;
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Models\AppointmentImportBatch;
+use App\Services\Notifications\ProductNotificationService;
 use App\Support\AppointmentImportService;
 use App\Support\ClinicPanelScope;
 use App\Support\SaasEntitlements;
@@ -18,8 +19,8 @@ use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ImportAppointments extends Page implements HasForms
 {
@@ -29,7 +30,7 @@ class ImportAppointments extends Page implements HasForms
 
     protected string $view = 'filament.admin.resources.appointments.pages.import-appointments';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     public ?array $data = [];
 
@@ -68,7 +69,7 @@ class ImportAppointments extends Page implements HasForms
         $selectedClinic = ClinicPanelScope::selectedClinic();
 
         return $selectedClinic?->clinic_name
-            ? $selectedClinic->clinic_name . ' - ' . ($selectedClinic->organization?->name ?? '')
+            ? $selectedClinic->clinic_name.' - '.($selectedClinic->organization?->name ?? '')
             : 'Select a clinic before importing.';
     }
 
@@ -159,7 +160,7 @@ class ImportAppointments extends Page implements HasForms
 
             Notification::make()
                 ->title('Preview ready')
-                ->body(($this->previewResult['ready'] ?? 0) . ' ready, ' . ($this->previewResult['failed'] ?? 0) . ' need attention.')
+                ->body(($this->previewResult['ready'] ?? 0).' ready, '.($this->previewResult['failed'] ?? 0).' need attention.')
                 ->color(($this->previewResult['failed'] ?? 0) > 0 ? 'warning' : 'success')
                 ->send();
         } catch (\Throwable $throwable) {
@@ -215,6 +216,12 @@ class ImportAppointments extends Page implements HasForms
                 'original_name' => $originalName,
                 'message' => $throwable->getMessage(),
             ]);
+            app(ProductNotificationService::class)->integrationFailure(
+                'appointment import',
+                'Appointment import failed for '.$clinic->clinic_name.'. Review the import file and try again.',
+                (int) $clinic->organization_id,
+                (int) $clinic->id,
+            );
 
             if (is_string($storedPath) && Storage::disk('local')->exists($storedPath)) {
                 Storage::disk('local')->delete($storedPath);
@@ -240,9 +247,18 @@ class ImportAppointments extends Page implements HasForms
         $this->previewResult = null;
         $this->createImportBatch($result, $clinic, $user, $originalName);
 
+        if (($result['failed'] ?? 0) > 0) {
+            app(ProductNotificationService::class)->integrationFailure(
+                'appointment import',
+                ($result['failed'] ?? 0).' appointment row(s) could not be imported for '.$clinic->clinic_name.'.',
+                (int) $clinic->organization_id,
+                (int) $clinic->id,
+            );
+        }
+
         Notification::make()
             ->title('Appointment import completed')
-            ->body(($result['imported'] ?? 0) . ' imported, ' . ($result['failed'] ?? 0) . ' failed, ' . ($result['warnings'] ?? 0) . ' warning(s).')
+            ->body(($result['imported'] ?? 0).' imported, '.($result['failed'] ?? 0).' failed, '.($result['warnings'] ?? 0).' warning(s).')
             ->color(($result['failed'] ?? 0) > 0 ? 'warning' : 'success')
             ->send();
     }
@@ -283,7 +299,7 @@ class ImportAppointments extends Page implements HasForms
             }
 
             fclose($handle);
-        }, 'failed-appointment-import-rows-' . $batch->id . '.csv');
+        }, 'failed-appointment-import-rows-'.$batch->id.'.csv');
     }
 
     protected function storeUploadedFile(TemporaryUploadedFile $uploadedFile, ?string $originalName): string
@@ -291,7 +307,7 @@ class ImportAppointments extends Page implements HasForms
         $extension = strtolower($uploadedFile->getClientOriginalExtension() ?: pathinfo($originalName ?? '', PATHINFO_EXTENSION) ?: 'csv');
         $storedPath = $uploadedFile->storeAs(
             'imports/appointments',
-            Str::uuid()->toString() . '.' . $extension,
+            Str::uuid()->toString().'.'.$extension,
             'local',
         );
 

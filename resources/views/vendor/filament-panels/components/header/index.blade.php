@@ -8,34 +8,103 @@
 
 <style>
     .pd-hero-header {
-        display: flex;
-        gap: 24px;
-        justify-content: space-between;
-        align-items: stretch;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 1rem;
+        width: 100%;
+        margin: 0;
+        padding: 1rem clamp(1.25rem, 2vw, 2rem);
+        border: 0;
+        border-bottom: 1px solid #e4e7ec;
+        border-radius: 0;
+        background: #ffffff;
+        box-shadow: none;
     }
 
     .pd-hero-header__content {
+        display: flex;
+        flex-direction: column;
         flex: 1 1 auto;
+        gap: 0.35rem;
         min-width: 0;
+    }
+
+    .pd-hero-header__copy {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        min-width: 0;
+    }
+
+    .pd-hero-header .fi-header-heading {
+        margin: 0;
+        color: #101828;
+        font-size: 1.65rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .pd-hero-header .fi-header-subheading {
+        margin: 0;
+        max-width: 62rem;
+        color: #667085;
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
+
+    .pd-hero-header__breadcrumbs {
+        display: inline-flex;
+        align-items: center;
+        width: fit-content;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
+
+    .pd-hero-header__breadcrumbs .fi-breadcrumbs,
+    .pd-hero-header__breadcrumbs .fi-breadcrumbs-list {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+    }
+
+    .pd-hero-header__breadcrumbs :is(a, span, li) {
+        color: #667085;
+        font-size: 0.74rem;
+        font-weight: 600;
+    }
+
+    .pd-hero-header__breadcrumbs li:last-child :is(a, span),
+    .pd-hero-header__breadcrumbs li:last-child {
+        color: #344054;
+        font-weight: 700;
     }
 
     .pd-hero-header__actions {
         display: flex;
         flex: 0 0 auto;
-        gap: 10px;
-        align-items: flex-end;
+        gap: 0.5rem;
+        align-items: center;
         justify-content: flex-end;
-        align-self: flex-end;
+        align-self: center;
         min-width: max-content;
+    }
+
+    .pd-hero-header__actions .fi-btn {
+        min-height: 2.35rem;
+        border-radius: 0.5rem;
+        border-width: 1px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
     }
 
     @media (max-width: 960px) {
         .pd-hero-header {
+            display: flex;
+            align-items: stretch;
             flex-direction: column;
-        }
-
-        .pd-hero-header__content {
-            flex: none;
+            padding: 0.9rem 1.25rem;
         }
 
         .pd-hero-header__actions {
@@ -55,14 +124,13 @@
             'fi-header-has-breadcrumbs' => $breadcrumbs,
         ])
     }}
-    style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden; padding: 24px;"
 >
-    <div class="pd-hero-header__content" style="display: flex; flex-direction: column; justify-content: space-between; gap: 12px; min-width: 0;">
+    <div class="pd-hero-header__content">
         {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_HEADING_BEFORE, scopes: $this->getRenderHookScopes()) }}
 
-        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+        <div class="pd-hero-header__copy">
             @if (filled($heading))
-                <h1 class="fi-header-heading" style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a; line-height: 1.12;">
+                <h1 class="fi-header-heading">
                     {{ $heading }}
                 </h1>
             @endif
@@ -70,17 +138,16 @@
             {{ \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_HEADING_AFTER, scopes: $this->getRenderHookScopes()) }}
 
             @if (filled($subheading))
-                <p class="fi-header-subheading" style="margin: 0; max-width: 980px; font-size: 15px; line-height: 1.75; color: #64748b;">
+                <p class="fi-header-subheading">
                     {{ $subheading }}
                 </p>
             @endif
         </div>
 
         @if ($breadcrumbs)
-            <div style="display: inline-flex; align-items: center; gap: 8px; width: fit-content; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe;">
+            <div class="pd-hero-header__breadcrumbs">
                 <x-filament::breadcrumbs
                     :breadcrumbs="$breadcrumbs"
-                    style="margin: 0;"
                 />
             </div>
         @endif
@@ -96,7 +163,7 @@
             {{ $beforeActions }}
 
             @if ($actions)
-                <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem;">
                     <x-filament::actions
                         :actions="$actions"
                         :alignment="$actionsAlignment"

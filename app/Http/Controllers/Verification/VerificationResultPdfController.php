@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Verification;
 
 use App\Http\Controllers\Controller;
 use App\Models\BillingWorkItem;
+use App\Models\VerificationFormSubmission;
+use App\Models\VerificationPdfPreset;
+use App\Services\Verification\DeliveryService;
+use App\Services\Verification\PDFService;
 use App\Support\AdminClinicScope;
 use App\Support\ClinicPanelScope;
 use App\Support\VerificationResultPdf;
@@ -16,15 +20,18 @@ class VerificationResultPdfController extends Controller
     {
         $this->ensureAdminCanAccess($billingWorkItem);
 
-        $mode = $this->resolveMode($request, $billingWorkItem);
-        $sections = $this->resolveSections($request, $billingWorkItem, $mode);
-        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode);
+        $preset = $this->resolvePreset($request, $billingWorkItem);
+        $mode = $this->resolveMode($request, $billingWorkItem, $preset);
+        $sections = $this->resolveSections($request, $billingWorkItem, $mode, $preset);
+        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
+        $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
+        $submission = $this->resolveSubmission($request, $billingWorkItem);
         $this->recordPdfActivity($billingWorkItem, 'downloaded', 'admin', $mode);
 
         return response()->streamDownload(
-            fn () => print(VerificationResultPdf::output($billingWorkItem, $mode, $sections, $questionIds)),
-            VerificationResultPdf::fileName($billingWorkItem, $mode),
-            $this->pdfHeaders('attachment; filename="' . VerificationResultPdf::fileName($billingWorkItem, $mode) . '"'),
+            fn () => print(app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission)),
+            app(PDFService::class)->fileName($billingWorkItem, $mode, $submission),
+            $this->pdfHeaders('attachment; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );
     }
 
@@ -32,15 +39,18 @@ class VerificationResultPdfController extends Controller
     {
         $this->ensureAdminCanAccess($billingWorkItem);
 
-        $mode = $this->resolveMode($request, $billingWorkItem);
-        $sections = $this->resolveSections($request, $billingWorkItem, $mode);
-        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode);
+        $preset = $this->resolvePreset($request, $billingWorkItem);
+        $mode = $this->resolveMode($request, $billingWorkItem, $preset);
+        $sections = $this->resolveSections($request, $billingWorkItem, $mode, $preset);
+        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
+        $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
+        $submission = $this->resolveSubmission($request, $billingWorkItem);
         $this->recordPdfActivity($billingWorkItem, 'previewed', 'admin', $mode);
 
         return response(
-            VerificationResultPdf::output($billingWorkItem, $mode, $sections, $questionIds),
+            app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission),
             200,
-            $this->pdfHeaders('inline; filename="' . VerificationResultPdf::fileName($billingWorkItem, $mode) . '"'),
+            $this->pdfHeaders('inline; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );
     }
 
@@ -48,15 +58,18 @@ class VerificationResultPdfController extends Controller
     {
         $this->ensureClinicCanAccess($billingWorkItem);
 
-        $mode = $this->resolveMode($request, $billingWorkItem);
-        $sections = $this->resolveSections($request, $billingWorkItem, $mode);
-        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode);
+        $preset = $this->resolvePreset($request, $billingWorkItem);
+        $mode = $this->resolveMode($request, $billingWorkItem, $preset);
+        $sections = $this->resolveSections($request, $billingWorkItem, $mode, $preset);
+        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
+        $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
+        $submission = $this->resolveSubmission($request, $billingWorkItem);
         $this->recordPdfActivity($billingWorkItem, 'downloaded', 'clinic', $mode);
 
         return response()->streamDownload(
-            fn () => print(VerificationResultPdf::output($billingWorkItem, $mode, $sections, $questionIds)),
-            VerificationResultPdf::fileName($billingWorkItem, $mode),
-            $this->pdfHeaders('attachment; filename="' . VerificationResultPdf::fileName($billingWorkItem, $mode) . '"'),
+            fn () => print(app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission)),
+            app(PDFService::class)->fileName($billingWorkItem, $mode, $submission),
+            $this->pdfHeaders('attachment; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );
     }
 
@@ -64,21 +77,27 @@ class VerificationResultPdfController extends Controller
     {
         $this->ensureClinicCanAccess($billingWorkItem);
 
-        $mode = $this->resolveMode($request, $billingWorkItem);
-        $sections = $this->resolveSections($request, $billingWorkItem, $mode);
-        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode);
+        $preset = $this->resolvePreset($request, $billingWorkItem);
+        $mode = $this->resolveMode($request, $billingWorkItem, $preset);
+        $sections = $this->resolveSections($request, $billingWorkItem, $mode, $preset);
+        $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
+        $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
+        $submission = $this->resolveSubmission($request, $billingWorkItem);
         $this->recordPdfActivity($billingWorkItem, 'previewed', 'clinic', $mode);
 
         return response(
-            VerificationResultPdf::output($billingWorkItem, $mode, $sections, $questionIds),
+            app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission),
             200,
-            $this->pdfHeaders('inline; filename="' . VerificationResultPdf::fileName($billingWorkItem, $mode) . '"'),
+            $this->pdfHeaders('inline; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );
     }
 
     protected function ensureAdminCanAccess(BillingWorkItem $billingWorkItem): void
     {
-        abort_unless(auth()->user()?->canAccessSaasRevenueOperations(), 403);
+        $user = auth()->user();
+
+        abort_unless($user?->canAccessVerificationWorkspace(), 403);
+        abort_unless($user?->can('view', $billingWorkItem), 403);
 
         $selectedClinicId = AdminClinicScope::selectedClinicId();
 
@@ -109,11 +128,7 @@ class VerificationResultPdfController extends Controller
 
     protected function recordPdfActivity(BillingWorkItem $billingWorkItem, string $action, string $panel, string $mode): void
     {
-        $billingWorkItem->recordActivity('verification_pdf_' . $action, 'Verification PDF ' . $action . '.', [
-            'panel' => $panel,
-            'output_mode' => $mode,
-            'user_name' => auth()->user()?->name,
-        ]);
+        app(DeliveryService::class)->recordPdfAccess($billingWorkItem, $action, $panel, $mode, auth()->user());
     }
 
     protected function pdfHeaders(string $disposition): array
@@ -127,19 +142,36 @@ class VerificationResultPdfController extends Controller
         ];
     }
 
-    protected function resolveMode(Request $request, BillingWorkItem $billingWorkItem): string
+    protected function resolvePreset(Request $request, BillingWorkItem $billingWorkItem): ?VerificationPdfPreset
     {
-        $configuredMode = $billingWorkItem->clinic?->getVerificationPdfOutputMode();
-        $mode = (string) ($configuredMode ?: $request->string('mode', 'standard'));
+        $presetId = $request->integer('preset_id');
 
-        return array_key_exists($mode, VerificationResultPdf::OUTPUT_MODE_OPTIONS) ? $mode : 'standard';
+        if (! $presetId || ! $billingWorkItem->clinic_id) {
+            return null;
+        }
+
+        return VerificationPdfPreset::query()
+            ->where('clinic_id', $billingWorkItem->clinic_id)
+            ->where('is_active', true)
+            ->whereKey($presetId)
+            ->first();
     }
 
-    protected function resolveSections(Request $request, BillingWorkItem $billingWorkItem, string $mode): array
+    protected function resolveMode(Request $request, BillingWorkItem $billingWorkItem, ?VerificationPdfPreset $preset = null): string
     {
-        $configuredSections = $billingWorkItem->clinic?->getVerificationPdfOutputSections() ?? [];
+        $configuredMode = $preset?->getOutputMode() ?: $billingWorkItem->clinic?->getVerificationPdfOutputMode();
+        $mode = $request->filled('mode')
+            ? (string) $request->input('mode')
+            : (string) ($configuredMode ?: 'standard');
 
-        if ($mode !== 'selected') {
+        return VerificationResultPdf::normalizeOutputMode($mode);
+    }
+
+    protected function resolveSections(Request $request, BillingWorkItem $billingWorkItem, string $mode, ?VerificationPdfPreset $preset = null): array
+    {
+        $configuredSections = $preset?->getSectionKeys() ?? $billingWorkItem->clinic?->getVerificationPdfOutputSections() ?? [];
+
+        if (! VerificationResultPdf::isCustomOutputMode($mode)) {
             return [];
         }
 
@@ -154,13 +186,13 @@ class VerificationResultPdfController extends Controller
         return array_values(array_filter($sections, fn ($section): bool => is_string($section) && $section !== ''));
     }
 
-    protected function resolveQuestionIds(Request $request, BillingWorkItem $billingWorkItem, string $mode): array
+    protected function resolveQuestionIds(Request $request, BillingWorkItem $billingWorkItem, string $mode, ?VerificationPdfPreset $preset = null): array
     {
-        if ($mode !== 'selected') {
+        if (! VerificationResultPdf::isCustomOutputMode($mode)) {
             return [];
         }
 
-        $configuredQuestionIds = $billingWorkItem->clinic?->getVerificationPdfOutputQuestionIds() ?? [];
+        $configuredQuestionIds = $preset?->getQuestionIds() ?? $billingWorkItem->clinic?->getVerificationPdfOutputQuestionIds() ?? [];
         $questionIds = ! empty($configuredQuestionIds)
             ? $configuredQuestionIds
             : $request->input('question_ids', []);
@@ -173,5 +205,31 @@ class VerificationResultPdfController extends Controller
             $questionIds,
             fn ($questionId): bool => is_numeric($questionId) && (int) $questionId > 0
         ));
+    }
+
+    protected function resolveShowBlankRows(Request $request, string $mode, ?VerificationPdfPreset $preset = null): bool
+    {
+        if ($preset) {
+            return $preset->shouldShowBlankRows();
+        }
+
+        if ($request->has('show_blank_rows')) {
+            return $request->boolean('show_blank_rows');
+        }
+
+        return $mode === 'standard';
+    }
+
+    protected function resolveSubmission(Request $request, BillingWorkItem $billingWorkItem): ?VerificationFormSubmission
+    {
+        $submissionId = $request->integer('submission_id');
+
+        if (! $submissionId) {
+            return null;
+        }
+
+        return $billingWorkItem->formSubmissions()
+            ->where('status', BillingWorkItem::STATUS_DONE)
+            ->findOrFail($submissionId);
     }
 }

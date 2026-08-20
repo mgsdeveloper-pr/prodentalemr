@@ -50,7 +50,7 @@ class ManagedBillingServiceInfolist
                                     ->label('Client enrollments')
                                     ->state(fn ($record) => $record->enrollments_count ?? $record->enrollments()->count()),
                                 TextEntry::make('work_items_count')
-                                    ->label('Work items')
+                                    ->label('Service requests')
                                     ->state(fn ($record) => $record->work_items_count ?? $record->workItems()->count()),
                             ]),
                     ]),

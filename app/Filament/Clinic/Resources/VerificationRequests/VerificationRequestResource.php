@@ -27,11 +27,11 @@ class VerificationRequestResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentCheck;
 
-    protected static ?string $navigationLabel = 'Insurance Verification';
+    protected static ?string $navigationLabel = 'Verification Requests';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'reference_number';
 
@@ -39,17 +39,17 @@ class VerificationRequestResource extends Resource
 
     public static function getModelLabel(): string
     {
-        return 'insurance verification';
+        return 'verification request';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'insurance verification';
+        return 'verification requests';
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Verification List';
+        return 'Verification Requests';
     }
 
     public static function form(Schema $schema): Schema

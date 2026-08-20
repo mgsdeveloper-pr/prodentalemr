@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\VerificationInboxMailbox;
 use App\Support\AdminClinicScope;
 use App\Support\SaasEntitlements;
@@ -182,6 +183,21 @@ class VerificationInboxSettings extends Page implements HasForms
             Action::make('save')
                 ->label('Save inbox settings')
                 ->action('save'),
+        ];
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Configure mailbox connection, synchronization, and retention for the selected clinic.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            VerificationGeneralSettings::getUrl() => 'Settings',
+            'Mailbox',
+            'Clinic Inbox',
         ];
     }
 

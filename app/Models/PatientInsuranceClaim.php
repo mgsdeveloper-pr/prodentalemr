@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PatientInsuranceClaim extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     public const CLAIM_TYPE_OPTIONS = [
         'claim' => 'Claim',

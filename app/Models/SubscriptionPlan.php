@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Support\PanelPermissionMatrix;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SubscriptionPlan extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -54,6 +55,21 @@ class SubscriptionPlan extends Model
     public const WORKSPACE_PMS = 'clinic';
 
     public const WORKSPACE_VERIFICATION = 'verification';
+
+    protected static function booted(): void
+    {
+        static::saving(function (SubscriptionPlan $plan): void {
+            $plan->included_modules = array_values(array_unique([
+                ...static::coreClinicModules(),
+                ...($plan->included_modules ?? []),
+            ]));
+        });
+    }
+
+    public static function coreClinicModules(): array
+    {
+        return ['appointments'];
+    }
 
     public static function planTypeOptions(): array
     {
@@ -132,7 +148,10 @@ class SubscriptionPlan extends Model
 
     public static function defaultIncludedModules(): array
     {
-        return array_keys(static::clinicModuleOptions());
+        return array_values(array_unique([
+            ...static::coreClinicModules(),
+            ...array_keys(static::clinicModuleOptions()),
+        ]));
     }
 
     public static function clinicModuleGroups(): array

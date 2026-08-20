@@ -47,7 +47,7 @@ class SubscriptionPlanInfolist
                                 TextEntry::make('max_users')
                                     ->numeric()
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('gray'),
                                 TextEntry::make('included_modules_count')
                                     ->label('Modules')
                                     ->state(fn ($record): int => count($record->included_modules ?? []))

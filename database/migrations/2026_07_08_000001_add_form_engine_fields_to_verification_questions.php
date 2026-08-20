@@ -33,7 +33,9 @@ return new class extends Migration
         });
 
         if (Schema::hasTable('verification_template_sections')) {
-            DB::statement('ALTER TABLE verification_template_sections MODIFY clinic_id BIGINT UNSIGNED NULL');
+            if (DB::getDriverName() !== 'sqlite') {
+                DB::statement('ALTER TABLE verification_template_sections MODIFY clinic_id BIGINT UNSIGNED NULL');
+            }
 
             Schema::table('verification_template_sections', function (Blueprint $table): void {
                 if (! Schema::hasColumn('verification_template_sections', 'is_locked_by_admin')) {

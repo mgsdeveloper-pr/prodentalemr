@@ -8,13 +8,14 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Collection;
 use App\Models\PortalCredential;
+use App\Models\AuditLog;
 use App\Support\VerificationManagedServiceAccess;
 
 class ListPortalCredentials extends ListRecords
 {
     protected static string $resource = PortalCredentialResource::class;
 
-    protected string $view = 'filament.clinic.resources.portal-credentials.pages.list-portal-credentials';
+    protected string $view = 'filament.clinic.resources.portal-credentials.pages.portal-credential-workspace';
 
     public string $search = '';
     public bool $passwordModalOpen = false;
@@ -47,6 +48,17 @@ class ListPortalCredentials extends ListRecords
             ->get();
     }
 
+    public function getCredentialSummary(): array
+    {
+        $credentials = $this->getPortalCredentials();
+
+        return [
+            'total' => $credentials->count(),
+            'active' => $credentials->where('is_active', true)->count(),
+            'mfa' => $credentials->where('mfa_required', true)->count(),
+        ];
+    }
+
     public function canUpdatePasswords(): bool
     {
         return VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService()
@@ -63,7 +75,7 @@ class ListPortalCredentials extends ListRecords
         $this->editingCredentialId = $credential->getKey();
         $this->editingCredentialName = $credential->portal_name;
         $this->editingCredentialLink = $credential->login_url;
-        $this->editingCredentialUsername = $credential->username;
+        $this->editingCredentialUsername = PortalCredential::maskSecret($credential->username);
         $this->newPassword = '';
         $this->newPasswordConfirmation = '';
         $this->passwordModalOpen = true;
@@ -107,6 +119,41 @@ class ListPortalCredentials extends ListRecords
         $this->closePasswordEditor();
     }
 
+    public function revealCredentialSecret(int $credentialId, string $field): void
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId);
+        $this->guardSecretField($field);
+        $this->recordSecretAccess($credential, $field, 'revealed');
+
+        $this->dispatch(
+            'portal-credential-revealed',
+            targetId: "portal-{$field}-{$credential->getKey()}",
+            value: (string) ($credential->{$field} ?? ''),
+        );
+    }
+
+    public function copyCredentialSecret(int $credentialId, string $field): void
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId);
+        $this->guardSecretField($field);
+        $this->recordSecretAccess($credential, $field, 'copied');
+
+        $this->dispatch(
+            'portal-credential-copy',
+            value: (string) ($credential->{$field} ?? ''),
+        );
+
+        Notification::make()
+            ->success()
+            ->title(ucfirst($field) . ' copied')
+            ->send();
+    }
+
+    public function editCredentialUrl(PortalCredential $credential): string
+    {
+        return PortalCredentialResource::getUrl('edit', ['record' => $credential]);
+    }
+
     protected function getScopedPortalCredentialQuery()
     {
         return PortalCredential::query()->when(
@@ -118,8 +165,45 @@ class ListPortalCredentials extends ListRecords
         );
     }
 
+    protected function resolveAccessibleCredential(int $credentialId): PortalCredential
+    {
+        abort_unless($this->canUpdatePasswords(), 403);
+
+        return $this->getScopedPortalCredentialQuery()->findOrFail($credentialId);
+    }
+
+    protected function guardSecretField(string $field): void
+    {
+        abort_unless(in_array($field, ['username', 'password'], true), 422);
+    }
+
+    protected function recordSecretAccess(PortalCredential $credential, string $field, string $action): void
+    {
+        AuditLog::query()->forceCreate([
+            'user_id' => auth()->id(),
+            'organization_id' => $credential->organization_id,
+            'clinic_id' => $credential->clinic_id,
+            'module' => 'portal_credentials',
+            'action' => "{$field}_{$action}",
+            'old_values' => null,
+            'new_values' => json_encode([
+                'portal_credential_id' => $credential->getKey(),
+                'portal_name' => $credential->portal_name,
+                'field' => $field,
+                'access' => $action,
+            ], JSON_THROW_ON_ERROR),
+            'ip_address' => request()->ip(),
+            'device_info' => request()->userAgent(),
+        ]);
+    }
+
     public function getHeading(): string
     {
         return '';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [];
     }
 }

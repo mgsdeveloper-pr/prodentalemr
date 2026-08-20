@@ -3,7 +3,6 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="0;url={{ $performUrl }}">
     <title>Signing Out - ProDental EMR</title>
     <style>
         body {
@@ -49,12 +48,16 @@
         <p class="text">Signing you out...</p>
         <p class="text">
             If you are not redirected automatically,
-            <a class="link" href="{{ $performUrl }}">continue here</a>.
+            <button class="link" type="submit" form="panel-sign-out-form">continue here</button>.
         </p>
     </div>
 
+    <form id="panel-sign-out-form" method="POST" action="{{ $performUrl }}" style="display: none;">
+        @csrf
+    </form>
+
     <script>
-        window.location.replace(@json($performUrl));
+        document.getElementById('panel-sign-out-form').submit();
     </script>
 </body>
 </html>

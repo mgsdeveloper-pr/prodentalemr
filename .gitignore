@@ -16,6 +16,9 @@
 /public/build
 /public/hot
 /public/storage
+/public/samples/*.html
+/public/samples/*.pdf
+/public/samples/*.svg
 /storage/*.key
 /storage/pail
 /vendor
@@ -23,3 +26,5 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 tmp_video_frame.png
+/tmp/
+/storage/framework/PsySH/

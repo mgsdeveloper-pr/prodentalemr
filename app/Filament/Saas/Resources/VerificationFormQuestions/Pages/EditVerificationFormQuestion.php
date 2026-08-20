@@ -4,9 +4,7 @@ namespace App\Filament\Saas\Resources\VerificationFormQuestions\Pages;
 
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\Concerns\InteractsWithVerificationFormQuestionOrdering;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
-use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
-use App\Support\AdminClinicScope;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
@@ -25,26 +23,12 @@ class EditVerificationFormQuestion extends EditRecord
 
     public function getSelectedClinicName(): string
     {
-        $clinicId = $this->data['clinic_id'] ?? $this->record?->clinic_id ?? null;
-
-        if (filled($clinicId)) {
-            $clinic = Clinic::query()->with('organization')->find($clinicId);
-
-            if ($clinic) {
-                return $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '');
-            }
-        }
-
-        $selectedClinic = AdminClinicScope::selectedClinic();
-
-        return $selectedClinic
-            ? $selectedClinic->clinic_name . ' - ' . ($selectedClinic->organization?->name ?? '')
-            : 'Select clinic scope';
+        return 'Platform Master Template';
     }
 
     public function getSectionCards(): array
     {
-        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : ($this->record?->clinic_id ?? AdminClinicScope::selectedClinicId());
+        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : $this->record?->clinic_id;
 
         return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? $this->record?->template_key ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
             ->map(fn (string $label, string $key): array => [
@@ -58,7 +42,7 @@ class EditVerificationFormQuestion extends EditRecord
     public function getCurrentSectionLabel(): string
     {
         $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
-        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : ($this->record?->clinic_id ?? AdminClinicScope::selectedClinicId());
+        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : $this->record?->clinic_id;
 
         return filled($key)
             ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? $this->record?->template_key ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
@@ -109,7 +93,7 @@ class EditVerificationFormQuestion extends EditRecord
     {
         $this->originalSectionKey = $this->record?->section_key;
 
-        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : ($this->record?->clinic_id ?? AdminClinicScope::selectedClinicId());
+        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : $this->record?->clinic_id;
         $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor(
             $this->record?->section_key,
             $this->record?->template_key,
@@ -137,6 +121,8 @@ class EditVerificationFormQuestion extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data['organization_id'] = null;
+        $data['clinic_id'] = null;
         $data['sort_order'] = (int) ($data['sort_order'] ?? ($this->record?->sort_order ?? 9990));
         $data['section_key'] = filled($data['sub_section_key'] ?? null)
             ? $data['sub_section_key']

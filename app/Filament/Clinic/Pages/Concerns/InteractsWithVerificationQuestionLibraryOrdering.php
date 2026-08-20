@@ -2,7 +2,9 @@
 
 namespace App\Filament\Clinic\Pages\Concerns;
 
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
@@ -36,16 +38,20 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function getSelectedTemplateLabel(): string
     {
-        return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$this->selectedTemplateKey] ?? 'Master Template';
+        return 'Clinic Template';
     }
 
     public function repositionQuestion(int $questionId, string $direction): void
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
 
-        if (! $clinicId) {
+        if (! $clinicId
+            || ! (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            || $version?->status !== VerificationTemplateVersion::STATUS_DRAFT) {
             Notification::make()
-                ->title('Select a clinic first')
+                ->title('Create a draft first')
+                ->body('Published clinic template versions are read-only. Create a draft before changing question order.')
                 ->danger()
                 ->send();
 
@@ -58,6 +64,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         $question = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->selectedTemplateKey)
+            ->where('template_version_id', $version->getKey())
             ->find($questionId);
 
         if (! $question) {
@@ -73,6 +80,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
             ->visibleForClinic($clinicId, $organizationId)
             ->where('section_key', $question->section_key)
             ->where('template_key', $question->template_key)
+            ->where('template_version_id', $version->getKey())
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -151,10 +159,12 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         }
 
         $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
 
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->selectedTemplateKey)
+            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
             ->where('is_active', true)
             ->orderBy('section_key')
             ->orderBy('sort_order')

@@ -47,7 +47,7 @@
             'rightContent' => $heroRightContent,
         ])
 
-        <form wire:submit="{{ $this->getSubmitMethodName() }}" style="display: flex; flex-direction: column; gap: 20px;">
+        <form wire:submit.prevent="{{ $this->getSubmitMethodName() }}" style="display: flex; flex-direction: column; gap: 20px;">
             <div style="display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr); gap: 20px; align-items: start;">
                 <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06); overflow: hidden;">
                     <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
@@ -79,14 +79,14 @@
                                 <button
                                     type="button"
                                     wire:click="setPlacement('top')"
-                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#f59e0b' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#fff7ed' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#b45309' : '#475569' }}; font-size: 13px; font-weight: 800;"
+                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#5eead4' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#f0fdfa' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#0f766e' : '#475569' }}; font-size: 13px; font-weight: 800;"
                                 >
                                     Move to top
                                 </button>
                                 <button
                                     type="button"
                                     wire:click="setPlacement('bottom')"
-                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#f59e0b' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#fff7ed' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#b45309' : '#475569' }}; font-size: 13px; font-weight: 800;"
+                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#5eead4' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#f0fdfa' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#0f766e' : '#475569' }}; font-size: 13px; font-weight: 800;"
                                 >
                                     Move to bottom
                                 </button>
@@ -110,7 +110,7 @@
                                             draggable="true"
                                             data-question-id="{{ $card['id'] }}"
                                             x-on:dragstart="draggingId = '{{ $card['id'] }}'; $event.dataTransfer.effectAllowed = 'move';"
-                                            x-on:dragover.prevent="$event.currentTarget.style.borderColor = '#f59e0b';"
+                                            x-on:dragover.prevent="$event.currentTarget.style.borderColor = '#0f766e';"
                                             x-on:dragleave="$event.currentTarget.style.borderColor = '#e2e8f0';"
                                             x-on:drop.prevent="
                                                 $event.currentTarget.style.borderColor = '#e2e8f0';
@@ -137,14 +137,14 @@
                                                 <button
                                                     type="button"
                                                     wire:click="setPlacement('above', {{ $card['id'] }})"
-                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f59e0b' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#fff7ed' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#b45309' : '#475569' }}; font-size: 12px; font-weight: 800;"
+                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#5eead4' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f0fdfa' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#0f766e' : '#475569' }}; font-size: 12px; font-weight: 800;"
                                                 >
                                                     Above this
                                                 </button>
                                                 <button
                                                     type="button"
                                                     wire:click="setPlacement('below', {{ $card['id'] }})"
-                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f59e0b' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#fff7ed' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#b45309' : '#475569' }}; font-size: 12px; font-weight: 800;"
+                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#5eead4' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f0fdfa' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#0f766e' : '#475569' }}; font-size: 12px; font-weight: 800;"
                                                 >
                                                     Below this
                                                 </button>
@@ -172,9 +172,12 @@
                         </a>
                         <button
                             type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="{{ $this->getSubmitMethodName() }}"
                             style="display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 11px 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #0f766e 0%, #0ea5a4 100%); color: #ffffff; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.22);"
                         >
-                            {{ $this->getSubmitButtonLabel() }}
+                            <span wire:loading.remove wire:target="{{ $this->getSubmitMethodName() }}">{{ $this->getSubmitButtonLabel() }}</span>
+                            <span wire:loading wire:target="{{ $this->getSubmitMethodName() }}">Saving...</span>
                         </button>
                     </div>
             </section>

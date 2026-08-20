@@ -10,12 +10,7 @@ class VerificationInboxMessagePreviewController extends Controller
 {
     public function __invoke(VerificationInboxMessage $message): Response
     {
-        abort_unless(auth()->user()?->canAccessVerificationWorkspace(), 403);
-        abort_unless(
-            auth()->user()?->hasFullVerificationClinicAccess()
-            || auth()->user()?->canAccessVerificationClinic($message->clinic_id),
-            403
-        );
+        abort_unless(auth()->user()?->can('view', $message), 403);
 
         return response($message->sanitizedHtmlBody(), 200, [
             'Content-Type' => 'text/html; charset=UTF-8',

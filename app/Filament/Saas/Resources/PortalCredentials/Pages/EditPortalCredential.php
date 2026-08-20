@@ -15,10 +15,10 @@ class EditPortalCredential extends EditRecord
     {
         $clinic = AdminClinicScope::selectedClinic();
 
-        if (! $clinic) {
+        if (! $clinic || ! PortalCredentialResource::canEdit($this->record)) {
             Notification::make()
-                ->title('Select a clinic first')
-                ->body('Choose a clinic from the Workspace menu before updating a portal credential.')
+                ->title('Support mode required')
+                ->body('Start Support Mode for this clinic before updating a portal credential.')
                 ->danger()
                 ->send();
 

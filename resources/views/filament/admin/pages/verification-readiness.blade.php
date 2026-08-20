@@ -2,7 +2,6 @@
     @php
         $summary = $this->getSummary();
         $sections = $this->getSections();
-        $verificationNavItems = \App\Support\VerificationSettingsNavigation::items();
         $toneStyles = [
             'success' => ['border' => '#bbf7d0', 'bg' => '#f0fdf4', 'text' => '#166534'],
             'warning' => ['border' => '#fde68a', 'bg' => '#fffbeb', 'text' => '#92400e'],
@@ -11,13 +10,6 @@
         ];
     @endphp
 
-    <x-verification-management-shell
-        :items="$verificationNavItems"
-        active="readiness"
-        menu-title="Verification"
-        menu-eyebrow="Admin Settings"
-        menu-description="Configure verification output, question content, and section ordering from one workspace."
-    >
     <div style="display:flex;flex-direction:column;gap:22px;">
         <section style="border:1px solid #dbe4ee;border-radius:24px;background:linear-gradient(180deg,#ffffff 0%,#fbfdff 100%);box-shadow:0 12px 28px rgba(15,23,42,0.06);overflow:hidden;">
             <div style="padding:22px 24px;border-bottom:1px solid #edf2f7;">
@@ -91,5 +83,4 @@
             </section>
         @endforeach
     </div>
-    </x-verification-management-shell>
 </x-filament-panels::page>

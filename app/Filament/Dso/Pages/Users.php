@@ -109,7 +109,7 @@ class Users extends Page
         $this->role = 'dso_viewer';
 
         Notification::make()
-            ->title('DSO user invited')
+            ->title('DSO user created')
             ->body("{$user->name} can now access the DSO workspace.")
             ->success()
             ->send();

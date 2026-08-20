@@ -27,9 +27,9 @@ class ProviderResource extends Resource
 
     protected static ?string $navigationLabel = 'Providers';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Patient Care';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Data';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'display_name';
 

@@ -90,7 +90,7 @@ class ImportVerificationRequests extends Page implements HasForms
             Action::make('importNow')
                 ->label('Import requests')
                 ->icon('heroicon-o-arrow-up-tray')
-                ->color('warning')
+                ->color('primary')
                 ->action('importRequests'),
             Action::make('back')
                 ->label('Back to list')

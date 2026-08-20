@@ -5,8 +5,8 @@ namespace App\Filament\Clinic\Pages;
 use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
 use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationRequestResponse;
 use App\Models\BillingWorkItem;
-use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
+use App\Services\Verification\WorkflowService;
 use App\Support\ClinicPanelScope;
 use App\Support\SaasEntitlements;
 use BackedEnum;
@@ -21,11 +21,32 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleLeftRight;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
-    protected static ?string $navigationLabel = 'Request & Response';
+    protected static ?string $navigationLabel = 'Clinic Responses';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
+
+    public ?string $returnToQueue = null;
+
+    public function mount(): void
+    {
+        $queueUrl = route('filament.clinic.resources.verification-requests.index');
+        $returnUrl = request()->query('return');
+        $this->returnToQueue = is_string($returnUrl) && str_starts_with($returnUrl, $queueUrl)
+            ? $returnUrl
+            : null;
+
+        $respondWorkItemId = request()->integer('respond');
+
+        if ($respondWorkItemId <= 0) {
+            return;
+        }
+
+        $this->statusFilter = 'open';
+        $this->selectedWorkItemId = $respondWorkItemId;
+        $this->openResponseComposer($respondWorkItemId);
+    }
 
     public static function canAccess(): bool
     {
@@ -44,7 +65,7 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
         $count = BillingWorkItem::query()
             ->where('clinic_id', $clinicId)
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
-            ->where('source', '!=', 'clinic_self_service')
+            ->where('processing_mode', BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE)
             ->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE)
             ->count();
 
@@ -80,48 +101,43 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
 
     public function canShowResponseShortcut(BillingWorkItem $workItem): bool
     {
-        if (! $workItem->clinicUserCanEditVerification(auth()->user())) {
-            return false;
-        }
-
-        if ($workItem->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE) {
-            return true;
-        }
-
-        $hasRequest = $workItem->activities->contains(
-            fn (BillingWorkItemActivity $activity): bool => $activity->activity_type === self::REQUEST_ACTIVITY
-        );
-        $hasResponse = $workItem->activities->contains(
-            fn (BillingWorkItemActivity $activity): bool => $activity->activity_type === self::RESPONSE_ACTIVITY
-        );
-
-        return $hasRequest && ! $hasResponse;
+        return $workItem->clinicUserCanRespondToVerification(auth()->user());
     }
 
     public function canShowResponseEdit(BillingWorkItem $workItem): bool
     {
-        if (! $workItem->clinicUserCanEditVerification(auth()->user())) {
-            return false;
-        }
+        return false;
+    }
 
-        return $workItem->activities->contains(
-            fn (BillingWorkItemActivity $activity): bool => $activity->activity_type === self::RESPONSE_ACTIVITY
-        ) || filled($workItem->clinic_responded_at);
+    public function responseWorkspaceTitle(): string
+    {
+        return 'Clinic Responses';
+    }
+
+    public function responseWorkspaceDescription(): string
+    {
+        return 'Review requests from the verification team and send clinic responses.';
+    }
+
+    public function responseWorkspaceScope(): string
+    {
+        return ClinicPanelScope::selectedClinic()?->clinic_name ?? 'All Clinics';
+    }
+
+    public function canExportResponseLog(): bool
+    {
+        return false;
     }
 
     public function openResponseComposer(int $workItemId): void
     {
         $workItem = $this->query()->findOrFail($workItemId);
 
-        abort_unless($this->canShowResponseShortcut($workItem) || $this->canShowResponseEdit($workItem), 403);
+        abort_unless($this->canShowResponseShortcut($workItem), 403);
 
-        $latestResponse = $workItem->activities
-            ->where('activity_type', self::RESPONSE_ACTIVITY)
-            ->sortByDesc('created_at')
-            ->first();
-
+        $this->selectedWorkItemId = $workItem->getKey();
         $this->responseComposerWorkItemId = $workItem->getKey();
-        $this->responseComposerNote = trim((string) data_get($latestResponse?->meta, 'clinic_response_note', $workItem->notes ?: ''));
+        $this->responseComposerNote = '';
         $this->responseComposerAttachments = [];
         $this->resetErrorBag('responseComposerNote');
         $this->resetErrorBag('responseComposerAttachments');
@@ -142,49 +158,13 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
 
         $workItem = $this->query()->findOrFail((int) $this->responseComposerWorkItemId);
 
-        abort_unless($this->canShowResponseShortcut($workItem) || $this->canShowResponseEdit($workItem), 403);
+        abort_unless($this->canShowResponseShortcut($workItem), 403);
 
         $responseNote = trim($this->responseComposerNote);
         $responseStartedAt = now();
-        $existingResponse = $workItem->activities()
-            ->where('activity_type', self::RESPONSE_ACTIVITY)
-            ->latest('created_at')
-            ->first();
-
-        if ($existingResponse) {
-            $workItem->notes = $responseNote;
-            $workItem->clinic_responded_at ??= now();
-            $workItem->clinic_responded_by_user_id ??= auth()->id();
-            $workItem->save();
-            $this->persistResponseComposerAttachments($workItem);
-
-            $meta = $existingResponse->meta ?? [];
-            $meta['clinic_response_note'] = $responseNote;
-            $meta['responded_by_role'] = 'clinic';
-            $meta['edited_at'] = now()->toDateTimeString();
-            $meta['edited_by_user_id'] = auth()->id();
-
-            $existingResponse->forceFill([
-                'description' => 'Clinic response updated.',
-                'meta' => $meta,
-            ])->save();
-
-            $this->selectedWorkItemId = $workItem->getKey();
-            $this->showResponseComposerModal = false;
-            $this->responseComposerWorkItemId = null;
-            $this->closeResponseComposer();
-
-            Notification::make()
-                ->title('Response updated')
-                ->body('The latest clinic response has been updated for the verification team.')
-                ->success()
-                ->send();
-
-            return;
-        }
 
         $workItem->notes = $responseNote;
-        $workItem->transitionStatus(BillingWorkItem::STATUS_IN_PROGRESS);
+        $workItem = app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_IN_PROGRESS);
         $this->persistResponseComposerAttachments($workItem);
 
         $hasResponseActivity = $workItem->activities()
@@ -246,16 +226,34 @@ class VerificationRequestResponse extends AdminVerificationRequestResponse
         return VerificationRequestResource::getUrl('view', ['record' => $workItem]);
     }
 
+    public function verificationRequestIndexUrl(): string
+    {
+        return $this->returnToQueue ?? route('filament.clinic.resources.verification-requests.index');
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            route('filament.clinic.resources.verification-requests.index') => 'Verification Requests',
+            'Clinic Responses',
+        ];
+    }
+
     public function responseAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
     {
-        return route('clinic.billing-work-item-attachments.download', $attachment);
+        return route('clinic.verification-request-attachments.download', $attachment);
+    }
+
+    public function responseAttachmentPreviewUrl(BillingWorkItemAttachment $attachment): string
+    {
+        return route('clinic.verification-request-attachments.preview', $attachment);
     }
 
     protected function query(): Builder
     {
         $query = ClinicPanelScope::apply(BillingWorkItem::query(), 'clinic_id')
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
-            ->where('source', '!=', 'clinic_self_service')
+            ->where('processing_mode', BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE)
             ->whereHas('activities', fn (Builder $builder) => $builder->whereIn('activity_type', [
                 self::REQUEST_ACTIVITY,
                 self::RESPONSE_ACTIVITY,

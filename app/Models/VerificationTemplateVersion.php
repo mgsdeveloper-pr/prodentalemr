@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class VerificationTemplateVersion extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     public const SCOPE_MASTER = 'master';
     public const SCOPE_CLINIC = 'clinic';
@@ -17,6 +19,28 @@ class VerificationTemplateVersion extends Model
     public const STATUS_DRAFT = 'draft';
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_ARCHIVED = 'archived';
+
+    public const FORM_TYPE_BOTH = 'both';
+    public const FORM_TYPE_FULL = 'full_form';
+    public const FORM_TYPE_SHORT = 'short_form';
+
+    public const FORM_TYPE_OPTIONS = [
+        self::FORM_TYPE_BOTH => 'Full + Short',
+        self::FORM_TYPE_FULL => 'Full Form',
+        self::FORM_TYPE_SHORT => 'Short Form',
+    ];
+
+    public const CLINIC_VISIBILITY_HIDDEN = 'hidden';
+    public const CLINIC_VISIBILITY_VISIBLE = 'visible_to_clinics';
+    public const CLINIC_VISIBILITY_DEFAULT = 'default_for_new_clinics';
+    public const CLINIC_VISIBILITY_RETIRED = 'retired';
+
+    public const CLINIC_VISIBILITY_OPTIONS = [
+        self::CLINIC_VISIBILITY_HIDDEN => 'Hidden from Clinics',
+        self::CLINIC_VISIBILITY_VISIBLE => 'Visible to Clinics',
+        self::CLINIC_VISIBILITY_DEFAULT => 'Default for New Clinics',
+        self::CLINIC_VISIBILITY_RETIRED => 'Retired',
+    ];
 
     protected $fillable = [
         'template_key',
@@ -27,8 +51,11 @@ class VerificationTemplateVersion extends Model
         'source_version_id',
         'version_number',
         'name',
+        'form_type',
+        'clinic_visibility',
         'status',
         'is_active',
+        'is_working_draft',
         'published_at',
         'created_by',
         'notes',
@@ -38,6 +65,7 @@ class VerificationTemplateVersion extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_working_draft' => 'boolean',
             'version_number' => 'integer',
             'published_at' => 'datetime',
         ];

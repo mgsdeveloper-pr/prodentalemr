@@ -23,7 +23,7 @@ class InvoiceInfolist
                                 TextEntry::make('invoice_number')
                                     ->label('Invoice number')
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('gray'),
                                 TextEntry::make('status')
                                     ->badge()
                                     ->color(fn ($state): string => match ($state) {
@@ -67,7 +67,7 @@ class InvoiceInfolist
                                 TextEntry::make('discount_amount')
                                     ->money('USD')
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('info'),
                                 TextEntry::make('total_amount')
                                     ->money('USD')
                                     ->badge()

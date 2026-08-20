@@ -53,8 +53,8 @@
             width: 0.5rem;
             height: 0.5rem;
             border-radius: 999px;
-            background: #f59e0b;
-            box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.16);
+            background: #0f766e;
+            box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
         }
 
         .ops-account__hero-main {
@@ -164,8 +164,8 @@
         }
 
         html.dark .ops-account__cta {
-            background: #f59e0b;
-            color: #111827;
+            background: #0f766e;
+            color: #ffffff;
             box-shadow: none;
         }
 

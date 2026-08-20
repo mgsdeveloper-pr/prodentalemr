@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Providers\Pages;
 
 use App\Filament\Clinic\Resources\Providers\ProviderResource;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
@@ -24,7 +25,15 @@ class EditProvider extends EditRecord
         return [
             ViewAction::make(),
             DeleteAction::make()
-                ->visible(fn (): bool => auth()->user()?->canDeleteClinicProviders() ?? false),
+                ->label('Deactivate')
+                ->modalHeading('Deactivate provider')
+                ->modalDescription('This keeps historical appointments, verification requests, and reports intact while removing the provider from active use.')
+                ->successNotificationTitle('Provider deactivated')
+                ->visible(fn (): bool => (auth()->user()?->canDeleteClinicProviders() ?? false) && ! $this->record->trashed()),
+            RestoreAction::make()
+                ->label('Restore Provider')
+                ->successNotificationTitle('Provider restored')
+                ->visible(fn (): bool => (auth()->user()?->canDeleteClinicProviders() ?? false) && $this->record->trashed()),
         ];
     }
 }

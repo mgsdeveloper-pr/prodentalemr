@@ -122,6 +122,7 @@ class SubscriptionPlanForm
                             ->viewData([
                                 'moduleGroups' => SubscriptionPlan::clinicModuleGroups(),
                                 'moduleLabels' => SubscriptionPlan::clinicModuleOptions(),
+                                'coreModules' => SubscriptionPlan::coreClinicModules(),
                             ])
                             ->columnSpanFull(),
                     ])

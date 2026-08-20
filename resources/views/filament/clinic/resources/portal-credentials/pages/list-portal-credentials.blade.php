@@ -221,7 +221,7 @@
                     <button type="button" wire:click="closePasswordEditor" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700;">
                         Cancel
                     </button>
-                    <button type="button" wire:click="updateCredentialPassword" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #f59e0b; background: #f59e0b; color: #ffffff; font-size: 13px; font-weight: 700;">
+                    <button type="button" wire:click="updateCredentialPassword" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; border-radius: 14px; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; font-size: 13px; font-weight: 700;">
                         Save Password
                     </button>
                 </div>

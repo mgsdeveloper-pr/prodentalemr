@@ -9,7 +9,9 @@ use App\Filament\Clinic\Resources\VerificationQuestions\Pages\ReorderVerificatio
 use App\Models\AdaProcedureCode;
 use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
+use App\Support\VerificationTemplateVersionService;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -44,13 +46,13 @@ class VerificationQuestionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Template Management';
+    protected static ?string $navigationLabel = 'Clinic Template';
 
-    protected static ?string $modelLabel = 'Template Question';
+    protected static ?string $modelLabel = 'Clinic Template Question';
 
-    protected static ?string $pluralModelLabel = 'Template Questions';
+    protected static ?string $pluralModelLabel = 'Clinic Template';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
     protected static ?int $navigationSort = 4;
 
@@ -71,7 +73,7 @@ class VerificationQuestionResource extends Resource
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
                         Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Master Template clean and organized.')
+                            ->description('Choose where this question belongs before writing it. This keeps the clinic template clean and organized.')
                             ->columnSpan(12)
                             ->schema([
                                 Placeholder::make('clinic_scope')
@@ -87,10 +89,11 @@ class VerificationQuestionResource extends Resource
                                     ->schema([
                                         Select::make('template_key')
                                             ->label('Template')
-                                            ->options(VerificationFormQuestion::templateOptionsForUi())
+                                            ->options(fn (): array => static::clinicTemplateOptions())
                                             ->default(VerificationFormQuestion::defaultTemplateKey())
                                             ->required()
-                                            ->live()
+                                            ->disabled()
+                                            ->dehydrated()
                                             ->native(false)
                                             ->afterStateUpdated(function (Set $set): void {
                                                 $set('section_key', null);
@@ -280,7 +283,7 @@ class VerificationQuestionResource extends Resource
                                             ->columnSpan(12),
                                         Toggle::make('has_note')
                                             ->label('Add a separate note area')
-                                            ->helperText('Displays an optional note box beside or below this question in the Master Template.')
+                                            ->helperText('Displays an optional note box beside or below this question in the clinic template.')
                                             ->default(false)
                                             ->live()
                                             ->inline(false)
@@ -371,11 +374,16 @@ class VerificationQuestionResource extends Resource
                 $selectedOrganizationId = ClinicPanelScope::selectedOrganizationId();
 
                 return $query
-                    ->when(
-                        filled($selectedClinicId),
-                        fn (Builder $builder) => $builder->visibleForClinic($selectedClinicId, $selectedOrganizationId),
-                        fn (Builder $builder) => $builder->whereRaw('1 = 0')
-                    )
+                    ->when(filled($selectedClinicId), function (Builder $builder) use ($selectedClinicId): Builder {
+                        $version = static::currentClinicWorkingVersion();
+
+                        return $builder
+                            ->where('clinic_id', $selectedClinicId)
+                            ->when(
+                                $version,
+                                fn (Builder $query) => $query->where('template_version_id', $version->getKey())
+                            );
+                    }, fn (Builder $builder) => $builder->whereRaw('1 = 0'))
                     ->with(['clinic', 'organization'])
                     ->orderBy('section_key')
                     ->orderBy('sort_order')
@@ -392,7 +400,7 @@ class VerificationQuestionResource extends Resource
                     ->badge(),
                 TextColumn::make('template_key')
                     ->label('Template')
-                    ->formatStateUsing(fn (string $state): string => VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$state] ?? str($state)->headline()->toString())
+                    ->formatStateUsing(fn (): string => static::clinicTemplateOptionLabel())
                     ->badge(),
                 TextColumn::make('form_type')
                     ->label('Form')
@@ -426,7 +434,7 @@ class VerificationQuestionResource extends Resource
             ->filters([
                 SelectFilter::make('template_key')
                     ->label('Template')
-                    ->options(VerificationFormQuestion::templateOptionsForUi())
+                    ->options(fn (): array => static::clinicTemplateOptions())
                     ->default(VerificationFormQuestion::defaultTemplateKey()),
                 SelectFilter::make('section_key')
                     ->label('Section')
@@ -461,17 +469,37 @@ class VerificationQuestionResource extends Resource
 
     public static function canCreate(): bool
     {
-        return (auth()->user()?->canManageClinicTemplateSections() ?? false) && filled(ClinicPanelScope::selectedClinicId());
+        $clinic = ClinicPanelScope::selectedClinic();
+        $version = static::currentClinicWorkingVersion($clinic);
+
+        return (auth()->user()?->canManageClinicTemplateSections($clinic) ?? false)
+            && filled($clinic?->getKey())
+            && static::isEditableClinicTemplateVersion($version);
     }
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()?->canManageClinicTemplateSections() ?? false;
+        return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            && static::isEditableClinicTemplateVersion($record->templateVersion);
     }
 
     public static function canDelete(Model $record): bool
     {
-        return auth()->user()?->canManageClinicTemplateSections() ?? false;
+        return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            && static::isEditableClinicTemplateVersion($record->templateVersion);
+    }
+
+    protected static function isEditableClinicTemplateVersion(?VerificationTemplateVersion $version): bool
+    {
+        if (! $version || $version->scope !== VerificationTemplateVersion::SCOPE_CLINIC) {
+            return false;
+        }
+
+        return $version->status === VerificationTemplateVersion::STATUS_DRAFT
+            || (
+                $version->status === VerificationTemplateVersion::STATUS_PUBLISHED
+                && (bool) $version->is_active
+            );
     }
 
     public static function getPages(): array
@@ -482,5 +510,72 @@ class VerificationQuestionResource extends Resource
             'edit' => EditVerificationQuestion::route('/{record}/edit'),
             'reorder' => ReorderVerificationQuestions::route('/reorder'),
         ];
+    }
+
+    public static function currentClinicWorkingVersion(?Clinic $clinic = null): ?VerificationTemplateVersion
+    {
+        $clinic ??= ClinicPanelScope::selectedClinic();
+
+        if (! $clinic) {
+            return null;
+        }
+
+        $templateKey = VerificationFormQuestion::defaultTemplateKey();
+
+        $draft = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->where('clinic_id', $clinic->getKey())
+            ->orderByDesc('is_working_draft')
+            ->latest('id')
+            ->first();
+
+        if ($draft) {
+            return $draft;
+        }
+
+        return app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic, $templateKey);
+    }
+
+    public static function clinicTemplateOptions(?Clinic $clinic = null): array
+    {
+        return [
+            VerificationFormQuestion::defaultTemplateKey() => static::clinicTemplateOptionLabel($clinic),
+        ];
+    }
+
+    public static function clinicTemplateOptionLabel(?Clinic $clinic = null): string
+    {
+        $clinic ??= ClinicPanelScope::selectedClinic();
+        $version = static::currentClinicWorkingVersion($clinic);
+
+        if (filled($version?->name)) {
+            return static::clinicTemplateDisplayName((string) $version->name, $clinic);
+        }
+
+        if (filled($clinic?->clinic_name)) {
+            return $clinic->clinic_name . ' Template';
+        }
+
+        return 'Clinic Template';
+    }
+
+    protected static function clinicTemplateDisplayName(string $name, ?Clinic $clinic = null): string
+    {
+        $displayName = trim(str_replace(
+            ['Master Template Draft', 'Master Template'],
+            ['Clinic Template Draft', 'Clinic Template'],
+            $name,
+        ));
+
+        if (
+            filled($clinic?->clinic_name)
+            && str_contains($displayName, (string) $clinic->clinic_name)
+        ) {
+            return $displayName;
+        }
+
+        return $displayName !== '' ? $displayName : 'Clinic Template';
     }
 }

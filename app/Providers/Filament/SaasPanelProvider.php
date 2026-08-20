@@ -6,9 +6,11 @@ use App\Http\Middleware\SaasAccessMiddleware;
 use App\Http\Middleware\PanelAuthenticateRedirect;
 use App\Filament\Saas\Pages\BillingSettings;
 use App\Filament\Saas\Pages\AdaProcedureCodeImport;
+use App\Filament\Saas\Pages\ClientManagement;
 use App\Filament\Saas\Pages\DsoOnboarding;
 use App\Filament\Saas\Pages\ModuleSettings;
 use App\Filament\Saas\Pages\NotificationCentre;
+use App\Filament\Saas\Pages\OrganizationWorkspace;
 use App\Filament\Saas\Pages\PaymentCredentials;
 use App\Filament\Saas\Pages\RolesAndPermissions;
 use App\Filament\Saas\Pages\SaasSettings;
@@ -18,17 +20,21 @@ use App\Filament\Saas\Pages\UserManagement;
 use App\Filament\Saas\Resources\Clinics\ClinicResource;
 use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\Dsos\DsoResource;
+use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
 use App\Filament\Saas\Resources\Invoices\InvoiceResource;
 use App\Filament\Saas\Resources\Locations\LocationResource;
+use App\Filament\Saas\Resources\ManagedBillingServices\ManagedBillingServiceResource;
 use App\Filament\Saas\Resources\Organizations\OrganizationResource;
 use App\Filament\Saas\Resources\Payments\PaymentResource;
 use App\Filament\Saas\Resources\SaasEntitlementAuditLogs\SaasEntitlementAuditLogResource;
 use App\Filament\Saas\Resources\SubscriptionPlans\SubscriptionPlanResource;
 use App\Filament\Saas\Resources\Subscriptions\SubscriptionResource;
 use App\Filament\Saas\Resources\Users\UserResource;
+use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Filament\Saas\Widgets\BillingHealthOverview;
 use App\Filament\Saas\Widgets\SaasBusinessOverview;
 use App\Models\SaasSetting;
+use App\Support\AppShell\AppShell;
 use Filament\Navigation\MenuItem;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -41,6 +47,7 @@ use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
@@ -52,7 +59,7 @@ class SaasPanelProvider extends PanelProvider
     {
         $settings = SaasSetting::current();
 
-        return $panel
+        return AppShell::registerSharedSidebar(AppShell::register($panel
             ->id('saas')
             ->path('saas')
             ->login()
@@ -81,26 +88,19 @@ class SaasPanelProvider extends PanelProvider
                     ->sort(PHP_INT_MAX),
             ])
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Teal,
             ])
             ->navigationGroups([
-                NavigationGroup::make()->label('Organizations'),
-                NavigationGroup::make()->label('Plans'),
-                NavigationGroup::make()->label('Payments'),
+                NavigationGroup::make()->label('Client Management'),
+                NavigationGroup::make()->label('Billing'),
+                NavigationGroup::make()->label('Master Data'),
+                NavigationGroup::make()->label('Administration'),
+                NavigationGroup::make()->label('Notifications'),
                 NavigationGroup::make()->label('Settings'),
             ])
             ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
-                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
-                    . view('filament.shared.partials.page-header-theme')->render(),
+                PanelsRenderHook::TOPBAR_AFTER,
+                fn (): string => auth()->check() ? view('filament.saas.partials.support-access-banner')->render() : '',
             )
             ->resources([
                 DsoResource::class,
@@ -109,6 +109,9 @@ class SaasPanelProvider extends PanelProvider
                 LocationResource::class,
                 UserResource::class,
                 ClientServiceEnrollmentResource::class,
+                ManagedBillingServiceResource::class,
+                InsuranceCarrierResource::class,
+                VerificationFormQuestionResource::class,
                 InvoiceResource::class,
                 PaymentResource::class,
                 SubscriptionPlanResource::class,
@@ -117,6 +120,8 @@ class SaasPanelProvider extends PanelProvider
             ])
             ->pages([
                 Dashboard::class,
+                ClientManagement::class,
+                OrganizationWorkspace::class,
                 TenantOnboarding::class,
                 DsoOnboarding::class,
                 NotificationCentre::class,
@@ -148,7 +153,8 @@ class SaasPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 PanelAuthenticateRedirect::class,
+                EnsureEmailIsVerified::class,
                 SaasAccessMiddleware::class,
-            ]);
+            ]), 'platform'));
     }
 }

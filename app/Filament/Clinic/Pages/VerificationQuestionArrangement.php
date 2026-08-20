@@ -18,7 +18,7 @@ class VerificationQuestionArrangement extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBars3BottomLeft;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
     protected static ?string $navigationLabel = 'Question Arrangement';
 

@@ -1,43 +1,57 @@
 <x-filament-panels::page>
+    @php
+        $modelLabel = match ($verificationModel) {
+            'self_service' => 'Self-Managed',
+            'hybrid' => 'Hybrid',
+            default => 'Managed Service',
+        };
+    @endphp
+
     <style>
-        .dso-onboarding { display: grid; gap: 24px; }
-        .dso-onboarding-hero { border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%); padding: 28px 32px; box-shadow: 0 16px 34px rgba(15, 23, 42, .06); }
-        .dso-onboarding-pill { display: inline-flex; align-items: center; border: 1px solid #bfdbfe; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 850; letter-spacing: .14em; padding: 8px 14px; text-transform: uppercase; }
-        .dso-onboarding-title { margin: 16px 0 8px; color: #020617; font-size: 34px; line-height: 1.1; font-weight: 900; letter-spacing: -.04em; }
-        .dso-onboarding-copy { margin: 0; max-width: 880px; color: #52637a; font-size: 15px; line-height: 1.7; }
-        .dso-onboarding-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
-        .dso-onboarding-step { border: 1px solid #e2e8f0; border-radius: 18px; background: #ffffff; padding: 14px; }
-        .dso-onboarding-step span { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 999px; background: #fef3c7; color: #b45309; font-size: 12px; font-weight: 900; }
-        .dso-onboarding-step strong { display: block; margin-top: 10px; color: #0f172a; font-size: 13px; font-weight: 850; }
-        .dso-onboarding-form { border: 1px solid #dbe4ee; border-radius: 26px; background: #ffffff; padding: 24px; box-shadow: 0 16px 34px rgba(15, 23, 42, .05); }
-        @media (max-width: 1100px) { .dso-onboarding-flow { grid-template-columns: 1fr; } }
+        .onboarding-page { display: grid; gap: 16px; }
+        .onboarding-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 4px 0 18px; border-bottom: 1px solid #dbe4ee; }
+        .onboarding-eyebrow { margin: 0 0 6px; color: #0f766e; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+        .onboarding-title { margin: 0; color: #0f172a; font-size: 28px; line-height: 1.2; font-weight: 800; }
+        .onboarding-copy { margin: 6px 0 0; color: #64748b; font-size: 14px; }
+        .onboarding-context { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+        .onboarding-badge { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #334155; font-size: 12px; font-weight: 700; }
+        .onboarding-flow { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1px solid #dbe4ee; border-radius: 8px; background: #fff; overflow: hidden; }
+        .onboarding-step { min-width: 0; padding: 12px; border-right: 1px solid #e2e8f0; color: #475569; font-size: 12px; font-weight: 700; }
+        .onboarding-step:last-child { border-right: 0; }
+        .onboarding-step span { display: block; margin-bottom: 3px; color: #0f766e; font-size: 11px; }
+        .onboarding-form { border: 1px solid #dbe4ee; border-radius: 8px; background: #fff; padding: 20px; }
+        .onboarding-actions { display: flex; justify-content: flex-end; padding-top: 18px; }
+        @media (max-width: 1050px) { .onboarding-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } .onboarding-step { border-bottom: 1px solid #e2e8f0; } }
+        @media (max-width: 720px) { .onboarding-header { align-items: flex-start; flex-direction: column; } .onboarding-context { justify-content: flex-start; } .onboarding-flow { grid-template-columns: 1fr; } .onboarding-step { border-right: 0; } }
     </style>
 
-    <div class="dso-onboarding">
-        <section class="dso-onboarding-hero">
-            <div class="dso-onboarding-pill">Enterprise Setup</div>
-            <h1 class="dso-onboarding-title">DSO Onboarding</h1>
-            <p class="dso-onboarding-copy">
-                Create the DSO, first organization, first clinic, subscription scope, and first DSO admin in one controlled flow.
-            </p>
-
-            <div class="dso-onboarding-flow">
-                <div class="dso-onboarding-step"><span>1</span><strong>Create DSO</strong></div>
-                <div class="dso-onboarding-step"><span>2</span><strong>Add Organization</strong></div>
-                <div class="dso-onboarding-step"><span>3</span><strong>Add Clinic</strong></div>
-                <div class="dso-onboarding-step"><span>4</span><strong>Assign Plan</strong></div>
-                <div class="dso-onboarding-step"><span>5</span><strong>Invite DSO User</strong></div>
+    <div class="onboarding-page">
+        <header class="onboarding-header">
+            <div>
+                <p class="onboarding-eyebrow">Client Onboarding</p>
+                <h1 class="onboarding-title">DSO Setup</h1>
+                <p class="onboarding-copy">Create the DSO hierarchy, first clinic, administrator, services, and plan in one guided process.</p>
             </div>
-        </section>
+            <div class="onboarding-context" aria-label="Selected onboarding configuration">
+                <span class="onboarding-badge">DSO / Enterprise</span>
+                <span class="onboarding-badge">{{ $modelLabel }}</span>
+            </div>
+        </header>
 
-        <section class="dso-onboarding-form">
+        <nav class="onboarding-flow" aria-label="Onboarding steps">
+            <div class="onboarding-step"><span>01</span>DSO</div>
+            <div class="onboarding-step"><span>02</span>Organization</div>
+            <div class="onboarding-step"><span>03</span>Clinic & Location</div>
+            <div class="onboarding-step"><span>04</span>Services & Plan</div>
+            <div class="onboarding-step"><span>05</span>Administrator</div>
+            <div class="onboarding-step"><span>06</span>Review</div>
+        </nav>
+
+        <section class="onboarding-form">
             <form wire:submit="create">
                 {{ $this->form }}
-
-                <div class="mt-6 flex justify-end">
-                    <x-filament::button type="submit">
-                        Complete DSO Setup
-                    </x-filament::button>
+                <div class="onboarding-actions">
+                    <x-filament::button type="submit">Review & Activate DSO</x-filament::button>
                 </div>
             </form>
         </section>

@@ -34,7 +34,7 @@ class PatientInfolist
                                 TextEntry::make('insurance_policies_count')
                                     ->label('Policies')
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('info'),
                                 TextEntry::make('dob')
                                     ->label('Date of birth')
                                     ->date('M d, Y')

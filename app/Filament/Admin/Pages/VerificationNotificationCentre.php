@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Pages;
 use App\Models\VerificationNotification;
 use App\Support\AdminClinicScope;
 use App\Support\VerificationNotificationCenter;
+use App\Services\Notifications\VerificationNotificationService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -101,12 +102,21 @@ class VerificationNotificationCentre extends Page
 
     public function markAsRead(int $notificationId): void
     {
-        $this->query()->whereKey($notificationId)->update(['read_at' => now()]);
+        $notification = $this->query()->whereKey($notificationId)->first();
+
+        if ($notification) {
+            app(VerificationNotificationService::class)->markRead($notification);
+        }
     }
 
     public function markAllAsRead(): void
     {
-        $this->query()->whereNull('read_at')->update(['read_at' => now()]);
+        app(VerificationNotificationService::class)->markQueryRead($this->query());
+    }
+
+    public function notificationOpenUrl(VerificationNotification $notification): string
+    {
+        return route('admin.verification-notifications.open', $notification);
     }
 
     protected function query(): Builder

@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class VerificationInboxAttachment extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'verification_inbox_message_id',
         'file_name',

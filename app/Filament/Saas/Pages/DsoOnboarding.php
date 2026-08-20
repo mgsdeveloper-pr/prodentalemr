@@ -6,14 +6,20 @@ use App\Filament\Saas\Resources\Dsos\DsoResource;
 use App\Models\Clinic;
 use App\Models\Dso;
 use App\Models\Location;
+use App\Models\OnboardingDraft;
 use App\Models\Organization;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\VerificationFormQuestion;
+use App\Services\ClientOnboardingService;
+use App\Support\SaasNotifications;
 use App\Support\UsLocationOptions;
 use App\Support\UsTimezoneOptions;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -38,7 +44,7 @@ class DsoOnboarding extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
@@ -56,6 +62,10 @@ class DsoOnboarding extends Page implements HasForms
 
     public ?array $data = [];
 
+    public ?string $verificationModel = null;
+
+    protected ?OnboardingDraft $draft = null;
+
     public static function canAccess(): bool
     {
         return auth()->user()?->canPerformSaasModuleAction('organizations', 'add') ?? false;
@@ -63,7 +73,18 @@ class DsoOnboarding extends Page implements HasForms
 
     public function mount(): void
     {
+        $this->draft = app(ClientOnboardingService::class)->findForUser(
+            request()->query('onboarding'),
+            auth()->user(),
+            'dso_onboarding',
+        );
+        $this->verificationModel = $this->draft?->verification_model;
+        $this->verificationModel = ! $this->draft && in_array(request()->query('verification_model'), ClientOnboardingService::VERIFICATION_MODELS, true)
+            ? request()->query('verification_model')
+            : $this->verificationModel;
+
         $this->form->fill([
+            'verification_model' => $this->verificationModel ?? 'managed_service',
             'dso_account_code' => $this->generateAccountCode(),
             'dso_country' => 'USA',
             'dso_status' => true,
@@ -84,7 +105,23 @@ class DsoOnboarding extends Page implements HasForms
             'subscription_start_date' => now()->toDateString(),
             'subscription_status' => 'active',
             'service_status' => 'active',
+            'verification_default_form_template' => VerificationFormQuestion::defaultTemplateKey(),
+            ...$this->verificationModelDefaults($this->verificationModel),
+            ...($this->draft?->data ?? []),
         ]);
+    }
+
+    public function updated($name, $value): void
+    {
+        if ($name === 'data.verification_model' && in_array($value, ClientOnboardingService::VERIFICATION_MODELS, true)) {
+            $this->verificationModel = $value;
+        }
+
+        if (! str_starts_with((string) $name, 'data.')) {
+            return;
+        }
+
+        $this->syncDraft();
     }
 
     public function form(Schema $schema): Schema
@@ -96,6 +133,8 @@ class DsoOnboarding extends Page implements HasForms
                     Step::make('DSO')
                         ->description('Create the parent enterprise account.')
                         ->schema([
+                            Hidden::make('verification_model')
+                                ->default($this->verificationModel ?? 'managed_service'),
                             TextInput::make('dso_name')
                                 ->label('DSO name')
                                 ->required()
@@ -241,8 +280,8 @@ class DsoOnboarding extends Page implements HasForms
                                 ->required(),
                         ])
                         ->columns(2),
-                    Step::make('Plan')
-                        ->description('Attach the first plan and service status.')
+                    Step::make('Services & Plan')
+                        ->description('Confirm the verification model, template, and first plan.')
                         ->schema([
                             Toggle::make('attach_subscription')
                                 ->label('Attach subscription now')
@@ -312,13 +351,19 @@ class DsoOnboarding extends Page implements HasForms
                                 ->visible(fn (Get $get): bool => (bool) $get('attach_subscription'))
                                 ->native(false),
                             Select::make('managed_services_status')
-                                ->label('Managed services')
+                                ->label('Verification service status')
                                 ->default('not_enabled')
                                 ->options([
                                     'not_enabled' => 'Not enabled',
                                     'requested' => 'Requested',
                                     'active' => 'Active',
                                 ])
+                                ->native(false),
+                            Select::make('verification_default_form_template')
+                                ->label('Default verification template')
+                                ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
+                                ->default(VerificationFormQuestion::defaultTemplateKey())
+                                ->required()
                                 ->native(false),
                         ])
                         ->columns(2),
@@ -354,6 +399,37 @@ class DsoOnboarding extends Page implements HasForms
                             Toggle::make('dso_admin_status')
                                 ->label('User active')
                                 ->required(),
+                        ])
+                        ->columns(2),
+                    Step::make('Review & Activate')
+                        ->description('Review the DSO hierarchy before creating the live accounts.')
+                        ->schema([
+                            Placeholder::make('review_structure')
+                                ->label('Account structure')
+                                ->content('DSO / Enterprise'),
+                            Placeholder::make('review_dso')
+                                ->label('DSO')
+                                ->content(fn (Get $get): string => (string) ($get('dso_name') ?: 'Not provided')),
+                            Placeholder::make('review_organization')
+                                ->label('First organization')
+                                ->content(fn (Get $get): string => (string) ($get('organization_name') ?: 'Not provided')),
+                            Placeholder::make('review_clinic')
+                                ->label('First clinic and location')
+                                ->content(fn (Get $get): string => trim(($get('clinic_name') ?: 'Not provided').' / '.($get('location_name') ?: 'Not provided'))),
+                            Placeholder::make('review_admin')
+                                ->label('DSO administrator')
+                                ->content(fn (Get $get): string => trim(($get('dso_admin_name') ?: 'Not provided').' / '.($get('dso_admin_email') ?: 'No email'))),
+                            Placeholder::make('review_verification_model')
+                                ->label('Verification model')
+                                ->content(fn (Get $get): string => $this->verificationModelLabel($get('verification_model'))),
+                            Placeholder::make('review_template')
+                                ->label('Verification template')
+                                ->content(fn (Get $get): string => VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[$get('verification_default_form_template')] ?? 'Master Template'),
+                            Placeholder::make('review_plan')
+                                ->label('Subscription')
+                                ->content(fn (Get $get): string => ! $get('attach_subscription')
+                                    ? 'No subscription attached'
+                                    : (SubscriptionPlan::find($get('subscription_plan_id'))?->name ?? 'Plan not selected')),
                         ])
                         ->columns(2),
                 ])->persistStepInQueryString(),
@@ -409,6 +485,7 @@ class DsoOnboarding extends Page implements HasForms
                     'pms_service_status' => ($plan?->includesPms() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
                     'verification_service_status' => ($plan?->includesVerification() ?? true) ? ($state['service_status'] ?? 'active') : 'not_enabled',
                     'managed_services_status' => $state['managed_services_status'] ?? 'not_enabled',
+                    'verification_default_form_template' => $state['verification_default_form_template'] ?? VerificationFormQuestion::defaultTemplateKey(),
                     'trial_ends_at' => $plan?->trial_days ? now()->addDays((int) $plan->trial_days)->toDateString() : null,
                     'demo_mode' => (bool) ($plan?->demo_mode_available && ($state['subscription_status'] ?? null) === 'trial'),
                     'account_manager_user_id' => auth()->id(),
@@ -481,7 +558,57 @@ class DsoOnboarding extends Page implements HasForms
             ->success()
             ->send();
 
+        if ($this->draft) {
+            SaasNotifications::clearIncompleteOnboarding($this->draft);
+            app(ClientOnboardingService::class)->activate(
+                $this->draft,
+                $result['organization'],
+                $result['dso'],
+            );
+        }
+
         return redirect(DsoResource::getUrl('view', ['record' => $result['dso']]));
+    }
+
+    protected function syncDraft(): void
+    {
+        $state = $this->form->getState();
+        $this->draft ??= app(ClientOnboardingService::class)->start(
+            auth()->user(),
+            'dso',
+            $state['verification_model'] ?? 'managed_service',
+        );
+
+        app(ClientOnboardingService::class)->save(
+            $this->draft,
+            $state,
+            $this->estimateLastCompletedStep($state),
+        );
+
+        if (! $this->draft->notification_sent_at) {
+            SaasNotifications::incompleteOnboarding($this->draft);
+        }
+    }
+
+    protected function estimateLastCompletedStep(array $state): int
+    {
+        if (filled($state['dso_admin_name'] ?? null) || filled($state['dso_admin_email'] ?? null)) {
+            return 5;
+        }
+
+        if (! empty($state['subscription_plan_id'])) {
+            return 4;
+        }
+
+        if (filled($state['clinic_name'] ?? null)) {
+            return 3;
+        }
+
+        if (filled($state['organization_name'] ?? null)) {
+            return 2;
+        }
+
+        return 1;
     }
 
     protected function generateAccountCode(): string
@@ -500,6 +627,34 @@ class DsoOnboarding extends Page implements HasForms
         } while (Clinic::query()->where('clinic_code', $code)->exists());
 
         return $code;
+    }
+
+    protected function verificationModelDefaults(?string $verificationModel): array
+    {
+        return match ($verificationModel) {
+            'self_service' => [
+                'managed_services_status' => 'not_enabled',
+                'service_status' => 'active',
+            ],
+            'hybrid' => [
+                'managed_services_status' => 'requested',
+                'service_status' => 'pending_setup',
+            ],
+            'managed_service' => [
+                'managed_services_status' => 'active',
+                'service_status' => 'active',
+            ],
+            default => [],
+        };
+    }
+
+    protected function verificationModelLabel(?string $verificationModel): string
+    {
+        return match ($verificationModel) {
+            'self_service' => 'Self-Managed',
+            'hybrid' => 'Hybrid',
+            default => 'Managed Service',
+        };
     }
 
     protected function successMessage(array $result): string

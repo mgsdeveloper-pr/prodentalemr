@@ -3,9 +3,11 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
 use App\Models\VerificationFormQuestion;
+use App\Services\Verification\PdfPresetService;
 use App\Support\AdminClinicScope;
 use App\Support\VerificationResultPdf;
 use BackedEnum;
@@ -13,6 +15,9 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -38,15 +43,20 @@ class VerificationSettings extends Page implements HasForms
 
     protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
-    protected static ?string $navigationLabel = 'Settings';
+    protected static ?string $navigationLabel = 'PDF & Output';
 
     protected static ?int $navigationSort = 99;
 
-    protected static ?string $title = 'Verification Settings';
+    protected static ?string $title = 'PDF & Output';
 
     protected static ?string $slug = 'verification-settings';
 
     protected string $view = 'filament.admin.pages.verification-settings';
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public ?array $data = [];
 
@@ -57,17 +67,41 @@ class VerificationSettings extends Page implements HasForms
         return auth()->user()?->canManageVerificationSettings() ?? false;
     }
 
+    public function getSubheading(): ?string
+    {
+        return 'Choose the clinic PDF preset, layout, sections, questions, and blank-row behavior.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            VerificationGeneralSettings::getUrl() => 'Settings',
+            'PDF & Output',
+        ];
+    }
+
     public function mount(): void
     {
         $this->clinicRecord = $this->resolveClinic();
-        $selectedQuestionIds = $this->clinicRecord?->getVerificationPdfOutputQuestionIds() ?? [];
+        if ($this->clinicRecord) {
+            app(PdfPresetService::class)->seedDefaultsForClinic($this->clinicRecord);
+            $this->clinicRecord->refresh();
+        }
+
+        $defaultPreset = $this->clinicRecord ? app(PdfPresetService::class)->defaultForClinic($this->clinicRecord) : null;
+        $selectedQuestionIds = $defaultPreset?->getQuestionIds() ?? $this->clinicRecord?->getVerificationPdfOutputQuestionIds() ?? [];
 
         $this->form->fill([
-            'verification_default_form_template' => $this->clinicRecord?->getVerificationDefaultFormTemplate() ?? VerificationFormQuestion::defaultTemplateKey(),
-            'verification_pdf_output_mode' => $this->clinicRecord?->getVerificationPdfOutputMode() ?? 'standard',
-            'verification_pdf_output_sections' => $this->clinicRecord?->getVerificationPdfOutputSections() ?? [],
+            'verification_pdf_preset_id' => $defaultPreset?->getKey(),
+            'verification_pdf_preset_name' => $defaultPreset?->name ?? 'Full Verification Report',
+            'verification_pdf_preset_description' => $defaultPreset?->description,
+            'verification_pdf_preset_is_default' => true,
+            'verification_pdf_output_mode' => $defaultPreset?->getOutputMode() ?? $this->clinicRecord?->getVerificationPdfOutputMode() ?? 'standard',
+            'verification_pdf_output_sections' => $defaultPreset?->getSectionKeys() ?? $this->clinicRecord?->getVerificationPdfOutputSections() ?? [],
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
             'verification_pdf_output_question_ids_by_section' => $this->groupQuestionIdsBySection($selectedQuestionIds),
+            'verification_pdf_show_blank_rows' => $defaultPreset?->shouldShowBlankRows() ?? true,
         ]);
     }
 
@@ -88,22 +122,48 @@ class VerificationSettings extends Page implements HasForms
                                     ? $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')
                                     : 'Select a clinic from the Workspace menu before changing verification settings.';
                             }),
+                        Select::make('verification_pdf_preset_id')
+                            ->label('PDF preset profile')
+                            ->options(fn (): array => ($clinic = $this->resolveClinic())
+                                ? app(PdfPresetService::class)->optionsForClinic($clinic)
+                                : [])
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(fn (?int $state): mixed => $state ? $this->loadPreset($state) : null)
+                            ->helperText('Choose a saved PDF profile, or use Create New Preset to start another profile.'),
+                        TextInput::make('verification_pdf_preset_name')
+                            ->label('Preset name')
+                            ->required()
+                            ->maxLength(120),
+                        Textarea::make('verification_pdf_preset_description')
+                            ->label('Preset description')
+                            ->rows(2)
+                            ->maxLength(500),
+                        Toggle::make('verification_pdf_preset_is_default')
+                            ->label('Use as clinic default preset')
+                            ->default(true)
+                            ->inline(false),
                         Select::make('verification_pdf_output_mode')
-                            ->label('Default PDF output')
+                            ->label('PDF layout')
                             ->options(VerificationResultPdf::OUTPUT_MODE_OPTIONS)
                             ->default('standard')
                             ->required()
                             ->native(false)
-                            ->live(),
-                        Select::make('verification_default_form_template')
-                            ->label('Default verification form')
-                            ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
-                            ->default(VerificationFormQuestion::defaultTemplateKey())
-                            ->required()
-                            ->native(false)
-                            ->helperText('Master Template is the recommended default and the active verification form experience.'),
+                            ->live()
+                            ->afterStateUpdated(fn (?string $state, Set $set): mixed => $set(
+                                'verification_pdf_show_blank_rows',
+                                ! VerificationResultPdf::isCustomOutputMode($state)
+                            ))
+                            ->helperText('Standard prints the normal clinic report. Custom Portrait and Custom Landscape allow section and question selection.'),
+                        Toggle::make('verification_pdf_show_blank_rows')
+                            ->label('Show blank rows')
+                            ->helperText('When off, unanswered questions are skipped. Leave off for compact one-page custom outputs.')
+                            ->default(fn (Get $get): bool => ! VerificationResultPdf::isCustomOutputMode($get('verification_pdf_output_mode')))
+                            ->inline(false),
                         CheckboxList::make('verification_pdf_output_sections')
-                            ->label('Selected output sections')
+                            ->label('Custom output sections')
                             ->options($this->getPdfSectionLabels())
                             ->columns(2)
                             ->live()
@@ -121,8 +181,8 @@ class VerificationSettings extends Page implements HasForms
                                 );
                                 $set('verification_pdf_output_question_ids_by_section', $normalizedGroupedState);
                             })
-                            ->visible(fn (Get $get): bool => $get('verification_pdf_output_mode') === 'selected')
-                            ->helperText('Select one or more sections first. Then use the section cards in "Choose Questions to Include" below to pick exact questions.'),
+                            ->visible(fn (Get $get): bool => VerificationResultPdf::isCustomOutputMode($get('verification_pdf_output_mode')))
+                            ->helperText('Used only for Custom Portrait and Custom Landscape. Select sections first, then choose the exact questions below.'),
                     ])
                     ->columns(1),
             ]);
@@ -136,10 +196,59 @@ class VerificationSettings extends Page implements HasForms
                 ->icon('heroicon-o-rectangle-stack')
                 ->url(fn (): string => VerificationFormQuestionResource::getUrl('index'))
                 ->color('gray'),
+            Action::make('newPreset')
+                ->label('Create New Preset')
+                ->icon('heroicon-o-document-plus')
+                ->color('gray')
+                ->action('createNewPreset'),
             Action::make('save')
-                ->label('Save settings')
+                ->label('Save preset')
                 ->action('save'),
         ];
+    }
+
+    public function createNewPreset(): void
+    {
+        $this->data['verification_pdf_preset_id'] = null;
+        $this->data['verification_pdf_preset_name'] = 'Custom PDF Preset';
+        $this->data['verification_pdf_preset_description'] = null;
+        $this->data['verification_pdf_preset_is_default'] = false;
+        $this->data['verification_pdf_show_blank_rows'] = false;
+
+        Notification::make()
+            ->title('New preset ready')
+            ->body('Name the preset, choose sections/questions, then save it.')
+            ->success()
+            ->send();
+    }
+
+    public function loadPreset(int $presetId): void
+    {
+        $clinic = $this->resolveClinic();
+
+        if (! $clinic) {
+            return;
+        }
+
+        $preset = app(PdfPresetService::class)
+            ->queryForClinic($clinic)
+            ->whereKey($presetId)
+            ->first();
+
+        if (! $preset) {
+            return;
+        }
+
+        $questionIds = $preset->getQuestionIds();
+        $this->data['verification_pdf_preset_id'] = $preset->getKey();
+        $this->data['verification_pdf_preset_name'] = $preset->name;
+        $this->data['verification_pdf_preset_description'] = $preset->description;
+        $this->data['verification_pdf_preset_is_default'] = $preset->is_default;
+        $this->data['verification_pdf_output_mode'] = $preset->getOutputMode();
+        $this->data['verification_pdf_output_sections'] = $preset->getSectionKeys();
+        $this->data['verification_pdf_output_question_ids'] = $questionIds;
+        $this->data['verification_pdf_output_question_ids_by_section'] = $this->groupQuestionIdsBySection($questionIds);
+        $this->data['verification_pdf_show_blank_rows'] = $preset->shouldShowBlankRows();
     }
 
     public function save(): void
@@ -167,12 +276,13 @@ class VerificationSettings extends Page implements HasForms
             ? $state['verification_pdf_output_question_ids_by_section']
             : [];
 
-        $groupedQuestionIds = $mode === 'selected'
+        $isCustomMode = VerificationResultPdf::isCustomOutputMode($mode);
+        $groupedQuestionIds = $isCustomMode
             ? $this->normalizeGroupedQuestionIds($sections, $groupedQuestionIds)
             : [];
         $questionIds = $this->flattenGroupedQuestionIds($groupedQuestionIds);
 
-        if ($mode === 'selected' && empty($sections)) {
+        if ($isCustomMode && empty($sections)) {
             Notification::make()
                 ->title('Select at least one section')
                 ->body('Choose the verification sections that should appear in the selected output PDF.')
@@ -182,26 +292,41 @@ class VerificationSettings extends Page implements HasForms
             return;
         }
 
+        $preset = filled($state['verification_pdf_preset_id'] ?? null)
+            ? app(PdfPresetService::class)->queryForClinic($clinic)->whereKey($state['verification_pdf_preset_id'])->first()
+            : null;
+
+        $savedPreset = app(PdfPresetService::class)->saveForClinic($clinic, [
+            'name' => $state['verification_pdf_preset_name'] ?? 'Verification PDF Preset',
+            'description' => $state['verification_pdf_preset_description'] ?? null,
+            'output_mode' => $mode,
+            'section_keys' => $isCustomMode ? array_values($sections) : [],
+            'question_ids' => $isCustomMode ? array_values($questionIds) : [],
+            'show_blank_rows' => (bool) ($state['verification_pdf_show_blank_rows'] ?? ($mode === 'standard')),
+            'is_default' => (bool) ($state['verification_pdf_preset_is_default'] ?? true),
+        ], $preset);
+
         $clinic->update([
-            'verification_default_form_template' => $state['verification_default_form_template'] ?? VerificationFormQuestion::defaultTemplateKey(),
-            'verification_pdf_output_mode' => $mode,
-            'verification_pdf_output_sections' => $mode === 'selected' ? array_values($sections) : [],
-            'verification_pdf_output_question_ids' => $mode === 'selected' ? array_values($questionIds) : [],
+            'default_verification_pdf_preset_id' => ($state['verification_pdf_preset_is_default'] ?? true) ? $savedPreset->getKey() : $clinic->default_verification_pdf_preset_id,
         ]);
 
         $this->clinicRecord = $clinic->fresh('organization');
-        $selectedQuestionIds = $this->clinicRecord->getVerificationPdfOutputQuestionIds();
+        $selectedQuestionIds = $savedPreset->getQuestionIds();
         $this->form->fill([
-            'verification_default_form_template' => $this->clinicRecord->getVerificationDefaultFormTemplate(),
-            'verification_pdf_output_mode' => $this->clinicRecord->getVerificationPdfOutputMode(),
-            'verification_pdf_output_sections' => $this->clinicRecord->getVerificationPdfOutputSections(),
+            'verification_pdf_preset_id' => $savedPreset->getKey(),
+            'verification_pdf_preset_name' => $savedPreset->name,
+            'verification_pdf_preset_description' => $savedPreset->description,
+            'verification_pdf_preset_is_default' => $savedPreset->is_default,
+            'verification_pdf_output_mode' => $savedPreset->getOutputMode(),
+            'verification_pdf_output_sections' => $savedPreset->getSectionKeys(),
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
             'verification_pdf_output_question_ids_by_section' => $this->groupQuestionIdsBySection($selectedQuestionIds),
+            'verification_pdf_show_blank_rows' => $savedPreset->shouldShowBlankRows(),
         ]);
 
         Notification::make()
-            ->title('Verification settings saved')
-            ->body('The clinic PDF output template has been updated successfully.')
+            ->title('PDF preset saved')
+            ->body('The clinic PDF preset has been updated successfully.')
             ->success()
             ->send();
     }
@@ -285,7 +410,7 @@ class VerificationSettings extends Page implements HasForms
             ? $this->data['verification_pdf_output_sections']
             : [];
 
-        if (! $clinic || $mode !== 'selected' || empty($sectionKeys)) {
+        if (! $clinic || ! VerificationResultPdf::isCustomOutputMode($mode) || empty($sectionKeys)) {
             return collect();
         }
 

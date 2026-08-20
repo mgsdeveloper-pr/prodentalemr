@@ -8,6 +8,7 @@ use App\Filament\Dso\Pages\Reports;
 use App\Filament\Dso\Pages\RolesAndPermissions;
 use App\Filament\Dso\Pages\Users;
 use App\Http\Middleware\PanelAuthenticateRedirect;
+use App\Support\AppShell\AppShell;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -16,9 +17,9 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
@@ -28,7 +29,7 @@ class DsoPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return AppShell::registerSharedSidebar(AppShell::register($panel
             ->id('dso')
             ->path('dso')
             ->login()
@@ -48,7 +49,7 @@ class DsoPanelProvider extends PanelProvider
                     ->sort(PHP_INT_MAX),
             ])
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Teal,
             ])
             ->navigationGroups([
                 NavigationGroup::make()->label('Dashboard'),
@@ -56,19 +57,6 @@ class DsoPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Reports'),
                 NavigationGroup::make()->label('Settings'),
             ])
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
-                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
-                    . view('filament.shared.partials.page-header-theme')->render(),
-            )
             ->pages([
                 Dashboard::class,
                 ClinicDirectory::class,
@@ -89,6 +77,7 @@ class DsoPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 PanelAuthenticateRedirect::class,
-            ]);
+                EnsureEmailIsVerified::class,
+            ]), 'dso'));
     }
 }

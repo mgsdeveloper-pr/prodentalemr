@@ -26,14 +26,14 @@
         }
 
         .verification-credentials-action--primary {
-            border-color: #f59e0b;
-            background: #f59e0b;
+            border-color: #0f766e;
+            background: #0f766e;
             color: #ffffff;
         }
 
         .verification-credentials-action--primary:hover {
-            border-color: #d97706;
-            background: #d97706;
+            border-color: #115e59;
+            background: #115e59;
             color: #ffffff;
         }
 
@@ -98,9 +98,9 @@
     <x-verification-management-shell
         :items="$verificationNavItems"
         active="credentials"
-        menu-title="Verification"
-        menu-eyebrow="Admin Settings"
-        menu-description="Configure verification output, insurance master data, portal credentials, question content, and section ordering from one workspace."
+        menu-title="Settings"
+        menu-eyebrow="Verification"
+        menu-description="Clinic, mailbox, output, and administrative configuration."
     >
         <div style="display: flex; flex-direction: column; gap: 22px;">
             <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">

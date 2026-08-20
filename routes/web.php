@@ -1,33 +1,33 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminClinicScopeController;
+use App\Http\Controllers\Auth\PanelLogoutController;
 use App\Http\Controllers\Billing\InvoicePaymentPageController;
 use App\Http\Controllers\Billing\PayPalCheckoutController;
 use App\Http\Controllers\Billing\StripeWebhookController;
-use App\Http\Controllers\Admin\AdminClinicScopeController;
-use App\Http\Controllers\Auth\PanelLogoutController;
 use App\Http\Controllers\Clinic\BillingWorkItemAttachmentController as ClinicBillingWorkItemAttachmentController;
 use App\Http\Controllers\Clinic\ChooseWorkspaceController;
-use App\Http\Controllers\Clinic\PatientFinancialDocumentController;
 use App\Http\Controllers\Clinic\ClinicPanelScopeController;
 use App\Http\Controllers\Clinic\PatientConsentFormController;
 use App\Http\Controllers\Clinic\PatientDocumentController;
+use App\Http\Controllers\Clinic\PatientFinancialDocumentController;
 use App\Http\Controllers\Clinic\VerificationRequestSampleController;
 use App\Http\Controllers\Dso\DsoClinicScopeController;
-use App\Http\Controllers\Verification\VerificationNotificationActionController;
-use App\Http\Controllers\Verification\VerificationInboxAttachmentController;
-use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
+use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Saas\BillingWorkItemAttachmentController;
+use App\Http\Controllers\Saas\InvoicePdfController;
+use App\Http\Controllers\Verification\BillingWorkItemAttachmentController as VerificationBillingWorkItemAttachmentController;
 use App\Http\Controllers\Verification\UserMailboxAttachmentController;
 use App\Http\Controllers\Verification\UserMailboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationAttentionQueueExportController;
 use App\Http\Controllers\Verification\VerificationAuditTrailController;
+use App\Http\Controllers\Verification\VerificationInboxAttachmentController;
+use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
+use App\Http\Controllers\Verification\VerificationNotificationActionController;
 use App\Http\Controllers\Verification\VerificationRequestResponseExportController;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
-use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
-use App\Models\BillingWorkItem;
-use App\Http\Controllers\Saas\BillingWorkItemAttachmentController;
-use App\Http\Controllers\Saas\InvoicePdfController;
-use App\Http\Controllers\ProfileController;
+use App\Support\ClinicWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -43,9 +43,24 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/global-search', GlobalSearchController::class)
+        ->middleware('throttle:120,1')
+        ->name('app.global-search');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::redirect('/saas/verification-form-questions', '/saas/master-template')
+        ->name('saas.master-template.legacy.index');
+    Route::redirect('/saas/verification-form-questions/create', '/saas/master-template/create')
+        ->name('saas.master-template.legacy.create');
+    Route::get('/saas/verification-form-questions/{record}/edit', fn (string $record) => redirect('/saas/master-template/'.$record.'/edit'))
+        ->name('saas.master-template.legacy.edit');
+    Route::redirect('/verification/verification-form-questions', '/verification/master-template')
+        ->name('admin.master-template.legacy.index');
+    Route::redirect('/verification/verification-form-questions/create', '/verification/master-template/create')
+        ->name('admin.master-template.legacy.create');
+    Route::get('/verification/verification-form-questions/{record}/edit', fn (string $record) => redirect('/verification/master-template/'.$record.'/edit'))
+        ->name('admin.master-template.legacy.edit');
     Route::get('/clinic/patient-documents/{document}/view', [PatientDocumentController::class, 'show'])->name('clinic.patient-documents.show');
     Route::get('/clinic/patient-documents/{document}/download', [PatientDocumentController::class, 'download'])->name('clinic.patient-documents.download');
     Route::get('/clinic/patient-consent-forms/{consent}/view', [PatientConsentFormController::class, 'show'])->name('clinic.patient-consent-forms.show');
@@ -56,39 +71,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/clinic/patient-ledger-entries/{entry}/receipt/download', [PatientFinancialDocumentController::class, 'downloadReceipt'])->name('clinic.patient-ledger-entries.receipt.download');
     Route::get('/verification/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('admin.signout.perform')]))->name('admin.signout');
     Route::get('/verification/clinic-scope', AdminClinicScopeController::class)->name('admin.clinic-scope');
+    Route::redirect('/verification/unassigned-patients', '/verification/unassigned-requests')
+        ->name('admin.unassigned-requests.legacy');
+    Route::redirect('/verification/portal-credential-settings', '/verification/portal-credentials')
+        ->name('admin.portal-credentials.legacy');
     Route::get('/clinic/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('clinic.signout.perform')]))->name('clinic.signout');
+    Route::redirect('/clinic/portal-credential-settings', '/clinic/portal-credentials')
+        ->name('clinic.portal-credentials.legacy');
     Route::get('/dso/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('dso.signout.perform')]))->name('dso.signout');
     Route::get('/dso/clinic-scope', DsoClinicScopeController::class)->name('dso.clinic-scope');
     Route::get('/choose-workspace', [ChooseWorkspaceController::class, 'show'])->name('clinic.choose-workspace');
-    Route::get('/choose-workspace/{workspace}', [ChooseWorkspaceController::class, 'switch'])
-        ->whereIn('workspace', [\App\Support\ClinicWorkspace::VERIFICATION, \App\Support\ClinicWorkspace::CLINIC_PMS])
+    Route::post('/choose-workspace/{workspace}', [ChooseWorkspaceController::class, 'switch'])
+        ->whereIn('workspace', [ClinicWorkspace::VERIFICATION, ClinicWorkspace::CLINIC_PMS])
         ->name('clinic.switch-workspace');
     Route::get('/clinic/clinic-scope', ClinicPanelScopeController::class)->name('clinic.clinic-scope');
     Route::get('/clinic/verification-requests/sample', VerificationRequestSampleController::class)->name('clinic.verification-requests.sample');
-    Route::get('/clinic/verification-requests/{billingWorkItem}/start', function (BillingWorkItem $billingWorkItem) {
-        abort_unless(auth()->user()?->canAccessClinicVerificationRequests(), 403);
-        abort_unless($billingWorkItem->clinicUserCanEditVerification(auth()->user()), 403);
-
-        $billingWorkItem->startWork(auth()->id());
-        $billingWorkItem->recordActivity('clinic_verification_started', 'Clinic user started the verification form.', [
-            'panel' => 'clinic',
-            'user_name' => auth()->user()?->name,
-        ]);
-
-        return redirect()->route('filament.clinic.resources.verification-requests.edit', ['record' => $billingWorkItem]);
-    })->name('clinic.verification-requests.start');
     Route::get('/saas/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('saas.signout.perform')]))->name('saas.signout');
-    Route::get('/verification/sign-out/perform', PanelLogoutController::class)->name('admin.signout.perform');
-    Route::get('/clinic/sign-out/perform', PanelLogoutController::class)->name('clinic.signout.perform');
-    Route::get('/dso/sign-out/perform', PanelLogoutController::class)->name('dso.signout.perform');
-    Route::get('/saas/sign-out/perform', PanelLogoutController::class)->name('saas.signout.perform');
-    Route::get('/verification/verifications/{billingWorkItem}/start', function (BillingWorkItem $billingWorkItem) {
-        abort_unless(auth()->user()?->canAccessSaasRevenueOperations(), 403);
-
-        $billingWorkItem->startWork(auth()->id());
-
-        return redirect(VerificationWorkItemResource::getUrl('edit', ['record' => $billingWorkItem]));
-    })->name('admin.verifications.start');
+    Route::post('/verification/sign-out/perform', PanelLogoutController::class)->name('admin.signout.perform');
+    Route::post('/clinic/sign-out/perform', PanelLogoutController::class)->name('clinic.signout.perform');
+    Route::post('/dso/sign-out/perform', PanelLogoutController::class)->name('dso.signout.perform');
+    Route::post('/saas/sign-out/perform', PanelLogoutController::class)->name('saas.signout.perform');
     Route::get('/verification/verifications/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForAdmin'])->name('admin.verifications.pdf.download');
     Route::get('/verification/verifications/{billingWorkItem}/preview', [VerificationResultPdfController::class, 'previewForAdmin'])->name('admin.verifications.pdf.preview');
     Route::get('/verification/verifications/{billingWorkItem}/audit', [VerificationAuditTrailController::class, 'downloadForAdmin'])->name('admin.verifications.audit.download');
@@ -98,28 +100,37 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/notifications/{notification}/open', [VerificationNotificationActionController::class, 'open'])->defaults('panel', 'verification')->name('admin.verification-notifications.open');
     Route::post('/verification/notifications/{notification}/read', [VerificationNotificationActionController::class, 'markRead'])->defaults('panel', 'verification')->name('admin.verification-notifications.read');
     Route::post('/verification/notifications/read-all', [VerificationNotificationActionController::class, 'markAllRead'])->defaults('panel', 'verification')->name('admin.verification-notifications.read-all');
+    Route::get('/verification/verification-request-attachments/{attachment}/preview', [VerificationBillingWorkItemAttachmentController::class, 'preview'])->name('admin.verification-request-attachments.preview');
+    Route::get('/verification/verification-request-attachments/{attachment}/download', [VerificationBillingWorkItemAttachmentController::class, 'download'])->name('admin.verification-request-attachments.download');
+    Route::get('/verification/billing-work-item-attachments/{attachment}/preview', fn (string $attachment) => redirect()->route('admin.verification-request-attachments.preview', ['attachment' => $attachment]))->name('admin.billing-work-item-attachments.preview');
+    Route::get('/verification/billing-work-item-attachments/{attachment}/download', fn (string $attachment) => redirect()->route('admin.verification-request-attachments.download', ['attachment' => $attachment]))->name('admin.billing-work-item-attachments.download');
     Route::get('/verification/inbox/attachments/{attachment}/download', VerificationInboxAttachmentController::class)->name('admin.verification-inbox-attachments.download');
     Route::get('/verification/inbox/messages/{message}/preview', VerificationInboxMessagePreviewController::class)->name('admin.verification-inbox-messages.preview');
     Route::get('/verification/mailbox/attachments/download', UserMailboxAttachmentController::class)->name('admin.user-mailbox-attachments.download');
     Route::get('/verification/mailbox/messages/preview', UserMailboxMessagePreviewController::class)->name('admin.user-mailbox-messages.preview');
     Route::get('/clinic/verification-requests/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForClinic'])->name('clinic.verification-requests.pdf.download');
     Route::get('/clinic/verification-requests/{billingWorkItem}/preview', [VerificationResultPdfController::class, 'previewForClinic'])->name('clinic.verification-requests.pdf.preview');
-    Route::get('/clinic/billing-work-item-attachments/{attachment}/preview', [ClinicBillingWorkItemAttachmentController::class, 'preview'])->name('clinic.billing-work-item-attachments.preview');
-    Route::get('/clinic/billing-work-item-attachments/{attachment}/download', [ClinicBillingWorkItemAttachmentController::class, 'download'])->name('clinic.billing-work-item-attachments.download');
+    Route::get('/clinic/verification-requests/{billingWorkItem}/audit', [VerificationAuditTrailController::class, 'downloadForClinic'])->name('clinic.verification-requests.audit.download');
+    Route::get('/clinic/verification-request-attachments/{attachment}/preview', [ClinicBillingWorkItemAttachmentController::class, 'preview'])->name('clinic.verification-request-attachments.preview');
+    Route::get('/clinic/verification-request-attachments/{attachment}/download', [ClinicBillingWorkItemAttachmentController::class, 'download'])->name('clinic.verification-request-attachments.download');
+    Route::get('/clinic/billing-work-item-attachments/{attachment}/preview', fn (string $attachment) => redirect()->route('clinic.verification-request-attachments.preview', ['attachment' => $attachment]))->name('clinic.billing-work-item-attachments.preview');
+    Route::get('/clinic/billing-work-item-attachments/{attachment}/download', fn (string $attachment) => redirect()->route('clinic.verification-request-attachments.download', ['attachment' => $attachment]))->name('clinic.billing-work-item-attachments.download');
     Route::get('/clinic/notifications/{notification}/open', [VerificationNotificationActionController::class, 'open'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.open');
     Route::post('/clinic/notifications/{notification}/read', [VerificationNotificationActionController::class, 'markRead'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.read');
     Route::post('/clinic/notifications/read-all', [VerificationNotificationActionController::class, 'markAllRead'])->defaults('panel', 'clinic')->name('clinic.verification-notifications.read-all');
     Route::get('/saas/invoices/{invoice}/pdf', [InvoicePdfController::class, 'show'])->name('saas.invoices.pdf.view');
     Route::get('/saas/invoices/{invoice}/download', [InvoicePdfController::class, 'download'])->name('saas.invoices.pdf.download');
-    Route::get('/saas/billing-work-item-attachments/{attachment}/preview', [BillingWorkItemAttachmentController::class, 'preview'])->name('saas.billing-work-item-attachments.preview');
-    Route::get('/saas/billing-work-item-attachments/{attachment}/download', [BillingWorkItemAttachmentController::class, 'download'])->name('saas.billing-work-item-attachments.download');
+    Route::get('/saas/verification-request-attachments/{attachment}/preview', [BillingWorkItemAttachmentController::class, 'preview'])->name('saas.verification-request-attachments.preview');
+    Route::get('/saas/verification-request-attachments/{attachment}/download', [BillingWorkItemAttachmentController::class, 'download'])->name('saas.verification-request-attachments.download');
+    Route::get('/saas/billing-work-item-attachments/{attachment}/preview', fn (string $attachment) => redirect()->route('saas.verification-request-attachments.preview', ['attachment' => $attachment]))->name('saas.billing-work-item-attachments.preview');
+    Route::get('/saas/billing-work-item-attachments/{attachment}/download', fn (string $attachment) => redirect()->route('saas.verification-request-attachments.download', ['attachment' => $attachment]))->name('saas.billing-work-item-attachments.download');
 });
 
 Route::get('/admin/{path?}', function (Request $request, ?string $path = null) {
-    $target = '/verification' . ($path ? '/' . ltrim($path, '/') : '');
+    $target = '/verification'.($path ? '/'.ltrim($path, '/') : '');
 
     if ($request->getQueryString()) {
-        $target .= '?' . $request->getQueryString();
+        $target .= '?'.$request->getQueryString();
     }
 
     return redirect($target, 301);

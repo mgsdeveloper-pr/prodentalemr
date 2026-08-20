@@ -30,7 +30,7 @@ class PaymentInfolist
                                 TextEntry::make('invoice.invoice_number')
                                     ->label('Invoice')
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('gray'),
                                 TextEntry::make('organization.name')
                                     ->label('Organization')
                                     ->columnSpan(2),

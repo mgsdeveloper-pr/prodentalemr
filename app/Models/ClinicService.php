@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClinicService extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'organization_id',
@@ -20,6 +21,7 @@ class ClinicService extends Model
         'description',
         'category',
         'default_fee',
+        'default_duration_minutes',
         'status',
     ];
 
@@ -27,6 +29,7 @@ class ClinicService extends Model
     {
         return [
             'default_fee' => 'decimal:2',
+            'default_duration_minutes' => 'integer',
             'status' => 'boolean',
         ];
     }
@@ -49,6 +52,11 @@ class ClinicService extends Model
     public function treatmentPlanItems(): HasMany
     {
         return $this->hasMany(TreatmentPlanItem::class);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
     }
 
     public function dentalChartEntries(): HasMany

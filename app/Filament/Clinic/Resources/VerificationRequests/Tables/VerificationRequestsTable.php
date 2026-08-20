@@ -4,6 +4,9 @@ namespace App\Filament\Clinic\Resources\VerificationRequests\Tables;
 
 use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
 use App\Models\BillingWorkItem;
+use App\Services\Verification\SLAService;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -17,10 +20,6 @@ class VerificationRequestsTable
     {
         return $table
             ->columns([
-                TextColumn::make('serial')
-                    ->label('S.No.')
-                    ->rowIndex()
-                    ->alignCenter(),
                 TextColumn::make('reference_number')
                     ->label('Reference')
                     ->searchable()
@@ -29,12 +28,16 @@ class VerificationRequestsTable
                     ->copyable(),
                 TextColumn::make('patient_display')
                     ->label('Patient')
-                    ->state(fn (BillingWorkItem $record): HtmlString => new HtmlString(
-                        '<div style="display:flex;flex-direction:column;gap:2px;min-width:140px;">'
-                        . '<span style="font-weight:700;color:#0f172a;">' . e($record->patient?->full_name ?: ($record->verificationProfile?->patient_full_name ?: '-')) . '</span>'
-                        . '<span style="font-size:11px;color:#64748b;">' . e($record->reference_number ?: 'No reference') . '</span>'
-                        . '</div>'
-                    ))
+                    ->state(function (BillingWorkItem $record): HtmlString {
+                        $dob = $record->verificationProfile?->patient_dob ?? $record->patient?->dob;
+
+                        return new HtmlString(
+                            '<div class="pd-verification-primary-cell">'
+                            . '<strong>' . e($record->patient?->full_name ?: ($record->verificationProfile?->patient_full_name ?: '-')) . '</strong>'
+                            . '<span>' . e($dob ? 'DOB ' . $dob->format('m/d/Y') : 'DOB not available') . '</span>'
+                            . '</div>'
+                        );
+                    })
                     ->html()
                     ->searchable(query: function ($query, string $search): void {
                         $query->where(function ($innerQuery) use ($search): void {
@@ -67,22 +70,26 @@ class VerificationRequestsTable
                     ->placeholder('-')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('insurance_provider_display')
-                    ->label('Insurance provider')
-                    ->state(fn (BillingWorkItem $record): HtmlString => new HtmlString(
-                        '<div style="display:flex;flex-direction:column;gap:2px;min-width:170px;">'
-                        . '<span style="font-weight:700;color:#0f172a;">' . e($record->insurancePolicy?->insurance_company ?: ($record->verificationPlanSnapshots->first()?->payer_name ?: '-')) . '</span>'
-                        . '<span style="font-size:11px;color:#64748b;">' . e(match ($record->verificationProfile?->form_type) {
-                            'full_form' => 'Full Form',
-                            'short_form' => 'Short Form',
-                            default => 'Verification request',
-                        }) . '</span>'
-                        . '</div>'
-                    ))
+                    ->label('Insurance')
+                    ->state(function (BillingWorkItem $record): HtmlString {
+                        $snapshot = $record->verificationPlanSnapshots->first();
+                        $memberId = $snapshot?->member_id ?: $record->insurancePolicy?->member_id;
+                        $maskedMemberId = filled($memberId)
+                            ? 'Member •••• ' . substr((string) $memberId, -4)
+                            : 'Member ID not available';
+
+                        return new HtmlString(
+                            '<div class="pd-verification-primary-cell">'
+                            . '<strong>' . e($snapshot?->payer_name ?? $record->insurancePolicy?->insurance_company ?? '-') . '</strong>'
+                            . '<span>' . e($maskedMemberId) . '</span>'
+                            . '</div>'
+                        );
+                    })
                     ->html()
                     ->placeholder('-')
                     ->searchable(),
                 TextColumn::make('verificationProfile.form_type')
-                    ->label('Type')
+                    ->label('Form Type')
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'full_form' => 'info',
@@ -94,8 +101,7 @@ class VerificationRequestsTable
                         'short_form' => 'Short Form',
                         default => '-',
                     })
-                    ->alignCenter()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->alignCenter(),
                 TextColumn::make('appointment_display')
                     ->label('Appointment date')
                     ->state(fn (BillingWorkItem $record): ?string => $record->appointment?->appointment_date?->toDateString() ?: $record->verificationProfile?->appointment_date)
@@ -108,7 +114,8 @@ class VerificationRequestsTable
                     ->badge()
                     ->alignCenter()
                     ->color(fn (?string $state): string => $state === 'urgent' ? 'danger' : 'info')
-                    ->formatStateUsing(fn (?string $state): string => $state === 'urgent' ? 'Urgent' : 'Normal'),
+                    ->formatStateUsing(fn (?string $state): string => $state === 'urgent' ? 'Urgent' : 'Normal')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('assigned_user_display')
                     ->label('Assigned user')
                     ->state(fn (BillingWorkItem $record): HtmlString => new HtmlString(
@@ -118,30 +125,14 @@ class VerificationRequestsTable
                     ))
                     ->alignCenter()
                     ->html()
-                    ->placeholder('-'),
-                TextColumn::make('workflow_actions')
-                    ->label('Actions')
-                    ->state(function (BillingWorkItem $record): HtmlString {
-                        $user = auth()->user();
-                        $buttonStyle = 'display:inline-flex;align-items:center;justify-content:center;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #dbe4ee;background:#ffffff;color:#334155;box-shadow:0 2px 6px rgba(15,23,42,0.05);';
-                        $primaryStyle = 'display:inline-flex;align-items:center;justify-content:center;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;text-decoration:none;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;box-shadow:0 4px 10px rgba(29,78,216,0.10);';
-
-                        $actions = [];
-
-                        if ($record->clinicUserCanEditVerification($user) && $record->normalized_status === 'pending') {
-                            $actions[] = '<a href="' . route('clinic.verification-requests.start', $record) . '" style="' . $primaryStyle . '">Start</a>';
-                        }
-
-                        $actions[] = '<a href="' . VerificationRequestResource::getUrl('view', ['record' => $record]) . '" style="' . $buttonStyle . '">View</a>';
-
-                        if ($record->clinicUserCanEditVerification($user) && $record->normalized_status !== 'done') {
-                            $actions[] = '<a href="' . VerificationRequestResource::getUrl('edit', ['record' => $record]) . '" style="' . $buttonStyle . '">Edit</a>';
-                        }
-
-                        return new HtmlString('<div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;min-width:210px;margin-inline:auto;">' . implode('', $actions) . '</div>');
-                    })
-                    ->alignCenter()
-                    ->html(),
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('processing_mode')
+                    ->label('Handled By')
+                    ->state(fn (BillingWorkItem $record): string => $record->processingModeLabel())
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'Managed service' ? 'info' : 'gray')
+                    ->alignCenter(),
                 TextColumn::make('normalized_status')
                     ->label('Status')
                     ->badge()
@@ -157,6 +148,19 @@ class VerificationRequestsTable
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => BillingWorkItem::STATUS_OPTIONS[$state] ?? str($state)->headline()->toString()),
+                TextColumn::make('due_at')
+                    ->label('Due / SLA')
+                    ->state(function (BillingWorkItem $record): HtmlString {
+                        $sla = app(SLAService::class)->snapshot($record);
+
+                        return new HtmlString(
+                            '<div class="pd-verification-sla pd-verification-sla--' . e($sla['status']) . '">'
+                            . '<strong>' . e($sla['due_at']) . '</strong>'
+                            . '<span>' . e($sla['relative']) . '</span>'
+                            . '</div>'
+                        );
+                    })
+                    ->html(),
                 TextColumn::make('sla_status')
                     ->label('SLA')
                     ->badge()
@@ -200,6 +204,33 @@ class VerificationRequestsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->recordUrl(fn (BillingWorkItem $record): string => static::primaryActionUrl($record))
+            ->actions([
+                Action::make('openRequest')
+                    ->label(fn (BillingWorkItem $record): string => static::primaryActionLabel($record))
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->url(fn (BillingWorkItem $record): string => static::primaryActionUrl($record)),
+                ActionGroup::make([
+                    Action::make('viewDetails')
+                        ->label('View details')
+                        ->icon('heroicon-o-eye')
+                        ->url(fn (BillingWorkItem $record): string => VerificationRequestResource::getUrl('view', [
+                            'record' => $record,
+                            'return' => static::queueReturnUrl(),
+                        ])),
+                    Action::make('respond')
+                        ->label('Respond')
+                        ->icon('heroicon-o-chat-bubble-left-right')
+                        ->visible(fn (BillingWorkItem $record): bool => $record->clinicUserCanRespondToVerification(auth()->user()))
+                        ->url(fn (BillingWorkItem $record): string => static::responseUrl($record)),
+                    Action::make('openForm')
+                        ->label('Open Form')
+                        ->icon('heroicon-o-pencil-square')
+                        ->visible(fn (BillingWorkItem $record): bool => $record->clinicUserCanOpenVerificationForm(auth()->user()))
+                        ->url(fn (BillingWorkItem $record): string => static::formUrl($record)),
+                ]),
+            ])
             ->filters([
                 Filter::make('appointment_date_range')
                     ->schema([
@@ -232,27 +263,21 @@ class VerificationRequestsTable
                         );
                     }),
                 SelectFilter::make('ownership')
-                    ->label('Ownership')
+                    ->label('Handled by')
                     ->options([
-                        'clinic' => 'Clinic',
-                        'service' => 'Service',
+                        BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed',
+                        BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service',
                     ])
                     ->query(function ($query, array $data) {
                         return match ($data['value'] ?? null) {
-                            'clinic' => $query->where('source', 'clinic_self_service'),
-                            'service' => $query->where('source', 'clinic_request'),
+                            BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => $query->where('processing_mode', BillingWorkItem::PROCESSING_MODE_SELF_MANAGED),
+                            BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => $query->where('processing_mode', BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE),
                             default => $query,
                         };
                     }),
-                SelectFilter::make('pms_sync_status')
-                    ->label('PMS sync')
-                    ->options(BillingWorkItem::PMS_SYNC_STATUS_OPTIONS),
                 SelectFilter::make('assigned_to')
-                    ->label('User filter')
+                    ->label('Assignee')
                     ->relationship('assignedTo', 'name'),
-                SelectFilter::make('organization_id')
-                    ->label('Organization')
-                    ->relationship('organization', 'name'),
                 SelectFilter::make('queue_view')
                     ->label('System View')
                     ->options([
@@ -272,42 +297,84 @@ class VerificationRequestsTable
                             default => $query,
                         };
                     }),
-                SelectFilter::make('managed_billing_service_id')
-                    ->label('Verification service')
-                    ->relationship('managedBillingService', 'name'),
-                SelectFilter::make('writeback_status')
-                    ->label('Automated Writeback')
-                    ->options(BillingWorkItem::WRITEBACK_STATUS_OPTIONS),
             ])
             ->defaultSort('due_at', 'asc');
     }
 
+    protected static function primaryActionLabel(BillingWorkItem $record): string
+    {
+        if ($record->clinicUserCanRespondToVerification(auth()->user())) {
+            return 'Respond';
+        }
+
+        if ($record->clinicUserCanOpenVerificationForm(auth()->user())) {
+            return 'Open Form';
+        }
+
+        return 'View';
+    }
+
+    protected static function primaryActionUrl(BillingWorkItem $record): string
+    {
+        if ($record->clinicUserCanRespondToVerification(auth()->user())) {
+            return static::responseUrl($record);
+        }
+
+        if ($record->clinicUserCanOpenVerificationForm(auth()->user())) {
+            return static::formUrl($record);
+        }
+
+        return VerificationRequestResource::getUrl('view', [
+            'record' => $record,
+            'return' => static::queueReturnUrl(),
+        ]);
+    }
+
+    protected static function formUrl(BillingWorkItem $record): string
+    {
+        return VerificationRequestResource::getUrl('edit', [
+            'record' => $record,
+            'return' => static::queueReturnUrl(),
+        ]);
+    }
+
+    public static function responseUrl(BillingWorkItem $record, ?string $returnUrl = null): string
+    {
+        return route('filament.clinic.pages.request-response', [
+            'respond' => $record->getKey(),
+            'return' => $returnUrl ?? static::queueReturnUrl(),
+        ]);
+    }
+
+    protected static function queueReturnUrl(): string
+    {
+        return route('filament.clinic.resources.verification-requests.index', request()->query());
+    }
+
     protected static function assignedUserLabel(BillingWorkItem $record): string
     {
-        if ($record->source === 'clinic_request') {
+        if ($record->isManagedServiceMode()) {
             return $record->assignedTo?->name ?: 'Unassigned';
         }
 
         return $record->verificationProfile?->requested_by_name
             ?: $record->creator?->name
-            ?: 'Clinic Team';
+            ?: 'Self-Managed';
     }
 
     protected static function ownershipLabel(BillingWorkItem $record): string
     {
-        return $record->source === 'clinic_request'
-            ? 'Service'
-            : 'Clinic';
+        return $record->processingModeLabel();
     }
 
     protected static function ownerName(BillingWorkItem $record): string
     {
-        if ($record->source === 'clinic_request') {
+        if ($record->isManagedServiceMode()) {
             return $record->assignedTo?->name ?: 'Pending Assignment';
         }
 
         return $record->verificationProfile?->requested_by_name
             ?: $record->creator?->name
-            ?: 'Clinic Team';
+            ?: 'Self-Managed';
     }
 }

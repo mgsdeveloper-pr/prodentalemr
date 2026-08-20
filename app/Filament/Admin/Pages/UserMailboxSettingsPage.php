@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\UserMailbox;
 use App\Support\SaasEntitlements;
 use App\Support\UserMailboxService;
@@ -39,7 +40,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     protected static ?int $navigationSort = 98;
 
-    protected static ?string $title = '';
+    protected static ?string $title = 'Mailbox Settings';
 
     protected static ?string $slug = 'mailbox-settings';
 
@@ -73,6 +74,32 @@ class UserMailboxSettingsPage extends Page implements HasForms
                 ->label('Save Mailbox Settings')
                 ->action('save'),
         ];
+    }
+
+    public function getSubheading(): ?string
+    {
+        $status = $this->getConnectionStatus();
+
+        return 'Configure the mailbox used to receive and send verification-related email. Connection: ' . $status['label'] . '.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            VerificationGeneralSettings::getUrl() => 'Settings',
+            'My Mailbox',
+        ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    public function getVerificationNavItems(): array
+    {
+        return \App\Support\VerificationSettingsNavigation::items();
     }
 
     public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema

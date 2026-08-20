@@ -2,19 +2,42 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class AdaProcedureCode extends Model
 {
+    use HasPublicId;
+
+    public const LIFECYCLE_ACTIVE = 'active';
+    public const LIFECYCLE_INACTIVE = 'inactive';
+    public const LIFECYCLE_DEPRECATED = 'deprecated';
+    public const LIFECYCLE_REMOVED_BY_ADA = 'removed_by_ada';
+
+    public const LIFECYCLE_OPTIONS = [
+        self::LIFECYCLE_ACTIVE => 'Active',
+        self::LIFECYCLE_INACTIVE => 'Inactive',
+        self::LIFECYCLE_DEPRECATED => 'Deprecated',
+        self::LIFECYCLE_REMOVED_BY_ADA => 'Removed by ADA',
+    ];
+
     protected $fillable = [
         'procedure_code',
         'description',
         'class',
         'is_active',
+        'lifecycle_status',
         'source_year',
         'source_document',
         'source_page',
+        'effective_date',
+        'retired_at',
+        'retirement_reason',
+        'governance_notes',
+        'last_reviewed_at',
+        'last_reviewed_by',
     ];
 
     protected function casts(): array
@@ -23,12 +46,21 @@ class AdaProcedureCode extends Model
             'is_active' => 'boolean',
             'source_year' => 'integer',
             'source_page' => 'integer',
+            'effective_date' => 'date',
+            'retired_at' => 'datetime',
+            'last_reviewed_at' => 'datetime',
         ];
     }
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query
+            ->where('is_active', true)
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->whereNull('lifecycle_status')
+                    ->orWhere('lifecycle_status', self::LIFECYCLE_ACTIVE);
+            });
     }
 
     public function scopeInClass(Builder $query, ?string $class): Builder

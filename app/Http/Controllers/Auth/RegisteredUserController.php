@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Organization;
 use App\Models\Clinic;
 use App\Models\Location;
+use App\Models\Organization;
+use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +22,8 @@ class RegisteredUserController extends Controller
      */
     public function create()
     {
+        abort_unless(config('prodental.public_registration'), 404);
+
         return view('auth.register');
     }
 
@@ -30,6 +32,8 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        abort_unless(config('prodental.public_registration'), 404);
+
         $request->validate([
             /*
             |--------------------------------------------------------------------------
@@ -83,7 +87,7 @@ class RegisteredUserController extends Controller
             $clinic = Clinic::create([
                 'organization_id' => $organization->id,
                 'clinic_name' => $request->clinic_name,
-                'clinic_code' => 'CLN-' . strtoupper(substr(uniqid(), -6)),
+                'clinic_code' => 'CLN-'.strtoupper(substr(uniqid(), -6)),
                 'timezone' => 'America/New_York',
                 'status' => true,
             ]);
@@ -142,21 +146,17 @@ class RegisteredUserController extends Controller
 
             Auth::login($user);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Step 7 — Redirect to Clinic Panel
-            |--------------------------------------------------------------------------
-            */
+            return redirect()->route('verification.notice');
 
-            return redirect('/clinic');
-
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
+
+            report($e);
 
             return back()
                 ->withInput()
                 ->withErrors([
-                    'error' => 'Registration failed: ' . $e->getMessage(),
+                    'error' => 'Registration could not be completed. Please try again or contact support.',
                 ]);
         }
     }

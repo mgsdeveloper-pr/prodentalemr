@@ -46,7 +46,6 @@ class VerificationRequestForm
                 Hidden::make('source')->default('manual'),
                 Hidden::make('status')->default('unassigned'),
                 Hidden::make('outcome_status')->default('pending'),
-                Hidden::make('priority')->default('normal'),
                 Hidden::make('pms_sync_status')->default('pending'),
                 Hidden::make('writeback_status')->default('not_requested'),
                 Hidden::make('managed_billing_service_id')
@@ -60,33 +59,42 @@ class VerificationRequestForm
                 Hidden::make('client_service_enrollment_id'),
                 Hidden::make('patient_id'),
                 Hidden::make('patient_insurance_policy_id'),
+                Hidden::make('appointment_id'),
                 Hidden::make('organization_id'),
                 Hidden::make('clinic_id'),
                 Hidden::make('vf_requested_by_name')->default($user?->name),
                 Hidden::make('vf_requested_by_role_slug')->default($user?->getPrimaryRoleName()),
                 Hidden::make('vf_requested_from_panel')->default('saas'),
 
-                Grid::make(2)
+                Section::make('Request Setup')
                     ->columnSpanFull()
                     ->schema([
-                        Select::make('assigned_to')
-                            ->label('Select User')
-                            ->helperText('Optional. Leave blank to let the system auto-assign the verification to the lightest active verification user.')
-                            ->options(fn (Get $get): array => VerificationAutoAssigner::optionList(
-                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null
-                            ))
-                            ->searchable()
-                            ->preload()
-                            ->placeholder('Unassigned queue'),
-                        Select::make('vf_form_type')
-                            ->label('Verification Form')
-                            ->options(VerificationProfile::FORM_TYPE_OPTIONS)
-                            ->default('full_form')
-                            ->native(false)
-                            ->required(),
+                        Grid::make(3)->schema([
+                            Select::make('vf_form_type')
+                                ->label('Form Type')
+                                ->options(VerificationProfile::FORM_TYPE_OPTIONS)
+                                ->default('full_form')
+                                ->native(false)
+                                ->required(),
+                            Select::make('priority')
+                                ->label('Priority')
+                                ->options(BillingWorkItem::PRIORITY_OPTIONS)
+                                ->default('normal')
+                                ->native(false)
+                                ->required(),
+                            Select::make('assigned_to')
+                                ->label('Assign To')
+                                ->helperText('Optional. Leave blank for automatic assignment.')
+                                ->options(fn (Get $get): array => VerificationAutoAssigner::optionList(
+                                    filled($get('clinic_id')) ? (int) $get('clinic_id') : null
+                                ))
+                                ->searchable()
+                                ->preload()
+                                ->placeholder('Auto-assign'),
+                        ]),
                     ]),
 
-                Section::make('Patient 1')
+                Section::make('Patient & Appointment')
                     ->columnSpanFull()
                     ->schema([
                         Select::make('import_appointment_id')
@@ -161,11 +169,6 @@ class VerificationRequestForm
                                                     })
                                                     ->required()
                                                     ->columnSpanFull(),
-                                                Checkbox::make('priority_flag')
-                                                    ->label('Mark as urgent')
-                                                    ->live()
-                                                    ->dehydrated(false)
-                                                    ->afterStateUpdated(fn (?bool $state, Set $set) => $set('priority', $state ? 'urgent' : 'normal')),
                                                 Select::make('provider_id')
                                                     ->label('Provider')
                                                     ->options(fn (Get $get): array => Provider::query()
@@ -265,7 +268,8 @@ class VerificationRequestForm
                                         'other' => 'Other',
                                     ])
                                     ->native(false)
-                                    ->searchable(),
+                                    ->searchable()
+                                    ->required(),
                             ]),
                         Repeater::make('verification_plan_snapshots')
                             ->label('')
@@ -273,8 +277,7 @@ class VerificationRequestForm
                                 ['plan_priority' => 'primary'],
                             ])
                             ->minItems(1)
-                            ->addActionLabel('Add Primary Plan')
-                            ->collapsed()
+                            ->addActionLabel('Add Another Plan')
                             ->itemLabel(fn (array $state): ?string => match ($state['plan_priority'] ?? 'primary') {
                                 'secondary' => 'Secondary Plan',
                                 'tertiary' => 'Tertiary Plan',

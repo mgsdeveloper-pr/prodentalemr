@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VerificationFormQuestion extends Model
 {
+    use HasPublicId;
+
     public const DEFAULT_TEMPLATE_KEY = 'template_3';
 
     public const TEMPLATE_OPTIONS = [
@@ -54,6 +58,7 @@ class VerificationFormQuestion extends Model
         'template_3_plan_provisions' => 'Plan Provisions',
         'template_3_service_history' => 'Service History',
         'template_3_frequency_percentage' => 'Frequency & Percentage',
+        'template_3_frequency_diagnostic_preventative' => 'Frequency & Percentage / Diagnostic & Preventative',
         'template_3_frequency_general' => 'Frequency & Percentage / General',
         'template_3_frequency_basic' => 'Frequency & Percentage / Basic',
         'template_3_frequency_major' => 'Frequency & Percentage / Major',
@@ -68,7 +73,8 @@ class VerificationFormQuestion extends Model
         'template_3_coverage_category',
         'template_3_plan_provisions',
         'template_3_service_history',
-        'template_3_frequency_general',
+        'template_3_frequency_percentage',
+        'template_3_frequency_diagnostic_preventative',
         'template_3_frequency_basic',
         'template_3_frequency_major',
         'template_3_frequency_orthodontics',
@@ -576,6 +582,14 @@ class VerificationFormQuestion extends Model
         $customSections = VerificationTemplateSection::query()
             ->visibleForClinic($clinicId)
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
+            ->when(
+                blank($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+            )
+            ->when(
+                filled($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+            )
             ->where('is_active', true)
             ->orderByRaw('parent_section_key is not null')
             ->orderBy('sort_order')
@@ -660,6 +674,14 @@ class VerificationFormQuestion extends Model
         $customSections = VerificationTemplateSection::query()
             ->visibleForClinic($clinicId)
             ->where('template_key', self::DEFAULT_TEMPLATE_KEY)
+            ->when(
+                blank($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+            )
+            ->when(
+                filled($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+            )
             ->where('is_active', true)
             ->orderByRaw('parent_section_key is not null')
             ->orderBy('sort_order')
@@ -697,7 +719,7 @@ class VerificationFormQuestion extends Model
 
         $builtInChildren = match ($parentSectionKey) {
             'template_3_frequency_percentage' => [
-                'template_3_frequency_general' => 'General',
+                'template_3_frequency_diagnostic_preventative' => 'Diagnostic & Preventative',
                 'template_3_frequency_basic' => 'Basic',
                 'template_3_frequency_major' => 'Major',
                 'template_3_frequency_orthodontics' => 'Orthodontics',
@@ -708,6 +730,14 @@ class VerificationFormQuestion extends Model
         $customChildren = VerificationTemplateSection::query()
             ->visibleForClinic($clinicId)
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
+            ->when(
+                blank($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+            )
+            ->when(
+                filled($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+            )
             ->where('parent_section_key', $parentSectionKey)
             ->where('is_active', true)
             ->orderBy('sort_order')
@@ -730,6 +760,7 @@ class VerificationFormQuestion extends Model
         }
 
         $builtInParents = [
+            'template_3_frequency_diagnostic_preventative' => 'template_3_frequency_percentage',
             'template_3_frequency_general' => 'template_3_frequency_percentage',
             'template_3_frequency_basic' => 'template_3_frequency_percentage',
             'template_3_frequency_major' => 'template_3_frequency_percentage',
@@ -743,6 +774,14 @@ class VerificationFormQuestion extends Model
         return VerificationTemplateSection::query()
             ->visibleForClinic($clinicId)
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
+            ->when(
+                blank($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+            )
+            ->when(
+                filled($clinicId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+            )
             ->where('section_key', $sectionKey)
             ->orderByRaw('clinic_id is null')
             ->value('parent_section_key');
@@ -752,6 +791,7 @@ class VerificationFormQuestion extends Model
     {
         return in_array($sectionKey, [
             'template_3_frequency_percentage',
+            'template_3_frequency_diagnostic_preventative',
             'template_3_frequency_general',
             'template_3_frequency_basic',
             'template_3_frequency_major',
@@ -762,6 +802,7 @@ class VerificationFormQuestion extends Model
     public static function templateThreeFrequencyCategory(?string $sectionKey): string
     {
         return match ($sectionKey) {
+            'template_3_frequency_diagnostic_preventative' => 'Diagnostic & Preventative',
             'template_3_frequency_basic' => 'Basic',
             'template_3_frequency_major' => 'Major',
             'template_3_frequency_orthodontics' => 'Orthodontics',
@@ -797,6 +838,10 @@ class VerificationFormQuestion extends Model
         return static::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', static::normalizeTemplateKey($templateKey))
+            ->when(
+                blank($clinicId) && blank($organizationId),
+                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+            )
             ->where('section_key', $sectionKey)
             ->where('is_active', true)
             ->where('input_type', 'yes_no')
@@ -811,6 +856,64 @@ class VerificationFormQuestion extends Model
             ->orderBy('id')
             ->pluck('prompt', 'id')
             ->all();
+    }
+
+    protected static function currentMasterWorkingTemplateVersionId(): ?int
+    {
+        $templateKey = static::DEFAULT_TEMPLATE_KEY;
+
+        $draftId = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereNull('clinic_id')
+            ->latest('id')
+            ->value('id');
+
+        if ($draftId) {
+            return (int) $draftId;
+        }
+
+        $publishedId = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+            ->where('is_active', true)
+            ->whereNull('clinic_id')
+            ->value('id');
+
+        return $publishedId ? (int) $publishedId : null;
+    }
+
+    protected static function currentClinicWorkingTemplateVersionId(?int $clinicId): ?int
+    {
+        if (! $clinicId) {
+            return null;
+        }
+
+        $templateKey = static::DEFAULT_TEMPLATE_KEY;
+
+        $draftId = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->where('clinic_id', $clinicId)
+            ->latest('id')
+            ->value('id');
+
+        if ($draftId) {
+            return (int) $draftId;
+        }
+
+        $publishedId = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+            ->where('is_active', true)
+            ->where('clinic_id', $clinicId)
+            ->value('id');
+
+        return $publishedId ? (int) $publishedId : null;
     }
 
     public static function sectionLabel(?string $sectionKey, ?string $templateKey = null, ?int $clinicId = null): string

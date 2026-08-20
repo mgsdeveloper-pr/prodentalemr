@@ -2,9 +2,9 @@
     <x-verification-management-shell
         :items="$this->getVerificationNavItems()"
         active="assignment"
-        menu-title="Verification"
-        menu-eyebrow="Admin Settings"
-        menu-description="Configure verification output, assignment logic, question content, and workspace controls from one place."
+        menu-title="Settings"
+        menu-eyebrow="Verification"
+        menu-description="Clinic, mailbox, output, and administrative configuration."
     >
         <div style="display: flex; flex-direction: column; gap: 22px;">
             <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">

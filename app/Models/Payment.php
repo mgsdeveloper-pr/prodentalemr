@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Services\Notifications\ProductNotificationService;
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payment extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     public const METHOD_LABELS = [
         'manual' => 'Manual',
@@ -53,6 +56,7 @@ class Payment extends Model
         static::saved($refreshInvoice);
         static::deleted($refreshInvoice);
         static::restored($refreshInvoice);
+        static::created(fn (self $payment): mixed => app(ProductNotificationService::class)->paymentReceived($payment));
     }
 
     public function invoice(): BelongsTo

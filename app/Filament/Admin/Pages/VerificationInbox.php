@@ -2,12 +2,14 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMessage;
 use App\Support\AdminClinicScope;
 use App\Support\SaasEntitlements;
 use App\Support\VerificationInboxService;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
@@ -24,7 +26,7 @@ class VerificationInbox extends Page
 
     protected static ?int $navigationSort = 3;
 
-    protected static ?string $title = '';
+    protected static ?string $title = 'Clinic Inbox';
 
     protected static ?string $slug = 'inbox';
 
@@ -42,6 +44,32 @@ class VerificationInbox extends Page
     {
         return (auth()->user()?->canAccessVerificationWorkspace() ?? false)
             && SaasEntitlements::userFeatureAllowed(auth()->user(), 'clinic_inbox', AdminClinicScope::selectedClinic());
+    }
+
+    public function getSubheading(): ?string
+    {
+        $scope = AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics';
+        $status = $this->getConnectionStatus();
+
+        return "Review payer notices, portal emails, and OTP messages. Scope: {$scope}. Connection: {$status['label']}.";
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            'Clinic Inbox',
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('refreshInbox')
+                ->label('Refresh Inbox')
+                ->icon('heroicon-o-arrow-path')
+                ->action('refreshInbox'),
+        ];
     }
 
     public function mount(): void
@@ -169,7 +197,7 @@ class VerificationInbox extends Page
             return [
                 'tone' => 'warning',
                 'label' => 'Clinic mailbox not configured',
-                'description' => 'Open Inbox Configuration and add mailbox details for this clinic.',
+                'description' => 'Open Settings > Mailbox > Clinic Inbox and add mailbox details for this clinic.',
             ];
         }
 
@@ -177,7 +205,7 @@ class VerificationInbox extends Page
             return [
                 'tone' => 'warning',
                 'label' => 'Mailbox not configured',
-                'description' => 'Open Inbox Configuration and add this clinic mailbox connection details.',
+                'description' => 'Open Settings > Mailbox > Clinic Inbox and add this clinic mailbox connection details.',
             ];
         }
 

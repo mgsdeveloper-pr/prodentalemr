@@ -25,11 +25,11 @@ class PatientResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
 
-    protected static ?string $navigationLabel = 'Patients';
+    protected static ?string $navigationLabel = 'Patient Manager';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Patient Care';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Data';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'full_name';
 

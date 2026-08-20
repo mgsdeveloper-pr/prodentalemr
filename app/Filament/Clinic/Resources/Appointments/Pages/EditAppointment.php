@@ -4,9 +4,12 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages;
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\Concerns\InteractsWithAppointmentEditor;
+use App\Services\Appointments\AppointmentSchedulingService;
+use App\Support\AppointmentVerificationSender;
 use App\Support\AppointmentWorkspaceScope;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 
@@ -18,7 +21,7 @@ class EditAppointment extends EditRecord
 
     protected string $view = 'filament.clinic.resources.appointments.pages.appointment-editor';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
@@ -26,7 +29,35 @@ class EditAppointment extends EditRecord
         $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
         $data = $this->syncStatusTimestamps($data);
 
-        return $data;
+        return app(AppointmentSchedulingService::class)->validateAndNormalize($data, $this->record);
+    }
+
+    protected function afterSave(): void
+    {
+        if (! $this->record->verification_required || filled($this->record->verification_work_item_id)) {
+            return;
+        }
+
+        try {
+            app(AppointmentVerificationSender::class)->send(
+                $this->record,
+                $this->record->verification_processing_mode,
+            );
+
+            Notification::make()
+                ->title('Verification workflow created')
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->title('Appointment saved; verification needs attention')
+                ->body($exception->getMessage())
+                ->warning()
+                ->persistent()
+                ->send();
+        }
     }
 
     protected function syncStatusTimestamps(array $data): array

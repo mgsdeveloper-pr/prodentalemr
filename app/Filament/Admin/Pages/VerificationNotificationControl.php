@@ -2,9 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
-use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
-use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
-use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\SaasSetting;
 use BackedEnum;
 use App\Support\VerificationSettingsNavigation;
@@ -50,6 +48,20 @@ class VerificationNotificationControl extends Page implements HasForms
     public static function canAccess(): bool
     {
         return auth()->user()?->canManageVerificationNotifications() ?? false;
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Control verification recipients, workflow events, and urgent alerts.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            VerificationGeneralSettings::getUrl() => 'Settings',
+            'Notifications',
+        ];
     }
 
     public function mount(): void
@@ -110,6 +122,28 @@ class VerificationNotificationControl extends Page implements HasForms
                                 ->default(true),
                         ]),
                     ]),
+                Section::make('Email Alerts')
+                    ->description('Email remains off by default. When enabled, messages contain only a secure reference and never patient details.')
+                    ->schema([
+                        Toggle::make('verification_email_notifications_enabled')
+                            ->label('Enable verification email alerts')
+                            ->default(false)
+                            ->live(),
+                        Grid::make(4)->schema([
+                            Toggle::make('verification_email_on_urgent')
+                                ->label('Urgent verification')
+                                ->default(true),
+                            Toggle::make('verification_email_on_clinic_action')
+                                ->label('Clinic request or response')
+                                ->default(true),
+                            Toggle::make('verification_email_on_sla')
+                                ->label('SLA due or overdue')
+                                ->default(true),
+                            Toggle::make('verification_email_on_audit')
+                                ->label('Audit and correction actions')
+                                ->default(true),
+                        ]),
+                    ]),
             ]);
     }
 
@@ -127,16 +161,10 @@ class VerificationNotificationControl extends Page implements HasForms
         $state = $this->form->getState();
         $newRequestEnabled = (bool) ($state['verification_notify_on_new_request'] ?? true);
 
-        $state['verification_notify_clinic_workspace'] = false;
         $state['verification_notify_on_managed_service_requested'] = $newRequestEnabled;
         $state['verification_notify_on_clinic_self_service_created'] = $newRequestEnabled;
         $state['verification_notify_on_verification_request_created'] = $newRequestEnabled;
         $state['verification_notify_on_admin_import_created'] = $newRequestEnabled;
-        $state['verification_notify_on_outcome_changed'] = false;
-        $state['verification_notify_on_clinic_verification_updated'] = false;
-        $state['verification_notify_on_verification_profile_saved'] = false;
-        $state['verification_notify_on_verification_pdf_download'] = false;
-        $state['verification_notify_on_verification_pdf_preview'] = false;
         unset($state['verification_notify_on_new_request']);
 
         $this->settings->update($state);
@@ -169,6 +197,11 @@ class VerificationNotificationControl extends Page implements HasForms
             'verification_notify_on_urgent_flagged',
             'verification_notify_on_urgent_assigned',
             'verification_notify_on_sla_alert',
+            'verification_email_notifications_enabled',
+            'verification_email_on_urgent',
+            'verification_email_on_clinic_action',
+            'verification_email_on_sla',
+            'verification_email_on_audit',
         ];
     }
 

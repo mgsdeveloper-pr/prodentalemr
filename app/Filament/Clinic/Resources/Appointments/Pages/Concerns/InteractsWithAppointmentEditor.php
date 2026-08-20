@@ -3,8 +3,10 @@
 namespace App\Filament\Clinic\Resources\Appointments\Pages\Concerns;
 
 use App\Models\Appointment;
+use App\Models\BillingWorkItem;
 use App\Models\Location;
 use App\Models\Patient;
+use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
 use App\Support\AppointmentWorkspaceScope;
 use Carbon\Carbon;
@@ -71,6 +73,32 @@ trait InteractsWithAppointmentEditor
             : 'General Appointment';
     }
 
+    public function getCurrentInsuranceLabel(): string
+    {
+        $policyId = $this->data['patient_insurance_policy_id'] ?? null;
+
+        if (! filled($policyId)) {
+            return 'No active policy on patient record';
+        }
+
+        $policy = PatientInsurancePolicy::query()->find($policyId);
+
+        return $policy
+            ? collect([$policy->insurance_company, $policy->member_id ? 'Member '.$policy->member_id : null])->filter()->implode(' | ')
+            : 'Policy record unavailable';
+    }
+
+    public function getVerificationRouteLabel(): string
+    {
+        if (! ($this->data['verification_required'] ?? true)) {
+            return 'Verification not required';
+        }
+
+        $mode = $this->data['verification_processing_mode'] ?? null;
+
+        return BillingWorkItem::PROCESSING_MODE_OPTIONS[$mode] ?? 'Select who will complete verification';
+    }
+
     public function getCurrentStatusLabel(): string
     {
         $status = $this->data['status'] ?? 'scheduled';
@@ -93,11 +121,11 @@ trait InteractsWithAppointmentEditor
         $formattedEnd = $end ? Carbon::parse($end)->format('g:i A') : null;
 
         if ($formattedStart && $formattedEnd) {
-            return $formattedDate . ' • ' . $formattedStart . ' - ' . $formattedEnd;
+            return $formattedDate.' • '.$formattedStart.' - '.$formattedEnd;
         }
 
         if ($formattedStart) {
-            return $formattedDate . ' • ' . $formattedStart;
+            return $formattedDate.' • '.$formattedStart;
         }
 
         return $formattedDate;
@@ -107,7 +135,7 @@ trait InteractsWithAppointmentEditor
     {
         $minutes = $this->data['duration_minutes'] ?? null;
 
-        return filled($minutes) ? $minutes . ' minutes planned' : 'Duration not set yet';
+        return filled($minutes) ? $minutes.' minutes planned' : 'Duration not set yet';
     }
 
     public function getProviderDaySnapshot(): array
@@ -161,7 +189,14 @@ trait InteractsWithAppointmentEditor
         $existing = Appointment::query()
             ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
             ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
-            ->where('provider_id', $providerId)
+            ->whereNotIn('status', ['cancelled', 'no_show'])
+            ->where(function ($query) use ($providerId): void {
+                $query->where('provider_id', $providerId);
+
+                if (filled($this->data['clinic_operatory_id'] ?? null)) {
+                    $query->orWhere('clinic_operatory_id', $this->data['clinic_operatory_id']);
+                }
+            })
             ->whereDate('appointment_date', $date)
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))
             ->get(['start_time', 'end_time']);
@@ -237,7 +272,7 @@ trait InteractsWithAppointmentEditor
             return 'No slot selected';
         }
 
-        return Carbon::parse($start)->format('g:i A') . ' - ' . Carbon::parse($end)->format('g:i A');
+        return Carbon::parse($start)->format('g:i A').' - '.Carbon::parse($end)->format('g:i A');
     }
 
     public function previousCalendarMonth(): void
@@ -342,6 +377,7 @@ trait InteractsWithAppointmentEditor
             ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
             ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
             ->where('provider_id', $providerId)
+            ->whereNotIn('status', ['cancelled', 'no_show'])
             ->whereBetween('appointment_date', [$from->toDateString(), $to->toDateString()])
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))
             ->get(['appointment_date', 'start_time', 'end_time'])
@@ -376,14 +412,14 @@ trait InteractsWithAppointmentEditor
 
         return [
             'tone' => 'open',
-            'label' => $count . ' Slots',
+            'label' => $count.' Slots',
         ];
     }
 
     protected function buildAvailableSlotsForDate(string $date, int $duration, Collection $existingAppointments): array
     {
-        $dayStart = Carbon::parse($date . ' 09:00:00');
-        $dayEnd = Carbon::parse($date . ' 17:00:00');
+        $dayStart = Carbon::parse($date.' 09:00:00');
+        $dayEnd = Carbon::parse($date.' 17:00:00');
         $slots = [];
         $cursor = $dayStart->copy();
         $selectedStart = $this->data['start_time'] ?? null;
@@ -398,8 +434,8 @@ trait InteractsWithAppointmentEditor
                     return false;
                 }
 
-                $existingStart = Carbon::parse($date . ' ' . $appointment->start_time);
-                $existingEnd = Carbon::parse($date . ' ' . $appointment->end_time);
+                $existingStart = Carbon::parse($date.' '.$appointment->start_time);
+                $existingEnd = Carbon::parse($date.' '.$appointment->end_time);
 
                 return $slotStart->lt($existingEnd) && $slotEnd->gt($existingStart);
             });
@@ -411,12 +447,12 @@ trait InteractsWithAppointmentEditor
                 $slots[] = [
                     'start' => $startValue,
                     'end' => $endValue,
-                    'label' => $slotStart->format('g:i A') . ' - ' . $slotEnd->format('g:i A'),
+                    'label' => $slotStart->format('g:i A').' - '.$slotEnd->format('g:i A'),
                     'is_selected' => $selectedStart === $startValue && $selectedEnd === $endValue,
                 ];
             }
 
-            $cursor->addMinutes(30);
+            $cursor->addMinutes(15);
         }
 
         return $slots;

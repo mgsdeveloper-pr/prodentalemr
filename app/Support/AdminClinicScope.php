@@ -95,6 +95,21 @@ class AdminClinicScope
         return $query->whereIn($column, $accessibleClinicIds);
     }
 
+    public static function applyVerificationRequests(
+        Builder $query,
+        string $clinicColumn = 'clinic_id',
+        string $assigneeColumn = 'assigned_to'
+    ): Builder {
+        $query = self::apply($query, $clinicColumn);
+        $user = auth()->user();
+
+        if ($user?->hasRole('verification_user') && ! $user->canManageVerificationQueue()) {
+            $query->where($assigneeColumn, $user->getAuthIdentifier());
+        }
+
+        return $query;
+    }
+
     public static function managedServiceClinicQuery(): Builder
     {
         return Clinic::query()

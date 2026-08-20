@@ -121,7 +121,7 @@
                         </div>
                         <div style="display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                             @if (filled($notification->target_url))
-                                <a href="{{ $notification->target_url }}" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700; text-decoration: none;">
+                                <a href="{{ $this->notificationOpenUrl($notification) }}" style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 13px; font-weight: 700; text-decoration: none;">
                                     Open
                                 </a>
                             @endif

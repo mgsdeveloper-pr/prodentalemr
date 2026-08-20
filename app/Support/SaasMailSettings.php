@@ -8,8 +8,29 @@ use Illuminate\Support\Facades\Mail;
 
 class SaasMailSettings
 {
+    public static function normalizeHost(?string $host): ?string
+    {
+        if (blank($host)) {
+            return null;
+        }
+
+        $normalized = trim($host);
+        $normalized = preg_replace('#^[a-z][a-z0-9+.-]*://#i', '', $normalized) ?? $normalized;
+        $normalized = preg_replace('#[/:]+$#', '', $normalized) ?? $normalized;
+
+        return filled($normalized) ? $normalized : null;
+    }
+
+    public static function normalizeState(array $state): array
+    {
+        $state['email_host'] = static::normalizeHost($state['email_host'] ?? null);
+
+        return $state;
+    }
+
     public static function apply(array $state): void
     {
+        $state = static::normalizeState($state);
         $mailer = $state['email_mailer'] ?? 'smtp';
         $encryption = $state['email_encryption'] ?? null;
         $scheme = match ($encryption) {
@@ -47,6 +68,8 @@ class SaasMailSettings
 
     public static function canSend(array $state): bool
     {
+        $state = static::normalizeState($state);
+
         if (! ($state['email_enabled'] ?? false)) {
             return false;
         }

@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClinicPortalCredentialOverride extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'organization_id',
         'clinic_id',

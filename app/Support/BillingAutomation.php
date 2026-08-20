@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Invoice;
 use App\Models\SaasSetting;
+use App\Services\Notifications\ProductNotificationService;
 
 class BillingAutomation
 {
@@ -48,6 +49,8 @@ class BillingAutomation
                     'status' => 'overdue',
                     'marked_overdue_at' => now(),
                 ])->save();
+
+                app(ProductNotificationService::class)->invoiceOverdue($invoice);
 
                 $count++;
             });

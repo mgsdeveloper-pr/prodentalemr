@@ -18,6 +18,10 @@ class DatabaseSeeder extends Seeder
         $this->call(RoleSeeder::class);
         $this->call(SubscriptionPlanSeeder::class);
 
+        if (app()->environment('local')) {
+            $this->call(LocalAdminUserSeeder::class);
+        }
+
         // User::factory(10)->create();
 
         User::query()->firstOrCreate([

@@ -11,10 +11,9 @@ class UserMailboxAttachmentController extends Controller
 {
     public function __invoke(Request $request, UserMailboxService $service): StreamedResponse
     {
-        abort_unless(auth()->user()?->canAccessVerificationWorkspace(), 403);
-
         $mailbox = $service->mailbox(auth()->user());
         abort_unless($mailbox && $service->isConfigured($mailbox), 404);
+        abort_unless(auth()->user()?->can('download', $mailbox), 403);
 
         $attachment = $service->downloadAttachment(
             $mailbox,

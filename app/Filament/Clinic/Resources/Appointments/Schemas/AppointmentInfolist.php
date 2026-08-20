@@ -2,6 +2,9 @@
 
 namespace App\Filament\Clinic\Resources\Appointments\Schemas;
 
+use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
+use App\Models\Appointment;
+use App\Models\BillingWorkItem;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -52,9 +55,22 @@ class AppointmentInfolist
                                     ->label('Visit type')
                                     ->placeholder('-')
                                     ->columnSpan(2),
+                                TextEntry::make('clinicService.service_code')
+                                    ->label('Service code')
+                                    ->placeholder('-'),
+                                TextEntry::make('insurancePolicy.insurance_company')
+                                    ->label('Insurance policy')
+                                    ->description(fn ($record): ?string => $record->insurancePolicy?->member_id
+                                        ? 'Member '.$record->insurancePolicy->member_id
+                                        : null)
+                                    ->placeholder('Not selected'),
+                                TextEntry::make('parentAppointment.appointment_date')
+                                    ->label('Follow-up to')
+                                    ->date('M d, Y')
+                                    ->placeholder('Not a follow-up'),
                                 TextEntry::make('duration_minutes')
                                     ->label('Duration')
-                                    ->formatStateUsing(fn ($state): string => filled($state) ? $state . ' min' : '-'),
+                                    ->formatStateUsing(fn ($state): string => filled($state) ? $state.' min' : '-'),
                                 TextEntry::make('checked_in_at')
                                     ->label('Checked in at')
                                     ->dateTime('M d, Y h:i A')
@@ -79,6 +95,53 @@ class AppointmentInfolist
                             ->label('Arrival notes')
                             ->placeholder('-')
                             ->columnSpanFull(),
+                        TextEntry::make('reason_for_visit')
+                            ->label('Reason for visit')
+                            ->placeholder('-')
+                            ->columnSpanFull(),
+                    ]),
+                Section::make('Insurance Verification')
+                    ->description('Verification follows this appointment from request creation through completion.')
+                    ->schema([
+                        Grid::make(4)
+                            ->schema([
+                                TextEntry::make('verification_status')
+                                    ->label('Verification status')
+                                    ->badge()
+                                    ->state(fn ($record): string => $record->verification_status ?: Appointment::VERIFICATION_STATUS_NOT_SENT)
+                                    ->formatStateUsing(fn (string $state): string => Appointment::VERIFICATION_STATUS_OPTIONS[$state] ?? 'Not Sent')
+                                    ->color(fn (string $state): string => match ($state) {
+                                        Appointment::VERIFICATION_STATUS_COMPLETED => 'success',
+                                        Appointment::VERIFICATION_STATUS_IN_PROGRESS => 'info',
+                                        Appointment::VERIFICATION_STATUS_SENT => 'warning',
+                                        Appointment::VERIFICATION_STATUS_NEEDS_INSURANCE => 'danger',
+                                        default => 'gray',
+                                    }),
+                                TextEntry::make('verificationWorkItem.reference_number')
+                                    ->label('Request')
+                                    ->placeholder('Not created')
+                                    ->url(function ($record): ?string {
+                                        $request = $record->verificationWorkItem;
+
+                                        if (! $request) {
+                                            return null;
+                                        }
+
+                                        return VerificationRequestResource::getUrl(
+                                            $request->clinicUserCanEditVerification(auth()->user()) ? 'edit' : 'view',
+                                            ['record' => $request],
+                                        );
+                                    }),
+                                TextEntry::make('verificationWorkItem.processing_mode')
+                                    ->label('Completed by')
+                                    ->formatStateUsing(fn (?string $state): string => BillingWorkItem::PROCESSING_MODE_OPTIONS[$state] ?? 'Not selected')
+                                    ->placeholder('-'),
+                                TextEntry::make('verificationWorkItem.outcome_status')
+                                    ->label('Result')
+                                    ->badge()
+                                    ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title()->toString() : 'Pending')
+                                    ->color(fn (?string $state): string => in_array($state, ['verified', 'completed', 'approved'], true) ? 'success' : 'gray'),
+                            ]),
                     ]),
             ])
             ->columns(1);

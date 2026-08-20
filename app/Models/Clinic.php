@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use App\Models\VerificationFormQuestion;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -12,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Clinic extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'organization_id',
@@ -34,8 +36,10 @@ class Clinic extends Model
         'service_notes',
         'verification_pdf_output_mode',
         'verification_default_form_template',
+        'allow_verification_manager_template_edits',
         'verification_pdf_output_sections',
         'verification_pdf_output_question_ids',
+        'default_verification_pdf_preset_id',
     ];
 
     protected function casts(): array
@@ -48,6 +52,7 @@ class Clinic extends Model
             'demo_mode' => 'boolean',
             'feature_overrides' => 'array',
             'usage_snapshot' => 'array',
+            'allow_verification_manager_template_edits' => 'boolean',
             'verification_pdf_output_sections' => 'array',
             'verification_pdf_output_question_ids' => 'array',
         ];
@@ -80,6 +85,11 @@ class Clinic extends Model
     public function allowsManagedServices(): bool
     {
         return in_array($this->managed_services_status, ['active', 'trial'], true);
+    }
+
+    public function allowsVerificationManagerTemplateEdits(): bool
+    {
+        return (bool) $this->allow_verification_manager_template_edits;
     }
 
     public function featureOverride(string $feature, mixed $default = null): mixed
@@ -156,6 +166,16 @@ class Clinic extends Model
     public function verificationInboxMailbox(): HasOne
     {
         return $this->hasOne(VerificationInboxMailbox::class);
+    }
+
+    public function pdfPresets(): HasMany
+    {
+        return $this->hasMany(VerificationPdfPreset::class);
+    }
+
+    public function defaultVerificationPdfPreset(): BelongsTo
+    {
+        return $this->belongsTo(VerificationPdfPreset::class, 'default_verification_pdf_preset_id');
     }
 
     public function getVerificationPdfOutputMode(): string

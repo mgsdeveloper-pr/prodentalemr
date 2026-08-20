@@ -32,13 +32,23 @@ class BillingWorkItemResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static ?string $navigationLabel = 'Work Queue';
+    protected static ?string $navigationLabel = 'Verification Requests';
 
     protected static string|UnitEnum|null $navigationGroup = 'Insurance Verification';
 
     protected static ?int $navigationSort = 10;
 
     protected static ?string $recordTitleAttribute = 'display_title';
+
+    public static function getModelLabel(): string
+    {
+        return 'verification request';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'verification requests';
+    }
 
     public static function form(Schema $schema): Schema
     {

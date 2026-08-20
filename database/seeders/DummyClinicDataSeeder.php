@@ -17,7 +17,8 @@ class DummyClinicDataSeeder extends Seeder
         $clinic = Clinic::query()
             ->with('organization')
             ->where('organization_id', 1)
-            ->where('clinic_name', 'Meditya Global Services LLC')
+            ->whereIn('clinic_name', ['Meditya Global Services LLC', 'Demo Solo Dental Clinic'])
+            ->orderByRaw("FIELD(clinic_name, 'Demo Solo Dental Clinic', 'Meditya Global Services LLC')")
             ->first();
 
         if (! $clinic) {
@@ -28,7 +29,8 @@ class DummyClinicDataSeeder extends Seeder
 
         $location = Location::query()
             ->where('clinic_id', $clinic->id)
-            ->where('location_name', 'New York')
+            ->whereIn('location_name', ['New York', 'Main Office'])
+            ->orderByRaw("FIELD(location_name, 'Main Office', 'New York')")
             ->first();
 
         if (! $location) {
@@ -99,6 +101,6 @@ class DummyClinicDataSeeder extends Seeder
             ],
         );
 
-        $this->command?->info('Dummy provider and patient added to Meditya Global Services LLC / New York.');
+        $this->command?->info("Dummy provider and patient added to {$clinic->clinic_name} / {$location->location_name}.");
     }
 }

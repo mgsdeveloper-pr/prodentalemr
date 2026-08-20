@@ -27,9 +27,11 @@ class LocationResource extends Resource
 
     protected static ?string $navigationLabel = 'Locations';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 40;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $recordTitleAttribute = 'location_name';
 

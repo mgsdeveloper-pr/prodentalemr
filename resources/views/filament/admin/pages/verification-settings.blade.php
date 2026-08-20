@@ -6,16 +6,19 @@
         $selectedQuestionSections = $this->getSelectedQuestionSections();
         $availableQuestionSections = $this->getAvailableQuestionSectionsForSelection();
         $currentMode = $this->data['verification_pdf_output_mode'] ?? 'standard';
+        $currentModeLabel = \App\Support\VerificationResultPdf::OUTPUT_MODE_OPTIONS[\App\Support\VerificationResultPdf::normalizeOutputMode($currentMode)] ?? 'Standard';
+        $isCustomOutputMode = \App\Support\VerificationResultPdf::isCustomOutputMode($currentMode);
         $selectedSections = is_array($this->data['verification_pdf_output_sections'] ?? null) ? $this->data['verification_pdf_output_sections'] : [];
+        $showBlankRows = (bool) ($this->data['verification_pdf_show_blank_rows'] ?? ! $isCustomOutputMode);
         $verificationNavItems = \App\Support\VerificationSettingsNavigation::items();
     @endphp
 
     <x-verification-management-shell
         :items="$verificationNavItems"
-        active="settings"
-        menu-title="Verification"
-        menu-eyebrow="Admin Settings"
-        menu-description="Configure verification output, question content, and section ordering from one workspace."
+        active="pdf"
+        menu-title="Settings"
+        menu-eyebrow="Verification"
+        menu-description="Clinic, mailbox, output, and administrative configuration."
     >
     <div class="verification-settings-page" style="display: flex; flex-direction: column; gap: 22px;">
         <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
@@ -48,6 +51,35 @@
 
         <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
             <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
+                <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #0f766e;">Output Flow</div>
+                <h3 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">How this preset prints</h3>
+            </div>
+            <div style="padding: 18px 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+                <div style="padding: 14px 16px; border-radius: 16px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                    <div style="margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Form Type</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;">Full or Short</div>
+                    <div style="margin-top: 6px; font-size: 12px; line-height: 1.6; color: #64748b;">Selected on the verification request.</div>
+                </div>
+                <div style="padding: 14px 16px; border-radius: 16px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                    <div style="margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">PDF Layout</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $currentModeLabel }}</div>
+                    <div style="margin-top: 6px; font-size: 12px; line-height: 1.6; color: #64748b;">Controls Standard, Custom Portrait, or Custom Landscape output.</div>
+                </div>
+                <div style="padding: 14px 16px; border-radius: 16px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                    <div style="margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Custom Selection</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $isCustomOutputMode ? count($selectedSections) . ' section(s)' : 'Not required' }}</div>
+                    <div style="margin-top: 6px; font-size: 12px; line-height: 1.6; color: #64748b;">Section and question choices apply only to custom layouts.</div>
+                </div>
+                <div style="padding: 14px 16px; border-radius: 16px; border: 1px solid #dbe4ee; background: #f8fafc;">
+                    <div style="margin-bottom: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Blank Rows</div>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;">{{ $showBlankRows ? 'Shown' : 'Hidden' }}</div>
+                    <div style="margin-top: 6px; font-size: 12px; line-height: 1.6; color: #64748b;">Hidden keeps custom PDFs compact and easier to fit on one page.</div>
+                </div>
+            </div>
+        </section>
+
+        <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
+            <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7;">
                 <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #0f766e;">Sub-Question Selection</div>
                 <h3 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">Choose Questions to Include</h3>
                 <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
@@ -55,9 +87,9 @@
                 </p>
             </div>
             <div style="padding: 18px 22px; display: flex; flex-direction: column; gap: 12px;">
-                @if ($currentMode !== 'selected')
+                @if (! $isCustomOutputMode)
                     <div style="border: 1px dashed #cbd5e1; border-radius: 18px; padding: 22px; background: #f8fafc; font-size: 14px; line-height: 1.7; color: #64748b;">
-                        Switch the default output to <strong>Current with Selected Output</strong> to configure question-level PDF selection.
+                        Switch the default output to <strong>Custom Landscape</strong> or <strong>Custom Portrait</strong> to configure question-level PDF selection.
                     </div>
                 @elseif (empty($selectedSections))
                     <div style="border: 1px dashed #cbd5e1; border-radius: 18px; padding: 22px; background: #f8fafc; font-size: 14px; line-height: 1.7; color: #64748b;">
@@ -99,7 +131,7 @@
                             </div>
                             <div style="padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
                                 @foreach ($section['questions'] as $question)
-                                    <label style="display: flex; align-items: flex-start; gap: 12px; min-height: 72px; padding: 14px 16px; border: 1px solid {{ $question['selected'] ? '#f59e0b' : '#e2e8f0' }}; border-radius: 18px; background: {{ $question['selected'] ? 'linear-gradient(180deg, #fffdf7 0%, #fff7ed 100%)' : '#ffffff' }}; box-shadow: {{ $question['selected'] ? '0 8px 20px rgba(245, 158, 11, 0.12)' : '0 2px 8px rgba(15, 23, 42, 0.04)' }};">
+                                    <label style="display: flex; align-items: flex-start; gap: 12px; min-height: 72px; padding: 14px 16px; border: 1px solid {{ $question['selected'] ? '#5eead4' : '#e2e8f0' }}; border-radius: 18px; background: {{ $question['selected'] ? 'linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%)' : '#ffffff' }}; box-shadow: {{ $question['selected'] ? '0 8px 20px rgba(15, 118, 110, 0.10)' : '0 2px 8px rgba(15, 23, 42, 0.04)' }};">
                                         <input
                                             type="checkbox"
                                             value="{{ $question['id'] }}"
@@ -110,7 +142,7 @@
                                             <span style="font-size: 13px; line-height: 1.55; font-weight: 700; color: #0f172a;">
                                                 {{ $question['prompt'] }}
                                             </span>
-                                            <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{ $question['selected'] ? '#b45309' : '#94a3b8' }};">
+                                            <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: {{ $question['selected'] ? '#0f766e' : '#94a3b8' }};">
                                                 {{ $question['selected'] ? 'Included in PDF' : 'Available to include' }}
                                             </span>
                                         </span>

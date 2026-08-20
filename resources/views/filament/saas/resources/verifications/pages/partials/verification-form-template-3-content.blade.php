@@ -43,7 +43,6 @@
         'Provider' => [
             ['label' => 'Doctor', 'value' => $quickReference['provider_name'] ?? '-'],
             ['label' => 'Provider NPI', 'value' => $quickReference['provider_npi'] ?? '-'],
-            ['label' => 'Practice NPI', 'value' => $quickReference['practice_npi'] ?? '-'],
             ['label' => 'Insurance Phone', 'value' => $quickReference['phone'] ?? '-'],
         ],
         'Patient' => $templateThreeContextRows['patient'] ?? [],
@@ -241,20 +240,30 @@
 
         return null;
     };
-    $templateThreePlanProvisionFields = [
-        data_get($this->data, 'vf_missing_tooth_clause'),
-        data_get($this->data, 'vf_crowns_paid_on'),
-        data_get($this->data, 'vf_prosthetic_replacement_period'),
-        data_get($this->data, 'vf_coordination_of_benefits'),
-        data_get($this->data, 'vf_plan_provisions'),
-        $this->waitingPeriodAnswer === 'yes'
-            ? collect($this->waitingPeriodDetails ?? [])->contains(
-                fn ($detail): bool => filled(data_get($detail, 'period'))
-                    || filled(data_get($detail, 'notes'))
-                    || filled(data_get($detail, 'unit'))
-            )
-            : filled($this->waitingPeriodAnswer ?? null),
+    $templateThreePlanProvisionVisibility = [
+        'vf_waiting_periods' => $this->templateThreeFieldIsVisible('vf_waiting_periods', false),
+        'vf_missing_tooth_clause' => $this->templateThreeFieldIsVisible('vf_missing_tooth_clause', false),
+        'vf_crowns_paid_on' => $this->templateThreeFieldIsVisible('vf_crowns_paid_on', false),
+        'vf_prosthetic_replacement_period' => $this->templateThreeFieldIsVisible('vf_prosthetic_replacement_period', false),
+        'vf_coordination_of_benefits' => $this->templateThreeFieldIsVisible('vf_coordination_of_benefits', false),
+        'vf_plan_provisions' => $this->templateThreeFieldIsVisible('vf_plan_provisions', false),
     ];
+    $templateThreePlanProvisionFields = array_values(array_filter([
+        $templateThreePlanProvisionVisibility['vf_missing_tooth_clause'] ? data_get($this->data, 'vf_missing_tooth_clause') : null,
+        $templateThreePlanProvisionVisibility['vf_crowns_paid_on'] ? data_get($this->data, 'vf_crowns_paid_on') : null,
+        $templateThreePlanProvisionVisibility['vf_prosthetic_replacement_period'] ? data_get($this->data, 'vf_prosthetic_replacement_period') : null,
+        $templateThreePlanProvisionVisibility['vf_coordination_of_benefits'] ? data_get($this->data, 'vf_coordination_of_benefits') : null,
+        $templateThreePlanProvisionVisibility['vf_plan_provisions'] ? data_get($this->data, 'vf_plan_provisions') : null,
+        $templateThreePlanProvisionVisibility['vf_waiting_periods']
+            ? ($this->waitingPeriodAnswer === 'yes'
+                ? collect($this->waitingPeriodDetails ?? [])->contains(
+                    fn ($detail): bool => filled(data_get($detail, 'period'))
+                        || filled(data_get($detail, 'notes'))
+                        || filled(data_get($detail, 'unit'))
+                )
+                : filled($this->waitingPeriodAnswer ?? null))
+            : null,
+    ], fn ($value): bool => $value !== null));
     $templateThreePlanProvisionCompleted = collect($templateThreePlanProvisionFields)
         ->filter(fn ($value): bool => filled($value))
         ->count();
@@ -741,16 +750,6 @@
         font-size: 13px;
     }
 
-    .uel2-actions {
-        display: flex;
-        justify-content: flex-end;
-        flex-wrap: wrap;
-        gap: 12px;
-        padding: 18px 20px;
-        border-top: 1px solid var(--uel2-line);
-        background: #fbfdfc;
-    }
-
     .uel2-managed-questions {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -853,15 +852,16 @@
                                 ['Patient Name', $quickReference['patient'] ?? '-'],
                                 ['Patient DOB', $quickReference['dob'] ?? '-'],
                                 ['Member ID', $quickReference['member_id'] ?? '-'],
+                                ['Relationship', $quickReference['relationship'] ?? '-'],
                                 ['Subscriber Name', $quickReference['subscriber_name'] ?? '-'],
                                 ['Subscriber DOB', $quickReference['subscriber_dob'] ?? '-'],
                                 ['Coverage Role', $quickReference['coverage_role'] ?? '-'],
                                 ['Insurance / TPA', $quickReference['insurance_name'] ?? '-'],
                                 ['Insurance / TPA Phone', $quickReference['phone'] ?? '-'],
                                 ['Group Number', $quickReference['group_number'] ?? '-'],
+                                ['Appointment Date', $quickReference['appointment_date'] ?? '-'],
                                 ['Doctor Name', $quickReference['provider_name'] ?? '-'],
                                 ['Provider NPI', $quickReference['provider_npi'] ?? '-'],
-                                ['Practice NPI', $quickReference['practice_npi'] ?? '-'],
                             ] as [$quickReferenceLabel, $quickReferenceValue])
                                 <div class="uel2-quick-reference__item">
                                     <div class="uel2-quick-reference__label">{{ $quickReferenceLabel }}</div>
@@ -940,9 +940,9 @@
                 ['Date of Birth', 'vf_patient_dob', 'date'],
                 ['Member ID', 'vf_patient_identifier', 'text'],
                 ['Relationship', 'vf_insured_relation', 'select', [
-                    'Dependent' => 'Dependent',
-                    'Self' => 'Self',
-                    'Spouse' => 'Spouse',
+                    'dependent' => 'Dependent',
+                    'self' => 'Self',
+                    'spouse' => 'Spouse',
                 ]],
                 ['Subscriber Name', 'vf_subscriber_name', 'text'],
                 ['Subscriber DOB', 'vf_subscriber_dob', 'date'],
@@ -1224,19 +1224,21 @@
                 <table class="uel2-table">
                     <thead><tr><th style="width:68%;">Question</th><th style="width:32%;" aria-label="Response"></th></tr></thead>
                     <tbody>
-                        <tr>
-                            <td data-label="Question">
-                                <b>Is there any Waiting Period on this plan?</b>
-                                <div style="margin-top:4px;color:#6d7d77;font-size:12px;">If Yes, waiting period details will appear below.</div>
-                            </td>
-                            <td data-label="Response">
-                                <select wire:model.live="waitingPeriodAnswer">
-                                    <option value="no">No</option>
-                                    <option value="yes">Yes</option>
-                                </select>
-                            </td>
-                        </tr>
-                        @if ($this->waitingPeriodAnswer === 'yes')
+                        @if ($templateThreePlanProvisionVisibility['vf_waiting_periods'])
+                            <tr>
+                                <td data-label="Question">
+                                    <b>Is there any Waiting Period on this plan?</b>
+                                    <div style="margin-top:4px;color:#6d7d77;font-size:12px;">If Yes, waiting period details will appear below.</div>
+                                </td>
+                                <td data-label="Response">
+                                    <select wire:model.live="waitingPeriodAnswer">
+                                        <option value="no">No</option>
+                                        <option value="yes">Yes</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        @endif
+                        @if ($templateThreePlanProvisionVisibility['vf_waiting_periods'] && $this->waitingPeriodAnswer === 'yes')
                             <tr>
                                 <td colspan="2" style="padding:14px;">
                                     <div style="padding:16px;border:1px solid #bfe3d5;border-radius:16px;background:#f7fcfa;">
@@ -1278,52 +1280,62 @@
                                 </td>
                             </tr>
                         @endif
-                        <tr>
-                            <td data-label="Question"><b>Missing Tooth Clause</b></td>
-                            <td data-label="Response">
-                                <select wire:model.blur="data.vf_missing_tooth_clause">
-                                    <option value="">Select</option>
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                </select>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td data-label="Question"><b>Crowns are paid on Prep Date or Seat Date?</b></td>
-                            <td data-label="Response">
-                                <select wire:model.blur="data.vf_crowns_paid_on">
-                                    <option value="">Select</option>
-                                    <option value="Prep">Prep</option>
-                                    <option value="Seat">Seat</option>
-                                    <option value="Either-Or">Either-Or</option>
-                                </select>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td data-label="Question"><b>Prosthetic Replacement Year / Month</b></td>
-                            <td data-label="Response">
-                                <input wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period">
-                            </td>
-                        </tr>
-                        <tr>
-                            <td data-label="Question"><b>Coordination of Benefits</b></td>
-                            <td data-label="Response">
-                                <select wire:model.blur="data.vf_coordination_of_benefits">
-                                    <option value="">Select</option>
-                                    <option value="Standard">Standard</option>
-                                    <option value="Non-Dup">Non-Dup</option>
-                                    <option value="Birthday Rule">Birthday Rule</option>
-                                    <option value="No COB">No COB</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </td>
-                        </tr>
+                        @if ($templateThreePlanProvisionVisibility['vf_missing_tooth_clause'])
+                            <tr>
+                                <td data-label="Question"><b>Missing Tooth Clause</b></td>
+                                <td data-label="Response">
+                                    <select wire:model.blur="data.vf_missing_tooth_clause">
+                                        <option value="">Select</option>
+                                        <option value="No">No</option>
+                                        <option value="Yes">Yes</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        @endif
+                        @if ($templateThreePlanProvisionVisibility['vf_crowns_paid_on'])
+                            <tr>
+                                <td data-label="Question"><b>Crowns are paid on Prep Date or Seat Date?</b></td>
+                                <td data-label="Response">
+                                    <select wire:model.blur="data.vf_crowns_paid_on">
+                                        <option value="">Select</option>
+                                        <option value="Prep">Prep</option>
+                                        <option value="Seat">Seat</option>
+                                        <option value="Either-Or">Either-Or</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        @endif
+                        @if ($templateThreePlanProvisionVisibility['vf_prosthetic_replacement_period'])
+                            <tr>
+                                <td data-label="Question"><b>Prosthetic Replacement Year / Month</b></td>
+                                <td data-label="Response">
+                                    <input wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period">
+                                </td>
+                            </tr>
+                        @endif
+                        @if ($templateThreePlanProvisionVisibility['vf_coordination_of_benefits'])
+                            <tr>
+                                <td data-label="Question"><b>Coordination of Benefits</b></td>
+                                <td data-label="Response">
+                                    <select wire:model.blur="data.vf_coordination_of_benefits">
+                                        <option value="">Select</option>
+                                        <option value="Standard">Standard</option>
+                                        <option value="Non-Dup">Non-Dup</option>
+                                        <option value="Birthday Rule">Birthday Rule</option>
+                                        <option value="No COB">No COB</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        @endif
                     </tbody>
                 </table>
-                <div class="uel2-field" style="margin-top:14px;">
-                    <label>Plan Provision Notes</label>
-                    <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateThreeInput }}"></textarea>
-                </div>
+                @if ($templateThreePlanProvisionVisibility['vf_plan_provisions'])
+                    <div class="uel2-field" style="margin-top:14px;">
+                        <label>Plan Provision Notes</label>
+                        <textarea wire:model.blur="data.vf_plan_provisions" placeholder="Add any other plan provision note" style="{{ $templateThreeInput }}"></textarea>
+                    </div>
+                @endif
                 @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
                     'questions' => $templateThreePlanProvisionQuestions,
                 ])
@@ -1500,29 +1512,6 @@
                 ])
             </div>
         @endif
-        <div class="uel2-actions">
-            @if ($canSubmitForm)
-                <button
-                    type="button"
-                    @if (($this->formTemplate ?? null) === 'template_3')
-                        onclick="return window.triggerTemplateThreeDraftSave(this);"
-                    @else
-                        wire:click="saveAsDraft"
-                    @endif
-                    style="border:1px solid #dce8e3;border-radius:12px;padding:11px 18px;background:#f8fafc;color:#334155;font-weight:900;cursor:pointer;"
-                >Save as Draft</button>
-                @if ($this->auditReady)
-                    <button type="button" wire:click="saveTemplateThreeVerification" class="uel-button uel-button-primary" style="border:0;border-radius:12px;padding:11px 18px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
-                @else
-                    <button type="button" wire:click="auditVerification" style="border:1px solid #b8d4c9;border-radius:12px;padding:11px 18px;background:#eaf6f1;color:#0b6b4f;font-weight:900;cursor:pointer;">{{ $this->getSaveButtonLabel() }}</button>
-                @endif
-                @if ($canRequestClinicInfo)
-                    <button type="button" onclick="openWorkflowModal('info-request-modal')" style="border:1px solid #fed7aa;border-radius:12px;padding:11px 18px;background:#fff7ed;color:#c2410c;font-weight:900;cursor:pointer;">Request to Clinic</button>
-                @endif
-                <button type="button" wire:click="saveAndBack" style="border:1px solid #dce8e3;border-radius:12px;padding:11px 18px;background:#fff;color:#334155;font-weight:900;cursor:pointer;">Back</button>
-                <button type="button" onclick="if (! confirm('Clear the verification answers and reset this form?')) return false;" wire:click="clearVerificationForm" style="border:1px solid #fecdd3;border-radius:12px;padding:11px 18px;background:#fff1f2;color:#be123c;font-weight:900;cursor:pointer;">Clear Form</button>
-            @endif
-        </div>
     </section>
                 </div>
             </div>

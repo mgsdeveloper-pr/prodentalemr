@@ -109,6 +109,7 @@ class AdaProcedureCodeImportService
                 'description' => $preview['description'],
                 'class' => $this->normalizeClass($normalizedRow['class'] ?? $normalizedRow['category'] ?? null),
                 'is_active' => true,
+                'lifecycle_status' => AdaProcedureCode::LIFECYCLE_ACTIVE,
                 'source_year' => (int) date('Y'),
                 'source_document' => $originalName,
             ]);

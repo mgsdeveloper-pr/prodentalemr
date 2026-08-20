@@ -27,9 +27,9 @@ class InvoiceResource extends Resource
 
     protected static ?string $navigationLabel = 'Invoices';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Payments';
+    protected static string|UnitEnum|null $navigationGroup = 'Billing';
 
-    protected static ?int $navigationSort = 9;
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $recordTitleAttribute = 'invoice_number';
 
@@ -57,22 +57,22 @@ class InvoiceResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canAccessSaasModule('invoices') ?? false;
+        return auth()->user()?->can('viewAny', Invoice::class) ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('invoices', 'add') ?? false;
+        return auth()->user()?->can('create', Invoice::class) ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('invoices', 'update') ?? false;
+        return auth()->user()?->can('update', $record) ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('invoices', 'delete') ?? false;
+        return auth()->user()?->can('delete', $record) ?? false;
     }
 
     public static function getEloquentQuery(): Builder

@@ -47,7 +47,7 @@ class ClientServiceEnrollmentsTable
                     ->date()
                     ->sortable(),
                 TextColumn::make('work_items_count')
-                    ->label('Work items')
+                    ->label('Verification requests')
                     ->sortable(),
                 TextColumn::make('sla_summary')
                     ->label('Verification SLA')

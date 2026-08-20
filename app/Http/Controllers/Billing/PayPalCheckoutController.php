@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Billing;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Support\PayPalGateway;
+use App\Services\Notifications\ProductNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,6 +35,7 @@ class PayPalCheckoutController extends Controller
             $error = null;
         } catch (RuntimeException $exception) {
             $error = $exception->getMessage();
+            app(ProductNotificationService::class)->paymentFailed($invoice, 'PayPal');
         }
 
         return view('billing.invoices.payment-success', [

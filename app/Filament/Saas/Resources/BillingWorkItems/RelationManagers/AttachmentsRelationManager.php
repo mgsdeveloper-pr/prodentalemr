@@ -2,6 +2,7 @@
 
 namespace App\Filament\Saas\Resources\BillingWorkItems\RelationManagers;
 
+use App\Support\SaasSupportAccess;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -63,14 +64,24 @@ class AttachmentsRelationManager extends RelationManager
                     ->dateTime('M d, Y h:i A'),
             ])
             ->headerActions([
-                CreateAction::make(),
+                CreateAction::make()
+                    ->visible(fn (): bool => $this->supportModeMatchesOwner()),
             ])
             ->recordActions([
                 Action::make('download')
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn ($record): string => route('saas.billing-work-item-attachments.download', $record)),
-                DeleteAction::make(),
+                    ->visible(fn (): bool => $this->supportModeMatchesOwner())
+                    ->url(fn ($record): string => route('saas.verification-request-attachments.download', $record)),
+                DeleteAction::make()
+                    ->visible(fn (): bool => $this->supportModeMatchesOwner()),
             ]);
+    }
+
+    protected function supportModeMatchesOwner(): bool
+    {
+        $workItem = $this->getOwnerRecord();
+
+        return SaasSupportAccess::matchesScope((int) $workItem->organization_id, (int) $workItem->clinic_id);
     }
 }

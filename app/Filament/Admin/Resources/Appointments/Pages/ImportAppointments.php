@@ -7,6 +7,7 @@ use App\Models\AppointmentImportBatch;
 use App\Support\AdminClinicScope;
 use App\Support\AppointmentImportService;
 use App\Support\SaasEntitlements;
+use App\Services\Notifications\ProductNotificationService;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -215,6 +216,12 @@ class ImportAppointments extends Page implements HasForms
                 'original_name' => $originalName,
                 'message' => $throwable->getMessage(),
             ]);
+            app(ProductNotificationService::class)->integrationFailure(
+                'appointment import',
+                'Appointment import failed for ' . $clinic->clinic_name . '. Review the import file and try again.',
+                (int) $clinic->organization_id,
+                (int) $clinic->id,
+            );
 
             if (is_string($storedPath) && Storage::disk('local')->exists($storedPath)) {
                 Storage::disk('local')->delete($storedPath);
@@ -239,6 +246,15 @@ class ImportAppointments extends Page implements HasForms
         $this->lastImportResult = $result;
         $this->previewResult = null;
         $this->createImportBatch($result, $clinic, $user, $originalName);
+
+        if (($result['failed'] ?? 0) > 0) {
+            app(ProductNotificationService::class)->integrationFailure(
+                'appointment import',
+                ($result['failed'] ?? 0) . ' appointment row(s) could not be imported for ' . $clinic->clinic_name . '.',
+                (int) $clinic->organization_id,
+                (int) $clinic->id,
+            );
+        }
 
         Notification::make()
             ->title('Appointment import completed')

@@ -5,6 +5,7 @@ namespace App\Filament\Clinic\Pages;
 use App\Models\VerificationNotification;
 use App\Support\ClinicPanelScope;
 use App\Support\VerificationNotificationCenter;
+use App\Services\Notifications\VerificationNotificationService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -18,9 +19,9 @@ class VerificationNotificationCentre extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Notifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
-    protected static ?string $navigationLabel = 'Notification Centre';
+    protected static ?string $navigationLabel = 'Notifications';
 
     protected static ?int $navigationSort = 5;
 
@@ -95,12 +96,21 @@ class VerificationNotificationCentre extends Page
 
     public function markAsRead(int $notificationId): void
     {
-        $this->query()->whereKey($notificationId)->update(['read_at' => now()]);
+        $notification = $this->query()->whereKey($notificationId)->first();
+
+        if ($notification) {
+            app(VerificationNotificationService::class)->markRead($notification);
+        }
     }
 
     public function markAllAsRead(): void
     {
-        $this->query()->whereNull('read_at')->update(['read_at' => now()]);
+        app(VerificationNotificationService::class)->markQueryRead($this->query());
+    }
+
+    public function notificationOpenUrl(VerificationNotification $notification): string
+    {
+        return route('clinic.verification-notifications.open', $notification);
     }
 
     protected function query(): Builder

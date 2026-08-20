@@ -59,6 +59,10 @@ class VerificationTemplateThreeDefaults
             ...self::coverageCategoryQuestions(),
             ...self::planProvisionQuestions(),
             ...self::serviceHistoryQuestions(),
+            ...self::frequencyDiagnosticPreventativeQuestions(),
+            ...self::frequencyBasicQuestions(),
+            ...self::frequencyMajorQuestions(),
+            ...self::frequencyOrthodonticsQuestions(),
             ...self::verificationInformationQuestions(),
         ];
     }
@@ -154,6 +158,68 @@ class VerificationTemplateThreeDefaults
             ['Bitewings', 'vf_history_bitewings', 'text', 30],
             ['Full Mouth X-Ray / Panoramic X-Ray', 'vf_history_full_mouth_xray', 'text', 40],
             ['Other Major History Affecting Eligibility', 'vf_history_basic_or_major', 'textarea', 50],
+        ]);
+    }
+
+    protected static function frequencyDiagnosticPreventativeQuestions(): array
+    {
+        return self::section('template_3_frequency_diagnostic_preventative', [
+            ['Regular Oral Exams (D0120)', 'vf_frequency_regular_oral_exams', 'text', 10],
+            ['Limited Exam (D0140)', 'vf_frequency_limited_exam', 'text', 20],
+            ['Comprehensive Exam (D0150)', 'vf_frequency_comprehensive_exam', 'text', 30],
+            ['Does (D0120, D0140, D0150) Share Freq?', 'vf_frequency_exam_shared', 'text', 40],
+            ['Oral Cancer Screening (D0431)', 'vf_frequency_oral_cancer_screening', 'text', 50],
+            ['Can we bill Oral D0431 in conjunction with D0150 or D0120?', 'vf_frequency_oral_cancer_conjunction', 'text', 60],
+            ['Prophylaxis (D1110/D1120)', 'vf_frequency_prophylaxis', 'text', 70],
+            ['Bitewings X-Ray (D0272/D0274)', 'vf_frequency_bitewings', 'text', 80],
+            ['Full Mouth X-Ray / Panoramic X-Ray (D0210 / D0330) Share Freq', 'vf_frequency_full_mouth_pano_shared', 'text', 90],
+            ['Pa\'s (D0220 / D0230)', 'vf_frequency_pas', 'text', 100],
+            ['Sealants (D1351) & Age Limit', 'vf_frequency_sealants', 'text', 110],
+            ['If yes ask guideline)', 'vf_frequency_sealants_guideline', 'text', 120],
+            ['Caries-Arresting Medicament (D1354) & Age Limit', 'vf_frequency_caries_arresting', 'text', 130],
+            ['Fluoride (D1206/D1208) & Age Limit', 'vf_frequency_fluoride', 'text', 140],
+        ]);
+    }
+
+    protected static function frequencyBasicQuestions(): array
+    {
+        return self::section('template_3_frequency_basic', [
+            ['Scaling & Root Planning (D4341/ D4342)', 'vf_basic_scaling_root_planing', 'text', 10],
+            ['Can all 4 quads be done on the same visit? (Guidelines)', 'vf_basic_all_quads_same_visit', 'text', 20],
+            ['Perio Maintenance (D4910) Share frq (Yes/No)?', 'vf_basic_perio_maintenance_share_freq', 'text', 30],
+            ['FMD (D4355)', 'vf_basic_fmd', 'text', 40],
+            ['Root Canal (D3310 / D3320 / D3330)', 'vf_basic_root_canal', 'text', 50],
+            ['Simple Extraction (D7140)', 'vf_basic_simple_extraction', 'text', 60],
+            ['Surgical Extraction (D7210)', 'vf_basic_surgical_extraction', 'text', 70],
+            ['Posterior Composites (D2391/D2392/D2393/D2394)', 'vf_basic_posterior_composites', 'text', 80],
+            ['Post Composites downgraded to Amalgam?', 'vf_basic_composites_downgrade', 'text', 90],
+            ['Occlusal Guard (D9944/D9945) "Bruxism only OR osseous surgery only"', 'vf_basic_occlusal_guard', 'text', 100],
+        ]);
+    }
+
+    protected static function frequencyMajorQuestions(): array
+    {
+        return self::section('template_3_frequency_major', [
+            ['Crowns (D2740) Downgrade (Yes/No)? If Yes need Code.', 'vf_major_crowns_downgrade', 'text', 10],
+            ['Porcelain Fused To High Noble Metal Crown (D2750)', 'vf_major_pf_high_noble', 'text', 20],
+            ['Application of hydroxyapatite regeneration medicament (D2991)', 'vf_major_hydroxyapatite', 'text', 30],
+            ['Dentures (D5110)', 'vf_major_dentures', 'text', 40],
+            ['Implant (D6010)', 'vf_major_implant', 'text', 50],
+            ['Implant abutment (D6057)', 'vf_major_implant_abutment', 'text', 60],
+            ['Implant Crown (D6058)', 'vf_major_implant_crown', 'text', 70],
+            ['Bone Graft Performed At The Same Time As A Dental Implant (D6104)', 'vf_major_bone_graft_same_time_implant', 'text', 80],
+            ['BoneGrafts (D7953)', 'vf_major_bone_grafts', 'text', 90],
+        ]);
+    }
+
+    protected static function frequencyOrthodonticsQuestions(): array
+    {
+        return self::section('template_3_frequency_orthodontics', [
+            ['Orthodontic Retention (D8680)', 'vf_ortho_retention', 'text', 10],
+            ['Ortho Lifetime Maximum?', 'vf_ortho_lifetime_maximum', 'text', 20],
+            ['Remaining Ortho maximum?', 'vf_ortho_remaining_maximum', 'text', 30],
+            ['Ortho Deductibles?', 'vf_ortho_deductibles', 'text', 40],
+            ['Ortho Age Limit?', 'vf_ortho_age_limit', 'text', 50],
         ]);
     }
 

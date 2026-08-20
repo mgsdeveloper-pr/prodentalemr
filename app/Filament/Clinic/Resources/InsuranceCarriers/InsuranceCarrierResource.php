@@ -34,7 +34,7 @@ class InsuranceCarrierResource extends Resource
 
     protected static ?string $navigationLabel = 'Insurance Directory';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Data';
 
     public static function form(Schema $schema): Schema
     {

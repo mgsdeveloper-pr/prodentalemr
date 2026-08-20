@@ -9,7 +9,7 @@
             <div style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; padding: 20px 22px; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05); display: flex; flex-direction: column; gap: 16px; min-width: min(420px, 100%);">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                     <div>
-                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8;">Clinic scope</div>
+                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #94a3b8;">Template scope</div>
                         <div style="margin-top: 6px; font-size: 20px; font-weight: 800; color: #0f172a;">' . e($this->getSelectedClinicName()) . '</div>
                     </div>
                     <span style="display: inline-flex; align-items: center; padding: 8px 12px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;">
@@ -76,14 +76,14 @@
                                 <button
                                     type="button"
                                     wire:click="setPlacement('top')"
-                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#f59e0b' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#fff7ed' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#b45309' : '#475569' }}; font-size: 13px; font-weight: 800;"
+                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#5eead4' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#f0fdfa' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'top' ? '#0f766e' : '#475569' }}; font-size: 13px; font-weight: 800;"
                                 >
                                     Move to top
                                 </button>
                                 <button
                                     type="button"
                                     wire:click="setPlacement('bottom')"
-                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#f59e0b' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#fff7ed' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#b45309' : '#475569' }}; font-size: 13px; font-weight: 800;"
+                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#5eead4' : '#dbe4ee' }}; background: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#f0fdfa' : '#ffffff' }}; color: {{ ($this->data['order_position'] ?? 'bottom') === 'bottom' ? '#0f766e' : '#475569' }}; font-size: 13px; font-weight: 800;"
                                 >
                                     Move to bottom
                                 </button>
@@ -107,7 +107,7 @@
                                             draggable="true"
                                             data-question-id="{{ $card['id'] }}"
                                             x-on:dragstart="draggingId = '{{ $card['id'] }}'; $event.dataTransfer.effectAllowed = 'move';"
-                                            x-on:dragover.prevent="$event.currentTarget.style.borderColor = '#f59e0b';"
+                                            x-on:dragover.prevent="$event.currentTarget.style.borderColor = '#0f766e';"
                                             x-on:dragleave="$event.currentTarget.style.borderColor = '#e2e8f0';"
                                             x-on:drop.prevent="
                                                 $event.currentTarget.style.borderColor = '#e2e8f0';
@@ -134,14 +134,14 @@
                                                 <button
                                                     type="button"
                                                     wire:click="setPlacement('above', {{ $card['id'] }})"
-                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f59e0b' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#fff7ed' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#b45309' : '#475569' }}; font-size: 12px; font-weight: 800;"
+                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#5eead4' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f0fdfa' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'above' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#0f766e' : '#475569' }}; font-size: 12px; font-weight: 800;"
                                                 >
                                                     Above this
                                                 </button>
                                                 <button
                                                     type="button"
                                                     wire:click="setPlacement('below', {{ $card['id'] }})"
-                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f59e0b' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#fff7ed' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#b45309' : '#475569' }}; font-size: 12px; font-weight: 800;"
+                                                    style="display: inline-flex; align-items: center; justify-content: center; padding: 10px 12px; border-radius: 14px; border: 1px solid {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#5eead4' : '#dbe4ee' }}; background: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#f0fdfa' : '#ffffff' }}; color: {{ (($this->data['order_position'] ?? null) === 'below' && (int) ($this->data['order_reference_id'] ?? 0) === $card['id']) ? '#0f766e' : '#475569' }}; font-size: 12px; font-weight: 800;"
                                                 >
                                                     Below this
                                                 </button>

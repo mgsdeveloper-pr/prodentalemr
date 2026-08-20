@@ -5,10 +5,16 @@ namespace App\Filament\Clinic\Resources\VerificationRequests\Pages;
 use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Location;
-use App\Support\VerificationAutoAssigner;
 use App\Support\VerificationRequestDuplicateGuard;
+use App\Actions\Verification\CreateVerificationRequestAction;
+use App\Services\Verification\VerificationIntakeService;
+use App\Support\VerificationTemplateVersionService;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\Width;
+use Illuminate\Validation\ValidationException;
 
 class CreateVerificationRequest extends CreateRecord
 {
@@ -20,6 +26,8 @@ class CreateVerificationRequest extends CreateRecord
 
     protected array $verificationPlanSnapshotData = [];
 
+    protected static bool $canCreateAnother = false;
+
     public function getTitle(): string
     {
         return 'Create Insurance Verification';
@@ -27,7 +35,7 @@ class CreateVerificationRequest extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        if ($this->record->source === 'clinic_request' && ! $this->record->clinicWorkspaceEnabled()) {
+        if ($this->record->isManagedServiceMode()) {
             return VerificationRequestResource::getUrl('view', ['record' => $this->record]);
         }
 
@@ -52,11 +60,12 @@ class CreateVerificationRequest extends CreateRecord
             filled($appointmentDate) ? date('M d, Y', strtotime((string) $appointmentDate)) : null,
         ])->filter()->implode(' - '));
 
-        $data['due_at'] = static::resolveDueAt($data);
-        $data['assigned_to'] = $data['assigned_to'] ?? VerificationAutoAssigner::resolve(
-            $data['source'] ?? null,
-            filled($data['clinic_id'] ?? null) ? (int) $data['clinic_id'] : null,
-        )?->id;
+        $data = app(VerificationIntakeService::class)->normalizeAndValidate(
+            $data,
+            $this->verificationProfileData,
+            $this->verificationPlanSnapshotData,
+        );
+        $data = app(CreateVerificationRequestAction::class)->prepareData($data);
 
         VerificationRequestDuplicateGuard::ensureNotQueued(
             $data,
@@ -71,14 +80,15 @@ class CreateVerificationRequest extends CreateRecord
 
     protected function afterCreate(): void
     {
+        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->record->verificationPlanSnapshots()->delete();
         $this->record->verificationPlanSnapshots()->createMany($this->verificationPlanSnapshotData);
         $this->record->recordActivity('verification_profile_saved', 'Structured verification request details captured.');
-        if ($this->record->source === 'clinic_request') {
+        if ($this->record->isManagedServiceMode()) {
             $this->record->recordActivity('managed_service_requested', 'Insurance verification was submitted from the clinic portal to the Admin verification queue.');
         } else {
-            $this->record->recordActivity('clinic_self_service_created', 'Insurance verification was created from the clinic portal for self-service use.');
+            $this->record->recordActivity('clinic_self_service_created', 'A Self-Managed insurance verification was created for the clinic to complete in the verification workspace.');
         }
     }
 
@@ -113,6 +123,30 @@ class CreateVerificationRequest extends CreateRecord
             : now()->addDays(3);
     }
 
+    protected function getCreateFormAction(): Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Create Request')
+            ->disabled(blank(\App\Support\ClinicPanelScope::selectedClinicId() ?? auth()->user()?->clinic_id));
+    }
+
+    public function getFormContentComponent(): Component
+    {
+        return parent::getFormContentComponent()
+            ->extraAttributes(['novalidate' => true]);
+    }
+
+    protected function onValidationError(ValidationException $exception): void
+    {
+        parent::onValidationError($exception);
+
+        Notification::make()
+            ->danger()
+            ->title('Request is incomplete')
+            ->body('Complete the required fields highlighted in the form, then create the request again.')
+            ->send();
+    }
+
     protected function applyManagedServiceRouting(array $data): array
     {
         $location = filled($data['location_id'] ?? null)
@@ -129,10 +163,25 @@ class CreateVerificationRequest extends CreateRecord
             filled($locationId) ? (int) $locationId : null,
         );
 
-        $data['managed_billing_service_id'] = $enrollment?->managed_billing_service_id
-            ?: VerificationRequestForm::resolveDefaultVerificationServiceId();
-        $data['client_service_enrollment_id'] = $enrollment?->id;
-        $data['source'] = $enrollment ? 'clinic_request' : 'clinic_self_service';
+        $allowedModes = VerificationRequestForm::processingModeOptions(
+            filled($organizationId) ? (int) $organizationId : null,
+            filled($clinicId) ? (int) $clinicId : null,
+            filled($locationId) ? (int) $locationId : null,
+        );
+        $processingMode = (string) ($data['processing_mode'] ?? array_key_first($allowedModes));
+
+        if (! array_key_exists($processingMode, $allowedModes)) {
+            $processingMode = (string) array_key_first($allowedModes);
+        }
+
+        $isManaged = $processingMode === \App\Models\BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE;
+
+        $data['processing_mode'] = $processingMode;
+        $data['managed_billing_service_id'] = $isManaged
+            ? $enrollment?->managed_billing_service_id
+            : VerificationRequestForm::resolveDefaultVerificationServiceId();
+        $data['client_service_enrollment_id'] = $isManaged ? $enrollment?->id : null;
+        $data['source'] = $isManaged ? 'clinic_request' : 'clinic_self_service';
         $data['status'] = 'pending';
 
         if ($location?->clinic) {

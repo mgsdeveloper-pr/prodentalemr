@@ -2,6 +2,8 @@
 
 namespace App\Filament\Saas\Resources\Organizations\Tables;
 
+use App\Filament\Saas\Pages\OrganizationWorkspace;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -87,6 +89,13 @@ class OrganizationsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
+                Action::make('openWorkspace')
+                    ->label('Open Workspace')
+                    ->icon('heroicon-o-building-office-2')
+                    ->color('primary')
+                    ->url(fn ($record): string => OrganizationWorkspace::getUrl([
+                        'record' => $record->public_id ?: $record->getKey(),
+                    ])),
                 ViewAction::make(),
                 EditAction::make(),
                 RestoreAction::make(),

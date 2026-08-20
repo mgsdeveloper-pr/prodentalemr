@@ -12,7 +12,6 @@ use App\Filament\Clinic\Resources\Appointments\Schemas\AppointmentInfolist;
 use App\Filament\Clinic\Resources\Appointments\Tables\AppointmentsTable;
 use App\Models\Appointment;
 use App\Support\ClinicPanelScope;
-use App\Support\ClinicWorkspace;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -30,7 +29,7 @@ class AppointmentResource extends Resource
 
     protected static ?string $navigationLabel = 'Appointments';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Scheduling';
+    protected static string|UnitEnum|null $navigationGroup = 'Daily Work';
 
     protected static ?int $navigationSort = 2;
 
@@ -38,21 +37,17 @@ class AppointmentResource extends Resource
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION
-            ? 'Verifications'
-            : 'Scheduling';
+        return 'Daily Work';
     }
 
     public static function getNavigationLabel(): string
     {
-        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION
-            ? 'Appointment'
-            : 'Appointments';
+        return 'Appointments';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION ? 2 : 2;
+        return 2;
     }
 
     public static function form(Schema $schema): Schema
@@ -81,7 +76,7 @@ class AppointmentResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ])
-            ->with(['patient', 'provider.user', 'location', 'operatory']);
+            ->with(['patient', 'provider.user', 'location', 'operatory', 'clinicService', 'insurancePolicy', 'parentAppointment', 'verificationWorkItem']);
 
         $selectedClinicId = ClinicPanelScope::selectedClinicId();
         $selectedOrganizationId = ClinicPanelScope::selectedOrganizationId();

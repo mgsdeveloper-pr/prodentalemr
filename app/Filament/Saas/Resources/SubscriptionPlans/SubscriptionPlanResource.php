@@ -27,7 +27,7 @@ class SubscriptionPlanResource extends Resource
 
     protected static ?string $navigationLabel = 'Subscription Plans';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Plans';
+    protected static string|UnitEnum|null $navigationGroup = 'Billing';
 
     protected static ?int $navigationSort = 10;
 

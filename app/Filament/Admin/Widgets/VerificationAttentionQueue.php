@@ -3,8 +3,10 @@
 namespace App\Filament\Admin\Widgets;
 
 use App\Models\BillingWorkItem;
-use App\Support\AdminClinicScope;
 use App\Models\User;
+use App\Services\Verification\StatusService;
+use App\Services\Verification\WorkflowService;
+use App\Support\AdminClinicScope;
 use App\Support\VerificationAutoAssigner;
 use Filament\Actions\Action as HeaderAction;
 use Filament\Actions\ActionGroup as HeaderActionGroup;
@@ -102,9 +104,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Take Ownership')
                         ->icon('heroicon-o-hand-raised')
                         ->color('info')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
-                            && $record->normalized_status !== BillingWorkItem::STATUS_DONE
-                            && $record->assigned_to !== auth()->id())
+                        ->visible(fn (BillingWorkItem $record): bool => app(StatusService::class)->canShowTakeOwnership($record, auth()->user()))
                         ->action(function (BillingWorkItem $record): void {
                             abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
@@ -126,8 +126,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Reassign')
                         ->icon('heroicon-o-arrow-path')
                         ->color('gray')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
-                            && $record->normalized_status !== BillingWorkItem::STATUS_DONE)
+                        ->visible(fn (BillingWorkItem $record): bool => app(StatusService::class)->canShowReassign($record, auth()->user()))
                         ->form(fn (BillingWorkItem $record): array => [
                             Select::make('assigned_to')
                                 ->label('Assign to')
@@ -143,8 +142,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->action(function (BillingWorkItem $record, array $data): void {
                             abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
-                            $record->assigned_to = $data['assigned_to'];
-                            $record->save();
+                            app(WorkflowService::class)->assign($record, (int) $data['assigned_to'], auth()->user());
 
                             Notification::make()
                                 ->title('Request reassigned')
@@ -156,12 +154,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->label('Return for Rework')
                         ->icon('heroicon-o-arrow-uturn-left')
                         ->color('danger')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
-                            && in_array($record->normalized_status, [
-                                BillingWorkItem::STATUS_REVIEW,
-                                BillingWorkItem::STATUS_DONE,
-                            ], true)
-                            && $record->canUserTransitionTo(auth()->user(), BillingWorkItem::STATUS_RETURNED_FOR_REWORK))
+                        ->visible(fn (BillingWorkItem $record): bool => app(StatusService::class)->canShowReturnForRework($record, auth()->user()))
                         ->form([
                             Textarea::make('return_reason')
                                 ->label('Rework reason')
@@ -171,8 +164,7 @@ class VerificationAttentionQueue extends TableWidget
                         ->action(function (BillingWorkItem $record, array $data): void {
                             abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
-                            $record->return_reason = $data['return_reason'];
-                            $record->transitionStatus(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
+                            app(WorkflowService::class)->rejectQa($record, $data['return_reason'], auth()->user());
 
                             Notification::make()
                                 ->title('Returned for rework')
@@ -183,17 +175,20 @@ class VerificationAttentionQueue extends TableWidget
                     Action::make('reopen')
                         ->label('Reopen')
                         ->icon('heroicon-o-arrow-path-rounded-square')
-                        ->color('warning')
-                        ->visible(fn (BillingWorkItem $record): bool => auth()->user()?->canManageVerificationQueue()
-                            && in_array($record->normalized_status, [
-                                BillingWorkItem::STATUS_DONE,
-                                BillingWorkItem::STATUS_INCOMPLETE,
-                            ], true)
-                            && $record->canUserTransitionTo(auth()->user(), BillingWorkItem::STATUS_IN_PROGRESS))
-                        ->action(function (BillingWorkItem $record): void {
+                        ->color('gray')
+                        ->outlined()
+                        ->visible(fn (BillingWorkItem $record): bool => app(StatusService::class)->canShowReopen($record, auth()->user()))
+                        ->form([
+                            Textarea::make('reopen_reason')
+                                ->label('Reason for reopening')
+                                ->helperText('This reason will be retained in the verification timeline.')
+                                ->rows(4)
+                                ->required(),
+                        ])
+                        ->action(function (BillingWorkItem $record, array $data): void {
                             abort_unless(auth()->user()?->canManageVerificationQueue(), 403);
 
-                            $record->transitionStatus(BillingWorkItem::STATUS_IN_PROGRESS);
+                            app(WorkflowService::class)->reopen($record, $data['reopen_reason'], auth()->user());
 
                             Notification::make()
                                 ->title('Request reopened')
@@ -287,7 +282,7 @@ class VerificationAttentionQueue extends TableWidget
 
     protected function getTableQuery(): Builder
     {
-        $query = AdminClinicScope::apply(
+        $query = AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
             ->with(['clinic', 'assignedTo', 'patient', 'verificationProfile'])
             ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))

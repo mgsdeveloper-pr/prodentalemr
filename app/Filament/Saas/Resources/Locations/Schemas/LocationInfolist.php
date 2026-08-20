@@ -36,6 +36,16 @@ class LocationInfolist
                                 TextEntry::make('phone')
                                     ->placeholder('-')
                                     ->copyable(),
+                                TextEntry::make('users_count')
+                                    ->label('Users')
+                                    ->state(fn ($record): int => $record->users()->count())
+                                    ->badge()
+                                    ->color('success'),
+                                TextEntry::make('verification_requests_count')
+                                    ->label('Verification requests')
+                                    ->state(fn ($record): int => $record->billingWorkItems()->count())
+                                    ->badge()
+                                    ->color('info'),
                             ]),
                     ]),
                 Section::make('Address Details')

@@ -15,11 +15,11 @@ class DocumentCenter extends Page
 {
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static string | UnitEnum | null $navigationGroup = 'Verifications';
+    protected static string | UnitEnum | null $navigationGroup = 'Documents';
 
-    protected static ?string $navigationLabel = 'Document Center';
+    protected static ?string $navigationLabel = 'Documents';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $title = '';
 

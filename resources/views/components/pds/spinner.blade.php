@@ -1,0 +1,1 @@
+<span {{ $attributes->merge(['class' => 'pds-spinner inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-teal-700']) }} aria-hidden="true"></span>

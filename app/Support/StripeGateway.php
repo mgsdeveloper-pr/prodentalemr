@@ -94,6 +94,19 @@ class StripeGateway
 
     public static function handleWebhookEvent(\Stripe\Event $event): void
     {
+        if (in_array($event->type, ['checkout.session.expired', 'checkout.session.async_payment_failed'], true)) {
+            /** @var \Stripe\Checkout\Session $failedSession */
+            $failedSession = $event->data->object;
+            $failedInvoiceId = data_get($failedSession, 'metadata.invoice_id') ?? $failedSession->client_reference_id;
+            $failedInvoice = filled($failedInvoiceId) ? Invoice::query()->find($failedInvoiceId) : null;
+
+            if ($failedInvoice) {
+                app(\App\Services\Notifications\ProductNotificationService::class)->paymentFailed($failedInvoice, 'Stripe');
+            }
+
+            return;
+        }
+
         if ($event->type !== 'checkout.session.completed') {
             return;
         }

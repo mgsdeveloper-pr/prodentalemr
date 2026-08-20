@@ -2,26 +2,7 @@
     @php($messages = $this->getMessages())
     @php($selectedMessage = $this->getSelectedMessage())
     @php($folderCounts = $this->getFolderCounts())
-    @php($status = $this->getConnectionStatus())
-
     <div style="display: flex; flex-direction: column; gap: 24px;">
-        @include('filament.shared.partials.page-hero', [
-            'eyebrow' => 'Clinic Inbox',
-            'title' => 'Inbox',
-            'description' => 'Review inbox and spam together, surface portal OTP emails quickly, and keep a synced operations trail for the selected clinic scope.',
-            'scopeLabel' => 'Scope',
-            'scopeValue' => \App\Support\AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics',
-            'rightContent' => '
-                <div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid ' . ($status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca')) . '; background: ' . ($status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2')) . '; color: ' . ($status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c')) . ';"><span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span><span style="font-size: 13px; font-weight: 800;">' . e($status['label']) . '</span></div>
-                <button
-                    type="button"
-                    wire:click="refreshInbox"
-                    style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border-radius: 14px; border: 1px solid #0f766e; background: linear-gradient(180deg, #14b8a6 0%, #0f766e 100%); color: #ffffff; font-size: 13px; font-weight: 700; box-shadow: 0 10px 22px rgba(15, 118, 110, 0.16);"
-                >
-                    <span>Refresh Inbox</span>
-                </button>',
-        ])
-
         <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: #ffffff; box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07); overflow: hidden;">
             <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                 <div style="display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;">

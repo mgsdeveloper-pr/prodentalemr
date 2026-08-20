@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PatientInsuranceClaimLineItem extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     public const STATUS_OPTIONS = [
         'ready' => 'Ready',

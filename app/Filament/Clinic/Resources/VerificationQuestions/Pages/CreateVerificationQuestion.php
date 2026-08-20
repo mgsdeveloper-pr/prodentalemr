@@ -6,6 +6,7 @@ use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionReso
 use App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns\InteractsWithVerificationQuestionOrdering;
 use App\Models\VerificationFormQuestion;
 use App\Support\ClinicPanelScope;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
 
@@ -86,8 +87,10 @@ class CreateVerificationQuestion extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['template_key'] = $data['template_key'] ?: VerificationFormQuestion::defaultTemplateKey();
         $data['clinic_id'] = $data['clinic_id'] ?: ClinicPanelScope::selectedClinicId();
         $data['organization_id'] = $data['organization_id'] ?: ClinicPanelScope::selectedOrganizationId();
+        $data['template_version_id'] = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic())?->getKey();
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);
         $data['section_key'] = filled($data['sub_section_key'] ?? null)
             ? $data['sub_section_key']
@@ -118,10 +121,16 @@ class CreateVerificationQuestion extends CreateRecord
             $this->data['order_position'] ?? 'bottom',
             filled($this->data['order_reference_id'] ?? null) ? (int) $this->data['order_reference_id'] : null,
         );
+
+        Notification::make()
+            ->title('Question created')
+            ->body('The question was added to this clinic template.')
+            ->success()
+            ->send();
     }
 
     protected function getRedirectUrl(): string
     {
-        return VerificationQuestionResource::getUrl('create');
+        return VerificationQuestionResource::getUrl();
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Filament\Clinic\Resources\Providers\Schemas;
 
 use App\Models\Provider;
-use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -23,9 +22,17 @@ class ProviderInfolist
                                 TextEntry::make('user.name')
                                     ->label('Provider name')
                                     ->columnSpan(2),
-                                IconEntry::make('status')
-                                    ->label('Active')
-                                    ->boolean(),
+                                TextEntry::make('provider_status')
+                                    ->label('Status')
+                                    ->state(fn (Provider $record): string => $record->trashed()
+                                        ? 'Deactivated'
+                                        : ($record->status ? 'Active' : 'Inactive'))
+                                    ->badge()
+                                    ->color(fn (string $state): string => match ($state) {
+                                        'Active' => 'success',
+                                        'Inactive' => 'warning',
+                                        default => 'gray',
+                                    }),
                                 TextEntry::make('appointments_count')
                                     ->label('Appointments')
                                     ->badge()

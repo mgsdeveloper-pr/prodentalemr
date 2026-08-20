@@ -12,13 +12,13 @@ class RolesAndPermissions extends RolePermissionsPage
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     protected static ?string $navigationLabel = 'Roles & Permissions';
 
-    protected static ?int $navigationSort = 55;
+    protected static ?int $navigationSort = 20;
 
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $slug = 'roles-permissions';
 

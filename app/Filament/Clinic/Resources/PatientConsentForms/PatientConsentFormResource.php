@@ -27,9 +27,9 @@ class PatientConsentFormResource extends Resource
 
     protected static ?string $navigationLabel = 'Consent Forms';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Clinical Records';
+    protected static string|UnitEnum|null $navigationGroup = 'Documents';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'display_title';
 

@@ -32,6 +32,7 @@ class PanelPermissionMatrix
                 'organizations' => 'Organizations',
                 'clinics' => 'Clinics',
                 'locations' => 'Locations',
+                'providers' => 'Providers',
                 'users' => 'Users',
                 'managed_services' => 'Managed Services',
                 'client_enrollments' => 'Client Enrollments',

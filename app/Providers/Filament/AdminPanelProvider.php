@@ -6,6 +6,7 @@ use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\DocumentCenter;
 use App\Filament\Admin\Pages\VerificationClinicAssignments;
 use App\Filament\Admin\Pages\VerificationFormLab;
+use App\Filament\Admin\Pages\VerificationGeneralSettings;
 use App\Filament\Admin\Pages\RolesAndPermissions;
 use App\Filament\Admin\Pages\UserMailboxPage;
 use App\Filament\Admin\Pages\UserMailboxSettingsPage;
@@ -13,25 +14,23 @@ use App\Filament\Admin\Pages\VerificationQuestionArrangement;
 use App\Filament\Admin\Pages\VerificationReports;
 use App\Filament\Admin\Pages\VerificationRequestResponse;
 use App\Filament\Admin\Pages\VerificationInbox;
-use App\Filament\Admin\Pages\VerificationUnassignedPatients;
+use App\Filament\Admin\Pages\VerificationUnassignedRequests;
 use App\Filament\Admin\Pages\VerificationInboxSettings;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationNotificationCentre;
 use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationSettings;
 use App\Filament\Admin\Pages\VerificationReadiness;
-use App\Filament\Admin\Pages\PortalCredentialSettings;
-use App\Filament\Admin\Resources\Appointments\AppointmentResource;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Filament\Admin\Widgets\ManagedServicesQuickLinks;
 use App\Filament\Admin\Widgets\VerificationAttentionQueue;
 use App\Http\Middleware\PanelAuthenticateRedirect;
+use App\Support\AppShell\AppShell;
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
 use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
 use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
-use App\Filament\Saas\Resources\BillingWorkItems\BillingWorkItemResource;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -40,9 +39,9 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
@@ -52,7 +51,7 @@ class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return AppShell::registerSharedSidebar(AppShell::register($panel
             ->default()
             ->id('admin')
             ->path('verification')
@@ -79,7 +78,7 @@ class AdminPanelProvider extends PanelProvider
                     ->sort(PHP_INT_MAX),
             ])
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Teal,
             ])
             ->navigationGroups([
                 NavigationGroup::make()->label('Dashboard'),
@@ -88,36 +87,8 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Reports'),
                 NavigationGroup::make()->label('Settings'),
             ])
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
-                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_NAV_START,
-                fn (): string => view('filament.admin.partials.clinic-scope-switcher', [
-                    'clinicOptions' => \App\Support\AdminClinicScope::clinicOptions(),
-                ])->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
-                    . view('filament.shared.partials.page-header-theme')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
-                fn (): string => view('filament.shared.partials.verification-notification-bell', [
-                    'panel' => 'verification',
-                    'clinicId' => \App\Support\AdminClinicScope::selectedClinicId(),
-                ])->render(),
-            )
             ->resources([
-                AppointmentResource::class,
-                BillingWorkItemResource::class,
-                VerificationWorkItemResource::class,
+                VerificationRequestResource::class,
                 VerificationFormQuestionResource::class,
                 InsuranceCarrierResource::class,
                 InsuranceCarrierNetworkProfileResource::class,
@@ -130,7 +101,7 @@ class AdminPanelProvider extends PanelProvider
                 DocumentCenter::class,
                 UserMailboxPage::class,
                 UserMailboxSettingsPage::class,
-                VerificationUnassignedPatients::class,
+                VerificationUnassignedRequests::class,
                 VerificationFormLab::class,
                 VerificationRequestResponse::class,
                 VerificationNotificationControl::class,
@@ -141,8 +112,8 @@ class AdminPanelProvider extends PanelProvider
                 VerificationClinicAssignments::class,
                 VerificationReadiness::class,
                 VerificationAssignmentManagement::class,
+                VerificationGeneralSettings::class,
                 VerificationSettings::class,
-                PortalCredentialSettings::class,
                 VerificationQuestionArrangement::class,
                 RolesAndPermissions::class,
             ])
@@ -164,6 +135,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 PanelAuthenticateRedirect::class,
+                EnsureEmailIsVerified::class,
+            ]), 'verification'), fn (): string => view('filament.admin.partials.clinic-scope-switcher', [
+                'clinicOptions' => \App\Support\AdminClinicScope::clinicOptions(),
+            ])->render(), fn (): array => [
+                'panel' => 'verification',
+                'clinicId' => \App\Support\AdminClinicScope::selectedClinicId(),
             ]);
     }
 }

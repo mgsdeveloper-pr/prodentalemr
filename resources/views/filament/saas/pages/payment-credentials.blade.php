@@ -4,7 +4,7 @@
         .payment-provider-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
         .payment-provider-tab { border: 1px solid #dbe4ee; border-radius: 22px; background: #fff; padding: 18px 20px; text-align: left; cursor: pointer; box-shadow: 0 14px 30px rgba(15, 23, 42, .05); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease; }
         .payment-provider-tab:hover { transform: translateY(-1px); border-color: #93c5fd; box-shadow: 0 18px 36px rgba(15, 23, 42, .08); }
-        .payment-provider-tab.is-active { border-color: #f59e0b; background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); box-shadow: 0 18px 38px rgba(245, 158, 11, .16); }
+        .payment-provider-tab.is-active { border-color: #5eead4; background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%); box-shadow: 0 14px 30px rgba(15, 118, 110, .12); }
         .payment-provider-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
         .payment-provider-title { margin: 0; color: #0f172a; font-size: 17px; font-weight: 900; }
         .payment-provider-copy { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.55; }

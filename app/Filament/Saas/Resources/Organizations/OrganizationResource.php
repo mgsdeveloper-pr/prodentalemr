@@ -22,15 +22,17 @@ use UnitEnum;
 
 class OrganizationResource extends Resource
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $model = Organization::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Organizations';
+    protected static ?string $navigationLabel = 'Client Registry';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -58,22 +60,22 @@ class OrganizationResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->canAccessSaasModule('organizations') ?? false;
+        return auth()->user()?->can('viewAny', Organization::class) ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('organizations', 'add') ?? false;
+        return auth()->user()?->can('create', Organization::class) ?? false;
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('organizations', 'update') ?? false;
+        return auth()->user()?->can('update', $record) ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->canPerformSaasModuleAction('organizations', 'delete') ?? false;
+        return auth()->user()?->can('delete', $record) ?? false;
     }
 
     public static function getEloquentQuery(): Builder

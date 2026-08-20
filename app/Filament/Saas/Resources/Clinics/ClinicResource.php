@@ -28,9 +28,11 @@ class ClinicResource extends Resource
 
     protected static ?string $navigationLabel = 'Clinics';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Organizations';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 30;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $recordTitleAttribute = 'clinic_name';
 

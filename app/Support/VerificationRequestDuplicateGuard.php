@@ -2,8 +2,8 @@
 
 namespace App\Support;
 
-use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
+use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource as ClinicVerificationRequestResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource as ManagedVerificationRequestResource;
 use App\Models\BillingWorkItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
@@ -188,11 +188,11 @@ class VerificationRequestDuplicateGuard
     protected static function existingRecordUrl(BillingWorkItem $existing, string $panel): string
     {
         return match ($panel) {
-            'clinic' => VerificationRequestResource::getUrl(
+            'clinic' => ClinicVerificationRequestResource::getUrl(
                 $existing->clinicUserCanEditVerification(auth()->user()) ? 'edit' : 'view',
                 ['record' => $existing]
             ),
-            'verification', 'admin' => VerificationWorkItemResource::getUrl('edit', ['record' => $existing]),
+            'verification', 'admin' => ManagedVerificationRequestResource::getUrl('edit', ['record' => $existing]),
             default => url('/verification/verifications/' . $existing->getKey() . '/edit'),
         };
     }

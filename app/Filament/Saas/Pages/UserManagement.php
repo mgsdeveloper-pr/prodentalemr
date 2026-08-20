@@ -10,13 +10,13 @@ use UnitEnum;
 
 class UserManagement extends Page
 {
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
-    protected static ?string $navigationLabel = 'User Management';
+    protected static ?string $navigationLabel = 'Platform Users';
 
-    protected static ?int $navigationSort = 50;
+    protected static ?int $navigationSort = 10;
 
     protected static ?string $title = '';
 

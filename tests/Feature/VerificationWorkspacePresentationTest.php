@@ -1,0 +1,301 @@
+<?php
+
+use App\Models\BillingWorkItem;
+use App\Models\Provider;
+use App\Models\User;
+use App\Models\VerificationPlanSnapshot;
+use App\Models\VerificationProfile;
+use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
+use App\Support\PanelPermissionMatrix;
+use App\Support\WorkContext\Providers\VerificationContextProvider;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Blade;
+use Spatie\Permission\Models\Permission;
+
+uses(RefreshDatabase::class);
+
+it('renders the verification request queue tabs', function (): void {
+    $html = view('filament.saas.resources.verifications.pages.partials.verification-queue-header')->render();
+
+    expect($html)
+        ->toContain('Verification request queues')
+        ->toContain('All requests')
+        ->toContain('Unassigned')
+        ->toContain('In progress')
+        ->toContain('Waiting on clinic')
+        ->toContain('Ready for audit')
+        ->toContain('Overdue')
+        ->toContain('verification-queue-kpi is-active');
+});
+
+it('keeps the shared request detail workspace clean across verification and clinic panels', function (): void {
+    $template = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/view-verification-request.blade.php'
+    ));
+
+    expect($template)
+        ->toContain('Patient &amp; Insurance Summary')
+        ->toContain('Verification Result Summary')
+        ->toContain('Eligibility status')
+        ->toContain('Annual maximum')
+        ->toContain('Preventive')
+        ->toContain('Audit Result')
+        ->toContain('Completed Form Snapshot')
+        ->toContain('PDF Outputs')
+        ->toContain('Documents &amp; Notes')
+        ->toContain('<details class="request-card request-timeline">')
+        ->toContain('Question / Field')
+        ->toContain('Previous Answer')
+        ->toContain('Current Answer')
+        ->toContain('Handled by')
+        ->not->toContain('Verification Operations')
+        ->not->toContain('delivery-summary')
+        ->not->toContain('linear-gradient');
+
+    $clinicPage = file_get_contents(app_path(
+        'Filament/Clinic/Resources/VerificationRequests/Pages/ViewVerificationRequest.php'
+    ));
+    $verificationPage = file_get_contents(app_path(
+        'Filament/Saas/Resources/Verifications/Pages/ViewVerificationRequest.php'
+    ));
+
+    expect($clinicPage)
+        ->toContain("->label('Open Form')")
+        ->toContain("->label('Request Correction')")
+        ->toContain('requestCorrection(')
+        ->and($verificationPage)
+        ->toContain("->label('Download PDF')");
+});
+
+it('renders the verification work context with existing record data', function (): void {
+    $record = new BillingWorkItem([
+        'reference_number' => 'BWI-TEST-0001',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'priority' => 'urgent',
+        'due_at' => Carbon::parse('2026-08-05 12:00:00'),
+    ]);
+
+    $html = view('filament.saas.resources.verifications.pages.partials.work-context-summary', [
+        'record' => $record,
+        'quickReference' => [
+            'patient' => 'Demo Patient',
+            'member_id' => '123456',
+            'insurance_name' => 'Demo Dental',
+        ],
+        'copyText' => 'Patient: Demo Patient',
+    ])->render();
+
+    expect($html)
+        ->toContain('Work Context')
+        ->toContain('Demo Patient')
+        ->toContain('Demo Dental')
+        ->toContain('Copy Context');
+});
+
+it('renders pds timeline components for verification activity', function (): void {
+    $html = Blade::render(<<<'BLADE'
+        <x-pds.timeline>
+            <x-pds.timeline-item title="Assigned" meta="Aug 05, 2026">Assigned to verifier.</x-pds.timeline-item>
+        </x-pds.timeline>
+    BLADE);
+
+    expect($html)
+        ->toContain('pds-timeline')
+        ->toContain('pds-timeline-item')
+        ->toContain('Assigned to verifier.');
+});
+
+it('renders pds focus mode components for verification work', function (): void {
+    $html = Blade::render(<<<'BLADE'
+        <x-pds.focus-mode-topbar
+            title="Verification Form"
+            reference="BWI-FOCUS-0001"
+            patient="Demo Patient"
+            save-status="warning"
+            save-label="Unsaved Changes"
+        >
+            <x-pds.button variant="secondary">Exit Focus Mode</x-pds.button>
+        </x-pds.focus-mode-topbar>
+
+        <x-pds.sticky-action-bar>
+            <x-pds.button>Save as Draft</x-pds.button>
+        </x-pds.sticky-action-bar>
+    BLADE);
+
+    expect($html)
+        ->toContain('pds-focus-mode-topbar')
+        ->toContain('Focus Mode')
+        ->toContain('Unsaved Changes')
+        ->toContain('Exit Focus Mode')
+        ->toContain('pds-sticky-action-bar')
+        ->toContain('Save as Draft');
+});
+
+it('builds a generic work context from the verification provider', function (): void {
+    $record = new BillingWorkItem([
+        'reference_number' => 'BWI-CONTEXT-0001',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'priority' => 'urgent',
+        'internal_summary' => 'Needs payer confirmation.',
+        'due_at' => Carbon::parse('2026-08-05 12:00:00'),
+    ]);
+
+    $context = (new VerificationContextProvider(
+        record: $record,
+        quickReference: [
+            'patient' => 'Demo Patient',
+            'dob' => '08-05-1990',
+            'member_id' => '123456',
+            'insurance_name' => 'Demo Dental',
+        ],
+        attachments: [
+            ['title' => 'Insurance Card', 'subtitle' => 'card.pdf', 'download_url' => '/download/card'],
+        ],
+        timeline: [
+            ['type' => 'Opened', 'description' => 'Verification opened.', 'author' => 'Verifier', 'created_at' => 'Aug 05, 2026'],
+        ],
+        copyText: 'Patient: Demo Patient',
+    ))->context();
+
+    expect($context->title)->toBe('Work Context')
+        ->and($context->cards())->toHaveCount(9)
+        ->and($context->cards()->first()->title)->toBe('Quick Reference');
+});
+
+it('renders the generic work context panel without verification-specific renderer logic', function (): void {
+    $record = new BillingWorkItem([
+        'reference_number' => 'BWI-CONTEXT-0002',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'priority' => 'normal',
+    ]);
+
+    $context = (new VerificationContextProvider(
+        record: $record,
+        quickReference: [
+            'patient' => 'Demo Patient',
+            'member_id' => '123456',
+            'insurance_name' => 'Demo Dental',
+        ],
+        timeline: [
+            ['type' => 'Opened', 'description' => 'Verification opened.', 'author' => 'Verifier', 'created_at' => 'Aug 05, 2026'],
+        ],
+    ))->context();
+
+    $html = Blade::render(<<<'BLADE'
+        <x-pds.work-context-panel :context="$context" />
+    BLADE, ['context' => $context]);
+
+    expect($html)
+        ->toContain('pds-work-context-panel')
+        ->toContain('pds-context-card')
+        ->toContain('Quick Reference')
+        ->toContain('Demo Patient')
+        ->toContain('AI Assistant');
+});
+
+it('builds quick reference from live worksheet data before saved fallbacks', function (): void {
+    $record = new BillingWorkItem([
+        'reference_number' => 'BWI-QUICK-0001',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'priority' => 'normal',
+    ]);
+    $record->setRelation('verificationProfile', new VerificationProfile([
+        'patient_identifier' => null,
+        'subscriber_id' => null,
+        'insurance_provider_name' => null,
+        'group_number' => null,
+    ]));
+    $record->setRelation('verificationPlanSnapshots', collect([
+        new VerificationPlanSnapshot([
+            'plan_priority' => 'primary',
+            'member_id' => 'PLAN-123',
+            'payer_name' => 'Plan Dental',
+            'group_number' => 'PLAN-GRP',
+        ]),
+    ]));
+    $record->setRelation('provider', new Provider([
+        'npi_number' => '1790914729',
+    ]));
+
+    $page = new class($record) {
+        use InteractsWithVerificationWorkbench;
+
+        public array $data = [
+            'vf_patient_full_name' => 'Liam Bennett',
+            'vf_patient_dob' => '1992-08-14',
+            'vf_subscriber_id' => 'U63292952',
+            'vf_insurance_provider_name' => 'Delta Dental of Kentucky',
+            'vf_group_number' => 'GRP-42',
+            'vf_insurance_company_phone_number' => '800-555-0199',
+        ];
+
+        public function __construct(private BillingWorkItem $record) {}
+
+        public function getRecord(): BillingWorkItem
+        {
+            return $this->record;
+        }
+    };
+
+    expect($page->getQuickReferenceCard())
+        ->toMatchArray([
+            'patient' => 'Liam Bennett',
+            'dob' => '08-14-1992',
+            'member_id' => 'U63292952',
+            'insurance_name' => 'Delta Dental of Kentucky',
+            'group_number' => 'GRP-42',
+            'provider_npi' => '1790914729',
+            'phone' => '800-555-0199',
+        ])
+        ->not->toHaveKey('practice_npi');
+});
+
+it('keeps the template three quick reference available while the worksheet scrolls', function (): void {
+    $template = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/verification-form-template-3.blade.php'
+    ));
+
+    expect($template)
+        ->toContain('--vt3-context-offset: calc(var(--pwdl-shell-topbar, 72px) + 12px)')
+        ->toContain('top: var(--vt3-context-offset)')
+        ->toContain('max-height: calc(100dvh - var(--vt3-context-offset) - 12px)')
+        ->toContain('overscroll-behavior: contain')
+        ->toContain('overflow-x: visible;')
+        ->toContain('overflow-y: visible;');
+});
+
+it('renders the template three identity actions and status as one integrated header', function (): void {
+    $template = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/edit-verification-request.blade.php'
+    ));
+
+    expect($template)
+        ->toContain('class="vt3-compact-workbar__identity"')
+        ->toContain('class="vt3-compact-workbar__context"')
+        ->toContain('.vt3-compact-workbar > .vt3-status-rail')
+        ->toContain('! $this->focusMode && ! $isTemplateThreeVerificationForm');
+});
+
+it('renders the verification queue page with the operational table configuration', function (): void {
+    $this->seed(RoleSeeder::class);
+
+    $permission = Permission::findOrCreate(
+        PanelPermissionMatrix::permissionName('verification', 'verification', 'view'),
+        'web',
+    );
+
+    $user = User::factory()->create(['status' => true]);
+    $user->assignRole('verification_manager');
+    $user->givePermissionTo($permission);
+
+    $this->actingAs($user)
+        ->get('/verification/verifications')
+        ->assertOk()
+        ->assertSee('All requests')
+        ->assertSee('Waiting on clinic')
+        ->assertSee('Ready for audit')
+        ->assertSee('No verification requests found')
+        ->assertSee('Patient');
+});

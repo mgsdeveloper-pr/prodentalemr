@@ -13,12 +13,6 @@
                 'description' => 'Control PDF output and default verification template rules.',
                 'url' => \App\Filament\Clinic\Pages\VerificationSettings::getUrl(),
             ],
-            [
-                'key' => 'insurance',
-                'label' => 'Insurance Directory',
-                'description' => 'Browse the shared carrier master and manage clinic-specific changes.',
-                'url' => \App\Filament\Clinic\Resources\InsuranceCarriers\InsuranceCarrierResource::getUrl('index'),
-            ],
         ];
         if ($showPortalCredentials) {
             $verificationNavItems[] = [

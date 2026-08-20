@@ -111,7 +111,7 @@
                             aria-checked="{{ ($this->modules[$moduleKey] ?? false) ? 'true' : 'false' }}"
                             wire:click="$toggle('modules.{{ $moduleKey }}')"
                             @disabled(! $canEditSelectedRole)
-                            style="position:relative;display:inline-flex;align-items:center;width:58px;height:32px;border-radius:999px;border:1px solid {{ ($this->modules[$moduleKey] ?? false) ? '#f59e0b' : '#d1d5db' }};background:{{ ($this->modules[$moduleKey] ?? false) ? 'linear-gradient(135deg,#f59e0b 0%,#fbbf24 100%)' : '#e5e7eb' }};cursor:{{ $canEditSelectedRole ? 'pointer' : 'not-allowed' }};opacity:{{ $canEditSelectedRole ? '1' : '0.65' }};"
+                            style="position:relative;display:inline-flex;align-items:center;width:58px;height:32px;border-radius:999px;border:1px solid {{ ($this->modules[$moduleKey] ?? false) ? '#0f766e' : '#d1d5db' }};background:{{ ($this->modules[$moduleKey] ?? false) ? '#0f766e' : '#e5e7eb' }};cursor:{{ $canEditSelectedRole ? 'pointer' : 'not-allowed' }};opacity:{{ $canEditSelectedRole ? '1' : '0.65' }};"
                         >
                             <span style="position:absolute;left:{{ ($this->modules[$moduleKey] ?? false) ? '28px' : '4px' }};width:24px;height:24px;border-radius:999px;background:#ffffff;box-shadow:0 4px 10px rgba(15,23,42,0.16);transition:left .2s ease;"></span>
                         </button>

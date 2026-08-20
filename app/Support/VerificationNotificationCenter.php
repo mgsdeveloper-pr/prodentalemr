@@ -2,13 +2,14 @@
 
 namespace App\Support;
 
-use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\SaasSetting;
 use App\Models\User;
 use App\Models\VerificationNotification;
+use App\Models\NotificationDelivery;
+use App\Models\NotificationEvent;
+use App\Services\Notifications\NotificationEngine;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -33,6 +34,13 @@ class VerificationNotificationCenter
         'returned_for_rework' => 'danger',
         'rework_resumed' => 'info',
         'rework_completed' => 'success',
+        'verification_submitted_for_qa' => 'warning',
+        'verification_qa_rejected' => 'danger',
+        'verification_qa_approved' => 'success',
+        'verification_reopened' => 'warning',
+        'clinic_correction_requested' => 'danger',
+        'verification_delivered' => 'success',
+        'verification_delivery_resent' => 'info',
         'sla_due_today' => 'warning',
         'sla_overdue' => 'danger',
     ];
@@ -56,6 +64,13 @@ class VerificationNotificationCenter
         'returned_for_rework' => 'verification_notify_on_status_changed',
         'rework_resumed' => 'verification_notify_on_status_changed',
         'rework_completed' => 'verification_notify_on_status_changed',
+        'verification_submitted_for_qa' => 'verification_notify_on_status_changed',
+        'verification_qa_rejected' => 'verification_notify_on_status_changed',
+        'verification_qa_approved' => 'verification_notify_on_outcome_changed',
+        'verification_reopened' => 'verification_notify_on_status_changed',
+        'clinic_correction_requested' => 'verification_notify_on_clinic_verification_updated',
+        'verification_delivered' => 'verification_notify_on_status_changed',
+        'verification_delivery_resent' => 'verification_notify_on_status_changed',
         'sla_due_today' => 'verification_notify_on_sla_alert',
         'sla_overdue' => 'verification_notify_on_sla_alert',
     ];
@@ -132,10 +147,11 @@ class VerificationNotificationCenter
         $deliveries = [];
 
         if ($settings->verification_notify_admin_all) {
-            foreach (static::adminRecipients() as $recipient) {
+            foreach (static::adminRecipients($workItem) as $recipient) {
                 $deliveries['verification:' . $recipient->getKey()] = [
                     'panel' => 'verification',
                     'recipient' => $recipient,
+                    'user' => $recipient,
                 ];
             }
         }
@@ -151,19 +167,25 @@ class VerificationNotificationCenter
                 $deliveries['clinic:' . $recipient->getKey()] = [
                     'panel' => 'clinic',
                     'recipient' => $recipient,
+                    'user' => $recipient,
                 ];
             }
         }
 
-        foreach ($deliveries as $delivery) {
-            static::storeNotification(
-                $delivery['recipient'],
-                $delivery['panel'],
-                $payload,
-                $workItem,
-                $activity
-            );
+        foreach ($deliveries as &$delivery) {
+            $delivery['channels'] = static::channelsFor($activity->activity_type, $settings);
+            $delivery['target_url'] = static::targetUrl($delivery['panel'], $workItem, $delivery['recipient']);
         }
+        unset($delivery);
+
+        static::publishEvent(
+            $workItem,
+            $activity->activity_type,
+            $payload,
+            array_values($deliveries),
+            'verification.activity.' . ($activity->public_id ?: $activity->getKey()),
+            $activity,
+        );
     }
 
     public static function syncSlaAlertsForUser(User $user, string $panel, ?int $clinicId = null): void
@@ -190,8 +212,14 @@ class VerificationNotificationCenter
                 continue;
             }
 
-            if ($panel === 'clinic' && $user->clinic_id !== $workItem->clinic_id) {
-                continue;
+            if ($panel === 'clinic') {
+                if ((int) $user->organization_id !== (int) $workItem->organization_id) {
+                    continue;
+                }
+
+                if (filled($user->clinic_id) && (int) $user->clinic_id !== (int) $workItem->clinic_id) {
+                    continue;
+                }
             }
 
             $activityType = null;
@@ -220,29 +248,35 @@ class VerificationNotificationCenter
 
             $payload = static::slaPayload($workItem, $activityType);
 
-            VerificationNotification::create([
-                'user_id' => $user->getKey(),
-                'organization_id' => $workItem->organization_id,
-                'clinic_id' => $workItem->clinic_id,
-                'billing_work_item_id' => $workItem->getKey(),
-                'actor_user_id' => null,
-                'panel' => $panel,
-                'activity_type' => $activityType,
-                'level' => $payload['level'],
-                'title' => $payload['title'],
-                'message' => $payload['message'],
-                'target_url' => static::targetUrl($panel, $workItem, $user),
-                'meta' => $payload['meta'],
-            ]);
+            static::publishEvent(
+                $workItem,
+                $activityType,
+                $payload,
+                [[
+                    'user' => $user,
+                    'recipient' => $user,
+                    'panel' => $panel,
+                    'channels' => static::channelsFor($activityType, $settings),
+                    'target_url' => static::targetUrl($panel, $workItem, $user),
+                ]],
+                implode('.', [
+                    'verification.sla',
+                    $activityType,
+                    $workItem->public_id ?: $workItem->getKey(),
+                    now()->toDateString(),
+                ]),
+            );
         }
     }
 
-    protected static function adminRecipients(): Collection
+    protected static function adminRecipients(BillingWorkItem $workItem): Collection
     {
         return User::query()
             ->where('status', true)
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['saas_admin', 'verification_admin', 'verification_manager']))
-            ->get();
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', ['verification_admin', 'verification_manager']))
+            ->get()
+            ->filter(fn (User $user): bool => $user->canAccessVerificationClinic((int) $workItem->clinic_id))
+            ->values();
     }
 
     protected static function assignedRecipients(BillingWorkItem $workItem): array
@@ -260,6 +294,7 @@ class VerificationNotificationCenter
         return [[
             'panel' => $panel,
             'recipient' => $recipient,
+            'user' => $recipient,
         ]];
     }
 
@@ -268,7 +303,10 @@ class VerificationNotificationCenter
         return User::query()
             ->where('status', true)
             ->where('organization_id', $workItem->organization_id)
-            ->where('clinic_id', $workItem->clinic_id)
+            ->where(function ($query) use ($workItem): void {
+                $query->where('clinic_id', $workItem->clinic_id)
+                    ->orWhereNull('clinic_id');
+            })
             ->whereHas('roles', fn ($query) => $query->whereIn('name', array_keys(User::clinicRoleOptions())))
             ->get()
             ->filter(fn (User $user): bool => $user->canAccessClinicModule('verification_requests'))
@@ -277,6 +315,10 @@ class VerificationNotificationCenter
 
     protected static function shouldNotifyClinic(BillingWorkItem $workItem, SaasSetting $settings, string $activityType): bool
     {
+        if ($activityType === 'info_requested_from_clinic') {
+            return true;
+        }
+
         if ($workItem->source === 'clinic_self_service') {
             return (bool) $settings->verification_notify_clinic_self_service;
         }
@@ -291,6 +333,10 @@ class VerificationNotificationCenter
                     'info_requested_from_clinic',
                     'returned_for_rework',
                     'rework_completed',
+                    'verification_qa_rejected',
+                    'verification_qa_approved',
+                    'verification_reopened',
+                    'clinic_correction_requested',
                 ], true);
         }
 
@@ -299,6 +345,10 @@ class VerificationNotificationCenter
                 'info_requested_from_clinic',
                 'returned_for_rework',
                 'rework_completed',
+                'verification_qa_rejected',
+                'verification_qa_approved',
+                'verification_reopened',
+                'clinic_correction_requested',
             ], true);
         }
 
@@ -307,8 +357,8 @@ class VerificationNotificationCenter
 
     protected static function shouldNotifyVerificationUser(User $user, BillingWorkItem $workItem, SaasSetting $settings): bool
     {
-        if ($settings->verification_notify_admin_all && $user->hasAnyRole(['saas_admin', 'saas_manager', 'verification_admin', 'verification_manager'])) {
-            return true;
+        if ($settings->verification_notify_admin_all && $user->hasAnyRole(['verification_admin', 'verification_manager'])) {
+            return $user->canAccessVerificationClinic((int) $workItem->clinic_id);
         }
 
         return $settings->verification_notify_assigned_user
@@ -343,6 +393,13 @@ class VerificationNotificationCenter
             'returned_for_rework' => 'Returned For Rework',
             'rework_resumed' => 'Rework Started',
             'rework_completed' => 'Rework Completed',
+            'verification_submitted_for_qa' => 'Ready for Audit',
+            'verification_qa_rejected' => 'Audit Returned for Correction',
+            'verification_qa_approved' => 'Audit Approved',
+            'verification_reopened' => 'Verification Reopened',
+            'clinic_correction_requested' => 'Clinic Requested Correction',
+            'verification_delivered' => 'Verification Report Available',
+            'verification_delivery_resent' => 'Verification Report Resent',
             default => str($activity->activity_type)->replace('_', ' ')->title()->toString(),
         };
 
@@ -375,6 +432,13 @@ class VerificationNotificationCenter
             'returned_for_rework' => "{$actorName} returned {$patientName} - {$clinicName} for correction or rework.",
             'rework_resumed' => "{$actorName} resumed rework on {$patientName} - {$clinicName}.",
             'rework_completed' => "{$actorName} completed rework for {$patientName} - {$clinicName}.",
+            'verification_submitted_for_qa' => "{$actorName} sent {$patientName} - {$clinicName} to Audit.",
+            'verification_qa_rejected' => "Audit returned {$patientName} - {$clinicName} for correction.",
+            'verification_qa_approved' => "Audit approved the verification for {$patientName} - {$clinicName}.",
+            'verification_reopened' => "{$actorName} reopened the verification for {$patientName} - {$clinicName}.",
+            'clinic_correction_requested' => "{$actorName} requested a correction for {$patientName} - {$clinicName}.",
+            'verification_delivered' => "The verification report for {$patientName} - {$clinicName} is available.",
+            'verification_delivery_resent' => "The verification report for {$patientName} - {$clinicName} was resent.",
             default => "{$actorName}: {$activity->description} {$patientName} - {$clinicName}",
         };
     }
@@ -403,22 +467,88 @@ class VerificationNotificationCenter
         ];
     }
 
-    protected static function storeNotification(User $recipient, string $panel, array $payload, BillingWorkItem $workItem, BillingWorkItemActivity $activity): void
+    protected static function channelsFor(string $activityType, SaasSetting $settings): array
     {
-        VerificationNotification::create([
-            'user_id' => $recipient->getKey(),
+        $channels = ['in_app'];
+
+        if (! $settings->verification_email_notifications_enabled) {
+            return $channels;
+        }
+
+        $emailEnabled = match ($activityType) {
+            'urgent_priority_flagged', 'urgent_priority_assigned' => $settings->verification_email_on_urgent,
+            'info_requested_from_clinic', 'clinic_response_received', 'returned_for_rework', 'rework_completed' => $settings->verification_email_on_clinic_action,
+            'verification_submitted_for_qa', 'verification_qa_rejected', 'verification_qa_approved', 'verification_reopened', 'clinic_correction_requested' => $settings->verification_email_on_audit,
+            'sla_due_today', 'sla_overdue' => $settings->verification_email_on_sla,
+            default => false,
+        };
+
+        if ($emailEnabled) {
+            $channels[] = 'email';
+        }
+
+        return $channels;
+    }
+
+    protected static function publishEvent(
+        BillingWorkItem $workItem,
+        string $activityType,
+        array $payload,
+        array $recipients,
+        string $idempotencyKey,
+        ?BillingWorkItemActivity $activity = null,
+    ): void {
+        if ($recipients === []) {
+            return;
+        }
+
+        $payload['external_title'] = 'Verification update requires attention';
+        $payload['external_message'] = implode("\n", array_filter([
+            'A verification notification requires your attention in ProDental.',
+            filled($workItem->reference_number) ? 'Reference: ' . $workItem->reference_number : null,
+            'Sign in to review the details securely.',
+        ]));
+
+        app(NotificationEngine::class)->publish([
+            'event_type' => 'verification.' . $activityType,
+            'source_type' => $activity?->getMorphClass(),
+            'source_id' => $activity?->getKey(),
+            'subject_type' => $workItem->getMorphClass(),
+            'subject_id' => $workItem->getKey(),
+            'actor_user_id' => $activity?->user_id,
             'organization_id' => $workItem->organization_id,
             'clinic_id' => $workItem->clinic_id,
-            'billing_work_item_id' => $workItem->getKey(),
-            'actor_user_id' => $activity->user_id,
-            'panel' => $panel,
-            'activity_type' => $activity->activity_type,
             'level' => $payload['level'],
             'title' => $payload['title'],
             'message' => $payload['message'],
-            'target_url' => static::targetUrl($panel, $workItem, $recipient),
-            'meta' => $payload['meta'],
-        ]);
+            'payload' => $payload,
+            'idempotency_key' => $idempotencyKey,
+            'occurred_at' => $activity?->created_at ?: now(),
+        ], $recipients, function (
+            NotificationEvent $event,
+            NotificationDelivery $delivery,
+            User $recipient,
+            array $recipientSpec,
+        ) use ($activityType, $payload, $workItem, $activity): void {
+            VerificationNotification::query()->firstOrCreate(
+                ['notification_delivery_id' => $delivery->getKey()],
+                [
+                    'notification_event_id' => $event->getKey(),
+                    'user_id' => $recipient->getKey(),
+                    'organization_id' => $workItem->organization_id,
+                    'clinic_id' => $workItem->clinic_id,
+                    'billing_work_item_id' => $workItem->getKey(),
+                    'actor_user_id' => $activity?->user_id,
+                    'panel' => $recipientSpec['panel'],
+                    'activity_type' => $activityType,
+                    'level' => $payload['level'],
+                    'title' => $payload['title'],
+                    'message' => $payload['message'],
+                    'target_url' => $recipientSpec['target_url'] ?? null,
+                    'meta' => $payload['meta'],
+                ],
+            );
+        });
     }
 
     protected static function targetUrl(string $panel, BillingWorkItem $workItem, User $recipient): ?string

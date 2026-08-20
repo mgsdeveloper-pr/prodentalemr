@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\UserMailbox;
 use App\Support\SaasEntitlements;
 use App\Support\UserMailboxService;
@@ -26,7 +27,7 @@ class UserMailboxPage extends Page
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $title = '';
+    protected static ?string $title = 'Mailbox';
 
     protected static ?string $slug = 'mailbox';
 
@@ -90,11 +91,6 @@ class UserMailboxPage extends Page
 
     protected function getHeaderActions(): array
     {
-        return [];
-    }
-
-    public function getToolbarActions(): array
-    {
         return [
             Action::make('refreshMailbox')
                 ->label('Refresh')
@@ -110,6 +106,26 @@ class UserMailboxPage extends Page
                         ->success()
                         ->send();
                 }),
+            Action::make('compose')
+                ->label('Compose')
+                ->icon('heroicon-o-pencil-square')
+                ->visible(fn (): bool => $this->isConfigured())
+                ->action('openComposeModal'),
+        ];
+    }
+
+    public function getSubheading(): ?string
+    {
+        $status = $this->getConnectionStatus();
+
+        return 'Review live inbox, spam, and sent mail from your connected mailbox. Connection: ' . $status['label'] . '.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            'Mailbox',
         ];
     }
 
@@ -218,7 +234,7 @@ class UserMailboxPage extends Page
             return [
                 'tone' => 'warning',
                 'label' => 'Mailbox not configured',
-                'description' => 'Open Mailbox Settings in the sidebar to connect your own inbox with live receive/send access.',
+                'description' => 'Open Settings > Mailbox > My Mailbox to connect your own inbox with live receive/send access.',
             ];
         }
 

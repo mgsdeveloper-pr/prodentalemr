@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -48,6 +49,12 @@ class ProfileController extends Controller
 
         $user = $request->user();
 
+        if ($reason = $this->accountDeletionBlockReason($user)) {
+            return back()->withErrors([
+                'password' => $reason,
+            ], 'userDeletion');
+        }
+
         Auth::logout();
 
         $user->delete();
@@ -56,5 +63,29 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return Redirect::to('/');
+    }
+
+    private function accountDeletionBlockReason(User $user): ?string
+    {
+        $responsibilities = [
+            'saas_admin' => User::query()->where('status', true)->whereKeyNot($user->getKey()),
+            'verification_admin' => User::query()->where('status', true)->whereKeyNot($user->getKey()),
+            'dso_admin' => User::query()->where('status', true)->whereKeyNot($user->getKey())->where('dso_id', $user->dso_id),
+            'clinic_admin' => User::query()->where('status', true)->whereKeyNot($user->getKey())
+                ->when($user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->when(! $user->organization_id, fn ($query) => $query->where('clinic_id', $user->clinic_id)),
+        ];
+
+        foreach ($responsibilities as $role => $possibleSuccessors) {
+            if (! $user->hasRole($role)) {
+                continue;
+            }
+
+            if (! $possibleSuccessors->role($role)->exists()) {
+                return 'Transfer your administrator responsibility to another active user before deleting this account.';
+            }
+        }
+
+        return null;
     }
 }

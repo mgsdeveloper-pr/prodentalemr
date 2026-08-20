@@ -6,6 +6,7 @@ use App\Filament\Saas\Resources\PortalCredentials\Pages\CreatePortalCredential;
 use App\Filament\Saas\Resources\PortalCredentials\Pages\EditPortalCredential;
 use App\Filament\Saas\Resources\PortalCredentials\Pages\ListPortalCredentials;
 use App\Support\AdminClinicScope;
+use App\Support\SaasSupportAccess;
 use App\Models\PortalCredential;
 use BackedEnum;
 use Filament\Forms\Components\Select;
@@ -13,6 +14,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Facades\Filament;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Placeholder;
@@ -38,6 +40,11 @@ class PortalCredentialResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Verifications';
 
     protected static ?int $navigationSort = 4;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() !== 'admin';
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -180,35 +187,35 @@ class PortalCredentialResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return (bool) (
-            auth()->user()?->canAccessVerificationModule('portal_credentials')
-            || auth()->user()?->canAccessSaasModule('portal_credentials')
-        );
+        return auth()->user()?->can('viewAny', PortalCredential::class) ?? false;
     }
 
     public static function canCreate(): bool
     {
-        return filled(AdminClinicScope::selectedClinicId())
-            && (
-                auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'add')
-                || auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'add')
-            );
+        $clinic = AdminClinicScope::selectedClinic();
+
+        return $clinic !== null
+            && SaasSupportAccess::matchesScope((int) $clinic->organization_id, (int) $clinic->getKey())
+            && (auth()->user()?->can('create', PortalCredential::class) ?? false);
     }
 
     public static function canEdit(Model $record): bool
     {
-        return (bool) (
-            auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update')
-            || auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update')
-        );
+        return (auth()->user()?->can('update', $record) ?? false)
+            && $record instanceof PortalCredential
+            && SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
     }
 
     public static function canDelete(Model $record): bool
     {
-        return (bool) (
-            auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'delete')
-            || auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'delete')
-        );
+        return (auth()->user()?->can('delete', $record) ?? false)
+            && $record instanceof PortalCredential
+            && SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
+    }
+
+    public static function canRestore(Model $record): bool
+    {
+        return static::canDelete($record);
     }
 
     public static function getPages(): array

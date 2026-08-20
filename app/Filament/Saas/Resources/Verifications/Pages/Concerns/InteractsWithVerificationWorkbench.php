@@ -6,6 +6,7 @@ use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
 use App\Models\VerificationFormSubmission;
+use App\Services\Verification\WorkflowService;
 use Illuminate\Support\Collection;
 
 trait InteractsWithVerificationWorkbench
@@ -13,6 +14,21 @@ trait InteractsWithVerificationWorkbench
     public bool $showSubmissionSnapshotModal = false;
 
     public ?array $selectedSubmissionSnapshot = null;
+
+    public function getWorkflowLifecycle(): array
+    {
+        /** @var BillingWorkItem $record */
+        $record = $this->getRecord();
+
+        $snapshot = app(WorkflowService::class)->lifecycleSnapshot($record);
+        $active = collect($snapshot)->firstWhere('active', true);
+
+        return [
+            'active_label' => $active['label'] ?? 'Request',
+            'active_key' => $active['key'] ?? 'request',
+            'items' => $snapshot,
+        ];
+    }
 
     public function getVerificationPanels(): array
     {
@@ -67,6 +83,23 @@ trait InteractsWithVerificationWorkbench
                 ],
             ],
         ];
+    }
+
+    public function getAuthoritativeSubmissionSnapshot(): ?array
+    {
+        /** @var BillingWorkItem $record */
+        $record = $this->getRecord();
+
+        if ($record->normalized_status !== BillingWorkItem::STATUS_DONE) {
+            return null;
+        }
+
+        $submission = $record->formSubmissions()
+            ->with('user')
+            ->latest('version')
+            ->first();
+
+        return $submission ? $this->formatSubmissionSnapshot($submission) : null;
     }
 
     public function getWorkbenchSummary(): array
@@ -261,27 +294,164 @@ trait InteractsWithVerificationWorkbench
         /** @var BillingWorkItem $record */
         $record = $this->getRecord();
         $profile = $record->verificationProfile;
-        $patientName = $profile?->patient_full_name ?: ($record->patient?->full_name ?: null);
-        $subscriberName = $profile?->subscriber_name ?: ($record->insurancePolicy?->subscriber_name ?: null);
-        $insuredRelation = $profile?->insured_relation ?: ($record->insurancePolicy?->subscriber_relationship ?: null);
-        $providerName = $record->provider?->display_name ?: ($profile?->provider_name ?: '-');
-        $insuranceName = $profile?->insurance_provider_name ?: ($record->insurancePolicy?->insurance_company ?: '-');
-        $insurancePhone = $profile?->insurance_company_phone_number ?: ($record->insurancePolicy?->payer_phone ?: '-');
+        $data = is_array($this->data ?? null) ? $this->data : [];
+        $primaryPlan = $record->verificationPlanSnapshots
+            ->sortBy(fn ($plan) => array_search($plan->plan_priority, ['primary', 'secondary', 'tertiary'], true))
+            ->first();
+
+        $patientName = $this->firstFilled(
+            data_get($data, 'vf_patient_full_name'),
+            $profile?->patient_full_name,
+            $record->patient?->full_name
+        );
+        $patientDob = $this->firstFilled(
+            data_get($data, 'vf_patient_dob'),
+            $profile?->patient_dob,
+            $record->patient?->dob
+        );
+        $memberId = $this->firstFilled(
+            data_get($data, 'vf_patient_identifier'),
+            data_get($data, 'vf_subscriber_id'),
+            $profile?->patient_identifier,
+            $profile?->subscriber_id,
+            $record->insurancePolicy?->member_id,
+            $primaryPlan?->member_id,
+            $record->patient?->insurance_number
+        );
+        $subscriberName = $this->firstFilled(
+            data_get($data, 'vf_subscriber_name'),
+            $profile?->subscriber_name,
+            $record->insurancePolicy?->subscriber_name,
+            $primaryPlan?->subscriber_name
+        );
+        $subscriberDob = $this->firstFilled(
+            data_get($data, 'vf_subscriber_dob'),
+            $profile?->subscriber_dob,
+            $record->insurancePolicy?->subscriber_dob,
+            $primaryPlan?->subscriber_dob
+        );
+        $insuredRelation = $this->firstFilled(
+            data_get($data, 'vf_insured_relation'),
+            $profile?->insured_relation,
+            $record->insurancePolicy?->subscriber_relationship
+        );
+        $isSelfRelationship = strtolower(trim((string) $insuredRelation)) === 'self';
+
+        if ($isSelfRelationship) {
+            $subscriberName = $patientName;
+            $subscriberDob = $patientDob;
+        }
+
+        $providerName = $this->firstFilled(
+            data_get($data, 'vf_provider_name'),
+            $record->provider?->display_name,
+            $profile?->provider_name
+        );
+        $insuranceName = $this->firstFilled(
+            data_get($data, 'vf_insurance_provider_name'),
+            $profile?->insurance_provider_name,
+            $record->insurancePolicy?->insurance_company,
+            $primaryPlan?->payer_name,
+            $record->patient?->insurance_provider
+        );
+        $insurancePhone = $this->firstFilled(
+            data_get($data, 'vf_insurance_company_phone_number'),
+            $profile?->insurance_company_phone_number,
+            $record->insurancePolicy?->payer_phone
+        );
+        $groupNumber = $this->firstFilled(
+            data_get($data, 'vf_group_number'),
+            $profile?->group_number,
+            $record->insurancePolicy?->group_number,
+            $primaryPlan?->group_number
+        );
+        $appointmentDate = $this->firstFilled(
+            data_get($data, 'vf_appointment_date'),
+            $profile?->appointment_date,
+            $record->appointment?->appointment_date
+        );
 
         return [
             'patient' => $patientName ?: '-',
-            'dob' => optional($profile?->patient_dob)->format('m-d-Y') ?: (optional($record->patient?->dob)->format('m-d-Y') ?: '-'),
-            'member_id' => $profile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-'),
+            'dob' => $this->formatQuickReferenceDate($patientDob),
+            'member_id' => $memberId ?: '-',
+            'relationship' => filled($insuredRelation) ? str((string) $insuredRelation)->headline()->toString() : '-',
             'subscriber_name' => $subscriberName ?: '-',
-            'subscriber_dob' => optional($profile?->subscriber_dob)->format('m-d-Y') ?: (optional($record->insurancePolicy?->subscriber_dob)->format('m-d-Y') ?: '-'),
-            'insurance_name' => $insuranceName,
+            'subscriber_dob' => $this->formatQuickReferenceDate($subscriberDob),
+            'insurance_name' => $insuranceName ?: '-',
             'coverage_role' => $this->resolveCoverageRole($patientName, $subscriberName, $insuredRelation),
-            'group_number' => $profile?->group_number ?: ($record->insurancePolicy?->group_number ?: '-'),
-            'provider_name' => $providerName,
+            'group_number' => $groupNumber ?: '-',
+            'appointment_date' => $this->formatQuickReferenceDate($appointmentDate),
+            'provider_name' => $providerName ?: '-',
             'provider_npi' => $record->provider?->npi_number ?: '-',
-            'practice_npi' => $record->organization?->npi_number ?? $record->clinic?->npi_number ?? '-',
-            'phone' => $insurancePhone,
+            'phone' => $insurancePhone ?: '-',
         ];
+    }
+
+    public function getClinicCommunication(): array
+    {
+        /** @var BillingWorkItem $record */
+        $record = $this->getRecord();
+        $activities = $record->activities()
+            ->with('user')
+            ->whereIn('activity_type', [
+                'info_requested_from_clinic',
+                'clinic_response_received',
+            ])
+            ->oldest('created_at')
+            ->get();
+
+        $requests = $activities->where('activity_type', 'info_requested_from_clinic')->values();
+        $responses = $activities->where('activity_type', 'clinic_response_received')->values();
+        $latestRequest = $requests->last();
+        $latestResponse = $responses
+            ->when($latestRequest, fn (Collection $items): Collection => $items
+                ->filter(fn (BillingWorkItemActivity $activity): bool => optional($activity->created_at)?->greaterThanOrEqualTo($latestRequest->created_at) ?? false)
+                ->values())
+            ->last();
+
+        return [
+            'request_count' => $requests->count(),
+            'response_count' => $responses->count(),
+            'has_activity' => $activities->isNotEmpty(),
+            'waiting_for_clinic' => $record->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+            'request' => $latestRequest ? [
+                'message' => trim((string) data_get($latestRequest->meta, 'info_request_reason', $latestRequest->description)) ?: 'Additional information requested.',
+                'actor' => $latestRequest->user?->name ?: 'Verification Team',
+                'date' => optional($latestRequest->created_at)->format('M d, Y h:i A') ?: '-',
+            ] : null,
+            'response' => $latestResponse ? [
+                'message' => trim((string) data_get($latestResponse->meta, 'clinic_response_note', $latestResponse->description)) ?: 'Clinic response received.',
+                'actor' => $latestResponse->user?->name ?: 'Clinic',
+                'date' => optional($latestResponse->created_at)->format('M d, Y h:i A') ?: '-',
+            ] : null,
+        ];
+    }
+
+    protected function firstFilled(mixed ...$values): mixed
+    {
+        foreach ($values as $value) {
+            if (filled($value)) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    protected function formatQuickReferenceDate(mixed $value): string
+    {
+        if (! filled($value)) {
+            return '-';
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('m-d-Y');
+        }
+
+        $timestamp = strtotime((string) $value);
+
+        return $timestamp === false ? (string) $value : date('m-d-Y', $timestamp);
     }
 
     public function getPlanSnapshots(): Collection
@@ -337,7 +507,7 @@ trait InteractsWithVerificationWorkbench
 
     public function getAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
     {
-        return route('saas.billing-work-item-attachments.download', $attachment);
+        return route('admin.verification-request-attachments.download', $attachment);
     }
 
     public function getActivityTimeline(?int $limit = null): Collection
@@ -354,13 +524,27 @@ trait InteractsWithVerificationWorkbench
                 $details = match ($activity->activity_type) {
                     'info_requested_from_clinic' => data_get($activity->meta, 'info_request_reason'),
                     'clinic_response_received' => data_get($activity->meta, 'clinic_response_note'),
+                    'clinic_correction_requested' => collect([
+                        filled(data_get($activity->meta, 'reason')) ? 'Reason: ' . data_get($activity->meta, 'reason') : null,
+                        collect(data_get($activity->meta, 'requested_fields', []))->isNotEmpty()
+                            ? "Requested items:\n- " . collect(data_get($activity->meta, 'requested_fields', []))->values()->implode("\n- ")
+                            : null,
+                        filled(data_get($activity->meta, 'baseline_submission_version'))
+                            ? 'Original completed result: v' . data_get($activity->meta, 'baseline_submission_version')
+                            : null,
+                    ])->filter()->implode("\n"),
                     'returned_for_rework' => data_get($activity->meta, 'return_reason'),
                     'attachment_added' => $this->buildAttachmentDetails($activity),
                     'attachment_downloaded' => $this->buildAttachmentDownloadDetails($activity),
                     'submission_snapshot_viewed' => $this->buildSnapshotViewDetails($activity),
                     'verification_detail_viewed' => $this->buildAccessDetails($activity),
                     'verification_console_opened' => $this->buildAccessDetails($activity),
+                    'verification_delivered', 'verification_delivery_resent' => $this->buildDeliveryDetails($activity),
+                    'verification_pdf_downloaded', 'verification_pdf_previewed' => $this->buildPdfAccessDetails($activity),
                     'form_submitted' => $this->buildSubmissionDetails($activity),
+                    'verification_qa_approved' => filled(data_get($activity->meta, 'submission_version'))
+                        ? 'Completed result: v' . data_get($activity->meta, 'submission_version') . "\nReviewed by: " . (data_get($activity->meta, 'reviewed_by') ?: 'Audit reviewer')
+                        : null,
                     default => null,
                 };
 
@@ -368,6 +552,7 @@ trait InteractsWithVerificationWorkbench
                     'type' => match ($activity->activity_type) {
                         'info_requested_from_clinic' => 'Information Requested',
                         'clinic_response_received' => 'Clinic Responded',
+                        'clinic_correction_requested' => 'Clinic Requested Correction',
                         'returned_for_rework' => 'Returned for Rework',
                         'rework_resumed' => 'Rework Started',
                         'rework_completed' => 'Rework Completed',
@@ -376,6 +561,10 @@ trait InteractsWithVerificationWorkbench
                         'submission_snapshot_viewed' => 'Snapshot Viewed',
                         'verification_detail_viewed' => 'Detail View Opened',
                         'verification_console_opened' => 'Verification Console Opened',
+                        'verification_delivered' => 'Report Delivered',
+                        'verification_delivery_resent' => 'Report Delivery Resent',
+                        'verification_pdf_downloaded' => 'PDF Downloaded',
+                        'verification_pdf_previewed' => 'PDF Previewed',
                         'form_submitted' => 'Form Submitted',
                         default => str($activity->activity_type)->replace('_', ' ')->title()->toString(),
                     },
@@ -387,6 +576,7 @@ trait InteractsWithVerificationWorkbench
                     'tone' => match ($activity->activity_type) {
                         'info_requested_from_clinic' => 'amber',
                         'clinic_response_received', 'rework_resumed' => 'sky',
+                        'clinic_correction_requested' => 'rose',
                         'returned_for_rework' => 'rose',
                         'rework_completed' => 'emerald',
                         'attachment_added' => 'violet',
@@ -394,10 +584,13 @@ trait InteractsWithVerificationWorkbench
                         'submission_snapshot_viewed' => 'slate',
                         'verification_detail_viewed' => 'slate',
                         'verification_console_opened' => 'slate',
+                        'verification_delivered' => 'emerald',
+                        'verification_delivery_resent' => 'sky',
+                        'verification_pdf_downloaded', 'verification_pdf_previewed' => 'slate',
                         'form_submitted' => 'indigo',
                         default => 'cyan',
                     },
-                    'submission_id' => $activity->activity_type === 'form_submitted'
+                    'submission_id' => in_array($activity->activity_type, ['form_submitted', 'verification_qa_approved'], true)
                         ? data_get($activity->meta, 'submission_id')
                         : null,
                 ];
@@ -443,6 +636,29 @@ trait InteractsWithVerificationWorkbench
     {
         $this->showSubmissionSnapshotModal = false;
         $this->selectedSubmissionSnapshot = null;
+    }
+
+    protected function buildDeliveryDetails(BillingWorkItemActivity $activity): ?string
+    {
+        return collect([
+            filled(data_get($activity->meta, 'channel'))
+                ? 'Channel: ' . str((string) data_get($activity->meta, 'channel'))->replace('_', ' ')->headline()->toString()
+                : null,
+            filled(data_get($activity->meta, 'user_name')) ? 'Recorded by: ' . data_get($activity->meta, 'user_name') : null,
+        ])->filter()->implode("\n") ?: null;
+    }
+
+    protected function buildPdfAccessDetails(BillingWorkItemActivity $activity): ?string
+    {
+        return collect([
+            filled(data_get($activity->meta, 'panel'))
+                ? 'Panel: ' . str((string) data_get($activity->meta, 'panel'))->headline()->toString()
+                : null,
+            filled(data_get($activity->meta, 'output_mode'))
+                ? 'Output mode: ' . str((string) data_get($activity->meta, 'output_mode'))->replace('_', ' ')->headline()->toString()
+                : null,
+            filled(data_get($activity->meta, 'user_name')) ? 'User: ' . data_get($activity->meta, 'user_name') : null,
+        ])->filter()->implode("\n") ?: null;
     }
 
     protected function buildSubmissionDetails(BillingWorkItemActivity $activity): ?string
@@ -511,6 +727,7 @@ trait InteractsWithVerificationWorkbench
     protected function formatSubmissionSnapshot(VerificationFormSubmission $submission): array
     {
         $payload = $submission->payload ?? [];
+        $changes = $this->buildSubmissionDiffRows($submission);
 
         return [
             'headline' => [
@@ -529,7 +746,16 @@ trait InteractsWithVerificationWorkbench
             'summary' => $this->formatSnapshotRows(data_get($payload, 'summary', [])),
             'work_item' => $this->formatSnapshotRows(data_get($payload, 'work_item', [])),
             'verification_profile' => $this->formatSnapshotRows(data_get($payload, 'verification_profile', [])),
-            'changes' => $this->buildSubmissionDiffRows($submission),
+            'filled_verification_profile' => collect($this->formatSnapshotRows(data_get($payload, 'verification_profile', [])))
+                ->reject(fn (array $row): bool => ($row['value'] ?? '-') === '-')
+                ->values()
+                ->all(),
+            'changes' => $changes,
+            'form_changes' => collect($changes)
+                ->reject(fn (array $change): bool => in_array($change['group'] ?? null, ['Submission Summary', 'Queue State'], true))
+                ->reject(fn (array $change): bool => in_array($change['label'] ?? null, ['Public Id', 'Is Pre Registered', 'Quick Reference'], true))
+                ->values()
+                ->all(),
             'answers' => collect(data_get($payload, 'answers', []))
                 ->map(function ($answer): array {
                     $answerValue = $this->normalizeSnapshotValue(data_get($answer, 'answer_value'));
@@ -546,23 +772,56 @@ trait InteractsWithVerificationWorkbench
                 })
                 ->values()
                 ->all(),
+            'coverage_codes' => collect(data_get($payload, 'coverage_codes', []))
+                ->map(fn (array $row): array => [
+                    'code' => data_get($row, 'code') ?: '-',
+                    'description' => data_get($row, 'description') ?: 'Coverage item',
+                    'value' => collect([
+                        filled(data_get($row, 'coverage_status')) ? 'Status: ' . str((string) data_get($row, 'coverage_status'))->headline() : null,
+                        filled(data_get($row, 'coverage_percent')) ? 'Coverage: ' . data_get($row, 'coverage_percent') . '%' : null,
+                        filled(data_get($row, 'frequency')) ? 'Frequency: ' . data_get($row, 'frequency') : null,
+                    ])->filter()->implode(' | ') ?: '-',
+                ])
+                ->values()
+                ->all(),
             'raw_payload' => json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) ?: '{}',
         ];
     }
 
     protected function buildSubmissionDiffRows(VerificationFormSubmission $submission): array
     {
-        $previous = $submission->workItem
+        $currentEntries = $this->buildSubmissionComparableEntries($submission->payload ?? []);
+        $previousQuery = $submission->workItem
             ?->formSubmissions()
-            ->where('version', '<', $submission->version)
-            ->latest('version')
-            ->first();
+            ->where('version', '<', $submission->version);
 
-        if (! $previous) {
-            return [];
+        if ($submission->status === BillingWorkItem::STATUS_DONE) {
+            $previousQuery?->where('status', BillingWorkItem::STATUS_DONE);
         }
 
-        $currentEntries = $this->buildSubmissionComparableEntries($submission->payload ?? []);
+        $previous = $previousQuery?->latest('version')->first();
+
+        if (! $previous) {
+            return collect($currentEntries)
+                ->map(function (array $entry): ?array {
+                    $after = $this->normalizeSnapshotValue($entry['value'] ?? null);
+
+                    if ($after === '-') {
+                        return null;
+                    }
+
+                    return [
+                        'group' => $entry['group'] ?? 'Verification Audit',
+                        'label' => $entry['label'] ?? 'Question',
+                        'before' => '-',
+                        'after' => $after,
+                    ];
+                })
+                ->filter()
+                ->values()
+                ->all();
+        }
+
         $previousEntries = $this->buildSubmissionComparableEntries($previous->payload ?? []);
 
         return collect(array_unique(array_merge(array_keys($currentEntries), array_keys($previousEntries))))
@@ -612,7 +871,12 @@ trait InteractsWithVerificationWorkbench
         foreach (data_get($payload, 'answers', []) as $answer) {
             $identifier = data_get($answer, 'code') ?: ('question_' . data_get($answer, 'question_id'));
             $entryKey = 'answers.' . $identifier;
-            $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, data_get($answer, 'answer_value'), $answer);
+            $answerValue = $this->normalizeSnapshotValue(data_get($answer, 'answer_value'));
+            $noteValue = $this->normalizeSnapshotValue(data_get($answer, 'note_value'));
+            $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, collect([
+                $answerValue !== '-' ? $answerValue : null,
+                $noteValue !== '-' ? 'Note: ' . $noteValue : null,
+            ])->filter()->implode("\n") ?: null, $answer);
         }
 
         foreach (data_get($payload, 'coverage_codes', []) as $row) {

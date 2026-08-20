@@ -16,7 +16,7 @@ class VerificationSlaAnalytics extends Widget
 
     protected function getViewData(): array
     {
-        $query = AdminClinicScope::apply(
+        $query = AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
                 ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
                 ->where('source', '!=', 'clinic_self_service'),

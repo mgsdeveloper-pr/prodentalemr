@@ -67,6 +67,7 @@ class ListPortalCredentials extends ListRecords
     public function canUpdatePasswords(): bool
     {
         return filled(AdminClinicScope::selectedClinicId())
+            && PortalCredentialResource::canCreate()
             && (
                 (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update') ?? false)
                 || (auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update') ?? false)
@@ -180,6 +181,7 @@ class ListPortalCredentials extends ListRecords
         abort_unless($this->canUpdatePasswords(), 403);
 
         $credential = $this->getScopedPortalCredentialQuery()->findOrFail($credentialId);
+        abort_unless(PortalCredentialResource::canEdit($credential), 403);
 
         $this->editingCredentialId = $credential->getKey();
         $this->editingCredentialName = $credential->portal_name;
@@ -215,6 +217,8 @@ class ListPortalCredentials extends ListRecords
         ]);
 
         $credential = $this->getScopedPortalCredentialQuery()->findOrFail($this->editingCredentialId);
+        abort_unless(PortalCredentialResource::canEdit($credential), 403);
+
         $credential->update([
             'password' => $this->newPassword,
         ]);

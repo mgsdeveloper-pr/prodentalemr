@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
 use App\Support\AdminClinicScope;
@@ -44,6 +45,20 @@ class PortalCredentialSettings extends Page
             )
             && SaasEntitlements::userFeatureAllowed(auth()->user(), 'portal_credentials', AdminClinicScope::selectedClinic())
         );
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Manage clinic portal access used during insurance verification.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification',
+            VerificationGeneralSettings::getUrl() => 'Settings',
+            'Portal Credentials',
+        ];
     }
 
     public function getSelectedClinic(): ?Clinic

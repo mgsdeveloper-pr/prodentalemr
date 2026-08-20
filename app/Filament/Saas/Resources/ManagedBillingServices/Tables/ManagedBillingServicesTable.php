@@ -36,7 +36,7 @@ class ManagedBillingServicesTable
                     ->label('Enrollments')
                     ->sortable(),
                 TextColumn::make('work_items_count')
-                    ->label('Work items')
+                    ->label('Service requests')
                     ->sortable(),
                 IconColumn::make('status')
                     ->label('Active')

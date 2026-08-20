@@ -9,6 +9,8 @@ use App\Models\OnboardingDraft;
 use App\Models\Organization;
 use App\Models\SaasSetting;
 use App\Models\User;
+use App\Services\Notifications\NotificationEngine;
+use App\Services\Notifications\ProductNotificationService;
 use App\Support\InvoicePdf;
 use App\Support\PayPalGateway;
 use App\Support\StripeGateway;
@@ -17,6 +19,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class SaasNotifications
 {
@@ -39,7 +42,32 @@ class SaasNotifications
             return;
         }
 
-        $notification->sendToDatabase(static::recipients(), isEventDispatched: true);
+        $data = $notification->toArray();
+        $recipients = static::recipients()
+            ->map(fn (User $user): array => [
+                'user' => $user,
+                'panel' => 'saas',
+                'channels' => ['in_app'],
+                'target_url' => data_get($data, 'actions.0.url'),
+            ])
+            ->all();
+
+        app(NotificationEngine::class)->publish([
+            'event_type' => 'saas.' . str($settingKey)->after('notify_database_on_')->toString(),
+            'level' => static::notificationLevel($data['status'] ?? null),
+            'title' => (string) ($data['title'] ?? 'Platform notification'),
+            'message' => (string) ($data['body'] ?? ''),
+            'target_url' => data_get($data, 'actions.0.url'),
+            'payload' => [
+                'filament' => $data,
+                'external_title' => (string) ($data['title'] ?? 'Platform notification'),
+                'external_message' => (string) ($data['body'] ?? ''),
+            ],
+            'idempotency_key' => 'saas.database.' . Str::ulid(),
+            'occurred_at' => now(),
+        ], $recipients, function ($event, $delivery, User $recipient) use ($data): void {
+            Notification::fromArray($data)->sendToDatabase($recipient, isEventDispatched: true);
+        });
     }
 
     protected static function sendEmailNotification(string $settingKey, string $subject, string $body): void
@@ -56,21 +84,34 @@ class SaasNotifications
             return;
         }
 
-        SaasMailSettings::apply($state);
-
         $recipients = static::recipients()
-            ->pluck('email')
-            ->filter()
-            ->unique()
-            ->values()
+            ->filter(fn (User $user): bool => filled($user->email))
+            ->map(fn (User $user): array => [
+                'user' => $user,
+                'panel' => 'saas',
+                'channels' => ['email'],
+            ])
             ->all();
 
-        foreach ($recipients as $recipient) {
-            Mail::mailer($state['email_mailer'] ?? 'smtp')
-                ->raw($body, function ($message) use ($recipient, $subject): void {
-                    $message->to($recipient)->subject($subject);
-                });
-        }
+        app(NotificationEngine::class)->publish([
+            'event_type' => 'saas.' . str($settingKey)->after('email_on_')->toString(),
+            'level' => 'info',
+            'title' => $subject,
+            'message' => $body,
+            'payload' => [
+                'external_title' => $subject,
+                'external_message' => $body,
+            ],
+            'idempotency_key' => 'saas.email.' . Str::ulid(),
+            'occurred_at' => now(),
+        ], $recipients);
+    }
+
+    protected static function notificationLevel(mixed $status): string
+    {
+        $value = $status instanceof \BackedEnum ? $status->value : (string) $status;
+
+        return in_array($value, ['danger', 'warning', 'success', 'info'], true) ? $value : 'info';
     }
 
     protected static function sendDirectEmail(string $recipient, string $subject, string $body, ?array $attachment = null): void
@@ -139,6 +180,16 @@ class SaasNotifications
             'User updated',
             $message,
         );
+
+        if ($actor && ! $actor->is($user)) {
+            app(ProductNotificationService::class)->accountSecurity(
+                $user,
+                'account_access_updated',
+                'Account access updated',
+                'An administrator updated your ProDental account or access permissions.',
+                'security.account-updated.' . $user->getKey() . '.' . now()->timestamp,
+            );
+        }
     }
 
     public static function userDeleted(string $name, string $email, ?User $actor = null): void
@@ -208,16 +259,18 @@ class SaasNotifications
     public static function incompleteOnboarding(OnboardingDraft $draft): void
     {
         $actionName = "resumeOnboardingDraft{$draft->id}";
+        $resumeUrl = app(\App\Services\ClientOnboardingService::class)->resumeUrl($draft);
+        $subject = $draft->account_structure === 'dso' ? 'DSO' : 'client';
 
         static::sendDatabaseNotification(
             Notification::make()
-            ->title('Incomplete organization onboarding')
-            ->body('An onboarding draft is waiting to be completed. Resume from where you left off.')
+            ->title("Incomplete {$subject} onboarding")
+            ->body('An onboarding record is waiting to be completed. Resume from where you left off.')
             ->warning()
             ->actions([
                 Action::make($actionName)
                     ->label('Resume')
-                    ->url(url('/saas/organization-onboarding'), shouldOpenInNewTab: false)
+                    ->url($resumeUrl, shouldOpenInNewTab: false)
                     ->markAsRead(),
             ]),
             'notify_database_on_incomplete_onboarding',
@@ -225,8 +278,8 @@ class SaasNotifications
 
         static::sendEmailNotification(
             'email_on_incomplete_onboarding',
-            'Incomplete organization onboarding',
-            'An organization onboarding draft is waiting to be completed. Resume it from the SaaS panel.',
+            "Incomplete {$subject} onboarding",
+            "A {$subject} onboarding record is waiting to be completed. Resume it from the SaaS panel.",
         );
 
         $draft->forceFill([
@@ -238,7 +291,6 @@ class SaasNotifications
     {
         DatabaseNotification::query()
             ->where('type', \Filament\Notifications\DatabaseNotification::class)
-            ->where('data', 'like', '%Incomplete organization onboarding%')
             ->where('data', 'like', "%resumeOnboardingDraft{$draft->id}%")
             ->delete();
     }

@@ -13,7 +13,7 @@ Template 3 currently uses four storage lanes.
 | Lane | UI field shape | Saves to | Save method | Reload method |
 | --- | --- | --- | --- | --- |
 | Built-in verification fields | `data.vf_*` | `verification_profiles.*` after removing `vf_` prefix | `buildTemplateThreeSavePayload()` -> `splitVerificationProfileData()` -> `afterSave()` -> `verificationProfile()->updateOrCreate()` | `mutateFormDataBeforeFill()` loads `verificationProfile` attributes back into `data.vf_*` |
-| Work item fields | native `billing_work_items` keys | `billing_work_items.*` | `mutateFormDataBeforeSave()` returns filtered work item data | Filament resource record fill |
+| Verification request fields | native `billing_work_items` keys | `billing_work_items.*` | `mutateFormDataBeforeSave()` returns filtered verification request data | Filament resource record fill |
 | Custom template questions | `data.custom_question_{id}` and `data.custom_question_note_{id}` | `verification_form_answers.answer_value`, `verification_form_answers.note_value` | `extractTemplateThreeCustomAnswerPayloads()` -> `syncVerificationFormAnswers()` | `mutateFormDataBeforeFill()` loads answers back into matching custom keys |
 | Frequency / ADA-CDT rows | `codeCoverageData.{index}.*` | `verification_coverage_codes.*` | `normalizeCodeCoverageRows()` -> `syncVerificationCoverageCodes()` | `resolveCodeCoverageRows()` loads saved rows and merges with configured template rows |
 
@@ -149,7 +149,7 @@ These rows are dynamic and are configured through Template Question Management w
 
 | Label | Field key | Input type | DB target | Save path | Reload path | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Reference Number | record value | Readonly | `billing_work_items.reference_number` | work item save path | record reload | Not a `vf_*` profile field |
+| Reference Number | record value | Readonly | `billing_work_items.reference_number` | verification request save path | record reload | Not a `vf_*` profile field |
 | Insurance Representative | `data.vf_insurance_representative_name` | Text | `verification_profiles.insurance_representative_name` | profile split | profile -> key |  |
 | Verified By | `data.vf_verified_by` | Readonly/autofill | `verification_profiles.verified_by` | profile split | profile/auth fallback |  |
 | Verification Date | `data.vf_verification_date` | Date/readonly depending UI | `verification_profiles.verification_date` | date normalization + profile split | profile -> browser date value |  |

@@ -53,8 +53,8 @@
             width: 0.6rem;
             height: 0.6rem;
             border-radius: 999px;
-            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
-            box-shadow: 0 0 0 0.18rem rgba(245, 158, 11, 0.14);
+            background: #0f766e;
+            box-shadow: 0 0 0 0.18rem rgba(15, 118, 110, 0.14);
         }
 
         .saas-account__hero-main {

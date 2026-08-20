@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+use App\Services\Notifications\ProductNotificationService;
+
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,7 +12,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Subscription extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     protected $fillable = [
         'dso_id',
@@ -56,6 +59,30 @@ class Subscription extends Model
             'entitlement_overrides' => 'array',
             'usage_snapshot' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updated(function (self $subscription): void {
+            if ($subscription->wasChanged('cancelled_at') && filled($subscription->cancelled_at)) {
+                app(ProductNotificationService::class)->subscriptionChanged($subscription, 'cancelled');
+
+                return;
+            }
+
+            if ($subscription->wasChanged('status')) {
+                app(ProductNotificationService::class)->subscriptionChanged(
+                    $subscription,
+                    in_array($subscription->status, ['cancelled', 'expired'], true) ? $subscription->status : 'status_changed',
+                );
+
+                return;
+            }
+
+            if ($subscription->wasChanged(['subscription_plan_id', 'change_type', 'renewal_date'])) {
+                app(ProductNotificationService::class)->subscriptionChanged($subscription, 'plan_changed');
+            }
+        });
     }
 
     public function organization(): BelongsTo

@@ -1,4 +1,8 @@
-<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;">
+<style>
+    .pd-booking-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+    @media (max-width: 900px) { .pd-booking-grid { grid-template-columns:1fr; } }
+</style>
+<div class="pd-booking-grid">
     <div>
         <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #0f172a;">Appointment Date<span style="color: #dc2626;">*</span></div>
         <div style="border: 1px solid #dbe4ee; border-radius: 10px; background: #ffffff; overflow: hidden;">
@@ -59,8 +63,8 @@
 
                                     if ($day['is_selected']) {
                                         $styles = [
-                                            'border' => '#4f6edb',
-                                            'background' => '#5b6fd8',
+                                            'border' => '#0f766e',
+                                            'background' => '#0f766e',
                                             'color' => '#ffffff',
                                             'meta' => '#dbe7ff',
                                         ];
@@ -78,7 +82,7 @@
                                         font-size: 14px;
                                         font-weight: {{ $day['is_selected'] ? '800' : '700' }};
                                         cursor: pointer;
-                                        box-shadow: {{ $day['is_selected'] ? 'inset 0 0 0 1px #4f6edb' : 'none' }};
+                                        box-shadow: {{ $day['is_selected'] ? 'inset 0 0 0 1px #0f766e' : 'none' }};
                                         display: flex;
                                         flex-direction: column;
                                         align-items: center;
@@ -106,7 +110,7 @@
             <div style="font-size: 12px; font-weight: 800; color: #0f172a;">Available Slot<span style="color: #dc2626;">*</span></div>
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <div style="font-size: 11px; font-weight: 700; color: #64748b;">{{ $selectedDuration }} min slots</div>
-                <div style="font-size: 11px; color: #64748b;">@Showing times in: <strong>{{ $displayTimezone }}</strong></div>
+                <div style="font-size: 11px; color: #64748b;">Showing times in <strong>{{ $displayTimezone }}</strong></div>
             </div>
         </div>
         <div style="min-height: 320px; border: 1px solid #e6ebf2; border-radius: 10px; background: #f7f9fc; overflow: hidden;">
@@ -119,9 +123,9 @@
                             style="
                                 padding: 14px 12px;
                                 border-radius: 10px;
-                                border: 1px solid {{ $slot['is_selected'] ? '#4f6edb' : '#dbe4ee' }};
-                                background: {{ $slot['is_selected'] ? '#eef2ff' : '#ffffff' }};
-                                color: {{ $slot['is_selected'] ? '#3559c7' : '#334155' }};
+                                border: 1px solid {{ $slot['is_selected'] ? '#0f766e' : '#dbe4ee' }};
+                                background: {{ $slot['is_selected'] ? '#ecfdf5' : '#ffffff' }};
+                                color: {{ $slot['is_selected'] ? '#0f766e' : '#334155' }};
                                 font-size: 13px;
                                 font-weight: 700;
                                 text-align: center;

@@ -4,9 +4,7 @@ namespace App\Filament\Saas\Resources\VerificationFormQuestions\Pages;
 
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\Concerns\InteractsWithVerificationFormQuestionOrdering;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
-use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
-use App\Support\AdminClinicScope;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
 
@@ -20,30 +18,40 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     protected Width | string | null $maxContentWidth = Width::Full;
 
-    public function getSelectedClinicName(): string
+    public function mount(): void
     {
-        $clinicId = $this->data['clinic_id'] ?? null;
+        parent::mount();
 
-        if (filled($clinicId)) {
-            $clinic = Clinic::query()->with('organization')->find($clinicId);
+        $sectionKey = request()->query('section');
 
-            if ($clinic) {
-                return $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '');
-            }
+        if (! is_string($sectionKey) || blank($sectionKey)) {
+            return;
         }
 
-        $selectedClinic = AdminClinicScope::selectedClinic();
+        $templateKey = VerificationFormQuestion::defaultTemplateKey();
+        $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor($sectionKey, $templateKey, null);
 
-        return $selectedClinic
-            ? $selectedClinic->clinic_name . ' - ' . ($selectedClinic->organization?->name ?? '')
-            : 'Select clinic scope';
+        $this->data['template_key'] = $templateKey;
+
+        if ($parentSectionKey) {
+            $this->data['section_key'] = $parentSectionKey;
+            $this->data['sub_section_key'] = $sectionKey;
+        } else {
+            $this->data['section_key'] = $sectionKey;
+            $this->data['sub_section_key'] = null;
+        }
+
+        $this->form->fill($this->data);
+    }
+
+    public function getSelectedClinicName(): string
+    {
+        return 'Platform Master Template';
     }
 
     public function getSectionCards(): array
     {
-        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : AdminClinicScope::selectedClinicId();
-
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), null))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -55,10 +63,8 @@ class CreateVerificationFormQuestion extends CreateRecord
     public function getCurrentSectionLabel(): string
     {
         $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
-        $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : AdminClinicScope::selectedClinicId();
-
         return filled($key)
-            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
+            ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), null))
             : 'Choose section';
     }
 
@@ -104,13 +110,9 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['clinic_id'] = filled($data['clinic_id'] ?? null)
-            ? (int) $data['clinic_id']
-            : null;
-
-        if (filled($data['clinic_id']) && ! filled($data['organization_id'])) {
-            $data['organization_id'] = Clinic::query()->whereKey($data['clinic_id'])->value('organization_id');
-        }
+        $data['template_version_id'] = VerificationFormQuestionResource::currentMasterWorkingVersion()?->getKey();
+        $data['organization_id'] = null;
+        $data['clinic_id'] = null;
 
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);
         $data['section_key'] = filled($data['sub_section_key'] ?? null)

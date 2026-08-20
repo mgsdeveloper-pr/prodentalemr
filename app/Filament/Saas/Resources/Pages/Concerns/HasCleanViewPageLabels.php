@@ -4,6 +4,17 @@ namespace App\Filament\Saas\Resources\Pages\Concerns;
 
 trait HasCleanViewPageLabels
 {
+    /**
+     * @return array<string>
+     */
+    public function getPageClasses(): array
+    {
+        return [
+            ...parent::getPageClasses(),
+            'pd-standard-record-view',
+        ];
+    }
+
     public function getTitle(): string
     {
         return $this->getCleanRecordLabel();

@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class VerificationProfile extends Model
 {
+    use HasPublicId;
+
     public const FORM_TYPE_OPTIONS = [
         'full_form' => 'Full Form',
         'short_form' => 'Short Form',

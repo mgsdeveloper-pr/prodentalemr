@@ -30,7 +30,7 @@ class ClientServiceEnrollmentInfolist
                                 TextEntry::make('status')
                                     ->badge(),
                                 TextEntry::make('work_items_count')
-                                    ->label('Work items')
+                                    ->label('Verification requests')
                                     ->state(fn ($record) => $record->work_items_count ?? $record->workItems()->count()),
                                 TextEntry::make('start_date')
                                     ->date()

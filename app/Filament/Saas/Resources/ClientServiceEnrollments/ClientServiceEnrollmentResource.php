@@ -28,9 +28,11 @@ class ClientServiceEnrollmentResource extends Resource
 
     protected static ?string $navigationLabel = 'Client Enrollments';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Plans';
+    protected static string|UnitEnum|null $navigationGroup = 'Client Management';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 60;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $recordTitleAttribute = 'display_title';
 

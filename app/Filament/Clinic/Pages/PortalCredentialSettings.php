@@ -20,7 +20,7 @@ class PortalCredentialSettings extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
     protected static ?string $navigationLabel = 'Portal Credential Settings';
 
@@ -33,6 +33,11 @@ class PortalCredentialSettings extends Page
     protected ?Clinic $clinicRecord = null;
 
     public string $search = '';
+
+    public function mount(): void
+    {
+        $this->redirect(PortalCredentialResource::getUrl('index'), navigate: true);
+    }
 
     public static function canAccess(): bool
     {

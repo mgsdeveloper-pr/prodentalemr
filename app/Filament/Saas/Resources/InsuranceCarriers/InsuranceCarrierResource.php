@@ -12,6 +12,7 @@ use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -26,7 +27,7 @@ use UnitEnum;
 
 class InsuranceCarrierResource extends Resource
 {
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $model = InsuranceCarrier::class;
 
@@ -34,7 +35,14 @@ class InsuranceCarrierResource extends Resource
 
     protected static ?string $navigationLabel = 'Insurance Directory';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
+    protected static string|UnitEnum|null $navigationGroup = 'Master Data';
+
+    protected static ?int $navigationSort = 10;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'saas';
+    }
 
     public static function getModelLabel(): string
     {

@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Actions\Verification\CreateVerificationRequestAction;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
@@ -10,6 +11,7 @@ use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
 use App\Models\User;
+use App\Services\Verification\VerificationIntakeService;
 use App\Support\VerificationRequestDuplicateGuard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
@@ -190,7 +192,7 @@ class VerificationRequestImportService
             ];
         }
 
-        $workItem = BillingWorkItem::create([
+        $workItemData = [
             'organization_id' => $clinic->organization_id,
             'clinic_id' => $clinic->id,
             'location_id' => $location?->id,
@@ -199,7 +201,6 @@ class VerificationRequestImportService
             'patient_id' => $patient?->id,
             'provider_id' => $provider?->id,
             'patient_insurance_policy_id' => $policy?->id,
-            'assigned_to' => VerificationAutoAssigner::resolve($source, $clinic->id)?->id,
             'created_by' => $user->id,
             'title' => trim(collect([
                 'Insurance Verification',
@@ -212,11 +213,26 @@ class VerificationRequestImportService
             'source' => $source,
             'pms_sync_status' => 'pending',
             'writeback_status' => 'not_requested',
-            'due_at' => $enrollment
-                ? $enrollment->calculateDueAt($priority)
-                : ($priority === 'urgent' ? now()->addHours(24) : now()->addDays(3)),
             'notes' => $row['notes'] ?? null,
-        ]);
+        ];
+
+        $planSnapshotData = [[
+            'plan_priority' => $this->normalizePlanPriority($row['plan_priority'] ?? null),
+            'payer_name' => $row['payer_name'],
+            'member_id' => $row['member_id'] ?? ($policy?->member_id ?? null),
+            'group_number' => $row['group_number'] ?? ($policy?->group_number ?? null),
+            'subscriber_name' => $row['subscriber_name'] ?: ($policy?->subscriber_name ?? null),
+            'subscriber_dob' => $this->normalizeDate($row['subscriber_dob'] ?? null),
+            'notes' => $row['notes'] ?? null,
+        ]];
+
+        $workItemData = app(VerificationIntakeService::class)->normalizeAndValidate(
+            $workItemData,
+            $verificationProfileData + ['form_type' => $this->normalizeFormType($row['form_type'] ?? null)],
+            $planSnapshotData,
+        );
+
+        $workItem = app(CreateVerificationRequestAction::class)->execute($workItemData);
 
         $workItem->verificationProfile()->create([
             'form_type' => $this->normalizeFormType($row['form_type'] ?? null),
@@ -240,15 +256,7 @@ class VerificationRequestImportService
             'verification_notes' => $row['notes'] ?? null,
         ]);
 
-        $workItem->verificationPlanSnapshots()->create([
-            'plan_priority' => $this->normalizePlanPriority($row['plan_priority'] ?? null),
-            'payer_name' => $row['payer_name'],
-            'member_id' => $row['member_id'] ?? ($policy?->member_id ?? null),
-            'group_number' => $row['group_number'] ?? ($policy?->group_number ?? null),
-            'subscriber_name' => $row['subscriber_name'] ?: ($policy?->subscriber_name ?? null),
-            'subscriber_dob' => $this->normalizeDate($row['subscriber_dob'] ?? null),
-            'notes' => $row['notes'] ?? null,
-        ]);
+        $workItem->verificationPlanSnapshots()->createMany($planSnapshotData);
 
         $workItem->recordActivity('verification_profile_saved', 'Structured verification request details captured from import.');
 

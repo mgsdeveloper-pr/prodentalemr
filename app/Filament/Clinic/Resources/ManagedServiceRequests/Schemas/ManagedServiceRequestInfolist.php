@@ -14,12 +14,16 @@ class ManagedServiceRequestInfolist
         return $schema
             ->components([
                 Section::make('Request Snapshot')
+                    ->description('Service, ownership, and current request status.')
                     ->schema([
                         Grid::make(4)
                             ->schema([
                                 TextEntry::make('managedBillingService.name')->label('Service'),
                                 TextEntry::make('managedBillingService.category')->label('Category')->badge(),
-                                TextEntry::make('status')->badge(),
+                                TextEntry::make('status')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'pending')->replace('_', ' ')->headline()->toString())
+                                    ->badge()
+                                    ->color('info'),
                                 TextEntry::make('created_at')->label('Requested on')->dateTime('M d, Y h:i A'),
                                 TextEntry::make('organization.name')->label('Organization'),
                                 TextEntry::make('clinic.clinic_name')->label('Clinic'),
@@ -30,6 +34,7 @@ class ManagedServiceRequestInfolist
                 Section::make('Request Notes')
                     ->schema([
                         TextEntry::make('notes')
+                            ->label('Clinic notes')
                             ->placeholder('No additional request details were added.')
                             ->columnSpanFull(),
                     ]),

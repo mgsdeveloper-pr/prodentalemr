@@ -11,9 +11,9 @@ class VerificationClinicAssignments extends AdminVerificationClinicAssignments
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Access Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
-    protected static ?string $navigationLabel = 'Assign Clinic';
+    protected static ?string $navigationLabel = 'Clinic Access';
 
     protected static ?int $navigationSort = 2;
 

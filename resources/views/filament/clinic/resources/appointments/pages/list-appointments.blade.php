@@ -24,19 +24,19 @@
         $displayTimezoneLabel = strtoupper($displayNow->format('T'));
     @endphp
 
-    <div style="display:flex;flex-direction:column;gap:22px;">
+    <div style="display:flex;flex-direction:column;gap:16px;">
         <section
             wire:poll.visible.10s
-            style="border:1px solid #e5e7eb;border-radius:26px;background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 18px 40px rgba(15,23,42,0.06);overflow:hidden;"
+            style="border:1px solid #dbe4ee;border-radius:8px;background:#ffffff;overflow:hidden;"
         >
             <div style="padding:24px 28px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,0.8fr);gap:22px;align-items:start;">
                 <div style="display:flex;flex-direction:column;gap:14px;">
-                    <div style="display:inline-flex;align-items:center;gap:8px;width:max-content;padding:8px 12px;border-radius:999px;background:#eef2ff;border:1px solid #c7d2fe;color:#4338ca;font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;">
+                    <div style="display:inline-flex;align-items:center;gap:8px;width:max-content;padding:6px 10px;border-radius:999px;background:#ecfdf5;border:1px solid #a7f3d0;color:#0f766e;font-size:11px;font-weight:800;text-transform:uppercase;">
                         {{ $workspaceBadge }}
                     </div>
 
                     <div style="display:flex;flex-direction:column;gap:8px;">
-                        <h2 style="margin:0;font-size:32px;line-height:1.08;font-weight:800;color:#0f172a;">{{ $pageTitle }}</h2>
+                        <h2 style="margin:0;font-size:26px;line-height:1.15;font-weight:800;color:#0f172a;">{{ $pageTitle }}</h2>
                         <p style="margin:0;max-width:760px;font-size:15px;line-height:1.75;color:#64748b;">
                             {{ $pageDescription }}
                         </p>
@@ -124,7 +124,7 @@
                     </div>
                 </div>
 
-                <div style="border:1px solid #e5e7eb;border-radius:22px;background:#ffffff;padding:22px;box-shadow:0 12px 28px rgba(79,70,229,0.08);display:flex;flex-direction:column;gap:16px;align-self:end;">
+                <div style="border:1px solid #dbe4ee;border-radius:8px;background:#f8fafc;padding:18px;display:flex;flex-direction:column;gap:14px;align-self:end;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                         <div>
                             <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">Workspace</div>
@@ -157,7 +157,7 @@
                             @if ($canImportAppointments && filled($importUrl))
                                 <a
                                     href="{{ $importUrl }}"
-                                    style="display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:16px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 10px 22px rgba(37,99,235,0.08);"
+                                    style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#ffffff;color:#334155;font-size:13px;font-weight:800;text-decoration:none;"
                                 >
                                     Import Appointments
                                 </a>
@@ -166,7 +166,7 @@
                             @if ($canCreateAppointments)
                             <a
                                 href="{{ $this->getCreateUrl() }}"
-                                style="display:inline-flex;align-items:center;justify-content:center;padding:12px 16px;border-radius:16px;background:linear-gradient(135deg,#f97316 0%,#fb7185 100%);color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 10px 22px rgba(249,115,22,0.22);"
+                                style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:6px;border:1px solid #0f766e;background:#0f766e;color:#ffffff;font-size:13px;font-weight:800;text-decoration:none;"
                             >
                                 Add Appointment
                             </a>
@@ -177,7 +177,7 @@
             </div>
         </section>
 
-        <section style="border:1px solid #e5e7eb;border-radius:26px;background:#ffffff;box-shadow:0 16px 34px rgba(15,23,42,0.06);overflow:hidden;">
+        <section style="border:1px solid #dbe4ee;border-radius:8px;background:#ffffff;overflow:hidden;">
             <div style="padding:22px;">
                 {{ $this->table }}
             </div>

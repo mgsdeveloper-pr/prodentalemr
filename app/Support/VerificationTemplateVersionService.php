@@ -27,8 +27,11 @@ class VerificationTemplateVersionService
                     'scope' => VerificationTemplateVersion::SCOPE_MASTER,
                     'version_number' => 1,
                     'name' => 'Master Template',
+                    'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
+                    'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT,
                     'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
                     'is_active' => true,
+                    'is_working_draft' => false,
                     'published_at' => now(),
                     'created_by' => auth()->id(),
                     'notes' => 'Initial published master template version.',
@@ -68,6 +71,26 @@ class VerificationTemplateVersionService
 
             $master = $this->ensureMasterVersion($templateKey);
 
+            if (! in_array($master->clinic_visibility, [
+                VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+                VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT,
+            ], true)) {
+                $visibleMaster = VerificationTemplateVersion::query()
+                    ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+                    ->where('template_key', $templateKey)
+                    ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+                    ->where('is_active', true)
+                    ->whereIn('clinic_visibility', [
+                        VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+                        VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT,
+                    ])
+                    ->latest('version_number')
+                    ->latest('id')
+                    ->first();
+
+                $master = $visibleMaster ?: $master;
+            }
+
             $version = VerificationTemplateVersion::query()->create([
                 'template_key' => $templateKey,
                 'scope' => VerificationTemplateVersion::SCOPE_CLINIC,
@@ -77,8 +100,11 @@ class VerificationTemplateVersionService
                 'source_version_id' => $master->id,
                 'version_number' => 1,
                 'name' => $clinic->clinic_name . ' Master Template',
+                'form_type' => $master->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
+                'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
                 'is_active' => true,
+                'is_working_draft' => false,
                 'published_at' => now(),
                 'created_by' => auth()->id(),
                 'notes' => 'Clinic working copy replicated from the active master template.',
@@ -93,39 +119,212 @@ class VerificationTemplateVersionService
 
     public function createDraftFromPublished(VerificationTemplateVersion $published): VerificationTemplateVersion
     {
-        return DB::transaction(function () use ($published): VerificationTemplateVersion {
+        return $this->createDraftFromSource($published, [
+            'name' => $published->name . ' Draft',
+            'form_type' => $published->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
+            'clinic_visibility' => $published->clinic_visibility ?: VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
+        ]);
+    }
+
+    public function createDraftFromSource(?VerificationTemplateVersion $source, array $options = []): VerificationTemplateVersion
+    {
+        $templateKey = $source?->template_key ?? ($options['template_key'] ?? VerificationFormQuestion::DEFAULT_TEMPLATE_KEY);
+        $scope = $source?->scope ?? ($options['scope'] ?? VerificationTemplateVersion::SCOPE_MASTER);
+        $organizationId = $source?->organization_id ?? ($options['organization_id'] ?? null);
+        $clinicId = $source?->clinic_id ?? ($options['clinic_id'] ?? null);
+        $formType = $options['form_type'] ?? 'both';
+        $clinicVisibility = $options['clinic_visibility'] ?? VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN;
+        $name = trim((string) ($options['name'] ?? ($source?->name ?: 'Master Template Draft')));
+        $startingPoint = $options['starting_point'] ?? (filled($source) ? 'current_master' : 'fresh');
+
+        return DB::transaction(function () use ($source, $templateKey, $scope, $organizationId, $clinicId, $formType, $clinicVisibility, $name, $startingPoint): VerificationTemplateVersion {
+            VerificationTemplateVersion::query()
+                ->where('scope', $scope)
+                ->where('template_key', $templateKey)
+                ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+                ->when($clinicId, fn ($query) => $query->where('clinic_id', $clinicId))
+                ->when(! $clinicId, fn ($query) => $query->whereNull('clinic_id'))
+                ->update(['is_working_draft' => false]);
+
             $nextVersionNumber = ((int) VerificationTemplateVersion::query()
-                ->where('scope', $published->scope)
-                ->where('template_key', $published->template_key)
-                ->when($published->clinic_id, fn ($query) => $query->where('clinic_id', $published->clinic_id))
-                ->when(! $published->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
+                ->where('scope', $scope)
+                ->where('template_key', $templateKey)
+                ->when($clinicId, fn ($query) => $query->where('clinic_id', $clinicId))
+                ->when(! $clinicId, fn ($query) => $query->whereNull('clinic_id'))
                 ->max('version_number')) + 1;
 
             $draft = VerificationTemplateVersion::query()->create([
-                'template_key' => $published->template_key,
-                'scope' => $published->scope,
-                'organization_id' => $published->organization_id,
-                'clinic_id' => $published->clinic_id,
-                'parent_version_id' => $published->id,
-                'source_version_id' => $published->source_version_id ?: $published->id,
+                'template_key' => $templateKey,
+                'scope' => $scope,
+                'organization_id' => $organizationId,
+                'clinic_id' => $clinicId,
+                'parent_version_id' => $source?->id,
+                'source_version_id' => $source?->source_version_id ?: $source?->id,
                 'version_number' => $nextVersionNumber,
-                'name' => $published->name,
+                'name' => filled($name) ? $name : 'Master Template Draft',
+                'form_type' => $formType,
+                'clinic_visibility' => $clinicVisibility,
                 'status' => VerificationTemplateVersion::STATUS_DRAFT,
                 'is_active' => false,
+                'is_working_draft' => true,
                 'created_by' => auth()->id(),
-                'notes' => 'Draft cloned from published version ' . $published->version_number . '.',
+                'notes' => $this->draftCreationNotes($source, $formType, $startingPoint),
             ]);
 
-            $this->copySections($published, $draft, $published->clinic);
-            $this->copyQuestions($published, $draft, $published->clinic);
+            if ($source) {
+                $this->copySections($source, $draft, $source->clinic);
+                $this->copyQuestions($source, $draft, $source->clinic);
+                $this->filterDraftQuestionsForFormType($draft, $formType);
+            }
+
+            $this->normalizeTemplateThreeVersion($draft);
 
             return $draft->refresh();
         });
     }
 
-    public function publishDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
+    protected function draftCreationNotes(?VerificationTemplateVersion $source, string $formType, string $startingPoint): string
     {
-        return DB::transaction(function () use ($draft): VerificationTemplateVersion {
+        $formLabel = match ($formType) {
+            'full_form' => 'Full Form',
+            'short_form' => 'Short Form',
+            default => 'Full + Short',
+        };
+
+        if (! $source) {
+            return 'Fresh draft created for ' . $formLabel . '.';
+        }
+
+        $sourceLabel = $startingPoint === 'specific_version'
+            ? 'specific version ' . $source->version_number
+            : 'current master version ' . $source->version_number;
+
+        return 'Draft replicated from ' . $sourceLabel . ' for ' . $formLabel . '.';
+    }
+
+    protected function filterDraftQuestionsForFormType(VerificationTemplateVersion $draft, string $formType): void
+    {
+        $allowedFormTypes = match ($formType) {
+            'full_form' => ['full_form', 'both'],
+            'short_form' => ['short_form', 'both'],
+            default => ['full_form', 'short_form', 'both'],
+        };
+
+        VerificationFormQuestion::query()
+            ->where('template_version_id', $draft->id)
+            ->where('template_key', $draft->template_key)
+            ->whereNotIn('form_type', $allowedFormTypes)
+            ->delete();
+    }
+
+    public function normalizeTemplateThreeVersion(VerificationTemplateVersion $version): VerificationTemplateVersion
+    {
+        if ($version->template_key !== VerificationFormQuestion::DEFAULT_TEMPLATE_KEY) {
+            return $version;
+        }
+
+        return DB::transaction(function () use ($version): VerificationTemplateVersion {
+            $sectionDefinitions = [
+                ['template_3_patient_subscriber', null, 'Patient & Subscriber Information', 10],
+                ['template_3_insurance', null, 'Insurance Information', 20],
+                ['template_3_maximums_deductibles', null, 'Maximums & Deductibles', 30],
+                ['template_3_coverage_category', null, 'Deductible & Coverage Category', 40],
+                ['template_3_plan_provisions', null, 'Plan Provisions', 50],
+                ['template_3_service_history', null, 'Service History', 60],
+                ['template_3_frequency_percentage', null, 'Frequency & Percentage', 70],
+                ['template_3_frequency_diagnostic_preventative', 'template_3_frequency_percentage', 'Diagnostic & Preventative', 71],
+                ['template_3_frequency_basic', 'template_3_frequency_percentage', 'Basic', 72],
+                ['template_3_frequency_major', 'template_3_frequency_percentage', 'Major', 73],
+                ['template_3_frequency_orthodontics', 'template_3_frequency_percentage', 'Orthodontics', 74],
+                ['template_3_verification_information', null, 'Verification Information', 80],
+            ];
+
+            foreach ($sectionDefinitions as [$sectionKey, $parentSectionKey, $label, $sortOrder]) {
+                VerificationTemplateSection::query()->updateOrCreate(
+                    [
+                        'template_version_id' => $version->id,
+                        'template_key' => $version->template_key,
+                        'section_key' => $sectionKey,
+                        'organization_id' => $version->organization_id,
+                        'clinic_id' => $version->clinic_id,
+                    ],
+                    [
+                        'parent_section_key' => $parentSectionKey,
+                        'label' => $label,
+                        'sort_order' => $sortOrder,
+                        'is_builtin' => true,
+                        'is_active' => true,
+                    ],
+                );
+            }
+
+            $frequencySectionMap = [
+                'frequency_diagnostic_preventative' => 'template_3_frequency_diagnostic_preventative',
+                'template_3_frequency_general' => 'template_3_frequency_diagnostic_preventative',
+                'frequency_basic' => 'template_3_frequency_basic',
+                'frequency_major' => 'template_3_frequency_major',
+                'frequency_orthodontics_benefit' => 'template_3_frequency_orthodontics',
+            ];
+
+            foreach ($frequencySectionMap as $from => $to) {
+                VerificationFormQuestion::query()
+                    ->where('template_version_id', $version->id)
+                    ->where('template_key', $version->template_key)
+                    ->where('section_key', $from)
+                    ->update(['section_key' => $to]);
+            }
+
+            VerificationFormQuestion::query()
+                ->where('template_version_id', $version->id)
+                ->where('template_key', $version->template_key)
+                ->whereIn('section_key', [
+                    'core_details',
+                    'coverage_matrix',
+                    'plan_provisions',
+                    'history',
+                    'service_history',
+                    'verification_information',
+                ])
+                ->delete();
+
+            VerificationTemplateSection::query()
+                ->where('template_version_id', $version->id)
+                ->where('template_key', $version->template_key)
+                ->whereNotIn('section_key', collect($sectionDefinitions)->pluck(0)->all())
+                ->delete();
+
+            $this->removeDuplicateQuestions($version);
+
+            return $version->refresh();
+        });
+    }
+
+    protected function removeDuplicateQuestions(VerificationTemplateVersion $version): void
+    {
+        VerificationFormQuestion::query()
+            ->where('template_version_id', $version->id)
+            ->where('template_key', $version->template_key)
+            ->orderBy('section_key')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (VerificationFormQuestion $question): string => implode('|', [
+                $question->section_key,
+                $question->field_key ?: 'prompt:' . trim((string) $question->prompt),
+                $question->code ?: '',
+            ]))
+            ->each(function ($duplicates): void {
+                $duplicates->skip(1)->each->delete();
+            });
+    }
+
+    public function publishDraft(
+        VerificationTemplateVersion $draft,
+        ?string $name = null,
+        ?string $notes = null,
+    ): VerificationTemplateVersion
+    {
+        return DB::transaction(function () use ($draft, $name, $notes): VerificationTemplateVersion {
             VerificationTemplateVersion::query()
                 ->where('scope', $draft->scope)
                 ->where('template_key', $draft->template_key)
@@ -136,10 +335,35 @@ class VerificationTemplateVersionService
                 ->update(['is_active' => false]);
 
             $draft->forceFill([
+                'name' => filled($name) ? trim((string) $name) : $draft->name,
+                'notes' => filled($notes) ? trim((string) $notes) : $draft->notes,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
                 'is_active' => true,
+                'is_working_draft' => false,
                 'published_at' => now(),
             ])->save();
+
+            return $draft->refresh();
+        });
+    }
+
+    public function markWorkingDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
+    {
+        if ($draft->status !== VerificationTemplateVersion::STATUS_DRAFT) {
+            return $draft;
+        }
+
+        return DB::transaction(function () use ($draft): VerificationTemplateVersion {
+            VerificationTemplateVersion::query()
+                ->where('scope', $draft->scope)
+                ->where('template_key', $draft->template_key)
+                ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+                ->when($draft->clinic_id, fn ($query) => $query->where('clinic_id', $draft->clinic_id))
+                ->when(! $draft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
+                ->whereKeyNot($draft->getKey())
+                ->update(['is_working_draft' => false]);
+
+            $draft->forceFill(['is_working_draft' => true])->save();
 
             return $draft->refresh();
         });
@@ -151,10 +375,34 @@ class VerificationTemplateVersionService
             return $workItem;
         }
 
-        $version = $workItem->clinic
+        $version = $this->latestPublishedVersionForWorkItem($workItem);
+
+        return $this->replaceWorkItemSnapshot($workItem, $version);
+    }
+
+    public function latestPublishedVersionForWorkItem(BillingWorkItem $workItem): VerificationTemplateVersion
+    {
+        return $workItem->clinic
             ? $this->ensureClinicPublishedVersion($workItem->clinic)
             : $this->ensureMasterVersion();
+    }
 
+    public function workItemUsesLatestPublishedVersion(BillingWorkItem $workItem): bool
+    {
+        return (int) $workItem->verification_template_version_id === (int) $this->latestPublishedVersionForWorkItem($workItem)->getKey();
+    }
+
+    public function refreshWorkItemSnapshot(BillingWorkItem $workItem): BillingWorkItem
+    {
+        if ($workItem->normalized_status === BillingWorkItem::STATUS_DONE) {
+            throw new \LogicException('Completed verification requests keep their original template snapshot for audit history.');
+        }
+
+        return $this->replaceWorkItemSnapshot($workItem, $this->latestPublishedVersionForWorkItem($workItem));
+    }
+
+    protected function replaceWorkItemSnapshot(BillingWorkItem $workItem, VerificationTemplateVersion $version): BillingWorkItem
+    {
         $workItem->forceFill([
             'verification_template_version_id' => $version->id,
             'verification_template_snapshot' => $this->snapshot($version),
@@ -175,6 +423,8 @@ class VerificationTemplateVersionService
                 'clinic_id' => $version->clinic_id,
                 'version_number' => $version->version_number,
                 'name' => $version->name,
+                'form_type' => $version->form_type,
+                'clinic_visibility' => $version->clinic_visibility,
                 'status' => $version->status,
                 'published_at' => optional($version->published_at)->toIso8601String(),
             ],

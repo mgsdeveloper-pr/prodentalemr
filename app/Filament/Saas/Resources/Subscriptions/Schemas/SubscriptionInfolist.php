@@ -39,7 +39,7 @@ class SubscriptionInfolist
                                 TextEntry::make('subscriptionPlan.name')
                                     ->label('Subscription plan')
                                     ->badge()
-                                    ->color('warning'),
+                                    ->color('info'),
                                 TextEntry::make('status')
                                     ->badge()
                                     ->color(fn ($state): string => match ($state) {

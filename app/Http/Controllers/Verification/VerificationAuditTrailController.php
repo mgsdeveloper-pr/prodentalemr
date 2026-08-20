@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Support\AdminClinicScope;
+use App\Support\ClinicPanelScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Response;
 
@@ -14,6 +15,19 @@ class VerificationAuditTrailController extends Controller
     public function downloadForAdmin(BillingWorkItem $billingWorkItem): Response
     {
         $this->ensureAdminCanAccess($billingWorkItem);
+
+        return $this->download($billingWorkItem, 'verification');
+    }
+
+    public function downloadForClinic(BillingWorkItem $billingWorkItem): Response
+    {
+        $this->ensureClinicCanAccess($billingWorkItem);
+
+        return $this->download($billingWorkItem, 'clinic');
+    }
+
+    protected function download(BillingWorkItem $billingWorkItem, string $panel): Response
+    {
 
         $billingWorkItem->load([
             'organization',
@@ -30,7 +44,7 @@ class VerificationAuditTrailController extends Controller
         ]);
 
         $billingWorkItem->recordActivity('verification_audit_exported', 'Verification audit trail exported.', [
-            'panel' => 'verification',
+            'panel' => $panel,
             'user_name' => auth()->user()?->name,
         ]);
 
@@ -58,13 +72,36 @@ class VerificationAuditTrailController extends Controller
 
     protected function ensureAdminCanAccess(BillingWorkItem $billingWorkItem): void
     {
-        abort_unless(auth()->user()?->canAccessSaasRevenueOperations(), 403);
+        $user = auth()->user();
+
+        abort_unless($user?->canAccessVerificationWorkspace(), 403);
+        abort_unless($user?->can('view', $billingWorkItem), 403);
 
         $selectedClinicId = AdminClinicScope::selectedClinicId();
 
         if ($selectedClinicId) {
             abort_unless((int) $billingWorkItem->clinic_id === (int) $selectedClinicId, 403);
         }
+    }
+
+    protected function ensureClinicCanAccess(BillingWorkItem $billingWorkItem): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user?->canAccessClinicVerificationRequests(), 403);
+
+        if ($user->shouldBypassClinicScope()) {
+            $selectedClinicId = ClinicPanelScope::selectedClinicId();
+            abort_unless($selectedClinicId && (int) $billingWorkItem->clinic_id === (int) $selectedClinicId, 403);
+
+            return;
+        }
+
+        abort_unless(
+            (int) $billingWorkItem->organization_id === (int) $user->organization_id
+            && (int) $billingWorkItem->clinic_id === (int) $user->clinic_id,
+            403
+        );
     }
 
     protected function buildSummary(BillingWorkItem $workItem): array

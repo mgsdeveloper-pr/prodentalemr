@@ -20,8 +20,9 @@
 
             <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;">
                 @if ($canUseVerification)
-                    <a
-                        href="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::VERIFICATION]) }}"
+                    <form method="POST" action="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::VERIFICATION]) }}">
+                        @csrf
+                    <button type="submit"
                         style="min-height: 210px; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; border-radius: 22px; border: 1px solid #bfdbfe; background: #ffffff; color: #0f172a; text-decoration: none; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);"
                     >
                         <div>
@@ -37,12 +38,14 @@
                             Open Verification Zone
                             <span aria-hidden="true">-></span>
                         </div>
-                    </a>
+                    </button>
+                    </form>
                 @endif
 
                 @if ($canUseClinicPms)
-                    <a
-                        href="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::CLINIC_PMS]) }}"
+                    <form method="POST" action="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::CLINIC_PMS]) }}">
+                        @csrf
+                    <button type="submit"
                         style="min-height: 210px; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; border-radius: 22px; border: 1px solid #fed7aa; background: #ffffff; color: #0f172a; text-decoration: none; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);"
                     >
                         <div>
@@ -58,7 +61,8 @@
                             Open Clinic PMS
                             <span aria-hidden="true">-></span>
                         </div>
-                    </a>
+                    </button>
+                    </form>
                 @endif
             </div>
         </section>

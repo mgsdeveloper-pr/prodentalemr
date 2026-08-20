@@ -11,20 +11,27 @@ class ListVerificationRequests extends ListRecords
 {
     protected static string $resource = VerificationRequestResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Verification Requests';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Track request status, results, and clinic follow-up.';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->label('Create verification request'),
             Action::make('import')
-                ->label('Import verification requests')
+                ->label('Import')
                 ->icon('heroicon-o-arrow-up-tray')
+                ->color('gray')
                 ->url(VerificationRequestResource::getUrl('import')),
-            Action::make('downloadSample')
-                ->label('Download sample Excel')
-                ->icon('heroicon-o-arrow-down-tray')
-                ->url(url('/samples/verification-request-import-sample.xlsx'))
-                ->openUrlInNewTab(),
+            CreateAction::make()
+                ->label('New Request')
+                ->icon('heroicon-o-plus'),
         ];
     }
 }

@@ -6,13 +6,31 @@
         $dayAgenda = $this->getDayAgenda();
     @endphp
 
-    <div style="display:flex;flex-direction:column;gap:24px;background:#f5f7fb;margin:-10px;padding:10px;border-radius:22px;">
-        <section style="border:1px solid #e6ebf2;border-radius:18px;background:#ffffff;box-shadow:0 14px 30px rgba(15,23,42,0.04);padding:18px 20px;">
-            <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;">
+    <style>
+        .pd-calendar { display:flex; flex-direction:column; gap:16px; }
+        .pd-calendar__toolbar, .pd-calendar__surface { border:1px solid #dbe4ee; border-radius:8px; background:#fff; overflow:hidden; }
+        .pd-calendar__toolbar { padding:14px 16px; }
+        .pd-calendar__filters { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)) auto; gap:10px; padding-top:14px; margin-top:14px; border-top:1px solid #e5e7eb; }
+        .pd-calendar__filters select { width:100%; min-height:38px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; padding:0 10px; color:#334155; font-size:13px; }
+        .pd-calendar__button { min-height:38px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; padding:0 12px; color:#334155; font-size:13px; font-weight:700; cursor:pointer; }
+        .pd-calendar__button--active { border-color:#0f766e; background:#0f766e; color:#fff; }
+        .pd-calendar__scroll { overflow-x:auto; }
+        @media (max-width: 900px) {
+            .pd-calendar__header { grid-template-columns:1fr !important; }
+            .pd-calendar__header > * { justify-self:stretch !important; }
+            .pd-calendar__filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .pd-calendar__scroll > div { min-width:900px; }
+        }
+        @media (max-width: 560px) { .pd-calendar__filters { grid-template-columns:1fr; } }
+    </style>
+
+    <div class="pd-calendar">
+        <section class="pd-calendar__toolbar">
+            <div class="pd-calendar__header" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px;">
                 <div style="display:flex;align-items:center;gap:8px;justify-self:start;">
-                    <button type="button" wire:click="previousPeriod" style="width:42px;height:38px;border-radius:10px;border:1px solid #d7dfeb;background:#ffffff;color:#475569;font-size:20px;line-height:1;cursor:pointer;">&#8249;</button>
-                    <button type="button" wire:click="nextPeriod" style="width:42px;height:38px;border-radius:10px;border:1px solid #d7dfeb;background:#ffffff;color:#475569;font-size:20px;line-height:1;cursor:pointer;">&#8250;</button>
-                    <button type="button" wire:click="goToToday" style="min-height:38px;padding:0 16px;border-radius:10px;border:1px solid #d7dfeb;background:#ffffff;color:#334155;font-size:14px;font-weight:800;cursor:pointer;">Today</button>
+                    <button type="button" wire:click="previousPeriod" class="pd-calendar__button" title="Previous period">&#8249;</button>
+                    <button type="button" wire:click="nextPeriod" class="pd-calendar__button" title="Next period">&#8250;</button>
+                    <button type="button" wire:click="goToToday" class="pd-calendar__button">Today</button>
                 </div>
 
                 <div style="justify-self:center;text-align:center;">
@@ -21,12 +39,12 @@
                 </div>
 
                 <div style="display:flex;align-items:center;justify-content:flex-end;">
-                    <div style="display:inline-grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #d7dfeb;border-radius:10px;overflow:hidden;background:#ffffff;">
+                    <div style="display:inline-grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;">
                         @foreach (['month' => 'Month', 'week' => 'Week', 'day' => 'Day'] as $mode => $label)
                             <button
                                 type="button"
                                 wire:click="setViewMode('{{ $mode }}')"
-                                style="min-width:92px;min-height:38px;border:none;background:{{ $viewMode === $mode ? '#5b6fd8' : '#ffffff' }};color:{{ $viewMode === $mode ? '#ffffff' : '#334155' }};font-size:14px;font-weight:800;cursor:pointer;"
+                                class="pd-calendar__button {{ $viewMode === $mode ? 'pd-calendar__button--active' : '' }}"
                             >
                                 {{ $label }}
                             </button>
@@ -34,9 +52,37 @@
                     </div>
                 </div>
             </div>
+
+            <div class="pd-calendar__filters">
+                <select wire:model.live="providerFilter" aria-label="Filter by provider">
+                    <option value="">All providers</option>
+                    @foreach ($this->getProviderOptions() as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+                <select wire:model.live="locationFilter" aria-label="Filter by location">
+                    <option value="">All locations</option>
+                    @foreach ($this->getLocationOptions() as $id => $name)
+                        <option value="{{ $id }}">{{ $name }}</option>
+                    @endforeach
+                </select>
+                <select wire:model.live="statusFilter" aria-label="Filter by appointment status">
+                    <option value="">All appointment statuses</option>
+                    @foreach (['scheduled' => 'Scheduled', 'confirmed' => 'Confirmed', 'checked_in' => 'Checked in', 'in_chair' => 'In chair', 'completed' => 'Completed', 'cancelled' => 'Cancelled', 'no_show' => 'No-show'] as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <select wire:model.live="verificationFilter" aria-label="Filter by verification status">
+                    <option value="">All verification statuses</option>
+                    @foreach (\App\Models\Appointment::VERIFICATION_STATUS_OPTIONS as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <button type="button" wire:click="clearFilters" class="pd-calendar__button">Clear</button>
+            </div>
         </section>
 
-        <section style="border:1px solid #e6ebf2;border-radius:18px;background:#ffffff;box-shadow:0 14px 30px rgba(15,23,42,0.04);overflow:hidden;">
+        <section class="pd-calendar__surface pd-calendar__scroll">
             @if ($viewMode === 'month')
                 <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-bottom:1px solid #dbe4ee;background:#ffffff;">
                     @foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dayName)
@@ -115,6 +161,7 @@
                                     <div style="font-size:11px;font-weight:800;color:#64748b;">{{ $event['time'] ?: 'Time pending' }}</div>
                                     <div style="font-size:13px;font-weight:800;color:#0f172a;line-height:1.4;">{{ $event['title'] }}</div>
                                     <div style="font-size:11px;font-weight:700;color:#64748b;">{{ $event['status'] }}</div>
+                                    <div style="font-size:11px;font-weight:700;color:#0f766e;">Verification: {{ $event['verification_status'] }}</div>
                                 </a>
                             @empty
                                 <div style="padding:14px 10px;border:1px dashed #dbe4ee;border-radius:10px;background:#f8fafc;font-size:12px;color:#94a3b8;text-align:center;">
@@ -142,7 +189,7 @@
                                 <div style="font-size:15px;font-weight:900;color:#0f172a;">{{ $event['time'] ?: 'Time pending' }}</div>
                                 <div style="display:flex;flex-direction:column;gap:4px;">
                                     <div style="font-size:15px;font-weight:900;color:#0f172a;">{{ $event['title'] }}</div>
-                                    <div style="font-size:13px;color:#64748b;">{{ $event['type'] }}</div>
+                                    <div style="font-size:13px;color:#64748b;">{{ $event['type'] }} &middot; Verification: {{ $event['verification_status'] }}</div>
                                 </div>
                                 <div style="display:flex;justify-content:flex-end;">
                                     <span style="display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 12px;border-radius:999px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;border:1px solid #dbe4ee;">

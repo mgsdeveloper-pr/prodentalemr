@@ -4,10 +4,11 @@ namespace App\Filament\Clinic\Resources\VerificationRequests\Pages;
 
 use App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource;
 use App\Models\BillingWorkItemAttachment;
-use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationWorkItem;
+use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest as BaseEditVerificationRequest;
+use App\Services\Verification\StatusService;
 use Filament\Support\Enums\Width;
 
-class EditVerificationRequest extends EditVerificationWorkItem
+class EditVerificationRequest extends BaseEditVerificationRequest
 {
     protected static string $resource = VerificationRequestResource::class;
 
@@ -20,7 +21,19 @@ class EditVerificationRequest extends EditVerificationWorkItem
 
     public function getIndexUrl(): string
     {
-        return VerificationRequestResource::getUrl('index');
+        return $this->returnToQueue ?? $this->getDefaultIndexUrl();
+    }
+
+    public function getClinicResponseUrl(): ?string
+    {
+        if ($this->record->normalized_status !== \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE) {
+            return null;
+        }
+
+        return route('filament.clinic.pages.request-response', [
+            'respond' => $this->record->getKey(),
+            'return' => $this->getIndexUrl(),
+        ]);
     }
 
     public function getPdfDownloadUrl(): string
@@ -51,7 +64,7 @@ class EditVerificationRequest extends EditVerificationWorkItem
 
     public function getSaveButtonLabel(): string
     {
-        return 'Save verification';
+        return $this->auditReady ? 'Audit' : 'Save verification';
     }
 
     public function getViewButtonLabel(): string
@@ -72,57 +85,38 @@ class EditVerificationRequest extends EditVerificationWorkItem
     public function getStatusActionButtons(): array
     {
         $user = auth()->user();
-        $status = $this->record->normalized_status;
+        $statuses = app(StatusService::class);
 
         return [
             [
                 'label' => 'Start Work',
                 'target' => \App\Models\BillingWorkItem::STATUS_IN_PROGRESS,
                 'tone' => 'primary',
-                'visible' => $status === \App\Models\BillingWorkItem::STATUS_PENDING
-                    && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_IN_PROGRESS),
+                'visible' => $statuses->canShowStartWork($this->record, $user),
             ],
             [
-                'label' => 'Send to Review',
+                'label' => 'Send to Audit',
                 'target' => \App\Models\BillingWorkItem::STATUS_REVIEW,
                 'tone' => 'info',
-                'visible' => in_array($status, [
-                    \App\Models\BillingWorkItem::STATUS_IN_PROGRESS,
-                    \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
-                    \App\Models\BillingWorkItem::STATUS_INCOMPLETE,
-                ], true) && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_REVIEW),
-            ],
-            [
-                'label' => 'Respond to Request',
-                'target' => \App\Models\BillingWorkItem::STATUS_IN_PROGRESS,
-                'tone' => 'primary',
-                'visible' => $status === \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE
-                    && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_IN_PROGRESS),
+                'visible' => $statuses->canShowSendToReview($this->record, $user),
             ],
             [
                 'label' => 'Return for Rework',
                 'target' => \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
                 'tone' => 'danger',
-                'visible' => in_array($status, [
-                    \App\Models\BillingWorkItem::STATUS_REVIEW,
-                    \App\Models\BillingWorkItem::STATUS_DONE,
-                ], true) && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK),
+                'visible' => $statuses->canShowReturnForRework($this->record, $user),
             ],
             [
                 'label' => 'Mark Incomplete',
                 'target' => \App\Models\BillingWorkItem::STATUS_INCOMPLETE,
                 'tone' => 'warning',
-                'visible' => in_array($status, [
-                    \App\Models\BillingWorkItem::STATUS_PENDING,
-                    \App\Models\BillingWorkItem::STATUS_IN_PROGRESS,
-                ], true) && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_INCOMPLETE),
+                'visible' => $statuses->canShowMarkIncomplete($this->record, $user),
             ],
             [
                 'label' => 'Mark Done',
                 'target' => \App\Models\BillingWorkItem::STATUS_DONE,
                 'tone' => 'success',
-                'visible' => $status === \App\Models\BillingWorkItem::STATUS_REVIEW
-                    && $this->record->canUserTransitionTo($user, \App\Models\BillingWorkItem::STATUS_DONE),
+                'visible' => $statuses->canShowMarkDone($this->record, $user),
             ],
         ];
     }
@@ -148,8 +142,13 @@ class EditVerificationRequest extends EditVerificationWorkItem
         return 'clinic';
     }
 
+    protected function getDefaultIndexUrl(): string
+    {
+        return route('filament.clinic.resources.verification-requests.index');
+    }
+
     public function getAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
     {
-        return route('clinic.billing-work-item-attachments.download', $attachment);
+        return route('clinic.verification-request-attachments.download', $attachment);
     }
 }

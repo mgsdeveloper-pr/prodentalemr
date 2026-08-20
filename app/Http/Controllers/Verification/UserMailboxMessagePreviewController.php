@@ -11,10 +11,9 @@ class UserMailboxMessagePreviewController extends Controller
 {
     public function __invoke(Request $request, UserMailboxService $service): Response
     {
-        abort_unless(auth()->user()?->canAccessVerificationWorkspace(), 403);
-
         $mailbox = $service->mailbox(auth()->user());
         abort_unless($mailbox && $service->isConfigured($mailbox), 404);
+        abort_unless(auth()->user()?->can('view', $mailbox), 403);
 
         $message = $service->fetchMessage(
             $mailbox,

@@ -58,7 +58,7 @@ class ManagedServicesOverview extends StatsOverviewWidget
 
     protected function verificationItems(): Builder
     {
-        return AdminClinicScope::apply(
+        return AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
                 ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))
         );

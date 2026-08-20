@@ -4,6 +4,8 @@ namespace App\Filament\Clinic\Pages;
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Models\Appointment;
+use App\Models\Location;
+use App\Models\Provider;
 use App\Support\ClinicPanelScope;
 use BackedEnum;
 use Carbon\Carbon;
@@ -18,11 +20,11 @@ class AppointmentCalendar extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Scheduling';
+    protected static string|UnitEnum|null $navigationGroup = 'Daily Work';
 
     protected static ?string $navigationLabel = 'Calendar';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $title = 'Appointment Calendar';
 
@@ -33,6 +35,14 @@ class AppointmentCalendar extends Page
     public string $viewMode = 'month';
 
     public ?string $anchorDate = null;
+
+    public ?string $providerFilter = null;
+
+    public ?string $locationFilter = null;
+
+    public ?string $statusFilter = null;
+
+    public ?string $verificationFilter = null;
 
     public static function canAccess(): bool
     {
@@ -96,7 +106,7 @@ class AppointmentCalendar extends Page
         $date = $this->resolveAnchorDate();
 
         return match ($this->viewMode) {
-            'week' => $date->copy()->startOfWeek(Carbon::SUNDAY)->format('M d') . ' - ' . $date->copy()->endOfWeek(Carbon::SATURDAY)->format('M d, Y'),
+            'week' => $date->copy()->startOfWeek(Carbon::SUNDAY)->format('M d').' - '.$date->copy()->endOfWeek(Carbon::SATURDAY)->format('M d, Y'),
             'day' => $date->format('F d, Y'),
             default => $date->format('F Y'),
         };
@@ -186,6 +196,45 @@ class AppointmentCalendar extends Page
         return AppointmentResource::getUrl('index');
     }
 
+    public function getProviderOptions(): array
+    {
+        $clinicId = ClinicPanelScope::selectedClinicId();
+
+        if (! $clinicId) {
+            return [];
+        }
+
+        return Provider::query()
+            ->with('user')
+            ->where('clinic_id', $clinicId)
+            ->where('status', true)
+            ->get()
+            ->sortBy('display_name')
+            ->mapWithKeys(fn (Provider $provider): array => [$provider->getKey() => $provider->display_name])
+            ->all();
+    }
+
+    public function getLocationOptions(): array
+    {
+        $clinicId = ClinicPanelScope::selectedClinicId();
+
+        if (! $clinicId) {
+            return [];
+        }
+
+        return Location::query()
+            ->where('clinic_id', $clinicId)
+            ->where('status', true)
+            ->orderBy('location_name')
+            ->pluck('location_name', 'id')
+            ->all();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->reset(['providerFilter', 'locationFilter', 'statusFilter', 'verificationFilter']);
+    }
+
     protected function resolveAnchorDate(): Carbon
     {
         return filled($this->anchorDate)
@@ -198,10 +247,20 @@ class AppointmentCalendar extends Page
         $selectedClinicId = ClinicPanelScope::selectedClinicId();
         $selectedOrganizationId = ClinicPanelScope::selectedOrganizationId();
 
-        return Appointment::query()
-            ->with(['patient', 'provider.user', 'location'])
-            ->when($selectedOrganizationId, fn ($query, $organizationId) => $query->where('organization_id', $organizationId))
-            ->when($selectedClinicId, fn ($query, $clinicId) => $query->where('clinic_id', $clinicId))
+        $query = Appointment::query()
+            ->with(['patient', 'provider.user', 'location', 'verificationWorkItem']);
+
+        if (! $selectedOrganizationId || ! $selectedClinicId) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->where('organization_id', $selectedOrganizationId)
+            ->where('clinic_id', $selectedClinicId)
+            ->when($this->providerFilter, fn ($builder, $providerId) => $builder->where('provider_id', $providerId))
+            ->when($this->locationFilter, fn ($builder, $locationId) => $builder->where('location_id', $locationId))
+            ->when($this->statusFilter, fn ($builder, $status) => $builder->where('status', $status))
+            ->when($this->verificationFilter, fn ($builder, $status) => $builder->where('verification_status', $status))
             ->whereNull('deleted_at');
     }
 
@@ -219,7 +278,7 @@ class AppointmentCalendar extends Page
     {
         $provider = $appointment->provider?->display_name ?: 'Provider';
         $patient = $appointment->patient?->full_name ?: 'Patient';
-        $title = trim($provider . ' - ' . $patient);
+        $title = trim($provider.' - '.$patient);
         $time = collect([
             $appointment->start_time ? Carbon::parse((string) $appointment->start_time)->format('g:i A') : null,
             $appointment->end_time ? Carbon::parse((string) $appointment->end_time)->format('g:i A') : null,
@@ -230,6 +289,8 @@ class AppointmentCalendar extends Page
             'title' => $title,
             'time' => $time,
             'status' => filled($appointment->status) ? str($appointment->status)->replace('_', ' ')->title()->toString() : 'Scheduled',
+            'verification_status' => Appointment::VERIFICATION_STATUS_OPTIONS[$appointment->verification_status]
+                ?? Appointment::VERIFICATION_STATUS_OPTIONS[Appointment::VERIFICATION_STATUS_NOT_SENT],
             'type' => $appointment->appointment_type ?: 'Appointment',
             'color' => $this->resolveEventColor($appointment),
             'url' => AppointmentResource::getUrl('view', ['record' => $appointment]),

@@ -12,10 +12,33 @@ use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
 use App\Models\User;
+use App\Models\VerificationFormQuestion;
+use App\Models\VerificationNotification;
 use App\Models\VerificationProfile;
+use App\Models\VerificationTemplateSection;
+use App\Models\VerificationTemplateVersion;
+use App\Actions\Verification\RefreshVerificationTemplateAction;
+use App\Actions\Verification\CreateVerificationRequestAction;
+use App\Actions\Verification\SaveVerificationAnswerAction;
+use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationRequestResponse;
+use App\Filament\Clinic\Pages\VerificationRequestResponse as ClinicVerificationRequestResponse;
+use App\Filament\Clinic\Resources\VerificationRequests\Tables\VerificationRequestsTable;
+use App\Services\Verification\DeliveryService;
+use App\Services\Verification\PdfPresetService;
+use App\Services\Verification\SLAService;
+use App\Services\Verification\StatusService;
+use App\Services\Verification\VerificationResultService;
+use App\Services\Verification\WorkflowService;
+use App\Support\SaasSupportAccess;
+use App\Support\VerificationTemplateVersionService;
+use App\Support\VerificationResultPdf;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Illuminate\Support\Facades\Storage;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -146,11 +169,47 @@ it('registers the new saas revenue operations routes cleanly', function () {
         ->toBe('saas/managed-billing-services');
     expect($router->getRoutes()->match(Request::create('/saas/client-service-enrollments', 'GET'))->uri())
         ->toBe('saas/client-service-enrollments');
-    expect($router->getRoutes()->match(Request::create('/saas/billing-work-items', 'GET'))->uri())
-        ->toBe('saas/billing-work-items');
+    expect(fn () => $router->getRoutes()->match(Request::create('/saas/providers', 'GET')))
+        ->toThrow(NotFoundHttpException::class);
+    expect(fn () => $router->getRoutes()->match(Request::create('/saas/billing-work-items', 'GET')))
+        ->toThrow(NotFoundHttpException::class);
+    expect(fn () => $router->getRoutes()->match(Request::create('/verification/billing-work-items', 'GET')))
+        ->toThrow(NotFoundHttpException::class);
+    expect($router->getRoutes()->match(Request::create('/verification/verifications', 'GET'))->uri())
+        ->toBe('verification/verifications');
 });
 
-it('logs creation and status changes for billing work items', function () {
+it('keeps template management routes scoped to their registered panels', function () {
+    $routes = collect(app('router')->getRoutes()->getRoutes());
+    $uris = $routes->map(fn ($route): string => $route->uri())->all();
+    $names = $routes->map(fn ($route): ?string => $route->getName())->filter()->values()->all();
+
+    expect($uris)
+        ->toContain('saas/master-template')
+        ->toContain('clinic/verification-settings')
+        ->toContain('clinic/verification-question-arrangement')
+        ->toContain('verification/verification-settings')
+        ->toContain('verification/verification-question-arrangement')
+        ->not->toContain('saas/verification-settings')
+        ->not->toContain('saas/verification-question-arrangement');
+
+    expect($names)
+        ->toContain('filament.saas.resources.master-template.index')
+        ->toContain('saas.master-template.legacy.index')
+        ->toContain('admin.master-template.legacy.index')
+        ->not->toContain('filament.saas.pages.verification-settings')
+        ->not->toContain('filament.saas.pages.verification-question-arrangement');
+
+    $this->actingAs($this->saasUser)
+        ->get('/saas/verification-form-questions')
+        ->assertRedirect('/saas/master-template');
+
+    $this->actingAs($this->saasUser)
+        ->get('/verification/verification-form-questions')
+        ->assertRedirect('/verification/master-template');
+});
+
+it('logs creation and status changes for verification requests', function () {
     $this->actingAs($this->saasUser);
 
     $workItem = BillingWorkItem::create([
@@ -181,8 +240,426 @@ it('logs creation and status changes for billing work items', function () {
     expect($workItem->activities()->where('activity_type', 'outcome_changed')->exists())->toBeTrue();
 });
 
-it('allows authorized saas users to download a billing work attachment', function () {
+it('maps professional workflow statuses onto the current stable request statuses', function () {
+    $statuses = app(StatusService::class);
+
+    expect($statuses->normalize('draft'))->toBe(BillingWorkItem::STATUS_PENDING);
+    expect($statuses->normalize('submitted'))->toBe(BillingWorkItem::STATUS_PENDING);
+    expect($statuses->normalize('accepted'))->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($statuses->normalize('waiting_on_clinic'))->toBe(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+    expect($statuses->normalize('waiting_on_insurance'))->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($statuses->normalize('ready_for_qa'))->toBe(BillingWorkItem::STATUS_REVIEW);
+    expect($statuses->normalize('qa_review'))->toBe(BillingWorkItem::STATUS_REVIEW);
+    expect($statuses->normalize('delivered'))->toBe(BillingWorkItem::STATUS_DONE);
+    expect($statuses->normalize('closed'))->toBe(BillingWorkItem::STATUS_DONE);
+});
+
+it('calculates verification sla windows and request states through the sla service', function () {
+    $sla = app(SLAService::class);
+
+    expect((int) round(now()->diffInHours($sla->calculateDefaultDueAt('urgent'))))->toBe(24);
+    expect((int) round(now()->diffInHours($sla->calculateDefaultDueAt('high'))))->toBe(48);
+    expect((int) round(now()->diffInDays($sla->calculateDefaultDueAt('normal'))))->toBe(3);
+
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'title' => 'SLA foundation smoke test',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'priority' => 'high',
+        'source' => 'appointment_sync',
+        'due_at' => now()->addDay(),
+    ]);
+
+    expect($sla->status($request))->toBe('on_track');
+    expect($sla->snapshot($request))
+        ->label->toBe('On Track')
+        ->priority->toBe('High')
+        ->is_paused->toBeFalse();
+
+    $request->forceFill(['due_at' => now()->subHour()])->save();
+    expect($sla->status($request->fresh()))->toBe('overdue');
+
+    $request->forceFill([
+        'status' => BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE,
+        'sla_pause_started_at' => now()->subMinutes(75),
+    ])->save();
+    expect($sla->snapshot($request->fresh()))
+        ->status->toBe('paused_waiting_clinic')
+        ->is_paused->toBeTrue()
+        ->pause_reason->toBe('Waiting on clinic response')
+        ->paused_for->toBe('1h 15m');
+
+    $request->forceFill([
+        'status' => BillingWorkItem::STATUS_DONE,
+        'completed_at' => now(),
+        'sla_pause_started_at' => null,
+    ])->save();
+    expect($sla->snapshot($request->fresh()))
+        ->status->toBe('closed')
+        ->relative->toBe('Completed');
+});
+
+it('coordinates the verification workflow foundation through services', function () {
     $this->actingAs($this->saasUser);
+    $this->saasUser->assignRole('verification_manager');
+
+    $specialist = User::factory()->create([
+        'name' => 'Verification Specialist',
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'status' => true,
+    ]);
+    $specialist->assignRole('verification_user');
+
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'title' => 'Workflow foundation smoke test',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'priority' => 'normal',
+        'source' => 'appointment_sync',
+    ]);
+
+    $workflow = app(WorkflowService::class);
+    $statuses = app(StatusService::class);
+
+    expect($workflow->lifecycleSnapshot($request))
+        ->toHaveCount(count(StatusService::LIFECYCLE_STAGES))
+        ->and(collect($workflow->lifecycleSnapshot($request))->firstWhere('active', true)['key'])
+        ->toBe('queue');
+    expect($statuses->canShowTakeOwnership($request, $this->saasUser))->toBeTrue();
+
+    $request = $workflow->assign($request, $specialist, $this->saasUser);
+    expect($request->assigned_to)->toBe($specialist->id);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_PENDING);
+    expect(collect($workflow->lifecycleSnapshot($request))->firstWhere('active', true)['key'])->toBe('assign');
+    expect($statuses->canShowReassign($request, $this->saasUser))->toBeTrue();
+
+    $request = $workflow->accept($request, $specialist);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($request->started_at)->not->toBeNull();
+    expect(collect($workflow->lifecycleSnapshot($request))->firstWhere('active', true)['key'])->toBe('work');
+
+    $workflow->saveDraft($request, ['field_count' => 3], $specialist);
+    expect($request->activities()->where('activity_type', 'verification_draft_saved')->exists())->toBeTrue();
+
+    $request = $workflow->submitForQa($request, $specialist);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_REVIEW);
+    expect(collect($workflow->lifecycleSnapshot($request))->firstWhere('active', true)['key'])->toBe('qa');
+    expect($statuses->canShowReturnForRework($request, $this->saasUser))->toBeTrue();
+    expect($request->activities()->where('activity_type', 'verification_submitted_for_qa')->exists())->toBeTrue();
+
+    $request = $workflow->rejectQa($request, 'Please verify coverage notes.', $this->saasUser);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
+    expect($request->activities()->where('activity_type', 'verification_qa_rejected')->exists())->toBeTrue();
+    expect(fn () => $workflow->complete($request, $this->saasUser))
+        ->toThrow(AuthorizationException::class);
+
+    $request = $workflow->start($request, $specialist);
+    $request = $workflow->submitForQa($request, $specialist);
+    $request = $workflow->complete($request, $this->saasUser);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_DONE);
+    expect($request->completed_at)->not->toBeNull();
+    expect(collect($workflow->lifecycleSnapshot($request))->firstWhere('active', true)['key'])->toBe('complete');
+    expect($statuses->canShowReturnForRework($request, $this->saasUser))->toBeFalse();
+    expect($statuses->canShowReopen($request, $this->saasUser))->toBeTrue();
+    expect($request->activities()->where('activity_type', 'verification_qa_approved')->exists())->toBeTrue();
+
+    $request = $workflow->deliver($request, 'portal_download', $this->saasUser);
+    expect($request->activities()->where('activity_type', 'verification_delivered')->exists())->toBeTrue();
+    expect(app(DeliveryService::class)->deliverySnapshot($request))
+        ->is_delivered->toBeTrue()
+        ->channel->toBe('Portal Download')
+        ->delivered_by->toBe($this->saasUser->name);
+
+    $request = $workflow->resendDelivery($request, 'email', $this->saasUser);
+    expect($request->activities()->where('activity_type', 'verification_delivery_resent')->exists())->toBeTrue();
+    expect(app(DeliveryService::class)->deliverySnapshot($request))
+        ->last_event->toBe('Verification Delivery Resent')
+        ->channel->toBe('Email');
+
+    expect(fn () => $workflow->reopen($request, '  ', $this->saasUser))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+
+    $request = $workflow->reopen($request, 'Payer supplied corrected benefit information.', $this->saasUser);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($request->activities()
+        ->where('activity_type', 'verification_reopened')
+        ->where('meta->reason', 'Payer supplied corrected benefit information.')
+        ->exists())->toBeTrue();
+});
+
+it('protects the complete cross panel verification lifecycle and historical output', function () {
+    $manager = $this->saasUser;
+    $manager->assignRole('verification_manager');
+    $manager->verificationClinics()->syncWithoutDetaching([$this->clinic->id]);
+
+    $specialist = User::factory()->create([
+        'name' => 'Cross Panel Specialist',
+        'email' => 'cross-panel-specialist@example.com',
+        'status' => true,
+    ]);
+    $specialist->assignRole('verification_user');
+
+    $clinicUser = User::factory()->create([
+        'name' => 'Cross Panel Clinic User',
+        'email' => 'cross-panel-clinic@example.com',
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'status' => true,
+    ]);
+    $clinicUser->assignRole('clinic_admin');
+
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    VerificationFormQuestion::query()
+        ->where('template_version_id', $version->id)
+        ->update(['is_required_for_audit' => false]);
+    $requiredQuestion = VerificationFormQuestion::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_verification_information',
+        'prompt' => 'Cross-panel confirmation number',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 999,
+        'is_required_for_audit' => true,
+        'is_active' => true,
+    ]);
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $specialist->id,
+        'title' => 'Cross-panel lifecycle verification',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+    ]);
+
+    $workflow = app(WorkflowService::class);
+    $answers = app(SaveVerificationAnswerAction::class);
+
+    $this->actingAs($specialist);
+    $request = $workflow->start($request, $specialist);
+
+    expect(fn () => $workflow->submitForQa($request, $specialist))
+        ->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+
+    $request->info_request_reason = 'Please confirm the payer reference with the clinic.';
+    $request->save();
+    $dueBeforePause = $request->due_at->copy();
+    $request = $workflow->transition($request, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE, $specialist);
+    expect($request->sla_pause_started_at)->not->toBeNull();
+
+    $this->travel(2)->hours();
+    $this->actingAs($clinicUser);
+    $request->notes = 'Payer reference confirmed with the front office.';
+    $request = $workflow->transition($request, BillingWorkItem::STATUS_IN_PROGRESS, $clinicUser);
+    expect($request->sla_pause_started_at)->toBeNull()
+        ->and($request->sla_paused_seconds)->toBeGreaterThanOrEqual(7199)
+        ->and($request->due_at->greaterThan($dueBeforePause))->toBeTrue();
+
+    $this->actingAs($specialist);
+    $answers->execute($request, $requiredQuestion->id, 'CONF-100', actor: $specialist);
+    $request = $workflow->submitForQa($request, $specialist);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_REVIEW);
+
+    $this->actingAs($manager);
+    $request = $workflow->rejectQa($request, 'Reconfirm the payer reference.', $manager);
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
+
+    $this->actingAs($specialist);
+    $answers->execute($request, $requiredQuestion->id, 'CONF-101', actor: $specialist);
+    $request = $workflow->submitForQa($request, $specialist);
+
+    $this->actingAs($manager);
+    $request->formSubmissions()->create([
+        'user_id' => $specialist->id,
+        'panel' => 'verification',
+        'status' => BillingWorkItem::STATUS_REVIEW,
+        'outcome_status' => $request->outcome_status,
+        'priority' => $request->priority,
+        'version' => 1,
+        'payload' => [
+            'work_item' => ['status' => BillingWorkItem::STATUS_REVIEW],
+            'verification_profile' => [
+                'effective_date' => '2026-01-01',
+                'network_status' => 'in_network',
+                'annual_maximum' => '1500.00',
+                'annual_maximum_remaining' => '900.00',
+                'individual_deductible' => '50.00',
+                'individual_deductible_remaining' => '25.00',
+                'coverage_preventive' => 100,
+                'coverage_basic_restorative' => 80,
+                'coverage_major_restorative' => 50,
+                'ortho_benefit' => 40,
+            ],
+            'answers' => [[
+                'question_id' => $requiredQuestion->id,
+                'code' => $requiredQuestion->code,
+                'prompt' => $requiredQuestion->prompt,
+                'answer_value' => 'CONF-101',
+                'note_value' => null,
+            ]],
+        ],
+    ]);
+    $request = $workflow->approveQa($request, $manager);
+    $lockedVersionId = $request->verification_template_version_id;
+
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_DONE)
+        ->and($request->outcome_status)->toBe('verified')
+        ->and($request->completed_at)->not->toBeNull()
+        ->and($request->formSubmissions()->latest('version')->value('status'))->toBe(BillingWorkItem::STATUS_DONE)
+        ->and(data_get($request->formSubmissions()->latest('version')->first()?->payload, 'answers.0.answer_value'))->toBe('CONF-101');
+
+    $request->verificationProfile()->update([
+        'effective_date' => '2027-02-02',
+        'annual_maximum' => '9999.00',
+        'coverage_preventive' => 20,
+    ]);
+    $recordedResult = app(VerificationResultService::class)->summary($request->fresh());
+
+    expect($recordedResult['eligibility_status'])->toBe('Verified')
+        ->and($recordedResult['effective_date'])->toBe('Jan 01, 2026')
+        ->and($recordedResult['annual_maximum'])->toBe('$1,500.00')
+        ->and($recordedResult['coverage_preventive'])->toBe('100%');
+    expect(fn () => $answers->execute($request, $requiredQuestion->id, 'CHANGED', actor: $manager))
+        ->toThrow(AuthorizationException::class);
+
+    app(VerificationTemplateVersionService::class)->publishDraft(
+        app(VerificationTemplateVersionService::class)->createDraftFromPublished($version)
+    );
+
+    expect($request->fresh()->verification_template_version_id)->toBe($lockedVersionId)
+        ->and($request->verificationFormAnswers()->where('verification_form_question_id', $requiredQuestion->id)->value('answer_value'))
+        ->toBe('CONF-101');
+
+    foreach (['standard', 'custom_portrait', 'custom_landscape'] as $mode) {
+        $pdf = VerificationResultPdf::output($request->fresh(), $mode);
+        expect($pdf)->toStartWith('%PDF-');
+    }
+
+    $originalCompletion = $request->formSubmissions()
+        ->where('status', BillingWorkItem::STATUS_DONE)
+        ->latest('version')
+        ->firstOrFail();
+
+    $this->actingAs($clinicUser);
+    $request = $workflow->requestCorrection(
+        $request,
+        'Please correct the confirmation number.',
+        $clinicUser,
+        ['answers.' . $requiredQuestion->code => $requiredQuestion->prompt],
+    );
+
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->and($request->activities()
+            ->where('activity_type', 'clinic_correction_requested')
+            ->where('meta->baseline_submission_id', $originalCompletion->id)
+            ->exists())->toBeTrue();
+
+    $this->actingAs($specialist);
+    $answers->execute($request, $requiredQuestion->id, 'CONF-102', actor: $specialist);
+    $request->formSubmissions()->create([
+        'user_id' => $specialist->id,
+        'panel' => 'verification',
+        'status' => BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
+        'outcome_status' => $request->outcome_status,
+        'priority' => $request->priority,
+        'version' => ((int) $request->formSubmissions()->max('version')) + 1,
+        'payload' => array_replace_recursive($originalCompletion->payload, [
+            'answers' => [[
+                'question_id' => $requiredQuestion->id,
+                'code' => $requiredQuestion->code,
+                'prompt' => $requiredQuestion->prompt,
+                'answer_value' => 'CONF-102',
+                'note_value' => null,
+            ]],
+        ]),
+    ]);
+    $request = $workflow->submitForQa($request, $specialist);
+
+    $this->actingAs($manager);
+    $request = $workflow->approveQa($request, $manager);
+    $revisedCompletion = $request->formSubmissions()
+        ->where('status', BillingWorkItem::STATUS_DONE)
+        ->latest('version')
+        ->firstOrFail();
+
+    expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_DONE)
+        ->and($request->formSubmissions()->where('status', BillingWorkItem::STATUS_DONE)->count())->toBe(2)
+        ->and($request->activities()
+            ->where('activity_type', 'verification_qa_approved')
+            ->where('meta->submission_id', $revisedCompletion->id)
+            ->exists())->toBeTrue()
+        ->and(data_get($originalCompletion->fresh()->payload, 'answers.0.answer_value'))->toBe('CONF-101')
+        ->and(data_get($revisedCompletion->payload, 'answers.0.answer_value'))->toBe('CONF-102')
+        ->and(app(VerificationResultService::class)->recordedData($request, $originalCompletion)['answers'][0]['answer_value'])->toBe('CONF-101')
+        ->and(app(VerificationResultService::class)->recordedData($request, $revisedCompletion)['answers'][0]['answer_value'])->toBe('CONF-102')
+        ->and(VerificationResultPdf::output($request, 'standard', submission: $originalCompletion))->toStartWith('%PDF-')
+        ->and(VerificationResultPdf::output($request, 'standard', submission: $revisedCompletion))->toStartWith('%PDF-');
+
+    $this->actingAs($manager)
+        ->get(route('admin.verifications.pdf.preview', [
+            'billingWorkItem' => $request,
+            'mode' => 'standard',
+            'submission_id' => $originalCompletion->id,
+        ]))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+
+    $this->actingAs($clinicUser)
+        ->get(route('clinic.verification-requests.pdf.preview', [
+            'billingWorkItem' => $request,
+            'mode' => 'standard',
+            'submission_id' => $originalCompletion->id,
+        ]))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+
+    expect($request->activities()->where('activity_type', 'info_requested_from_clinic')->exists())->toBeTrue()
+        ->and($request->activities()->where('activity_type', 'clinic_response_received')->exists())->toBeTrue()
+        ->and($request->activities()->where('activity_type', 'verification_submitted_for_qa')->exists())->toBeTrue()
+        ->and($request->activities()->where('activity_type', 'verification_qa_rejected')->exists())->toBeTrue()
+        ->and($request->activities()->where('activity_type', 'verification_qa_approved')->exists())->toBeTrue();
+});
+
+it('allows authorized saas users to download a verification request attachment', function () {
+    $this->actingAs($this->saasUser);
+    SaasSupportAccess::start(
+        $this->saasUser,
+        $this->organization,
+        $this->clinic,
+        'Download verification proof for support validation.'
+    );
 
     $workItem = BillingWorkItem::create([
         'organization_id' => $this->organization->id,
@@ -206,13 +683,13 @@ it('allows authorized saas users to download a billing work attachment', functio
         'original_file_name' => 'verification-proof.pdf',
     ]);
 
-    $response = $this->get(route('saas.billing-work-item-attachments.download', $attachment));
+    $response = $this->get(route('saas.verification-request-attachments.download', $attachment));
 
     $response->assertOk();
     expect($response->headers->get('content-disposition'))->toContain('verification-proof.pdf');
 });
 
-it('persists structured verification profile details on a work item', function () {
+it('persists structured verification profile details on a verification request', function () {
     $this->actingAs($this->saasUser);
 
     $workItem = BillingWorkItem::create([
@@ -247,4 +724,540 @@ it('persists structured verification profile details on a work item', function (
     expect($profile)->toBeInstanceOf(VerificationProfile::class);
     expect($workItem->fresh()->verificationProfile?->subscriber_name)->toBe('Mary Jones');
     expect($workItem->fresh()->verificationProfile?->coverage_preventive)->toBe(100);
+});
+
+it('allows verification managers to request clinic information before starting work', function () {
+    $verificationManager = User::factory()->create([
+        'name' => 'Verification Manager',
+        'email' => 'verification-manager@example.com',
+        'status' => true,
+    ]);
+    $verificationManager->assignRole('verification_manager');
+
+    $this->actingAs($verificationManager);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $verificationManager->id,
+        'title' => 'Needs clinic demographics before verification',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'outcome_status' => 'pending',
+        'priority' => 'high',
+        'source' => 'clinic_request',
+    ]);
+
+    expect($workItem->canUserTransitionTo($verificationManager, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE))->toBeTrue();
+
+    $workItem->info_request_reason = 'Please confirm subscriber DOB before verification can continue.';
+    $workItem->transitionStatus(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+
+    expect($workItem->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+    expect($workItem->activities()->where('activity_type', 'info_requested_from_clinic')->exists())->toBeTrue();
+});
+
+it('allows clinic users to respond to verification information requests', function () {
+    $verificationManager = User::factory()->create([
+        'name' => 'Verification Manager',
+        'email' => 'verification-manager-response@example.com',
+        'status' => true,
+    ]);
+    $verificationManager->assignRole('verification_manager');
+    $verificationManager->verificationClinics()->attach($this->clinic->id);
+
+    $clinicUser = User::factory()->create([
+        'name' => 'Clinic Coordinator',
+        'email' => 'clinic-coordinator@example.com',
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'status' => true,
+    ]);
+    $clinicUser->assignRole('clinic_admin');
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $verificationManager->id,
+        'title' => 'Needs subscriber details from clinic',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+        'info_request_reason' => 'Please confirm subscriber date of birth.',
+    ]);
+
+    $this->actingAs($verificationManager);
+    app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+
+    $workItem = $workItem->fresh();
+
+    expect($workItem->normalized_status)->toBe(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+    expect($workItem->canUserTransitionTo($clinicUser, BillingWorkItem::STATUS_IN_PROGRESS))->toBeTrue();
+    expect(VerificationNotification::query()
+        ->where('user_id', $clinicUser->getKey())
+        ->where('panel', 'clinic')
+        ->where('activity_type', 'info_requested_from_clinic')
+        ->where('billing_work_item_id', $workItem->getKey())
+        ->exists())->toBeTrue();
+
+    expect(VerificationRequestsTable::responseUrl($workItem))
+        ->toContain('/clinic/request-response')
+        ->toContain('respond=' . $workItem->getKey());
+
+    $this->actingAs($clinicUser);
+
+    $workItem->notes = 'Subscriber DOB confirmed as 05/10/1991.';
+    app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_IN_PROGRESS);
+
+    $workItem = $workItem->fresh();
+
+    expect($workItem->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($workItem->clinic_responded_by_user_id)->toBe($clinicUser->id);
+    expect($workItem->activities()->where('activity_type', 'clinic_response_received')->exists())->toBeTrue();
+    expect(VerificationNotification::query()
+        ->where('user_id', $verificationManager->getKey())
+        ->where('panel', 'verification')
+        ->where('activity_type', 'clinic_response_received')
+        ->where('billing_work_item_id', $workItem->getKey())
+        ->exists())->toBeTrue();
+
+    Storage::disk('local')->put('billing-work-items/' . $workItem->getKey() . '/clinic-response/test-response.png', 'fake image content');
+
+    $attachment = BillingWorkItemAttachment::create([
+        'billing_work_item_id' => $workItem->getKey(),
+        'user_id' => $clinicUser->getKey(),
+        'title' => 'Clinic response attachment',
+        'file_path' => 'billing-work-items/' . $workItem->getKey() . '/clinic-response/test-response.png',
+        'original_file_name' => 'test-response.png',
+        'mime_type' => 'image/png',
+        'file_size' => 18,
+    ]);
+
+    $this->get(route('clinic.verification-request-attachments.preview', $attachment))
+        ->assertOk();
+
+    $this->actingAs($verificationManager);
+
+    $this->get(route('admin.verification-request-attachments.preview', $attachment))
+        ->assertOk();
+});
+
+it('preserves every clinic response and blocks duplicate submissions', function () {
+    $verificationManager = User::factory()->create([
+        'name' => 'Verification Follow-up Manager',
+        'email' => 'verification-follow-up-manager@example.com',
+        'status' => true,
+    ]);
+    $verificationManager->assignRole('verification_manager');
+
+    $clinicUser = User::factory()->create([
+        'name' => 'Clinic Follow-up Coordinator',
+        'email' => 'clinic-follow-up-coordinator@example.com',
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'status' => true,
+    ]);
+    $clinicUser->assignRole('clinic_admin');
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $verificationManager->id,
+        'title' => 'Clinic response audit history',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+        'processing_mode' => BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE,
+        'info_request_reason' => 'Please confirm the subscriber date of birth.',
+    ]);
+
+    $this->actingAs($verificationManager);
+    app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+
+    $this->actingAs($clinicUser);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    Livewire::test(ClinicVerificationRequestResponse::class)
+        ->call('openResponseComposer', $workItem->getKey())
+        ->assertSet('responseComposerNote', '')
+        ->set('responseComposerNote', 'Subscriber DOB is May 10, 1991.')
+        ->call('sendClinicResponse')
+        ->assertHasNoErrors();
+
+    $workItem->refresh();
+
+    expect($workItem->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS)
+        ->and($workItem->activities()->where('activity_type', 'clinic_response_received')->count())->toBe(1);
+
+    Livewire::test(ClinicVerificationRequestResponse::class)
+        ->set('responseComposerWorkItemId', $workItem->getKey())
+        ->set('responseComposerNote', 'Duplicate response')
+        ->call('sendClinicResponse')
+        ->assertForbidden();
+
+    $this->actingAs($verificationManager);
+    $workItem->info_request_reason = 'Please also confirm the group number.';
+    app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+
+    $adminRequestResponse = app(AdminVerificationRequestResponse::class);
+
+    expect($adminRequestResponse->requestActionLabel($workItem->fresh()))
+        ->toBe('Send Follow-up')
+        ->and($adminRequestResponse->canCloseRequestResponse($workItem->fresh()))
+        ->toBeFalse();
+
+    $this->actingAs($clinicUser);
+    Livewire::test(ClinicVerificationRequestResponse::class)
+        ->call('openResponseComposer', $workItem->getKey())
+        ->assertSet('responseComposerNote', '')
+        ->set('responseComposerNote', 'Group number is GRP-2201.')
+        ->call('sendClinicResponse')
+        ->assertHasNoErrors();
+
+    $responses = $workItem->activities()
+        ->where('activity_type', 'clinic_response_received')
+        ->oldest('created_at')
+        ->get();
+
+    expect($responses)->toHaveCount(2)
+        ->and(data_get($responses->get(0)?->meta, 'clinic_response_note'))->toBe('Subscriber DOB is May 10, 1991.')
+        ->and(data_get($responses->get(1)?->meta, 'clinic_response_note'))->toBe('Group number is GRP-2201.');
+});
+
+it('saves clinic verification pdf preset profiles without changing non-default output', function () {
+    $this->actingAs($this->saasUser);
+
+    $service = app(PdfPresetService::class);
+
+    $defaultPreset = $service->saveForClinic($this->clinic, [
+        'name' => 'Full Verification Report',
+        'description' => 'Complete report for default clinic output.',
+        'output_mode' => 'standard',
+        'section_keys' => [],
+        'question_ids' => [],
+        'show_blank_rows' => true,
+        'is_default' => true,
+    ]);
+
+    $customPreset = $service->saveForClinic($this->clinic->fresh(), [
+        'name' => 'Patient Summary',
+        'description' => 'Only selected patient-facing details.',
+        'output_mode' => 'custom_landscape',
+        'section_keys' => ['core_details'],
+        'question_ids' => [101, 102],
+        'show_blank_rows' => false,
+        'is_default' => false,
+    ]);
+
+    $this->clinic->refresh();
+
+    expect($defaultPreset->fresh()->is_default)->toBeTrue()
+        ->and($customPreset->fresh()->is_default)->toBeFalse()
+        ->and($customPreset->fresh()->shouldShowBlankRows())->toBeFalse()
+        ->and($this->clinic->default_verification_pdf_preset_id)->toBe($defaultPreset->id)
+        ->and($this->clinic->getVerificationPdfOutputMode())->toBe('standard');
+});
+
+it('refreshes a verification request to the latest clinic template without changing workflow status', function () {
+    $this->actingAs($this->saasUser);
+
+    $service = app(VerificationTemplateVersionService::class);
+    $published = $service->ensureClinicPublishedVersion($this->clinic);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $this->saasUser->id,
+        'title' => 'Refresh template without closing',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'high',
+        'source' => 'clinic_request',
+    ]);
+
+    $workItem = $service->attachSnapshotToWorkItem($workItem);
+
+    $draft = $service->createDraftFromPublished($published);
+    $latest = $service->publishDraft($draft);
+
+    $refreshed = $service->refreshWorkItemSnapshot($workItem);
+
+    expect($refreshed->verification_template_version_id)->toBe($latest->id);
+    expect(data_get($refreshed->verification_template_snapshot, 'version.version_number'))->toBe($latest->version_number);
+    expect(data_get($refreshed->verification_template_snapshot, 'version.form_type'))->toBe($latest->form_type);
+    expect(data_get($refreshed->verification_template_snapshot, 'version.clinic_visibility'))->toBe($latest->clinic_visibility);
+    expect($refreshed->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
+    expect($refreshed->completed_at)->toBeNull();
+});
+
+it('shows refresh only for editable requests using an older template version', function () {
+    $verificationManager = User::factory()->create([
+        'name' => 'Template Refresh Manager',
+        'email' => 'template-refresh-manager@example.com',
+        'status' => true,
+    ]);
+    $verificationManager->assignRole('verification_manager');
+
+    $this->actingAs($verificationManager);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $refresh = app(RefreshVerificationTemplateAction::class);
+    $published = $versions->ensureClinicPublishedVersion($this->clinic);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $verificationManager->id,
+        'title' => 'Outdated editable template',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'high',
+        'source' => 'clinic_request',
+    ]);
+
+    $workItem = $versions->attachSnapshotToWorkItem($workItem);
+
+    expect($refresh->canRefresh($workItem, $verificationManager))->toBeFalse();
+
+    $latest = $versions->publishDraft($versions->createDraftFromPublished($published));
+
+    expect($latest->id)->not->toBe($workItem->verification_template_version_id);
+    expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeTrue();
+
+    $workItem->transitionStatus(BillingWorkItem::STATUS_DONE);
+
+    expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeFalse();
+});
+
+it('keeps completed verification template snapshots locked for audit history', function () {
+    $verificationManager = User::factory()->create([
+        'name' => 'Completed Template Refresh Manager',
+        'email' => 'completed-template-refresh-manager@example.com',
+        'status' => true,
+    ]);
+    $verificationManager->assignRole('verification_manager');
+
+    $this->actingAs($verificationManager);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $refresh = app(RefreshVerificationTemplateAction::class);
+    $published = $versions->ensureClinicPublishedVersion($this->clinic);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'assigned_to' => $verificationManager->id,
+        'title' => 'Completed audit snapshot',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'verified',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+    ]);
+
+    $workItem = $versions->attachSnapshotToWorkItem($workItem);
+    $originalVersionId = $workItem->verification_template_version_id;
+    $originalSnapshot = $workItem->verification_template_snapshot;
+
+    $versions->publishDraft($versions->createDraftFromPublished($published));
+    $workItem->transitionStatus(BillingWorkItem::STATUS_DONE);
+
+    expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeFalse();
+
+    try {
+        $refresh->execute($workItem->fresh());
+    } catch (AuthorizationException $exception) {
+        $locked = $workItem->fresh();
+
+        expect($locked->verification_template_version_id)->toBe($originalVersionId)
+            ->and($locked->verification_template_snapshot)->toBe($originalSnapshot)
+            ->and($locked->normalized_status)->toBe(BillingWorkItem::STATUS_DONE);
+
+        return;
+    }
+
+    $this->fail('Completed verification request was refreshed.');
+});
+
+it('replicates the platform master template into a clinic template copy', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $master = $versions->ensureMasterVersion();
+
+    $section = VerificationTemplateSection::create([
+        'template_version_id' => $master->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'custom_smoke_section',
+        'label' => 'Smoke Section',
+        'sort_order' => 900,
+        'is_active' => true,
+    ]);
+
+    $question = VerificationFormQuestion::create([
+        'template_version_id' => $master->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => $section->section_key,
+        'prompt' => 'Smoke test master question?',
+        'form_type' => 'both',
+        'input_type' => 'yes_no',
+        'sort_order' => 910,
+        'is_active' => true,
+    ]);
+
+    $clinicVersion = $versions->ensureClinicPublishedVersion($this->clinic);
+
+    $clinicQuestion = VerificationFormQuestion::query()
+        ->where('template_version_id', $clinicVersion->id)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('source_question_id', $question->id)
+        ->first();
+
+    expect($clinicVersion->scope)->toBe(VerificationTemplateVersion::SCOPE_CLINIC)
+        ->and($clinicVersion->parent_version_id)->toBe($master->id)
+        ->and($clinicVersion->form_type)->toBe($master->form_type)
+        ->and($clinicVersion->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE)
+        ->and($clinicQuestion)->not->toBeNull()
+        ->and($clinicQuestion->organization_id)->toBe($this->organization->id)
+        ->and($clinicQuestion->clinic_id)->toBe($this->clinic->id);
+
+    expect(VerificationFormQuestion::query()
+        ->whereKey($question->id)
+        ->whereNull('clinic_id')
+        ->whereNull('organization_id')
+        ->exists())->toBeTrue();
+});
+
+it('publishes a template draft without deleting earlier published versions', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $published = $versions->ensureClinicPublishedVersion($this->clinic);
+    $draft = $versions->createDraftFromPublished($published);
+
+    $latest = $versions->publishDraft(
+        $draft,
+        'Revenue Downtown Template v2',
+        'Adjusted clinic-specific template wording.'
+    );
+
+    expect($latest->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->and($latest->is_active)->toBeTrue()
+        ->and($latest->name)->toBe('Revenue Downtown Template v2')
+        ->and($latest->notes)->toBe('Adjusted clinic-specific template wording.');
+
+    expect($published->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->and($published->fresh()->is_active)->toBeFalse();
+
+    expect(VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->count())->toBe(2);
+});
+
+it('allows multiple master template drafts while keeping one working draft', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $published = $versions->ensureMasterVersion();
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $published->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_plan_provisions',
+        'prompt' => 'Full-only draft smoke question?',
+        'form_type' => 'full_form',
+        'input_type' => 'text',
+        'sort_order' => 990,
+        'is_active' => true,
+    ]);
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $published->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_plan_provisions',
+        'prompt' => 'Short-only draft smoke question?',
+        'form_type' => 'short_form',
+        'input_type' => 'text',
+        'sort_order' => 991,
+        'is_active' => true,
+    ]);
+
+    $fullDraft = $versions->createDraftFromSource($published, [
+        'name' => 'Full Form Draft',
+        'form_type' => VerificationTemplateVersion::FORM_TYPE_FULL,
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
+        'starting_point' => 'current_master',
+    ]);
+
+    $shortDraft = $versions->createDraftFromSource($published, [
+        'name' => 'Short Form Draft',
+        'form_type' => VerificationTemplateVersion::FORM_TYPE_SHORT,
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+        'starting_point' => 'current_master',
+    ]);
+
+    expect($fullDraft->fresh()->is_working_draft)->toBeFalse()
+        ->and($shortDraft->fresh()->is_working_draft)->toBeTrue()
+        ->and($fullDraft->fresh()->form_type)->toBe(VerificationTemplateVersion::FORM_TYPE_FULL)
+        ->and($shortDraft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE);
+
+    expect(VerificationFormQuestion::query()
+        ->where('template_version_id', $fullDraft->id)
+        ->where('prompt', 'Short-only draft smoke question?')
+        ->exists())->toBeFalse();
+
+    expect(VerificationFormQuestion::query()
+        ->where('template_version_id', $shortDraft->id)
+        ->where('prompt', 'Full-only draft smoke question?')
+        ->exists())->toBeFalse();
+
+    $versions->markWorkingDraft($fullDraft->fresh());
+
+    expect($fullDraft->fresh()->is_working_draft)->toBeTrue()
+        ->and($shortDraft->fresh()->is_working_draft)->toBeFalse();
 });

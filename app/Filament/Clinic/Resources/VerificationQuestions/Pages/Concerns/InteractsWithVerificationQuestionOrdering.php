@@ -2,6 +2,7 @@
 
 namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns;
 
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
 use App\Support\ClinicPanelScope;
 
@@ -11,6 +12,7 @@ trait InteractsWithVerificationQuestionOrdering
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
@@ -35,6 +37,7 @@ trait InteractsWithVerificationQuestionOrdering
         return VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $templateKey)
+            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
             ->whereIn('section_key', $sectionKeys)
             ->where('is_active', true)
             ->when($recordId, fn ($query) => $query->whereKeyNot($recordId))
@@ -69,6 +72,7 @@ trait InteractsWithVerificationQuestionOrdering
 
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
@@ -89,6 +93,7 @@ trait InteractsWithVerificationQuestionOrdering
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $templateKey)
+            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
             ->whereIn('section_key', $sectionKeys)
             ->where('is_active', true)
             ->whereIn('id', $orderedIds)
@@ -134,6 +139,7 @@ trait InteractsWithVerificationQuestionOrdering
         $organizationId = $record->organization_id ?: ClinicPanelScope::selectedOrganizationId();
         $sectionKey = $record->section_key;
         $templateKey = $record->template_key;
+        $versionId = $record->template_version_id;
 
         if (! $clinicId || ! filled($sectionKey)) {
             return;
@@ -142,6 +148,7 @@ trait InteractsWithVerificationQuestionOrdering
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $templateKey)
+            ->when($versionId, fn ($query) => $query->where('template_version_id', $versionId))
             ->where('section_key', $sectionKey)
             ->where('is_active', true)
             ->whereKeyNot($record->getKey())
@@ -189,6 +196,7 @@ trait InteractsWithVerificationQuestionOrdering
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
 
         if (! $clinicId || ! filled($sectionKey)) {
             return;
@@ -197,6 +205,7 @@ trait InteractsWithVerificationQuestionOrdering
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
             ->where('template_key', $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey())
+            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
             ->where('section_key', $sectionKey)
             ->where('is_active', true)
             ->when($excludeRecordId, fn ($query) => $query->whereKeyNot($excludeRecordId))

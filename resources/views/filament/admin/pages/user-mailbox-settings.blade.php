@@ -1,20 +1,23 @@
 <x-filament-panels::page>
-    @php($status = $this->getConnectionStatus())
-
-    <div style="display: flex; flex-direction: column; gap: 22px;">
-        @include('filament.shared.partials.page-hero', [
-            'eyebrow' => 'Universal Mailbox',
-            'title' => 'Mailbox Settings',
-            'description' => 'Configure your user-bound mailbox for live receive and send access. The default Meditya server is prefilled, but you can replace it with another provider any time.',
-            'rightContent' => '<div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid ' . ($status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca')) . '; background: ' . ($status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2')) . '; color: ' . ($status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c')) . ';"><span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span><span style="font-size: 13px; font-weight: 800;">' . e($status['label']) . '</span></div>',
-        ])
-
-        <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
-            <div style="padding: 22px;">
-                <form wire:submit="save">
-                    {{ $this->form }}
-                </form>
-            </div>
-        </section>
-    </div>
+    <x-verification-management-shell
+        :items="$this->getVerificationNavItems()"
+        active="mailbox-personal"
+        menu-title="Settings"
+        menu-eyebrow="Verification"
+        menu-description="Clinic, mailbox, output, and administrative configuration."
+    >
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+            <section style="border: 1px solid #dbe4ee; border-radius: 8px; background: #ffffff; overflow: hidden;">
+                <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7;">
+                    <h2 style="margin: 0; color: #101828; font-size: 20px; font-weight: 800;">My Mailbox</h2>
+                    <p style="margin: 6px 0 0; color: #667085; font-size: 13px; line-height: 1.55;">Connect your personal mailbox for verification email.</p>
+                </div>
+                <div style="padding: 20px;">
+                    <form wire:submit="save">
+                        {{ $this->form }}
+                    </form>
+                </div>
+            </section>
+        </div>
+    </x-verification-management-shell>
 </x-filament-panels::page>

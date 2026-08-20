@@ -3,6 +3,7 @@
 namespace App\Filament\Saas\Widgets;
 
 use App\Models\OnboardingDraft;
+use App\Services\ClientOnboardingService;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -22,7 +23,7 @@ class IncompleteOnboarding extends TableWidget
             ->query(
                 OnboardingDraft::query()
                     ->with('user')
-                    ->where('type', 'organization_onboarding')
+                    ->whereIn('status', [OnboardingDraft::STATUS_DRAFT, OnboardingDraft::STATUS_CHANGES_REQUESTED])
                     ->select('onboarding_drafts.*')
                     ->selectRaw("COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(data, '$.organization_name')), ''), 'Untitled organization') as organization_name")
                     ->latest('updated_at')
@@ -48,12 +49,21 @@ class IncompleteOnboarding extends TableWidget
                         default => 'Organization',
                     })
                     ->color('warning'),
+                TextColumn::make('account_structure')
+                    ->label('Structure')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'single_clinic' => 'Solo Practice',
+                        'dso' => 'DSO',
+                        default => 'Organization',
+                    }),
                 TextColumn::make('updated_at')
                     ->label('Last Activity')
                     ->since()
                     ->sortable(),
             ])
             ->defaultSort('updated_at', 'desc')
+            ->recordUrl(fn (OnboardingDraft $record): string => app(ClientOnboardingService::class)->resumeUrl($record))
             ->defaultKeySort(false)
             ->paginated(false)
             ->emptyStateHeading('No incomplete onboarding drafts')

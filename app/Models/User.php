@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\PanelPermissionMatrix;
 use App\Support\ClinicWorkspace;
@@ -25,6 +27,8 @@ use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 {
+    use HasPublicId;
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, HasRoles, SoftDeletes;
 
@@ -511,15 +515,21 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             ]);
     }
 
-    public function canManageClinicTemplateSections(): bool
+    public function canManageClinicTemplateSections(?Clinic $clinic = null): bool
     {
-        return $this->status
-            && $this->clinicServiceModuleEnabled('verification_requests')
-            && (
-                $this->canPerformClinicModuleAction('template_management', 'add')
-                || $this->canPerformClinicModuleAction('template_management', 'update')
-                || $this->isSaasAdmin()
-            );
+        if (! $this->status) {
+            return false;
+        }
+
+        if ($this->isSaasAdmin()
+            || $this->canPerformClinicModuleAction('template_management', 'add')
+            || $this->canPerformClinicModuleAction('template_management', 'update')) {
+            return true;
+        }
+
+        return $this->isVerificationManager()
+            && $clinic?->allowsVerificationManagerTemplateEdits()
+            && $this->canAccessVerificationClinic($clinic->getKey());
     }
 
     public function canAccessClinicModule(string $module): bool
@@ -1191,13 +1201,35 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     public function canAccessSaasRevenueOperations(): bool
     {
-        return $this->canAccessVerificationWorkspace();
+        return $this->canAccessVerificationWorkspace()
+            || $this->canAccessSaasModule('verification');
     }
 
     public function canManageVerificationQueue(): bool
     {
         return $this->canAccessVerificationWorkspace()
             && $this->hasAnyRole(['saas_admin', 'verification_admin', 'verification_manager']);
+    }
+
+    public function canAccessVerificationRequestRecord(BillingWorkItem $request): bool
+    {
+        if (! $this->canAccessVerificationWorkspace()) {
+            return false;
+        }
+
+        if ($this->hasFullVerificationClinicAccess()) {
+            return true;
+        }
+
+        if (! in_array((int) $request->clinic_id, array_map('intval', $this->verificationAccessibleClinicIds()), true)) {
+            return false;
+        }
+
+        if ($this->hasRole('verification_user') && ! $this->canManageVerificationQueue()) {
+            return (int) $request->assigned_to === (int) $this->getAuthIdentifier();
+        }
+
+        return $this->isVerificationManager();
     }
 
     public function canManageVerificationSettings(): bool
@@ -1327,6 +1359,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
 // class User extends Authenticatable
 // {
+
 //     /** @use HasFactory<UserFactory> */
 //     use HasFactory, Notifiable;
 

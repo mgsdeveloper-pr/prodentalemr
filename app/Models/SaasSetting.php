@@ -10,10 +10,13 @@ use Illuminate\Support\HtmlString;
 
 class SaasSetting extends Model
 {
+    protected const CURRENT_REQUEST_KEY = 'prodental.saas_settings.current';
+
     protected $fillable = [
         'platform_name',
         'company_name',
         'logo_path',
+        'login_image_path',
         'support_email',
         'support_phone',
         'address',
@@ -125,6 +128,21 @@ class SaasSetting extends Model
         'verification_notify_on_urgent_flagged',
         'verification_notify_on_urgent_assigned',
         'verification_notify_on_sla_alert',
+        'verification_email_notifications_enabled',
+        'verification_email_on_urgent',
+        'verification_email_on_clinic_action',
+        'verification_email_on_sla',
+        'verification_email_on_audit',
+        'notify_database_on_security_alerts',
+        'email_on_security_alerts',
+        'notify_database_on_payment_events',
+        'email_on_payment_events',
+        'notify_database_on_subscription_events',
+        'email_on_subscription_events',
+        'notify_database_on_integration_failures',
+        'email_on_integration_failures',
+        'notify_database_on_support_access',
+        'email_on_support_access',
         'verification_round_robin_enabled',
         'verification_round_robin_last_user_id',
         'verification_inbox_enabled',
@@ -225,6 +243,21 @@ class SaasSetting extends Model
             'verification_notify_on_urgent_flagged' => 'boolean',
             'verification_notify_on_urgent_assigned' => 'boolean',
             'verification_notify_on_sla_alert' => 'boolean',
+            'verification_email_notifications_enabled' => 'boolean',
+            'verification_email_on_urgent' => 'boolean',
+            'verification_email_on_clinic_action' => 'boolean',
+            'verification_email_on_sla' => 'boolean',
+            'verification_email_on_audit' => 'boolean',
+            'notify_database_on_security_alerts' => 'boolean',
+            'email_on_security_alerts' => 'boolean',
+            'notify_database_on_payment_events' => 'boolean',
+            'email_on_payment_events' => 'boolean',
+            'notify_database_on_subscription_events' => 'boolean',
+            'email_on_subscription_events' => 'boolean',
+            'notify_database_on_integration_failures' => 'boolean',
+            'email_on_integration_failures' => 'boolean',
+            'notify_database_on_support_access' => 'boolean',
+            'email_on_support_access' => 'boolean',
             'verification_round_robin_enabled' => 'boolean',
             'verification_round_robin_last_user_id' => 'integer',
             'verification_inbox_enabled' => 'boolean',
@@ -245,14 +278,25 @@ class SaasSetting extends Model
 
     protected static function booted(): void
     {
-        static::saved(fn (): bool => Cache::forget('saas_settings.current'));
-        static::deleted(fn (): bool => Cache::forget('saas_settings.current'));
+        static::saved(function (): void {
+            static::forgetCurrentRequestInstance();
+            Cache::forget('saas_settings.current');
+        });
+
+        static::deleted(function (): void {
+            static::forgetCurrentRequestInstance();
+            Cache::forget('saas_settings.current');
+        });
     }
 
     public static function current(): self
     {
+        if (($current = static::currentRequestInstance()) instanceof self) {
+            return $current;
+        }
+
         if (! Schema::hasTable('saas_settings')) {
-            return new static([
+            return static::rememberCurrentRequestInstance(new static([
                 'platform_name' => 'ProDental EMR',
                 'default_country' => 'USA',
                 'default_timezone' => 'America/New_York',
@@ -293,6 +337,11 @@ class SaasSetting extends Model
                 'notify_database_on_invoice_updated' => true,
                 'notify_database_on_invoice_deleted' => true,
                 'notify_database_on_invoice_sent' => true,
+                'notify_database_on_security_alerts' => true,
+                'notify_database_on_payment_events' => true,
+                'notify_database_on_subscription_events' => true,
+                'notify_database_on_integration_failures' => true,
+                'notify_database_on_support_access' => true,
                 'email_enabled' => false,
                 'email_mailer' => 'smtp',
                 'email_encryption' => 'tls',
@@ -307,6 +356,11 @@ class SaasSetting extends Model
                 'email_on_invoice_updated' => false,
                 'email_on_invoice_deleted' => false,
                 'email_on_invoice_sent' => true,
+                'email_on_security_alerts' => true,
+                'email_on_payment_events' => true,
+                'email_on_subscription_events' => true,
+                'email_on_integration_failures' => true,
+                'email_on_support_access' => false,
                 'stripe_enabled' => false,
                 'stripe_environment' => 'test',
                 'paypal_enabled' => false,
@@ -335,6 +389,11 @@ class SaasSetting extends Model
                 'verification_notify_on_urgent_flagged' => true,
                 'verification_notify_on_urgent_assigned' => true,
                 'verification_notify_on_sla_alert' => true,
+                'verification_email_notifications_enabled' => false,
+                'verification_email_on_urgent' => true,
+                'verification_email_on_clinic_action' => true,
+                'verification_email_on_sla' => true,
+                'verification_email_on_audit' => true,
                 'verification_round_robin_enabled' => false,
                 'verification_round_robin_last_user_id' => null,
                 'verification_inbox_enabled' => false,
@@ -351,10 +410,10 @@ class SaasSetting extends Model
                 'verification_inbox_spam_retention_days' => 30,
                 'verification_inbox_preserve_flagged' => true,
                 'verification_inbox_auto_cleanup_enabled' => true,
-            ]);
+            ]));
         }
 
-        return Cache::remember(
+        return static::rememberCurrentRequestInstance(Cache::remember(
             'saas_settings.current',
             now()->addMinutes(5),
             fn (): self => static::query()->firstOrCreate(
@@ -400,6 +459,11 @@ class SaasSetting extends Model
                     'notify_database_on_invoice_updated' => true,
                     'notify_database_on_invoice_deleted' => true,
                     'notify_database_on_invoice_sent' => true,
+                    'notify_database_on_security_alerts' => true,
+                    'notify_database_on_payment_events' => true,
+                    'notify_database_on_subscription_events' => true,
+                    'notify_database_on_integration_failures' => true,
+                    'notify_database_on_support_access' => true,
                     'email_enabled' => false,
                     'email_mailer' => 'smtp',
                     'email_encryption' => 'tls',
@@ -414,6 +478,11 @@ class SaasSetting extends Model
                     'email_on_invoice_updated' => false,
                     'email_on_invoice_deleted' => false,
                     'email_on_invoice_sent' => true,
+                    'email_on_security_alerts' => true,
+                    'email_on_payment_events' => true,
+                    'email_on_subscription_events' => true,
+                    'email_on_integration_failures' => true,
+                    'email_on_support_access' => false,
                     'stripe_enabled' => false,
                     'stripe_environment' => 'test',
                     'paypal_enabled' => false,
@@ -442,11 +511,43 @@ class SaasSetting extends Model
                     'verification_notify_on_urgent_flagged' => true,
                     'verification_notify_on_urgent_assigned' => true,
                     'verification_notify_on_sla_alert' => true,
+                    'verification_email_notifications_enabled' => false,
+                    'verification_email_on_urgent' => true,
+                    'verification_email_on_clinic_action' => true,
+                    'verification_email_on_sla' => true,
+                    'verification_email_on_audit' => true,
                     'verification_round_robin_enabled' => false,
                     'verification_round_robin_last_user_id' => null,
                 ],
             ),
-        );
+        ));
+    }
+
+    protected static function currentRequestInstance(): ?self
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $settings = request()->attributes->get(static::CURRENT_REQUEST_KEY);
+
+        return $settings instanceof self ? $settings : null;
+    }
+
+    protected static function rememberCurrentRequestInstance(self $settings): self
+    {
+        if (app()->bound('request')) {
+            request()->attributes->set(static::CURRENT_REQUEST_KEY, $settings);
+        }
+
+        return $settings;
+    }
+
+    protected static function forgetCurrentRequestInstance(): void
+    {
+        if (app()->bound('request')) {
+            request()->attributes->remove(static::CURRENT_REQUEST_KEY);
+        }
     }
 
     public function brandName(): string
@@ -476,5 +577,14 @@ class SaasSetting extends Model
             e($logoUrl),
             e($this->brandName()),
         ));
+    }
+
+    public function loginImageUrl(): string
+    {
+        if (filled($this->login_image_path)) {
+            return Storage::disk('branding')->url($this->login_image_path);
+        }
+
+        return asset('images/login/dental-office-default.png');
     }
 }

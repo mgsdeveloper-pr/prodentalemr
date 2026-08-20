@@ -39,7 +39,7 @@ class ManagedServicesQuickLinks extends Widget
 
     protected function getViewData(): array
     {
-        $verificationQuery = AdminClinicScope::apply(
+        $verificationQuery = AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
                 ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))
         );

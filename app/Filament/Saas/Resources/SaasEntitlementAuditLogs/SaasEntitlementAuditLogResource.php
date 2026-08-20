@@ -20,9 +20,9 @@ class SaasEntitlementAuditLogResource extends Resource
 
     protected static ?string $navigationLabel = 'Entitlement Audit';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 30;
 
     public static function table(Table $table): Table
     {

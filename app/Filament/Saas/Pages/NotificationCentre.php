@@ -2,6 +2,7 @@
 
 namespace App\Filament\Saas\Pages;
 
+use App\Models\NotificationDelivery;
 use App\Models\SaasSetting;
 use App\Support\SaasMailSettings;
 use App\Support\SaasNotifications;
@@ -19,6 +20,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Collection;
 use Throwable;
 use UnitEnum;
 
@@ -28,7 +30,7 @@ class NotificationCentre extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBellAlert;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Notifications';
 
     protected static ?string $navigationLabel = 'Notification Centre';
 
@@ -56,6 +58,31 @@ class NotificationCentre extends Page implements HasForms
             'email_password' => null,
             'test_email_recipient' => auth()->user()?->email ?? $settings->support_email,
         ]);
+    }
+
+    public function getDeliverySummary(): array
+    {
+        $counts = NotificationDelivery::query()
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return [
+            'delivered' => (int) ($counts[NotificationDelivery::STATUS_DELIVERED] ?? 0),
+            'pending' => (int) ($counts[NotificationDelivery::STATUS_PENDING] ?? 0)
+                + (int) ($counts[NotificationDelivery::STATUS_PROCESSING] ?? 0),
+            'failed' => (int) ($counts[NotificationDelivery::STATUS_FAILED] ?? 0),
+            'skipped' => (int) ($counts[NotificationDelivery::STATUS_SKIPPED] ?? 0),
+        ];
+    }
+
+    public function getRecentDeliveries(): Collection
+    {
+        return NotificationDelivery::query()
+            ->with(['event:id,event_type,title,level,occurred_at', 'recipient:id,name,email'])
+            ->latest('id')
+            ->limit(20)
+            ->get();
     }
 
     public function form(Schema $schema): Schema
@@ -121,6 +148,7 @@ class NotificationCentre extends Page implements HasForms
                             ->schema([
                                 TextInput::make('email_host')
                                     ->label('SMTP host')
+                                    ->helperText('Enter the server name only, for example smtp-relay.brevo.com. Do not include https://.')
                                     ->maxLength(255)
                                     ->visible(fn (Get $get): bool => ($get('email_enabled') ?? false) && $get('email_mailer') === 'smtp')
                                     ->required(fn (Get $get): bool => ($get('email_enabled') ?? false) && $get('email_mailer') === 'smtp'),
@@ -213,6 +241,47 @@ class NotificationCentre extends Page implements HasForms
                                     ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
                             ]),
                     ]),
+                Section::make('Operational Alerts')
+                    ->description('Control important security, payment, subscription, integration, and Support Mode notifications by channel.')
+                    ->schema([
+                        Grid::make(2)->schema([
+                            Toggle::make('notify_database_on_security_alerts')
+                                ->label('Security alerts - in app')
+                                ->default(true),
+                            Toggle::make('email_on_security_alerts')
+                                ->label('Security alerts - email')
+                                ->default(true)
+                                ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
+                            Toggle::make('notify_database_on_payment_events')
+                                ->label('Payments and overdue invoices - in app')
+                                ->default(true),
+                            Toggle::make('email_on_payment_events')
+                                ->label('Payments and overdue invoices - email')
+                                ->default(true)
+                                ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
+                            Toggle::make('notify_database_on_subscription_events')
+                                ->label('Subscription and trial events - in app')
+                                ->default(true),
+                            Toggle::make('email_on_subscription_events')
+                                ->label('Subscription and trial events - email')
+                                ->default(true)
+                                ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
+                            Toggle::make('notify_database_on_integration_failures')
+                                ->label('Import and integration failures - in app')
+                                ->default(true),
+                            Toggle::make('email_on_integration_failures')
+                                ->label('Import and integration failures - email')
+                                ->default(true)
+                                ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
+                            Toggle::make('notify_database_on_support_access')
+                                ->label('Support Mode activity - in app')
+                                ->default(true),
+                            Toggle::make('email_on_support_access')
+                                ->label('Support Mode activity - email')
+                                ->default(false)
+                                ->visible(fn (Get $get): bool => (bool) $get('email_enabled')),
+                        ]),
+                    ]),
                 Section::make('Test Email')
                     ->description('Send a quick test with the current form values before you rely on email alerts.')
                     ->schema([
@@ -240,7 +309,7 @@ class NotificationCentre extends Page implements HasForms
     public function save(): void
     {
         $settings = SaasSetting::current();
-        $data = $this->form->getState();
+        $data = SaasMailSettings::normalizeState($this->form->getState());
 
         $persistedPassword = $settings->email_password;
         $newPassword = $data['email_password'] ?? null;
@@ -266,7 +335,7 @@ class NotificationCentre extends Page implements HasForms
     public function sendTestEmail(): void
     {
         $settings = SaasSetting::current();
-        $state = $this->form->getState();
+        $state = SaasMailSettings::normalizeState($this->form->getState());
         $recipient = $state['test_email_recipient'] ?? auth()->user()?->email;
 
         if (! filled($recipient)) {

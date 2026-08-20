@@ -1,27 +1,7 @@
 <x-filament-panels::page>
-    @php($status = $this->getConnectionStatus())
-
     <div style="display: flex; flex-direction: column; gap: 24px;">
-        @include('filament.shared.partials.page-hero', [
-            'eyebrow' => 'Universal Mailbox',
-            'title' => 'Mailbox',
-            'description' => 'Review live inbox, spam, and sent mail from your connected mailbox in one workspace.',
-            'rightContent' => '<div style="display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; border: 1px solid ' . ($status['tone'] === 'success' ? '#86efac' : ($status['tone'] === 'warning' ? '#fde68a' : '#fecaca')) . '; background: ' . ($status['tone'] === 'success' ? '#f0fdf4' : ($status['tone'] === 'warning' ? '#fffbeb' : '#fef2f2')) . '; color: ' . ($status['tone'] === 'success' ? '#166534' : ($status['tone'] === 'warning' ? '#92400e' : '#b91c1c')) . ';"><span style="width: 10px; height: 10px; border-radius: 999px; background: currentColor;"></span><span style="font-size: 13px; font-weight: 800;">' . e($status['label']) . '</span></div>',
-        ])
-
-        <section style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding-inline: 4px;">
-            @foreach ($this->getToolbarActions() as $action)
-                {{ $action }}
-            @endforeach
-            @if ($this->isConfigured())
-                <button
-                    type="button"
-                    wire:click="openComposeModal"
-                    style="display: inline-flex; align-items: center; gap: 10px; padding: 11px 16px; border: 1px solid #fbbf24; border-radius: 14px; background: #fbbf24; color: #7c2d12; font-size: 14px; font-weight: 700; cursor: pointer;"
-                >
-                    <x-heroicon-o-pencil-square style="width: 18px; height: 18px;" />
-                    <span>Compose</span>
-                </button>
+        @if ($this->isConfigured())
+            <section style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding-inline: 4px;">
                 <button
                     type="button"
                     wire:click="openReplyModal"
@@ -40,15 +20,15 @@
                     <x-heroicon-o-arrow-uturn-left style="width: 18px; height: 18px;" />
                     <span>Reply All</span>
                 </button>
-            @endif
-        </section>
+            </section>
+        @endif
 
         @if (! $this->isConfigured())
             <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: #ffffff; box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07); overflow: hidden;">
                 <div style="padding: 34px 32px; display: flex; flex-direction: column; gap: 18px; max-width: 760px;">
                     <h3 style="margin: 0; font-size: 28px; font-weight: 800; color: #0f172a;">Connect your mailbox</h3>
                     <p style="margin: 0; font-size: 15px; line-height: 1.8; color: #64748b;">
-                        Open <strong>Mailbox Settings</strong> from the sidebar to enter your mailbox user ID and password. By default, we prefill:
+                        Open <strong>Settings &gt; Mailbox &gt; My Mailbox</strong> to enter your mailbox user ID and password. By default, we prefill:
                         <strong>Host:</strong> mail.medityaglobalservices.com
                         and
                         <strong>IMAP Port:</strong> 993.

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
 use App\Models\ClientServiceEnrollment;
@@ -9,10 +10,17 @@ use App\Models\ManagedBillingService;
 use App\Models\Organization;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
+use App\Models\PortalCredential;
 use App\Models\Provider;
 use App\Models\User;
+use App\Models\VerificationPdfPreset;
+use App\Models\VerificationTemplateVersion;
+use App\Filament\Clinic\Pages\VerificationSettings;
+use App\Filament\Clinic\Resources\PortalCredentials\Pages\ListPortalCredentials;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Http\Request;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -154,7 +162,7 @@ it('lets clinics create requested service enrollments', function () {
     expect($enrollment->managedBillingService?->name)->toBe('Eligibility & Benefits Verification');
 });
 
-it('creates clinic verification work items from active enrollments', function () {
+it('creates clinic verification requests from active enrollments', function () {
     $this->actingAs($this->clinicUser);
 
     $enrollment = ClientServiceEnrollment::create([
@@ -191,4 +199,364 @@ it('creates clinic verification work items from active enrollments', function ()
     expect($workItem->source)->toBe('clinic_request');
     expect($workItem->enrollment?->id)->toBe($enrollment->id);
     expect($workItem->patient?->full_name)->toBe('Lena Stone');
+});
+
+it('freezes self-managed and managed-service processing rules on each request', function () {
+    $this->actingAs($this->clinicUser);
+    $this->clinic->update([
+        'verification_services_enabled' => true,
+        'verification_service_status' => 'active',
+        'service_status' => 'active',
+    ]);
+    foreach (['view', 'update'] as $action) {
+        $this->clinicUser->givePermissionTo(Permission::findOrCreate("clinic.verification_requests.{$action}", 'web'));
+    }
+
+    $selfManaged = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'created_by' => $this->clinicUser->id,
+        'title' => 'Clinic team verification',
+        'source' => 'clinic_self_service',
+        'processing_mode' => BillingWorkItem::PROCESSING_MODE_SELF_MANAGED,
+        'status' => BillingWorkItem::STATUS_PENDING,
+    ]);
+
+    $managed = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'created_by' => $this->clinicUser->id,
+        'title' => 'Managed verification',
+        'source' => 'clinic_request',
+        'processing_mode' => BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE,
+        'status' => BillingWorkItem::STATUS_PENDING,
+    ]);
+
+    expect($selfManaged->workflowMode())->toBe('self_service')
+        ->and($selfManaged->clinicUserCanOpenVerificationForm($this->clinicUser))->toBeTrue()
+        ->and($managed->workflowMode())->toBe('managed_service')
+        ->and($managed->clinicUserCanOpenVerificationForm($this->clinicUser))->toBeFalse();
+
+    $managed->status = BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE;
+
+    expect($managed->clinicUserCanRespondToVerification($this->clinicUser))->toBeTrue();
+});
+
+it('offers per-request routing only when the managed enrollment allows clinic workspace', function () {
+    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+        $this->organization->id,
+        $this->clinic->id,
+        $this->location->id,
+    ))->toBe([BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed'])
+        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+            $this->organization->id,
+            $this->clinic->id,
+            $this->location->id,
+        ))->toBe('This request will be completed by the clinic as Self-Managed.');
+
+    $managedEnrollment = ClientServiceEnrollment::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'created_by' => $this->clinicUser->id,
+        'status' => 'active',
+        'clinic_workspace_enabled' => false,
+    ]);
+
+    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+        $this->organization->id,
+        $this->clinic->id,
+        $this->location->id,
+    ))->toBe([BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service'])
+        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+            $this->organization->id,
+            $this->clinic->id,
+            $this->location->id,
+        ))->toBe('This request will be completed by the Managed Service team.');
+
+    $managedEnrollment->update(['clinic_workspace_enabled' => true]);
+
+    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+        $this->organization->id,
+        $this->clinic->id,
+        $this->location->id,
+    ))->toBe([
+        BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service',
+        BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed',
+    ])->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+        $this->organization->id,
+        $this->clinic->id,
+        $this->location->id,
+    ))->toBe('Choose whether the clinic will self-manage this request or send it to Managed Service.')
+        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+            null,
+            null,
+            null,
+        ))->toBe('Select a clinic from the Workspace menu to determine who will complete the request.');
+});
+
+it('preserves the completed form snapshot when a clinic requests a correction', function () {
+    $this->actingAs($this->clinicUser);
+    $this->clinic->update([
+        'verification_services_enabled' => true,
+        'verification_service_status' => 'active',
+        'service_status' => 'active',
+    ]);
+    foreach (['view', 'update'] as $action) {
+        $this->clinicUser->givePermissionTo(Permission::findOrCreate("clinic.verification_requests.{$action}", 'web'));
+    }
+
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'created_by' => $this->clinicUser->id,
+        'title' => 'Completed managed verification',
+        'source' => 'clinic_request',
+        'processing_mode' => BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE,
+        'status' => BillingWorkItem::STATUS_DONE,
+        'outcome_status' => 'verified',
+    ]);
+
+    $submission = $request->formSubmissions()->create([
+        'user_id' => $this->clinicUser->id,
+        'panel' => 'verification',
+        'status' => BillingWorkItem::STATUS_DONE,
+        'outcome_status' => 'verified',
+        'priority' => 'normal',
+        'version' => 1,
+        'payload' => ['answers' => [['prompt' => 'Eligibility status', 'value' => 'Active']]],
+    ]);
+
+    $updated = app(\App\Services\Verification\WorkflowService::class)->requestCorrection(
+        $request,
+        'Please confirm the annual maximum remaining.',
+        $this->clinicUser,
+    );
+
+    expect($updated->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->and($updated->return_reason)->toBe('Please confirm the annual maximum remaining.')
+        ->and($updated->formSubmissions()->count())->toBe(1)
+        ->and($updated->formSubmissions()->first()->is($submission))->toBeTrue()
+        ->and($updated->formSubmissions()->first()->payload)->toBe($submission->payload)
+        ->and($updated->activities()->where('activity_type', 'clinic_correction_requested')->exists())->toBeTrue();
+});
+
+it('keeps verification settings page actions wired', function () {
+    $this->actingAs($this->clinicUser);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'client_service_enrollment_id' => null,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'created_by' => $this->clinicUser->id,
+        'title' => 'Settings preview request',
+        'source' => 'clinic_request',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'pms_sync_status' => 'pending',
+        'writeback_status' => 'not_requested',
+    ]);
+
+    Livewire::test(VerificationSettings::class)
+        ->call('showSettingsSection', 'template-management')
+        ->assertSet('activeSettingsSection', 'template-management')
+        ->call('showSettingsSection', 'pdf-settings')
+        ->assertSet('activeSettingsSection', 'pdf-settings')
+        ->call('showSettingsSection', 'unknown-section')
+        ->assertSet('activeSettingsSection', 'pdf-settings')
+        ->call('createNewPreset')
+        ->assertSet('data.verification_pdf_preset_name', 'Custom PDF Preset')
+        ->set('data.verification_pdf_preset_name', 'Clinic Action Test Preset')
+        ->set('data.verification_pdf_preset_description', 'Saved from settings action test.')
+        ->set('data.verification_pdf_output_mode', 'standard')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect(VerificationPdfPreset::query()
+        ->where('clinic_id', $this->clinic->id)
+        ->where('name', 'Clinic Action Test Preset')
+        ->exists())->toBeTrue();
+
+    expect(Livewire::test(VerificationSettings::class)->instance()->getPreviewPdfUrl())
+        ->toBe(route('clinic.verification-requests.pdf.preview', $workItem));
+});
+
+it('archives only unused clinic template versions from settings', function () {
+    $this->actingAs($this->clinicUser);
+
+    Livewire::test(VerificationSettings::class)
+        ->call('createClinicTemplateDraft')
+        ->assertSet('showCreateTemplateDraftModal', true)
+        ->set('newClinicTemplateDraftData.template_name', 'Archive Test Clinic Template Draft')
+        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_BOTH)
+        ->set('newClinicTemplateDraftData.starting_point', 'active')
+        ->call('submitCreateClinicTemplateDraft')
+        ->assertHasNoErrors();
+
+    $draft = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+        ->firstOrFail();
+
+    Livewire::test(VerificationSettings::class)
+        ->call('archiveClinicTemplateVersion', $draft->id)
+        ->assertHasNoErrors();
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_ARCHIVED);
+
+    $active = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    Livewire::test(VerificationSettings::class)
+        ->call('archiveClinicTemplateVersion', $active->id)
+        ->assertHasNoErrors();
+
+    expect($active->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED);
+});
+
+it('lets clinics select the active published template from settings', function () {
+    $this->actingAs($this->clinicUser);
+
+    Livewire::test(VerificationSettings::class)
+        ->call('createClinicTemplateDraft')
+        ->set('newClinicTemplateDraftData.template_name', 'Selectable Clinic Template Draft')
+        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_BOTH)
+        ->set('newClinicTemplateDraftData.starting_point', 'active')
+        ->call('submitCreateClinicTemplateDraft')
+        ->call('publishClinicTemplateDraft')
+        ->assertHasNoErrors();
+
+    $previousTemplate = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->where('is_active', false)
+        ->firstOrFail();
+
+    $component = Livewire::test(VerificationSettings::class);
+
+    expect($component->instance()->getClinicTemplateOptions())
+        ->toHaveKey($previousTemplate->getKey());
+
+    $component
+        ->set('data.verification_template_version_id', $previousTemplate->getKey())
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($previousTemplate->fresh()->is_active)->toBeTrue();
+    expect(VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->where('is_active', true)
+        ->count())->toBe(1);
+});
+
+it('maps only visible selected clinic portal credentials into verification settings', function () {
+    $this->actingAs($this->clinicUser);
+
+    $visibleCredential = PortalCredential::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'portal_name' => 'Delta Dental Portal',
+        'portal_category' => 'insurance',
+        'login_url' => 'https://example.test/delta',
+        'username' => 'delta-user',
+        'password' => 'delta-password',
+        'mfa_required' => true,
+        'mfa_method' => 'email',
+        'is_active' => true,
+        'visible_to_clinic' => true,
+    ]);
+
+    PortalCredential::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'portal_name' => 'Hidden Admin Portal',
+        'portal_category' => 'insurance',
+        'username' => 'hidden-user',
+        'password' => 'hidden-password',
+        'is_active' => true,
+        'visible_to_clinic' => false,
+    ]);
+
+    $credentials = \App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getEloquentQuery()->get();
+
+    expect($credentials)->toHaveCount(1);
+    expect($credentials->first()->is($visibleCredential))->toBeTrue();
+});
+
+it('keeps portal secrets out of the initial clinic credential page and audits explicit access', function () {
+    $this->clinic->update(['verification_services_enabled' => true]);
+
+    ClientServiceEnrollment::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->verificationService->id,
+        'created_by' => $this->clinicUser->id,
+        'status' => 'active',
+        'start_date' => today(),
+    ]);
+
+    $this->clinicUser->givePermissionTo(
+        Permission::findOrCreate('clinic.portal_credentials.view', 'web'),
+        Permission::findOrCreate('clinic.portal_credentials.update', 'web'),
+    );
+
+    $credential = PortalCredential::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'portal_name' => 'Secure Payer Portal',
+        'portal_category' => 'insurance',
+        'login_url' => 'https://example.test/secure',
+        'username' => 'private-portal-user',
+        'password' => 'private-portal-password',
+        'is_active' => true,
+        'visible_to_clinic' => true,
+    ]);
+
+    $this->actingAs($this->clinicUser);
+
+    $component = Livewire::test(ListPortalCredentials::class)
+        ->assertDontSee('private-portal-user')
+        ->assertDontSee('private-portal-password')
+        ->call('revealCredentialSecret', $credential->id, 'password')
+        ->assertDispatched('portal-credential-revealed');
+
+    expect($component->instance()->getPortalCredentials())->toHaveCount(1);
+    expect(AuditLog::query()
+        ->where('module', 'portal_credentials')
+        ->where('action', 'password_revealed')
+        ->where('clinic_id', $this->clinic->id)
+        ->exists())->toBeTrue();
+
+    $auditPayload = AuditLog::query()
+        ->where('module', 'portal_credentials')
+        ->where('action', 'password_revealed')
+        ->latest('id')
+        ->value('new_values');
+
+    expect($auditPayload)
+        ->not->toContain('private-portal-password')
+        ->toContain('Secure Payer Portal');
+
+    Livewire::test(\App\Filament\Clinic\Pages\PortalCredentialSettings::class)
+        ->assertRedirect(\App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getUrl('index'));
 });

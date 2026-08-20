@@ -6,10 +6,9 @@ use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\CreateVerificati
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\EditVerificationFormQuestion;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\ListVerificationFormQuestions;
 use App\Models\AdaProcedureCode;
-use App\Models\Clinic;
-use App\Models\Organization;
 use App\Models\VerificationFormQuestion;
-use App\Support\AdminClinicScope;
+use App\Models\VerificationTemplateVersion;
+use App\Support\VerificationTemplateVersionService;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -20,6 +19,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -38,21 +38,28 @@ use UnitEnum;
 
 class VerificationFormQuestionResource extends Resource
 {
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $model = VerificationFormQuestion::class;
 
+    protected static ?string $slug = 'master-template';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Template Management';
+    protected static ?string $navigationLabel = 'Master Template';
 
     protected static ?string $modelLabel = 'Template Question';
 
     protected static ?string $pluralModelLabel = 'Template Questions';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verification Workspace';
+    protected static string|UnitEnum|null $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 30;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() === 'saas';
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -66,50 +73,16 @@ class VerificationFormQuestionResource extends Resource
                         Hidden::make('order_position')
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
-                        Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the Master Template clean and organized.')
+                        Section::make('Step 1 - Master Template')
+                            ->description('Manage the platform Master Template directly. Client-specific templates are created later by copying this master into the client workspace.')
                             ->columnSpan(12)
                             ->schema([
                                 Grid::make(12)
                                     ->schema([
-                                        Select::make('organization_id')
-                                            ->label('Organization')
-                                            ->options(fn (): array => Organization::query()->orderBy('name')->pluck('name', 'id')->all())
-                                            ->native(false)
-                                            ->searchable()
-                                            ->live()
-                                            ->afterStateUpdated(fn (Set $set) => $set('clinic_id', null))
-                                            ->default(fn (): ?int => AdminClinicScope::selectedClinic()?->organization_id)
-                                            ->required()
-                                            ->columnSpan(4),
-                                        Select::make('clinic_id')
-                                            ->label('Clinic override')
-                                            ->helperText('Leave blank for a master question. Select a clinic only when the question should be customized for that clinic.')
-                                            ->options(function (Get $get): array {
-                                                $organizationId = $get('organization_id');
-
-                                                return Clinic::query()
-                                                    ->when($organizationId, fn ($query) => $query->where('organization_id', $organizationId))
-                                                    ->orderBy('clinic_name')
-                                                    ->pluck('clinic_name', 'id')
-                                                    ->all();
-                                            })
-                                            ->native(false)
-                                            ->searchable()
-                                            ->live()
-                                            ->default(fn (): ?int => AdminClinicScope::selectedClinicId())
-                                            ->afterStateUpdated(function ($state, Set $set): void {
-                                                if (! filled($state)) {
-                                                    return;
-                                                }
-
-                                                $organizationId = Clinic::query()->whereKey($state)->value('organization_id');
-
-                                                if (filled($organizationId)) {
-                                                    $set('organization_id', $organizationId);
-                                                }
-                                            })
-                                            ->columnSpan(4),
+                                        Hidden::make('organization_id')
+                                            ->default(null),
+                                        Hidden::make('clinic_id')
+                                            ->default(null),
                                         Select::make('template_key')
                                             ->label('Template')
                                             ->options(VerificationFormQuestion::templateOptionsForUi())
@@ -433,30 +406,15 @@ class VerificationFormQuestionResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query): Builder {
-                $selectedClinic = AdminClinicScope::selectedClinic();
-
-                if ($selectedClinic) {
-                    $query->where(function (Builder $scopeQuery) use ($selectedClinic): void {
-                        $scopeQuery
-                            ->where('clinic_id', $selectedClinic->id)
-                            ->orWhere(function (Builder $masterQuery) use ($selectedClinic): void {
-                                $masterQuery
-                                    ->whereNull('clinic_id')
-                                    ->where(function (Builder $organizationQuery) use ($selectedClinic): void {
-                                        $organizationQuery
-                                            ->whereNull('organization_id')
-                                            ->orWhere('organization_id', $selectedClinic->organization_id);
-                                    });
-                            });
-                    });
-                } else {
-                    $query = AdminClinicScope::apply($query, 'clinic_id');
-                }
+                $version = static::currentMasterWorkingVersion();
 
                 return $query
-                    ->with(['organization', 'clinic'])
-                    ->orderBy('organization_id')
-                    ->orderBy('clinic_id')
+                    ->whereNull('organization_id')
+                    ->whereNull('clinic_id')
+                    ->when(
+                        $version,
+                        fn (Builder $query) => $query->where('template_version_id', $version->getKey())
+                    )
                     ->orderBy('section_key')
                     ->orderBy('sort_order');
             })
@@ -465,12 +423,6 @@ class VerificationFormQuestionResource extends Resource
                     ->label('Question')
                     ->searchable()
                     ->wrap(),
-                TextColumn::make('organization.name')
-                    ->label('Organization')
-                    ->toggleable(),
-                TextColumn::make('clinic.clinic_name')
-                    ->label('Clinic')
-                    ->toggleable(),
                 TextColumn::make('code')
                     ->label('Code')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -519,12 +471,6 @@ class VerificationFormQuestionResource extends Resource
                 SelectFilter::make('section_key')
                     ->label('Section')
                     ->options(fn (): array => static::sectionFilterOptions()),
-                SelectFilter::make('organization_id')
-                    ->label('Organization')
-                    ->options(fn (): array => Organization::query()->orderBy('name')->pluck('name', 'id')->all()),
-                SelectFilter::make('clinic_id')
-                    ->label('Clinic')
-                    ->options(fn (): array => Clinic::query()->orderBy('clinic_name')->pluck('clinic_name', 'id')->all()),
                 SelectFilter::make('form_type')
                     ->label('Form')
                     ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS),
@@ -534,8 +480,10 @@ class VerificationFormQuestionResource extends Resource
                     ->label('System question'),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->visible(fn (VerificationFormQuestion $record): bool => static::canEdit($record)),
+                DeleteAction::make()
+                    ->visible(fn (VerificationFormQuestion $record): bool => static::canDelete($record)),
             ]);
     }
 
@@ -551,17 +499,39 @@ class VerificationFormQuestionResource extends Resource
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
+        $version = static::currentMasterWorkingVersion();
+
+        return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
+            && $version?->status === VerificationTemplateVersion::STATUS_DRAFT;
     }
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
+        return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
+            && blank($record->organization_id)
+            && blank($record->clinic_id)
+            && $record->templateVersion?->status === VerificationTemplateVersion::STATUS_DRAFT;
     }
 
     public static function canDelete(Model $record): bool
     {
-        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
+        return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
+            && blank($record->organization_id)
+            && blank($record->clinic_id)
+            && $record->templateVersion?->status === VerificationTemplateVersion::STATUS_DRAFT;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $version = static::currentMasterWorkingVersion();
+
+        return parent::getEloquentQuery()
+            ->whereNull('organization_id')
+            ->whereNull('clinic_id')
+            ->when(
+                $version,
+                fn (Builder $query) => $query->where('template_version_id', $version->getKey())
+            );
     }
 
     public static function getPages(): array
@@ -578,5 +548,25 @@ class VerificationFormQuestionResource extends Resource
         return VerificationFormQuestion::sectionOptionsForTemplate(
             VerificationFormQuestion::defaultTemplateKey(),
         );
+    }
+
+    public static function currentMasterWorkingVersion(): ?VerificationTemplateVersion
+    {
+        $templateKey = VerificationFormQuestion::defaultTemplateKey();
+
+        $draft = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+            ->where('template_key', $templateKey)
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereNull('clinic_id')
+            ->orderByDesc('is_working_draft')
+            ->latest('id')
+            ->first();
+
+        if ($draft) {
+            return $draft;
+        }
+
+        return app(VerificationTemplateVersionService::class)->ensureMasterVersion($templateKey);
     }
 }

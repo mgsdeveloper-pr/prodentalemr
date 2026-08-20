@@ -2,22 +2,29 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Appointment extends Model
 {
-    use SoftDeletes;
+    use HasPublicId, SoftDeletes;
 
     public const VERIFICATION_STATUS_NOT_SENT = 'not_sent';
+
+    public const VERIFICATION_STATUS_NEEDS_INSURANCE = 'needs_insurance';
+
     public const VERIFICATION_STATUS_SENT = 'sent';
+
     public const VERIFICATION_STATUS_IN_PROGRESS = 'in_progress';
+
     public const VERIFICATION_STATUS_COMPLETED = 'completed';
 
     public const VERIFICATION_STATUS_OPTIONS = [
         self::VERIFICATION_STATUS_NOT_SENT => 'Not Sent',
+        self::VERIFICATION_STATUS_NEEDS_INSURANCE => 'Needs Insurance Information',
         self::VERIFICATION_STATUS_SENT => 'Sent',
         self::VERIFICATION_STATUS_IN_PROGRESS => 'In Progress',
         self::VERIFICATION_STATUS_COMPLETED => 'Completed',
@@ -28,7 +35,10 @@ class Appointment extends Model
         'clinic_id',
         'location_id',
         'clinic_operatory_id',
+        'clinic_service_id',
         'patient_id',
+        'patient_insurance_policy_id',
+        'parent_appointment_id',
         'provider_id',
         'appointment_date',
         'start_time',
@@ -41,8 +51,12 @@ class Appointment extends Model
         'cancelled_at',
         'status',
         'verification_status',
+        'verification_required',
+        'verification_processing_mode',
         'verification_work_item_id',
         'appointment_type',
+        'source',
+        'reason_for_visit',
         'notes',
         'arrival_notes',
     ];
@@ -56,6 +70,7 @@ class Appointment extends Model
             'seated_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'verification_required' => 'boolean',
         ];
     }
 
@@ -79,9 +94,29 @@ class Appointment extends Model
         return $this->belongsTo(ClinicOperatory::class, 'clinic_operatory_id');
     }
 
+    public function clinicService(): BelongsTo
+    {
+        return $this->belongsTo(ClinicService::class);
+    }
+
     public function patient(): BelongsTo
     {
         return $this->belongsTo(Patient::class);
+    }
+
+    public function insurancePolicy(): BelongsTo
+    {
+        return $this->belongsTo(PatientInsurancePolicy::class, 'patient_insurance_policy_id');
+    }
+
+    public function parentAppointment(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_appointment_id');
+    }
+
+    public function followUpAppointments(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_appointment_id');
     }
 
     public function provider(): BelongsTo

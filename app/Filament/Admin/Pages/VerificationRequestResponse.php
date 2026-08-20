@@ -2,13 +2,15 @@
 
 namespace App\Filament\Admin\Pages;
 
-use App\Filament\Saas\Resources\Verifications\VerificationWorkItemResource;
+use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
+use App\Services\Verification\WorkflowService;
 use App\Support\AdminClinicScope;
 use App\Support\SaasEntitlements;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -32,7 +34,7 @@ class VerificationRequestResponse extends Page
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $title = '';
+    protected static ?string $title = 'Request & Response';
 
     protected static ?string $slug = 'request-response';
 
@@ -87,7 +89,7 @@ class VerificationRequestResponse extends Page
 
     public static function getNavigationBadge(): ?string
     {
-        $count = AdminClinicScope::apply(BillingWorkItem::query(), 'clinic_id')
+        $count = AdminClinicScope::applyVerificationRequests(BillingWorkItem::query(), 'clinic_id')
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
             ->where('source', '!=', 'clinic_self_service')
             ->where('status', '!=', BillingWorkItem::STATUS_DONE)
@@ -137,7 +139,7 @@ class VerificationRequestResponse extends Page
         abort_unless($this->canShowRequestShortcut($workItem), 403);
 
         $this->requestComposerWorkItemId = $workItem->getKey();
-        $this->requestComposerReason = (string) ($workItem->info_request_reason ?? '');
+        $this->requestComposerReason = '';
         $this->resetErrorBag('requestComposerReason');
         $this->showRequestComposerModal = true;
     }
@@ -173,7 +175,7 @@ class VerificationRequestResponse extends Page
         $workItem->outcome_status = 'info_requested';
 
         if ($workItem->normalized_status !== BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE) {
-            $workItem->transitionStatus(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
+            app(WorkflowService::class)->transition($workItem, BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
         } else {
             $workItem->save();
 
@@ -217,8 +219,8 @@ class VerificationRequestResponse extends Page
     public function requestActionLabel(BillingWorkItem $workItem): string
     {
         return $workItem->normalized_status === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE
-            ? 'Follow Up'
-            : 'Request Again';
+            ? 'Send Follow-up'
+            : 'Request Clinic Information';
     }
 
     public function canShowResponseShortcut(BillingWorkItem $workItem): bool
@@ -233,20 +235,7 @@ class VerificationRequestResponse extends Page
 
     public function canCloseRequestResponse(BillingWorkItem $workItem): bool
     {
-        $user = auth()->user();
-
-        if (! $user?->canWorkVerificationQueue()) {
-            return false;
-        }
-
-        if ($workItem->normalized_status === BillingWorkItem::STATUS_DONE) {
-            return false;
-        }
-
-        return filled($workItem->clinic_responded_at)
-            || $workItem->activities->contains(
-                fn (BillingWorkItemActivity $activity): bool => $activity->activity_type === self::RESPONSE_ACTIVITY
-            );
+        return false;
     }
 
     public function closeRequestResponse(int $workItemId): void
@@ -254,16 +243,6 @@ class VerificationRequestResponse extends Page
         $workItem = $this->query()->findOrFail($workItemId);
 
         abort_unless($this->canCloseRequestResponse($workItem), 403);
-
-        $workItem->transitionStatus(BillingWorkItem::STATUS_DONE);
-        $this->selectedWorkItemId = $workItem->getKey();
-        $this->showDetailsModal = false;
-
-        Notification::make()
-            ->title('Request closed')
-            ->body('The clinic response has been reviewed and moved to Closed Requests.')
-            ->success()
-            ->send();
     }
 
     public function openResponseComposer(int $workItemId): void
@@ -271,6 +250,8 @@ class VerificationRequestResponse extends Page
         $workItem = $this->query()->findOrFail($workItemId);
 
         abort_unless($this->canShowResponseShortcut($workItem) || $this->canShowResponseEdit($workItem), 403);
+
+        $this->selectedWorkItemId = $workItem->getKey();
     }
 
     public function closeResponseComposer(): void
@@ -286,7 +267,60 @@ class VerificationRequestResponse extends Page
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            Action::make('export')
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->visible(fn (): bool => $this->canExportResponseLog())
+                ->url(fn (): string => $this->responseLogExportUrl()),
+        ];
+    }
+
+    public function getSubheading(): ?string
+    {
+        return $this->responseWorkspaceDescription() . ' Scope: ' . $this->responseWorkspaceScope() . '.';
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            VerificationRequestResource::getUrl('index') => 'Verification Requests',
+            'Request & Response',
+        ];
+    }
+
+    public function responseWorkspaceTitle(): string
+    {
+        return 'Request & Response';
+    }
+
+    public function responseWorkspaceDescription(): string
+    {
+        return 'Review information requested from clinics and the responses received.';
+    }
+
+    public function responseWorkspaceScope(): string
+    {
+        return AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics';
+    }
+
+    public function responseWorkspaceSection(): string
+    {
+        return 'Verification';
+    }
+
+    public function canExportResponseLog(): bool
+    {
+        return auth()->user()?->canAccessVerificationWorkspace() ?? false;
+    }
+
+    public function responseLogExportUrl(): string
+    {
+        return route('admin.verification-request-response.export', [
+            'status' => $this->statusFilter,
+            'search' => $this->search,
+        ]);
     }
 
     public function getRows(): LengthAwarePaginator
@@ -504,7 +538,12 @@ class VerificationRequestResponse extends Page
 
     public function responseAttachmentDownloadUrl(BillingWorkItemAttachment $attachment): string
     {
-        return route('saas.billing-work-item-attachments.download', $attachment);
+        return route('admin.verification-request-attachments.download', $attachment);
+    }
+
+    public function responseAttachmentPreviewUrl(BillingWorkItemAttachment $attachment): string
+    {
+        return route('admin.verification-request-attachments.preview', $attachment);
     }
 
     public function openWorkItemUrl(BillingWorkItem $workItem): string
@@ -512,15 +551,20 @@ class VerificationRequestResponse extends Page
         $user = auth()->user();
 
         if ($workItem->verificationUserCanEditVerification($user)) {
-            return VerificationWorkItemResource::getUrl('edit', ['record' => $workItem]);
+            return VerificationRequestResource::getUrl('edit', ['record' => $workItem]);
         }
 
-        return VerificationWorkItemResource::getUrl('view', ['record' => $workItem]);
+        return VerificationRequestResource::getUrl('view', ['record' => $workItem]);
+    }
+
+    public function verificationRequestIndexUrl(): string
+    {
+        return VerificationRequestResource::getUrl('index');
     }
 
     protected function query(): Builder
     {
-        $query = AdminClinicScope::apply(BillingWorkItem::query(), 'clinic_id')
+        $query = AdminClinicScope::applyVerificationRequests(BillingWorkItem::query(), 'clinic_id')
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
             ->where('source', '!=', 'clinic_self_service')
             ->whereHas('activities', fn (Builder $builder) => $builder->whereIn('activity_type', [

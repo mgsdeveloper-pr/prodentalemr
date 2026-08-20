@@ -2,13 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class VerificationNotification extends Model
 {
+    use HasPublicId;
+
     protected $fillable = [
         'user_id',
+        'notification_event_id',
+        'notification_delivery_id',
         'organization_id',
         'clinic_id',
         'billing_work_item_id',
@@ -34,6 +40,16 @@ class VerificationNotification extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function event(): BelongsTo
+    {
+        return $this->belongsTo(NotificationEvent::class, 'notification_event_id');
+    }
+
+    public function delivery(): BelongsTo
+    {
+        return $this->belongsTo(NotificationDelivery::class, 'notification_delivery_id');
     }
 
     public function actor(): BelongsTo

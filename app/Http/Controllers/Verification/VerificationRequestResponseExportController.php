@@ -77,7 +77,7 @@ class VerificationRequestResponseExportController extends Controller
 
     protected function query(string $statusFilter, string $search): Builder
     {
-        $query = AdminClinicScope::apply(BillingWorkItem::query(), 'clinic_id')
+        $query = AdminClinicScope::applyVerificationRequests(BillingWorkItem::query(), 'clinic_id')
             ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
             ->where('source', '!=', 'clinic_self_service')
             ->whereHas('activities', fn (Builder $builder) => $builder->whereIn('activity_type', [

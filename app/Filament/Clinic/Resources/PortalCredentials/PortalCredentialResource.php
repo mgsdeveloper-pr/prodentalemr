@@ -35,9 +35,9 @@ class PortalCredentialResource extends Resource
 
     protected static ?string $navigationLabel = 'Portal Credentials';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
 
     public static function form(Schema $schema): Schema
     {
@@ -84,6 +84,9 @@ class PortalCredentialResource extends Resource
                                     ->label('Password')
                                     ->password()
                                     ->revealable()
+                                    ->afterStateHydrated(fn (TextInput $component) => $component->state(''))
+                                    ->dehydrated(fn (?string $state): bool => filled($state))
+                                    ->helperText('Leave blank to keep the current password.')
                                     ->maxLength(255)
                                     ->columnSpan(6),
                                 Toggle::make('mfa_required')
@@ -178,6 +181,9 @@ class PortalCredentialResource extends Resource
     {
         return VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService()
             && filled(ClinicPanelScope::selectedClinicId())
+            && $record instanceof PortalCredential
+            && (int) $record->clinic_id === ClinicPanelScope::selectedClinicId()
+            && (bool) $record->visible_to_clinic
             && (auth()->user()?->canPerformClinicModuleAction('portal_credentials', 'update') ?? false);
     }
 

@@ -326,6 +326,25 @@ it('registers the new clinic workflow routes cleanly', function () {
         ->toBe('clinic/appointments');
     expect($router->getRoutes()->match(Request::create('/clinic/treatment-plans', 'GET'))->uri())
         ->toBe('clinic/treatment-plans');
+    expect($router->getRoutes()->match(Request::create('/clinic/providers', 'GET'))->uri())
+        ->toBe('clinic/providers');
+    expect($router->getRoutes()->match(Request::create('/clinic/providers/create', 'GET'))->uri())
+        ->toBe('clinic/providers/create');
+});
+
+it('keeps clinic provider records soft deleted for historical safety', function () {
+    $this->actingAs($this->admin);
+
+    $providerId = $this->provider->id;
+
+    $this->provider->delete();
+
+    expect(Provider::query()->whereKey($providerId)->exists())->toBeFalse()
+        ->and(Provider::withTrashed()->whereKey($providerId)->exists())->toBeTrue();
+
+    Provider::withTrashed()->findOrFail($providerId)->restore();
+
+    expect(Provider::query()->whereKey($providerId)->exists())->toBeTrue();
 });
 
 it('rolls claim line item totals into the claim header', function () {

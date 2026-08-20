@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('verification_template_sections', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('organization_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('clinic_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('clinic_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('template_key')->default('template_3');
             $table->string('section_key');
             $table->string('parent_section_key')->nullable();

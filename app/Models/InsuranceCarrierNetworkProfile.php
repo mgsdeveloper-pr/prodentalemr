@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\HasPublicId;
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class InsuranceCarrierNetworkProfile extends Model
 {
+    use HasPublicId;
+
     public const OUT_OF_NETWORK_OPTIONS = [
         'yes' => 'Yes',
         'no' => 'No',

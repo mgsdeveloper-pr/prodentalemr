@@ -28,7 +28,7 @@ class ListInsuranceCarrierNetworkProfiles extends ListRecords
             CreateAction::make()
                 ->label('Add Participation Rule')
                 ->icon('heroicon-o-plus')
-                ->color('warning'),
+                ->color('primary'),
             Action::make('manageCarriers')
                 ->label('Insurance Directory')
                 ->icon('heroicon-o-building-library')

@@ -10,19 +10,40 @@ use App\Models\User;
 
 class SaasEntitlements
 {
+    /**
+     * Core clinic capabilities are available on every plan. Feature-level
+     * enhancements (such as appointment import) remain separately gated.
+     */
+    private const CORE_CLINIC_MODULES = [
+        'appointments',
+    ];
+
     public static function currentSubscriptionFor(?Organization $organization): ?Subscription
     {
         if (! $organization) {
             return null;
         }
 
-        return $organization->subscriptions()
+        $organizationId = (int) $organization->getKey();
+        $requestKey = "prodental.entitlements.current_subscription.{$organizationId}";
+
+        if (app()->bound('request') && request()->attributes->has($requestKey)) {
+            return request()->attributes->get($requestKey);
+        }
+
+        $subscription = $organization->subscriptions()
             ->with('subscriptionPlan')
             ->whereIn('status', ['active', 'trial'])
             ->whereIn('service_status', ['active', 'trial', 'pending_setup'])
             ->latest('start_date')
             ->latest('id')
             ->first();
+
+        if (app()->bound('request')) {
+            request()->attributes->set($requestKey, $subscription);
+        }
+
+        return $subscription;
     }
 
     public static function planForClinic(?Clinic $clinic): ?SubscriptionPlan
@@ -37,6 +58,10 @@ class SaasEntitlements
 
     public static function clinicModuleAllowed(?Clinic $clinic, string $module): bool
     {
+        if (in_array($module, self::CORE_CLINIC_MODULES, true)) {
+            return true;
+        }
+
         if ($module === 'template_management') {
             return self::clinicModuleAllowed($clinic, 'verification_requests');
         }

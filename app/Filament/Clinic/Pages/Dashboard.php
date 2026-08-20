@@ -24,9 +24,7 @@ class Dashboard extends BaseDashboard
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return ClinicWorkspace::selected() === ClinicWorkspace::VERIFICATION
-            ? 'Dashboard'
-            : 'Dashboard';
+        return 'Daily Work';
     }
 
     public static function getNavigationSort(): ?int

@@ -9,6 +9,7 @@ use App\Filament\Clinic\Pages\VerificationRequestResponse;
 use App\Filament\Clinic\Pages\VerificationNotificationCentre;
 use App\Http\Middleware\EnsureClinicWorkspaceSelected;
 use App\Http\Middleware\PanelAuthenticateRedirect;
+use App\Support\AppShell\AppShell;
 use App\Support\ClinicWorkspace;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -18,9 +19,9 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
@@ -30,7 +31,7 @@ class ClinicPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return AppShell::registerSharedSidebar(AppShell::register($panel
             ->id('clinic')
             ->path('clinic')
             ->homeUrl(fn (): string => ClinicWorkspace::homeUrl(ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) ?: ClinicWorkspace::CLINIC_PMS))
@@ -57,13 +58,13 @@ class ClinicPanelProvider extends PanelProvider
                 'switch_to_verification' => MenuItem::make()
                     ->label('Go to Verification Zone')
                     ->icon(\Filament\Support\Icons\Heroicon::OutlinedClipboardDocumentCheck)
-                    ->url(fn (): string => route('clinic.switch-workspace', ['workspace' => ClinicWorkspace::VERIFICATION]))
+                    ->url(fn (): string => route('clinic.choose-workspace'))
                     ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::VERIFICATION)
                     ->sort(860),
                 'switch_to_clinic_pms' => MenuItem::make()
                     ->label('Go to Clinic PMS')
                     ->icon(\Filament\Support\Icons\Heroicon::OutlinedBuildingOffice2)
-                    ->url(fn (): string => route('clinic.switch-workspace', ['workspace' => ClinicWorkspace::CLINIC_PMS]))
+                    ->url(fn (): string => route('clinic.choose-workspace'))
                     ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::CLINIC_PMS)
                     ->sort(870),
                 'logout' => MenuItem::make()->hidden(),
@@ -74,49 +75,21 @@ class ClinicPanelProvider extends PanelProvider
                     ->sort(PHP_INT_MAX),
             ])
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Teal,
             ])
             ->navigationGroups([
-                NavigationGroup::make()->label('Dashboard'),
-                NavigationGroup::make()->label('Verifications'),
+                NavigationGroup::make()->label('Verification'),
+                NavigationGroup::make()->label('Daily Work'),
+                NavigationGroup::make()->label('Clinic Data'),
+                NavigationGroup::make()->label('Documents'),
+                NavigationGroup::make()->label('Managed Services'),
                 NavigationGroup::make()->label('Scheduling'),
                 NavigationGroup::make()->label('Clinical Records'),
                 NavigationGroup::make()->label('Dental Charting'),
                 NavigationGroup::make()->label('Treatment Planning'),
-                NavigationGroup::make()->label('Patient Care'),
-                NavigationGroup::make()->label('Insurance Verification'),
-                NavigationGroup::make()->label('Notifications'),
-                NavigationGroup::make()->label('Managed Services'),
                 NavigationGroup::make()->label('Financial Records'),
-                NavigationGroup::make()->label('Access Management'),
-                NavigationGroup::make()->label('Settings'),
+                NavigationGroup::make()->label('Administration'),
             ])
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_BEFORE,
-                fn (): string => view('filament.shared.partials.sidebar-greeting')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_LOGO_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-toggle')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::SIDEBAR_NAV_START,
-                fn (): string => view('filament.clinic.partials.clinic-scope-switcher', [
-                    'clinicOptions' => \App\Support\ClinicPanelScope::clinicOptions(),
-                ])->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::STYLES_AFTER,
-                fn (): string => view('filament.shared.partials.sidebar-theme')->render()
-                    . view('filament.shared.partials.page-header-theme')->render(),
-            )
-            ->renderHook(
-                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
-                fn (): string => view('filament.shared.partials.verification-notification-bell', [
-                    'panel' => 'clinic',
-                    'clinicId' => \App\Support\ClinicPanelScope::selectedClinicId(),
-                ])->render(),
-            )
             ->discoverResources(in: app_path('Filament/Clinic/Resources'), for: 'App\Filament\Clinic\Resources')
             ->discoverPages(in: app_path('Filament/Clinic/Pages'), for: 'App\Filament\Clinic\Pages')
             ->pages([
@@ -142,7 +115,13 @@ class ClinicPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 PanelAuthenticateRedirect::class,
+                EnsureEmailIsVerified::class,
                 EnsureClinicWorkspaceSelected::class,
+            ]), 'clinic'), fn (): string => view('filament.clinic.partials.clinic-scope-switcher', [
+                'clinicOptions' => \App\Support\ClinicPanelScope::clinicOptions(),
+            ])->render(), fn (): array => [
+                'panel' => 'clinic',
+                'clinicId' => \App\Support\ClinicPanelScope::selectedClinicId(),
             ]);
     }
 }
