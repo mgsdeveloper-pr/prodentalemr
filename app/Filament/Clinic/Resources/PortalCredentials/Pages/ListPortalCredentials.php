@@ -66,6 +66,16 @@ class ListPortalCredentials extends ListRecords
             && (auth()->user()?->canPerformClinicModuleAction('portal_credentials', 'update') ?? false);
     }
 
+    public function canCreatePortalCredentials(): bool
+    {
+        return PortalCredentialResource::canCreate();
+    }
+
+    public function createCredentialUrl(): string
+    {
+        return PortalCredentialResource::getUrl('create');
+    }
+
     public function openPasswordEditor(int $credentialId): void
     {
         abort_unless($this->canUpdatePasswords(), 403);

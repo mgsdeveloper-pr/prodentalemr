@@ -2,6 +2,7 @@
 
 namespace App\Filament\Clinic\Resources\PortalCredentials;
 
+use App\Filament\Clinic\Resources\PortalCredentials\Pages\CreatePortalCredential;
 use App\Filament\Clinic\Resources\PortalCredentials\Pages\EditPortalCredential;
 use App\Filament\Clinic\Resources\PortalCredentials\Pages\ListPortalCredentials;
 use App\Models\PortalCredential;
@@ -174,7 +175,9 @@ class PortalCredentialResource extends Resource
 
     public static function canCreate(): bool
     {
-        return false;
+        return VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService()
+            && filled(ClinicPanelScope::selectedClinicId())
+            && (auth()->user()?->canPerformClinicModuleAction('portal_credentials', 'add') ?? false);
     }
 
     public static function canEdit(Model $record): bool
@@ -196,6 +199,7 @@ class PortalCredentialResource extends Resource
     {
         return [
             'index' => ListPortalCredentials::route('/'),
+            'create' => CreatePortalCredential::route('/create'),
             'edit' => EditPortalCredential::route('/{record}/edit'),
         ];
     }

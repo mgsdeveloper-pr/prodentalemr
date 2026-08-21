@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\ClinicPanelScope;
 use App\Support\ClinicWorkspace;
 use Closure;
 use Illuminate\Http\Request;
@@ -18,7 +19,9 @@ class EnsureClinicWorkspaceSelected
             return $next($request);
         }
 
-        $clinic = ClinicWorkspace::clinicForUser($user);
+        $clinic = $user->shouldBypassClinicScope()
+            ? ClinicPanelScope::initializeFor($user)
+            : ClinicWorkspace::clinicForUser($user);
 
         if (! ClinicWorkspace::needsChoice($clinic)) {
             $workspace = ClinicWorkspace::defaultWorkspace($clinic);

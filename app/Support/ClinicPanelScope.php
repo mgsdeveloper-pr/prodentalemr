@@ -47,6 +47,37 @@ class ClinicPanelScope
         );
     }
 
+    public static function initializeFor(User $user): ?Clinic
+    {
+        if (! $user->shouldBypassClinicScope()) {
+            return $user->clinic;
+        }
+
+        $selected = self::selectedClinic();
+
+        if ($selected?->status
+            && ($selected->hasActiveVerificationServices() || $selected->hasActiveClinicOperations())) {
+            return $selected;
+        }
+
+        $clinic = Clinic::query()
+            ->where('status', true)
+            ->orderBy('clinic_name')
+            ->get()
+            ->first(fn (Clinic $candidate): bool => $candidate->hasActiveVerificationServices()
+                || $candidate->hasActiveClinicOperations());
+
+        if (! $clinic) {
+            session()->forget(self::SESSION_KEY);
+
+            return null;
+        }
+
+        session([self::SESSION_KEY => $clinic->getKey()]);
+
+        return $clinic;
+    }
+
     public static function selectedOrganizationId(): ?int
     {
         $clinic = self::selectedClinic();
