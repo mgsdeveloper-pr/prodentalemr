@@ -6,6 +6,7 @@ Run `php artisan prodental:production-check` before every production deployment.
 
 - Clean, reviewed Git commit containing every required tracked file and migration.
 - `composer audit --locked` and `npm audit --omit=dev` report no known vulnerabilities.
+- Build frontend assets with `npm ci && npm run build`. For Git-only/shared-hosting deployments, commit `public/build` with the release so the Vite manifest and hashed assets reach the server.
 - `APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`, protected `APP_KEY`.
 - Public registration closed unless the complete onboarding release is approved.
 - Production database, encrypted sessions, secure cookies, shared cache where required.
@@ -29,5 +30,5 @@ Code controls support tenant isolation, role permissions, support-mode auditing,
 4. Run the complete automated suite and frontend production build.
 5. Run the production check against production-equivalent configuration.
 6. Back up the database and private files.
-7. Deploy code, run migrations once, restart workers, and clear/rebuild caches.
+7. Deploy code and compiled frontend assets, run migrations once, restart workers, and clear/rebuild caches.
 8. Smoke-test login, tenant scope, verification, appointment, PDF, email, queue, scheduler, and logout.
