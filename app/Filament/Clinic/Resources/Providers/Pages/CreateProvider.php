@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Providers\Pages;
 
 use App\Filament\Clinic\Resources\Providers\ProviderResource;
+use App\Support\ClinicPanelScope;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateProvider extends CreateRecord
@@ -11,8 +12,8 @@ class CreateProvider extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['organization_id'] ??= auth()->user()?->organization_id;
-        $data['clinic_id'] ??= auth()->user()?->clinic_id;
+        $data['organization_id'] = ClinicPanelScope::selectedOrganizationId();
+        $data['clinic_id'] = ClinicPanelScope::selectedClinicId();
 
         return $data;
     }

@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Users\Pages;
 
 use App\Filament\Clinic\Resources\Users\UserResource;
+use App\Support\ClinicPanelScope;
 use App\Support\SaasNotifications;
 use Filament\Resources\Pages\CreateRecord;
 
@@ -19,8 +20,8 @@ class CreateUser extends CreateRecord
         unset($data['selected_role'], $data['password_confirmation']);
 
         $data['created_by'] = auth()->id();
-        $data['organization_id'] ??= auth()->user()?->organization_id;
-        $data['clinic_id'] ??= auth()->user()?->clinic_id;
+        $data['organization_id'] = ClinicPanelScope::selectedOrganizationId();
+        $data['clinic_id'] = ClinicPanelScope::selectedClinicId();
 
         return $data;
     }

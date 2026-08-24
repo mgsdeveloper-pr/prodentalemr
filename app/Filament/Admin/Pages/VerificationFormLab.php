@@ -11,11 +11,12 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Collection;
 use UnitEnum;
 
 class VerificationFormLab extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     public string $labTemplateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
 
     public ?string $labSectionKey = null;
@@ -141,7 +142,7 @@ class VerificationFormLab extends Page
             ->where('template_key', $this->labTemplateKey)
             ->where('section_key', $sectionKey)
             ->exists()) {
-            $sectionKey = $baseKey . '_' . $counter++;
+            $sectionKey = $baseKey.'_'.$counter++;
         }
 
         VerificationTemplateSection::query()->create([
@@ -222,7 +223,7 @@ class VerificationFormLab extends Page
             ->where('template_key', $this->labTemplateKey)
             ->where('section_key', $sectionKey)
             ->exists()) {
-            $sectionKey = $baseKey . '_' . $counter++;
+            $sectionKey = $baseKey.'_'.$counter++;
         }
 
         VerificationTemplateSection::query()->create([

@@ -10,12 +10,13 @@ use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Filament\Saas\Resources\Verifications\Pages\ImportVerificationRequests;
 use App\Filament\Saas\Resources\Verifications\Pages\ListVerificationRequests;
 use App\Filament\Saas\Resources\Verifications\Pages\ViewVerificationRequest;
-use App\Filament\Saas\Resources\Verifications\Schemas\VerificationRequestQueueForm;
 use App\Filament\Saas\Resources\Verifications\Schemas\VerificationRequestInfolist;
+use App\Filament\Saas\Resources\Verifications\Schemas\VerificationRequestQueueForm;
 use App\Filament\Saas\Resources\Verifications\Tables\VerificationRequestsTable;
 use App\Models\BillingWorkItem;
 use App\Support\AdminClinicScope;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -40,6 +41,20 @@ class VerificationRequestResource extends Resource
     protected static ?string $recordTitleAttribute = 'reference_number';
 
     protected static ?string $slug = 'verifications';
+
+    public static function getNavigationLabel(): string
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin'
+            ? 'Verification Requests'
+            : 'Verification List';
+    }
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin'
+            ? 'Verification Work'
+            : 'Verifications';
+    }
 
     public static function getModelLabel(): string
     {

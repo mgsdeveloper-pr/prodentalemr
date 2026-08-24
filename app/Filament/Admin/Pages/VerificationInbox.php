@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
+use App\Models\Clinic;
 use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMessage;
 use App\Support\AdminClinicScope;
@@ -20,13 +21,13 @@ class VerificationInbox extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-inbox-stack';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Work';
 
-    protected static ?string $navigationLabel = 'Clinic Inbox';
+    protected static ?string $navigationLabel = 'Shared Inbox';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
-    protected static ?string $title = 'Clinic Inbox';
+    protected static ?string $title = 'Shared Inbox';
 
     protected static ?string $slug = 'inbox';
 
@@ -48,7 +49,7 @@ class VerificationInbox extends Page
 
     public function getSubheading(): ?string
     {
-        $scope = AdminClinicScope::selectedClinic()?->clinic_name ?? 'All accessible clinics';
+        $scope = $this->selectedClinic()?->clinic_name ?? 'All accessible clinics';
         $status = $this->getConnectionStatus();
 
         return "Review payer notices, portal emails, and OTP messages. Scope: {$scope}. Connection: {$status['label']}.";
@@ -58,7 +59,7 @@ class VerificationInbox extends Page
     {
         return [
             VerificationRequestResource::getUrl('index') => 'Verification',
-            'Clinic Inbox',
+            'Shared Inbox',
         ];
     }
 
@@ -96,7 +97,7 @@ class VerificationInbox extends Page
 
     public function refreshInbox(VerificationInboxService $service): void
     {
-        $result = $service->sync(force: true, clinicId: AdminClinicScope::selectedClinicId());
+        $result = $service->sync(force: true, clinicId: $this->selectedClinicId());
 
         Notification::make()
             ->title($result['ok'] ? 'Inbox refreshed' : 'Inbox refresh failed')
@@ -159,13 +160,13 @@ class VerificationInbox extends Page
         $attachmentBytes = (int) VerificationInboxAttachment::query()
             ->whereIn('verification_inbox_message_id', $messageIds)
             ->sum('file_size');
-        $mailbox = app(VerificationInboxService::class)->mailbox(AdminClinicScope::selectedClinicId());
+        $mailbox = app(VerificationInboxService::class)->mailbox($this->selectedClinicId());
 
         return [
             'messages' => $messageIds->count(),
             'unread' => (clone $this->query())->where('is_read', false)->count(),
             'attachments' => VerificationInboxAttachment::query()->whereIn('verification_inbox_message_id', $messageIds)->count(),
-            'storage' => $attachmentBytes > 0 ? number_format($attachmentBytes / 1048576, 2) . ' MB' : '0 MB',
+            'storage' => $attachmentBytes > 0 ? number_format($attachmentBytes / 1048576, 2).' MB' : '0 MB',
             'last_sync' => $mailbox?->verification_inbox_last_synced_at?->format('d M Y, h:i A') ?? 'Not synced yet',
             'last_cleanup' => $mailbox?->verification_inbox_last_cleanup_at?->format('d M Y, h:i A') ?? 'Not cleaned yet',
         ];
@@ -174,7 +175,7 @@ class VerificationInbox extends Page
     public function getConnectionStatus(): array
     {
         $service = app(VerificationInboxService::class);
-        $selectedClinicId = AdminClinicScope::selectedClinicId();
+        $selectedClinicId = $this->selectedClinicId();
         $mailbox = $service->mailbox($selectedClinicId);
 
         if (! $service->imapAvailable()) {
@@ -197,7 +198,7 @@ class VerificationInbox extends Page
             return [
                 'tone' => 'warning',
                 'label' => 'Clinic mailbox not configured',
-                'description' => 'Open Settings > Mailbox > Clinic Inbox and add mailbox details for this clinic.',
+                'description' => 'Open Settings > Inbox Configuration and add mailbox details for this clinic.',
             ];
         }
 
@@ -205,7 +206,7 @@ class VerificationInbox extends Page
             return [
                 'tone' => 'warning',
                 'label' => 'Mailbox not configured',
-                'description' => 'Open Settings > Mailbox > Clinic Inbox and add this clinic mailbox connection details.',
+                'description' => 'Open Settings > Inbox Configuration and add this clinic mailbox connection details.',
             ];
         }
 
@@ -236,7 +237,7 @@ class VerificationInbox extends Page
 
     protected function query(): Builder
     {
-        $query = AdminClinicScope::apply(VerificationInboxMessage::query(), 'clinic_id')
+        $query = $this->applyClinicScope(VerificationInboxMessage::query())
             ->when($this->folderFilter === VerificationInboxService::FOLDER_INBOX, fn (Builder $query) => $query->where('folder_type', VerificationInboxService::FOLDER_INBOX))
             ->when($this->folderFilter === VerificationInboxService::FOLDER_SPAM, fn (Builder $query) => $query->where('folder_type', VerificationInboxService::FOLDER_SPAM))
             ->when($this->readFilter === 'unread', fn (Builder $query) => $query->where('is_read', false))
@@ -244,13 +245,28 @@ class VerificationInbox extends Page
             ->when(filled($this->search), function (Builder $query): void {
                 $query->where(function (Builder $builder): void {
                     $builder
-                        ->where('subject', 'like', '%' . $this->search . '%')
-                        ->orWhere('from_name', 'like', '%' . $this->search . '%')
-                        ->orWhere('from_email', 'like', '%' . $this->search . '%')
-                        ->orWhere('snippet', 'like', '%' . $this->search . '%');
+                        ->where('subject', 'like', '%'.$this->search.'%')
+                        ->orWhere('from_name', 'like', '%'.$this->search.'%')
+                        ->orWhere('from_email', 'like', '%'.$this->search.'%')
+                        ->orWhere('snippet', 'like', '%'.$this->search.'%');
                 });
             });
 
         return $query;
+    }
+
+    protected function selectedClinic(): ?Clinic
+    {
+        return AdminClinicScope::selectedClinic();
+    }
+
+    protected function selectedClinicId(): ?int
+    {
+        return AdminClinicScope::selectedClinicId();
+    }
+
+    protected function applyClinicScope(Builder $query): Builder
+    {
+        return AdminClinicScope::apply($query, 'clinic_id');
     }
 }

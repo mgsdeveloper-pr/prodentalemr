@@ -50,6 +50,7 @@ class PanelPermissionMatrix
             ],
             'clinic' => [
                 'users' => 'Users',
+                'locations' => 'Locations',
                 'patients' => 'Patients',
                 'providers' => 'Providers',
                 'appointments' => 'Appointments',

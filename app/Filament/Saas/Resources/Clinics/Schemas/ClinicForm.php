@@ -7,8 +7,8 @@ use App\Models\VerificationFormQuestion;
 use App\Support\UsTimezoneOptions;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -39,6 +39,17 @@ class ClinicForm
                                     ->placeholder('Enter the clinic name')
                                     ->required()
                                     ->maxLength(255),
+                                TextInput::make('tax_id')
+                                    ->label('Tax ID / EIN')
+                                    ->placeholder('XX-XXXXXXX')
+                                    ->helperText('Stored securely as a clinic-level identifier.')
+                                    ->maxLength(20),
+                                TextInput::make('clinic_npi')
+                                    ->label('Clinic NPI')
+                                    ->placeholder('10-digit organization NPI')
+                                    ->helperText('Use the clinic or organization NPI, not an individual provider NPI.')
+                                    ->length(10)
+                                    ->regex('/^\d{10}$/'),
                                 Select::make('timezone')
                                     ->label('Timezone')
                                     ->options(UsTimezoneOptions::options())
@@ -197,7 +208,7 @@ class ClinicForm
     protected static function generateClinicCode(): string
     {
         do {
-            $code = 'CLN-' . Str::upper(Str::random(6));
+            $code = 'CLN-'.Str::upper(Str::random(6));
         } while (Clinic::query()->where('clinic_code', $code)->exists());
 
         return $code;

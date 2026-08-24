@@ -2,8 +2,8 @@
 
 namespace App\Filament\Admin\Pages;
 
-use App\Support\DocumentCenter as DocumentCenterData;
 use App\Support\AdminClinicScope;
+use App\Support\DocumentCenter as DocumentCenterData;
 use App\Support\SaasEntitlements;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -12,13 +12,13 @@ use UnitEnum;
 
 class DocumentCenter extends Page
 {
-    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-document-magnifying-glass';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static string | UnitEnum | null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Resources';
 
     protected static ?string $navigationLabel = 'Document Center';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $title = '';
 

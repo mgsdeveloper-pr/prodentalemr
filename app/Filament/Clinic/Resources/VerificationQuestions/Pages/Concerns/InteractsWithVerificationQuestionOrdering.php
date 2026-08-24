@@ -8,6 +8,30 @@ use App\Support\ClinicPanelScope;
 
 trait InteractsWithVerificationQuestionOrdering
 {
+    public function getSectionContextLabels(): array
+    {
+        $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
+        $clinicId = ClinicPanelScope::selectedClinicId();
+
+        return collect([
+            $this->data['section_key'] ?? null,
+            $this->data['sub_section_key'] ?? null,
+        ])
+            ->filter()
+            ->map(fn (string $key): string => str_replace(
+                ' Snapshot',
+                '',
+                VerificationFormQuestion::sectionLabel($key, $templateKey, $clinicId),
+            ))
+            ->values()
+            ->all();
+    }
+
+    public function getWorkingDraftName(): string
+    {
+        return VerificationQuestionResource::clinicTemplateOptionLabel(ClinicPanelScope::selectedClinic());
+    }
+
     public function getSectionQuestionOrderCards(): array
     {
         $clinicId = ClinicPanelScope::selectedClinicId();

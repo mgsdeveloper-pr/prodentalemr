@@ -14,7 +14,7 @@ class ListUsers extends ListRecords
     {
         return [
             CreateAction::make()
-                ->visible(fn (): bool => auth()->user()?->canManageClinicUsers() ?? false),
+                ->visible(fn (): bool => UserResource::canCreate()),
         ];
     }
 }

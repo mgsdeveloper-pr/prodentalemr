@@ -5,23 +5,14 @@
         $selectedClinicName = $this->getSelectedClinicName();
         $templateOptions = $this->getTemplateOptions();
         $selectedTemplateLabel = $this->getSelectedTemplateLabel();
-        $showPortalCredentials = \App\Support\VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService();
         $verificationNavItems = [
             [
                 'key' => 'settings',
-                'label' => 'PDF Settings',
-                'description' => 'Control PDF output and default verification template rules.',
+                'label' => 'Verification Settings',
+                'description' => 'Choose the active template and control PDF output.',
                 'url' => \App\Filament\Clinic\Pages\VerificationSettings::getUrl(),
             ],
         ];
-        if ($showPortalCredentials) {
-            $verificationNavItems[] = [
-                'key' => 'credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Keep clinic-specific website and payer portal credentials without using spreadsheets.',
-                'url' => \App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getUrl('index'),
-            ];
-        }
         $verificationNavItems[] = [
             'key' => 'questions',
             'label' => 'Template Management',

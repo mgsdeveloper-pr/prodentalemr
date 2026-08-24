@@ -28,13 +28,13 @@ class VerificationRequestResponse extends Page
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Work';
 
-    protected static ?string $navigationLabel = 'Request & Response';
+    protected static ?string $navigationLabel = 'Clinic Requests';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 3;
 
-    protected static ?string $title = 'Request & Response';
+    protected static ?string $title = 'Clinic Requests';
 
     protected static ?string $slug = 'request-response';
 
@@ -279,20 +279,20 @@ class VerificationRequestResponse extends Page
 
     public function getSubheading(): ?string
     {
-        return $this->responseWorkspaceDescription() . ' Scope: ' . $this->responseWorkspaceScope() . '.';
+        return $this->responseWorkspaceDescription().' Scope: '.$this->responseWorkspaceScope().'.';
     }
 
     public function getBreadcrumbs(): array
     {
         return [
             VerificationRequestResource::getUrl('index') => 'Verification Requests',
-            'Request & Response',
+            'Clinic Requests',
         ];
     }
 
     public function responseWorkspaceTitle(): string
     {
-        return 'Request & Response';
+        return 'Clinic Requests';
     }
 
     public function responseWorkspaceDescription(): string
@@ -595,7 +595,7 @@ class VerificationRequestResponse extends Page
             })
             ->when($this->statusFilter === 'closed', fn (Builder $builder) => $builder->where('status', BillingWorkItem::STATUS_DONE))
             ->when(filled($this->search), function (Builder $builder): void {
-                $search = '%' . trim($this->search) . '%';
+                $search = '%'.trim($this->search).'%';
 
                 $builder->where(function (Builder $searchQuery) use ($search): void {
                     $searchQuery

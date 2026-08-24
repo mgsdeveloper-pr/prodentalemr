@@ -2,13 +2,14 @@
 
 namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages;
 
-use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns\InteractsWithVerificationQuestionOrdering;
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
 use App\Support\ClinicPanelScope;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
+use Livewire\Attributes\Url;
 
 class CreateVerificationQuestion extends CreateRecord
 {
@@ -18,7 +19,32 @@ class CreateVerificationQuestion extends CreateRecord
 
     protected string $view = 'filament.clinic.resources.verification-questions.pages.verification-question-editor';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
+
+    #[Url(as: 'section')]
+    public ?string $requestedSectionKey = null;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->applyRequestedSection();
+    }
+
+    public function getTitle(): string
+    {
+        return 'Add Question';
+    }
+
+    public function getHeading(): string
+    {
+        return 'Add Question';
+    }
+
+    public function getBreadcrumb(): string
+    {
+        return 'Add Question';
+    }
 
     public function getSelectedClinicName(): string
     {
@@ -83,6 +109,41 @@ class CreateVerificationQuestion extends CreateRecord
     public function getCancelUrl(): string
     {
         return $this->previousUrl ?: VerificationQuestionResource::getUrl();
+    }
+
+    protected function afterFill(): void
+    {
+        $this->applyRequestedSection();
+    }
+
+    protected function applyRequestedSection(): void
+    {
+        $sectionKey = trim((string) ($this->requestedSectionKey ?: request()->query('section', '')));
+        $templateKey = VerificationFormQuestion::defaultTemplateKey();
+        $sectionOptions = VerificationFormQuestion::sectionOptionsForTemplate($templateKey, ClinicPanelScope::selectedClinicId());
+
+        if ($sectionKey === '' || ! array_key_exists($sectionKey, $sectionOptions)) {
+            return;
+        }
+
+        $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor(
+            $sectionKey,
+            $templateKey,
+            ClinicPanelScope::selectedClinicId(),
+        );
+
+        $this->data['template_key'] = $templateKey;
+        $this->data['section_key'] = $parentSectionKey ?: $sectionKey;
+        $this->data['sub_section_key'] = $parentSectionKey ? $sectionKey : null;
+
+        if (VerificationFormQuestion::isFrequencyPercentageSection($sectionKey)) {
+            $this->data['input_type'] = 'frequency_row';
+            $this->data['frequency_row_mode'] ??= 'question';
+            $this->data['frequency_response_mode'] ??= 'current';
+            $this->data['frequency_response_fields'] ??= VerificationFormQuestion::defaultFrequencyResponseFields('current');
+        } elseif (($this->data['input_type'] ?? null) === 'frequency_row') {
+            $this->data['input_type'] = 'text';
+        }
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

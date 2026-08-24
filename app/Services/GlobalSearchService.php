@@ -99,10 +99,6 @@ class GlobalSearchService
             ->map(fn (Clinic $record) => $this->item('clinic', $record->clinic_name, $record->organization?->name, 'Open clinic queue', $this->route('admin.clinic-scope', ['clinic_id' => $record->id, 'redirect' => $this->route('filament.admin.resources.verifications.index')])));
         $this->add($groups, 'clinics', 'Assigned Clinics', $clinics);
 
-        if ($user->canAccessVerificationModule('insurance_directory')) {
-            $this->add($groups, 'insurance', 'Insurance Directory', $this->insurance($query, 'filament.admin.resources.insurance-carriers.edit'));
-        }
-
         return $groups;
     }
 

@@ -10,6 +10,7 @@ use App\Support\ClinicPanelScope;
 use App\Support\VerificationManagedServiceAccess;
 use BackedEnum;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -36,7 +37,7 @@ class PortalCredentialResource extends Resource
 
     protected static ?string $navigationLabel = 'Portal Credentials';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verification';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?int $navigationSort = 3;
 
@@ -99,9 +100,41 @@ class PortalCredentialResource extends Resource
                                     ->label('MFA Method')
                                     ->options(PortalCredential::MFA_METHOD_OPTIONS)
                                     ->native(false)
+                                    ->live()
                                     ->default('none')
                                     ->visible(fn ($get): bool => (bool) $get('mfa_required'))
                                     ->columnSpan(3),
+                                Repeater::make('securityQuestions')
+                                    ->relationship()
+                                    ->label('Security Questions & Answers')
+                                    ->helperText('Add each portal challenge exactly as shown. Questions and answers are encrypted and only revealed through audited actions.')
+                                    ->visible(fn ($get): bool => (bool) $get('mfa_required') && $get('mfa_method') === 'security_question')
+                                    ->required(fn ($get): bool => (bool) $get('mfa_required') && $get('mfa_method') === 'security_question')
+                                    ->minItems(1)
+                                    ->orderColumn('sort_order')
+                                    ->addActionLabel('Add security question')
+                                    ->columns(12)
+                                    ->schema([
+                                        TextInput::make('question')
+                                            ->label('Security Question')
+                                            ->required()
+                                            ->maxLength(500)
+                                            ->columnSpan(6),
+                                        TextInput::make('answer')
+                                            ->label('Protected Answer')
+                                            ->password()
+                                            ->revealable()
+                                            ->required()
+                                            ->maxLength(500)
+                                            ->columnSpan(4),
+                                        Toggle::make('is_required')
+                                            ->label('Required')
+                                            ->helperText('Mark when the portal asks this question during sign-in.')
+                                            ->default(true)
+                                            ->inline(false)
+                                            ->columnSpan(2),
+                                    ])
+                                    ->columnSpan(12),
                                 Toggle::make('is_active')
                                     ->label('Active for this clinic')
                                     ->default(true)

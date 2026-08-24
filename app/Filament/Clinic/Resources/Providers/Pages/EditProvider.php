@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Providers\Pages;
 
 use App\Filament\Clinic\Resources\Providers\ProviderResource;
+use App\Support\ClinicPanelScope;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
@@ -14,8 +15,8 @@ class EditProvider extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['organization_id'] ??= auth()->user()?->organization_id;
-        $data['clinic_id'] ??= auth()->user()?->clinic_id;
+        $data['organization_id'] = ClinicPanelScope::selectedOrganizationId();
+        $data['clinic_id'] = ClinicPanelScope::selectedClinicId();
 
         return $data;
     }
@@ -29,11 +30,11 @@ class EditProvider extends EditRecord
                 ->modalHeading('Deactivate provider')
                 ->modalDescription('This keeps historical appointments, verification requests, and reports intact while removing the provider from active use.')
                 ->successNotificationTitle('Provider deactivated')
-                ->visible(fn (): bool => (auth()->user()?->canDeleteClinicProviders() ?? false) && ! $this->record->trashed()),
+                ->visible(fn (): bool => ProviderResource::canDelete($this->record) && ! $this->record->trashed()),
             RestoreAction::make()
                 ->label('Restore Provider')
                 ->successNotificationTitle('Provider restored')
-                ->visible(fn (): bool => (auth()->user()?->canDeleteClinicProviders() ?? false) && $this->record->trashed()),
+                ->visible(fn (): bool => ProviderResource::canDelete($this->record) && $this->record->trashed()),
         ];
     }
 }

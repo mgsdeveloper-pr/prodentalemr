@@ -10,13 +10,15 @@ use App\Filament\Clinic\Resources\Users\Schemas\UserForm;
 use App\Filament\Clinic\Resources\Users\Schemas\UserInfolist;
 use App\Filament\Clinic\Resources\Users\Tables\UsersTable;
 use App\Models\User;
+use App\Support\ClinicAdministrationAccess;
+use App\Support\ClinicPanelScope;
 use BackedEnum;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
 
 class UserResource extends Resource
@@ -25,22 +27,22 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $navigationLabel = 'Users';
+    protected static ?string $navigationLabel = 'Users & Access';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Management';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return 'Administration';
+        return 'Clinic Management';
     }
 
     public static function getNavigationSort(): ?int
     {
-        return 1;
+        return 4;
     }
 
     public static function form(Schema $schema): Schema
@@ -74,35 +76,26 @@ class UserResource extends Resource
             ->with(['roles', 'organization', 'clinic', 'location', 'creator'])
             ->whereHas('roles', fn (Builder $roleQuery) => $roleQuery->whereIn('name', array_keys(User::clinicRoleOptions())));
 
-        $user = auth()->user();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $clinicId = ClinicPanelScope::selectedClinicId();
 
-        if ($user?->shouldBypassClinicScope()) {
-            return $query;
-        }
-
-        if (! $user?->organization_id || ! $user?->clinic_id) {
+        if (! $organizationId || ! $clinicId) {
             return $query->whereRaw('1 = 0');
         }
 
         return $query
-            ->where('organization_id', $user->organization_id)
-            ->where('clinic_id', $user->clinic_id);
+            ->where('organization_id', $organizationId)
+            ->where('clinic_id', $clinicId);
     }
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return filled($user?->organization_id)
-            && filled($user?->clinic_id)
-            && ($user?->canManageClinicUsers() ?? false)
-            && ($user?->canAccessClinicModule('users') ?? false);
+        return ClinicAdministrationAccess::canView('users');
     }
 
     public static function canCreate(): bool
     {
-        return static::canAccess()
-            && (auth()->user()?->canPerformClinicModuleAction('users', 'add') ?? false);
+        return ClinicAdministrationAccess::canMutate('users', 'add');
     }
 
     public static function canViewAny(): bool
@@ -112,19 +105,20 @@ class UserResource extends Resource
 
     public static function canView($record): bool
     {
-        return static::canAccess();
+        return static::canAccess()
+            && (int) $record->organization_id === ClinicPanelScope::selectedOrganizationId()
+            && (int) $record->clinic_id === ClinicPanelScope::selectedClinicId();
     }
 
     public static function canEdit($record): bool
     {
-        return static::canAccess()
-            && (auth()->user()?->canPerformClinicModuleAction('users', 'update') ?? false);
+        return static::canView($record) && ClinicAdministrationAccess::canMutate('users', 'update');
     }
 
     public static function canDelete($record): bool
     {
-        return static::canAccess()
-            && (auth()->user()?->canPerformClinicModuleAction('users', 'delete') ?? false)
+        return static::canView($record)
+            && ClinicAdministrationAccess::canMutate('users', 'delete')
             && $record->id !== auth()->id();
     }
 

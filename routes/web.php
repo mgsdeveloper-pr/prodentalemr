@@ -55,12 +55,6 @@ Route::middleware('auth')->group(function () {
         ->name('saas.master-template.legacy.create');
     Route::get('/saas/verification-form-questions/{record}/edit', fn (string $record) => redirect('/saas/master-template/'.$record.'/edit'))
         ->name('saas.master-template.legacy.edit');
-    Route::redirect('/verification/verification-form-questions', '/verification/master-template')
-        ->name('admin.master-template.legacy.index');
-    Route::redirect('/verification/verification-form-questions/create', '/verification/master-template/create')
-        ->name('admin.master-template.legacy.create');
-    Route::get('/verification/verification-form-questions/{record}/edit', fn (string $record) => redirect('/verification/master-template/'.$record.'/edit'))
-        ->name('admin.master-template.legacy.edit');
     Route::get('/clinic/patient-documents/{document}/view', [PatientDocumentController::class, 'show'])->name('clinic.patient-documents.show');
     Route::get('/clinic/patient-documents/{document}/download', [PatientDocumentController::class, 'download'])->name('clinic.patient-documents.download');
     Route::get('/clinic/patient-consent-forms/{consent}/view', [PatientConsentFormController::class, 'show'])->name('clinic.patient-consent-forms.show');
@@ -106,6 +100,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/billing-work-item-attachments/{attachment}/download', fn (string $attachment) => redirect()->route('admin.verification-request-attachments.download', ['attachment' => $attachment]))->name('admin.billing-work-item-attachments.download');
     Route::get('/verification/inbox/attachments/{attachment}/download', VerificationInboxAttachmentController::class)->name('admin.verification-inbox-attachments.download');
     Route::get('/verification/inbox/messages/{message}/preview', VerificationInboxMessagePreviewController::class)->name('admin.verification-inbox-messages.preview');
+    Route::get('/clinic/shared-inbox/attachments/{attachment}/download', VerificationInboxAttachmentController::class)->name('clinic.verification-inbox-attachments.download');
+    Route::get('/clinic/shared-inbox/messages/{message}/preview', VerificationInboxMessagePreviewController::class)->name('clinic.verification-inbox-messages.preview');
     Route::get('/verification/mailbox/attachments/download', UserMailboxAttachmentController::class)->name('admin.user-mailbox-attachments.download');
     Route::get('/verification/mailbox/messages/preview', UserMailboxMessagePreviewController::class)->name('admin.user-mailbox-messages.preview');
     Route::get('/clinic/verification-requests/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForClinic'])->name('clinic.verification-requests.pdf.download');

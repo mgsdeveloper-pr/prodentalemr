@@ -4,6 +4,7 @@ namespace App\Services\Verification;
 
 use App\Models\BillingWorkItem;
 use App\Models\VerificationFormQuestion;
+use App\Support\VerificationTemplateVersionService;
 use Illuminate\Support\Collection;
 
 class VerificationAuditService
@@ -29,7 +30,7 @@ class VerificationAuditService
         foreach ($questions->where('input_type', '!=', 'frequency_row') as $question) {
             if ($question->isConditionalQuestion()) {
                 $parent = $questions->firstWhere('id', $question->parent_question_id)
-                    ?? VerificationFormQuestion::query()->find($question->parent_question_id);
+                    ?? $this->questionFromRequestTemplate($request, (int) $question->parent_question_id);
 
                 if (! $parent || ! $question->matchesTrigger($this->questionValue($request, $parent, $answers))) {
                     continue;
@@ -38,7 +39,7 @@ class VerificationAuditService
 
             foreach ($this->questionFieldValues($request, $question, $answers) as $field => $value) {
                 if ($this->isBlank($value)) {
-                    $missing['question:' . $question->getKey() . ':' . $field] = $question->prompt;
+                    $missing['question:'.$question->getKey().':'.$field] = $question->prompt;
                 }
             }
         }
@@ -53,7 +54,7 @@ class VerificationAuditService
             });
 
             if (! $coverage || ($this->isBlank($coverage->coverage_status) && $this->isBlank($coverage->coverage_percent))) {
-                $missing['frequency:' . $question->getKey()] = $question->prompt;
+                $missing['frequency:'.$question->getKey()] = $question->prompt;
             }
         }
 
@@ -96,20 +97,35 @@ class VerificationAuditService
             $query->where('input_type', '!=', 'frequency_row');
         }
 
-        if (filled($request->verification_template_version_id)) {
-            $query->where('template_version_id', $request->verification_template_version_id);
-        } else {
-            $query->visibleForClinic(
-                filled($request->clinic_id) ? (int) $request->clinic_id : null,
-                filled($request->organization_id) ? (int) $request->organization_id : null,
-            );
-        }
+        $query->where('template_version_id', $this->templateVersionId($request));
 
         return $query
             ->orderBy('section_key')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
+    }
+
+    public function templateVersionId(BillingWorkItem $request): int
+    {
+        $versionId = $request->verification_template_version_id
+            ?: data_get($request->verification_template_snapshot, 'version.id');
+
+        if (filled($versionId)) {
+            return (int) $versionId;
+        }
+
+        return (int) app(VerificationTemplateVersionService::class)
+            ->latestPublishedVersionForWorkItem($request)
+            ->getKey();
+    }
+
+    protected function questionFromRequestTemplate(BillingWorkItem $request, int $questionId): ?VerificationFormQuestion
+    {
+        return VerificationFormQuestion::query()
+            ->whereKey($questionId)
+            ->where('template_version_id', $this->templateVersionId($request))
+            ->first();
     }
 
     protected function questionValue(BillingWorkItem $request, VerificationFormQuestion $question, Collection $answers): mixed
@@ -122,7 +138,7 @@ class VerificationAuditService
     {
         if (! $question->is_builtin) {
             return [
-                'custom_question_' . $question->getKey() => $answers->get($question->getKey())?->answer_value,
+                'custom_question_'.$question->getKey() => $answers->get($question->getKey())?->answer_value,
             ];
         }
 

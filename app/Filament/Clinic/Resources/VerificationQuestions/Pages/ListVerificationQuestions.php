@@ -8,18 +8,12 @@ use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
 use App\Support\VerificationTemplateVersionService;
-use Filament\Actions\Action;
-use Filament\Actions\CreateAction;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\Page;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class ListVerificationQuestions extends ListRecords
+class ListVerificationQuestions extends Page
 {
     protected static string $resource = VerificationQuestionResource::class;
 
@@ -33,13 +27,35 @@ class ListVerificationQuestions extends ListRecords
 
     public bool $showTemplateSectionModal = false;
 
+    public ?string $selectedSectionKey = null;
+
+    public string $questionSearch = '';
+
+    public string $questionStatus = 'all';
+
+    public string $questionOwnership = 'all';
+
+    public string $builderView = 'questions';
+
+    public string $pendingBuilderAction = 'draft';
+
     public string $templateSectionMode = 'section';
 
-    public array $newDraftData = [
-        'template_name' => '',
-        'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
-        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
-    ];
+    protected ?Collection $questionSectionsCache = null;
+
+    protected ?Collection $templateBuilderSectionsCache = null;
+
+    protected bool $activeVersionResolved = false;
+
+    protected ?VerificationTemplateVersion $activeVersionCache = null;
+
+    protected bool $draftVersionResolved = false;
+
+    protected ?VerificationTemplateVersion $draftVersionCache = null;
+
+    protected bool $displayedVersionResolved = false;
+
+    protected ?VerificationTemplateVersion $displayedVersionCache = null;
 
     public array $newTemplateSectionData = [
         'label' => '',
@@ -49,6 +65,7 @@ class ListVerificationQuestions extends ListRecords
     protected $queryString = [
         'selectedTemplateKey' => ['except' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, 'as' => 'template'],
         'showDraft' => ['except' => false, 'as' => 'draft'],
+        'selectedSectionKey' => ['except' => null, 'as' => 'section'],
     ];
 
     public function getTitle(): string
@@ -71,7 +88,7 @@ class ListVerificationQuestions extends ListRecords
         return [];
     }
 
-    public function openCreateDraftModal(): void
+    public function openCreateDraftModal(string $action = 'draft'): void
     {
         if (! $this->canManageSelectedClinicTemplateSections()) {
             Notification::make()->title('Permission denied')->danger()->send();
@@ -79,13 +96,9 @@ class ListVerificationQuestions extends ListRecords
             return;
         }
 
-        $clinicName = $this->getSelectedClinicName() ?: 'Clinic';
-
-        $this->newDraftData = [
-            'template_name' => $clinicName . ' Template Draft',
-            'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
-            'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
-        ];
+        $this->pendingBuilderAction = in_array($action, ['questions', 'reorder'], true)
+            ? $action
+            : 'draft';
         $this->showCreateDraftModal = true;
     }
 
@@ -96,14 +109,59 @@ class ListVerificationQuestions extends ListRecords
 
     public function submitCreateDraftVersion(): void
     {
-        $data = $this->validate([
-            'newDraftData.template_name' => ['required', 'string', 'max:255'],
-            'newDraftData.form_type' => ['required', 'string'],
-            'newDraftData.clinic_visibility' => ['required', 'string'],
-        ])['newDraftData'];
+        $published = $this->getActiveClinicVersion();
+        $clinicName = $this->getSelectedClinicName() ?: 'Clinic';
+
+        if (! $published) {
+            Notification::make()->title('No published clinic template found')->danger()->send();
+
+            return;
+        }
+
+        $data = [
+            'template_name' => $clinicName.' Template Draft',
+            'form_type' => $published->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
+            'clinic_visibility' => $published->clinic_visibility ?: VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+        ];
 
         $this->createDraftVersion($data);
+        $this->resetBuilderCaches();
+
+        if (! $this->getDraftClinicVersion()) {
+            return;
+        }
+
+        $this->builderView = $this->pendingBuilderAction === 'reorder' ? 'reorder' : 'questions';
         $this->closeCreateDraftModal();
+
+        if ($this->pendingBuilderAction === 'questions') {
+            $this->redirectToQuestionCreate();
+        }
+    }
+
+    public function beginTemplateChange(string $action = 'questions'): void
+    {
+        if (! $this->canManageSelectedClinicTemplateSections()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return;
+        }
+
+        $this->pendingBuilderAction = $action === 'reorder' ? 'reorder' : 'questions';
+        $this->selectedSectionKey ??= $this->getSelectedBuilderSection()['key'] ?? null;
+
+        if ($this->getDraftClinicVersion()) {
+            $this->showDraft = true;
+            $this->builderView = $this->pendingBuilderAction;
+
+            if ($this->pendingBuilderAction === 'questions') {
+                $this->redirectToQuestionCreate();
+            }
+
+            return;
+        }
+
+        $this->openCreateDraftModal($this->pendingBuilderAction);
     }
 
     public function openTemplateSectionModal(string $mode = 'section'): void
@@ -192,7 +250,7 @@ class ListVerificationQuestions extends ListRecords
             ->where('template_key', $data['template_key'])
             ->where('section_key', $sectionKey)
             ->exists()) {
-            $sectionKey = $baseKey . '_' . $counter++;
+            $sectionKey = $baseKey.'_'.$counter++;
         }
 
         VerificationTemplateSection::query()->create([
@@ -231,19 +289,22 @@ class ListVerificationQuestions extends ListRecords
 
         return [
             'clinic_name' => $clinic?->clinic_name,
-            'active_version' => $active ? 'v' . $active->version_number : 'None',
-            'active_name' => $active?->name ?? 'No active clinic template',
+            'active_version' => $active ? 'v'.$active->version_number : 'None',
+            'active_name' => $active ? $this->clinicTemplateDisplayName($active->name, $clinic?->clinic_name) : 'No active clinic template',
             'active_published_at' => optional($active?->published_at)->format('M d, Y h:i A') ?: 'Not published',
             'active_form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$active?->form_type] ?? 'Full + Short',
             'active_visibility' => 'Clinic Copy',
-            'working_version' => $draft ? 'v' . $draft->version_number : 'No draft',
-            'working_name' => $draft?->name ?? 'Clinic Template Draft',
+            'template_id' => ($displayed = $this->getDisplayedClinicVersion())
+                ? $this->templateIdentifier($displayed)
+                : '-',
+            'working_version' => $draft ? 'v'.$draft->version_number : 'No draft',
+            'working_name' => $draft ? $this->clinicTemplateDisplayName($draft->name, $clinic?->clinic_name, true) : 'Clinic Template Draft',
             'working_status' => $draft ? 'Draft' : 'Create a draft to edit',
             'working_form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$draft?->form_type] ?? 'Full + Short',
             'working_visibility' => $draft ? 'Clinic Draft' : 'Read-only',
             'has_draft' => (bool) $draft,
             'showing_draft' => $this->showDraft && (bool) $draft,
-            'draft_version' => $draft ? 'v' . $draft->version_number : null,
+            'draft_version' => $draft ? 'v'.$draft->version_number : null,
             'can_manage' => $this->canManageSelectedClinicTemplateSections(),
             'manager_edits_enabled' => $clinic?->allowsVerificationManagerTemplateEdits() ?? false,
         ];
@@ -258,6 +319,7 @@ class ListVerificationQuestions extends ListRecords
         }
 
         $this->showDraft = true;
+        $this->resetBuilderCaches();
 
         return null;
     }
@@ -265,6 +327,7 @@ class ListVerificationQuestions extends ListRecords
     public function closeDraftVersion(): null
     {
         $this->showDraft = false;
+        $this->resetBuilderCaches();
 
         return null;
     }
@@ -295,7 +358,7 @@ class ListVerificationQuestions extends ListRecords
 
         Notification::make()
             ->title('Draft version ready')
-            ->body('You are now editing version ' . $draft->version_number . ' for ' . ($published->clinic?->clinic_name ?? 'this clinic') . '.')
+            ->body('You are now editing version '.$draft->version_number.' for '.($published->clinic?->clinic_name ?? 'this clinic').'.')
             ->success()
             ->send();
 
@@ -327,7 +390,7 @@ class ListVerificationQuestions extends ListRecords
 
         Notification::make()
             ->title('Clinic template published')
-            ->body('Version ' . $published->version_number . ' is now active for this clinic.')
+            ->body('Version '.$published->version_number.' is now active for this clinic.')
             ->success()
             ->send();
 
@@ -336,20 +399,32 @@ class ListVerificationQuestions extends ListRecords
 
     public function getActiveClinicVersion(): ?VerificationTemplateVersion
     {
+        if ($this->activeVersionResolved) {
+            return $this->activeVersionCache;
+        }
+
+        $this->activeVersionResolved = true;
         $clinic = ClinicPanelScope::selectedClinic();
 
-        return $clinic ? app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic) : null;
+        return $this->activeVersionCache = $clinic
+            ? app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic)
+            : null;
     }
 
     public function getDraftClinicVersion(): ?VerificationTemplateVersion
     {
+        if ($this->draftVersionResolved) {
+            return $this->draftVersionCache;
+        }
+
+        $this->draftVersionResolved = true;
         $clinic = ClinicPanelScope::selectedClinic();
 
         if (! $clinic) {
             return null;
         }
 
-        return VerificationTemplateVersion::query()
+        return $this->draftVersionCache = VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
@@ -376,7 +451,7 @@ class ListVerificationQuestions extends ListRecords
             ->get()
             ->map(fn (VerificationTemplateVersion $version): array => [
                 'name' => $version->name,
-                'version' => 'v' . $version->version_number,
+                'version' => 'v'.$version->version_number,
                 'form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$version->form_type] ?? 'Full + Short',
                 'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS[$version->clinic_visibility] ?? 'Visible to Clinics',
                 'status' => str($version->status)->headline()->toString(),
@@ -393,9 +468,11 @@ class ListVerificationQuestions extends ListRecords
         return auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false;
     }
 
-    public function getCreateUrl(): string
+    public function getCreateUrl(?string $sectionKey = null): string
     {
-        return VerificationQuestionResource::getUrl('create');
+        return VerificationQuestionResource::getUrl('create', array_filter([
+            'section' => $sectionKey,
+        ]));
     }
 
     public function getEditUrl(int $questionId): string
@@ -453,6 +530,16 @@ class ListVerificationQuestions extends ListRecords
             Notification::make()
                 ->title('Question not found')
                 ->danger()
+                ->send();
+
+            return;
+        }
+
+        if ($question->is_builtin) {
+            Notification::make()
+                ->title('SaaS system questions are protected')
+                ->body('This clinic can reorder inherited questions, but only clinic-added questions can be deleted.')
+                ->warning()
                 ->send();
 
             return;
@@ -596,12 +683,16 @@ class ListVerificationQuestions extends ListRecords
 
     public function getQuestionSections(): Collection
     {
+        if ($this->questionSectionsCache !== null) {
+            return $this->questionSectionsCache;
+        }
+
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
         $version = $this->getDisplayedClinicVersion();
 
         if (! $clinicId) {
-            return collect();
+            return $this->questionSectionsCache = collect();
         }
 
         $questions = VerificationFormQuestion::query()
@@ -614,7 +705,7 @@ class ListVerificationQuestions extends ListRecords
             ->get()
             ->groupBy('section_key');
 
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->selectedTemplateKey, $clinicId))
+        return $this->questionSectionsCache = collect(VerificationFormQuestion::sectionOptionsForTemplate($this->selectedTemplateKey, $clinicId))
             ->map(function (string $sectionTitle, string $sectionKey) use ($questions): array {
                 $sectionQuestions = $questions->get($sectionKey, collect());
                 $activeCount = $sectionQuestions->where('is_active', true)->count();
@@ -641,13 +732,211 @@ class ListVerificationQuestions extends ListRecords
             });
     }
 
-    protected function getDisplayedClinicVersion(): ?VerificationTemplateVersion
+    public function selectBuilderSection(string $sectionKey): void
     {
-        if ($this->showDraft && $this->getDraftClinicVersion()) {
-            return $this->getDraftClinicVersion();
+        $sectionExists = $this->getTemplateBuilderSections()
+            ->flatMap(fn (array $section): array => [
+                collect($section)->except('children')->all(),
+                ...$section['children'],
+            ])
+            ->contains('key', $sectionKey);
+
+        if (! $sectionExists) {
+            return;
         }
 
-        return $this->getActiveClinicVersion();
+        $this->selectedSectionKey = $sectionKey;
+    }
+
+    protected function redirectToQuestionCreate(): void
+    {
+        $sectionKey = $this->selectedSectionKey
+            ?? $this->getSelectedBuilderSection()['key']
+            ?? null;
+
+        if (! $sectionKey) {
+            Notification::make()
+                ->title('Choose a section first')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->redirect($this->getCreateUrl($sectionKey), navigate: true);
+    }
+
+    public function setBuilderView(string $view): void
+    {
+        if (in_array($view, ['questions', 'reorder', 'preview'], true)) {
+            if ($view === 'reorder' && ! $this->isDraftEditingOpen()) {
+                $this->beginTemplateChange('reorder');
+
+                return;
+            }
+
+            $this->builderView = $view;
+        }
+    }
+
+    public function clearQuestionFilters(): void
+    {
+        $this->questionSearch = '';
+        $this->questionStatus = 'all';
+        $this->questionOwnership = 'all';
+    }
+
+    public function getTemplateBuilderSections(): Collection
+    {
+        if ($this->templateBuilderSectionsCache !== null) {
+            return $this->templateBuilderSectionsCache;
+        }
+
+        $sections = $this->getQuestionSections();
+        $version = $this->getDisplayedClinicVersion();
+        $clinicId = ClinicPanelScope::selectedClinicId();
+
+        $parentMap = collect();
+
+        if ($version) {
+            $parentMap = VerificationTemplateSection::query()
+                ->visibleForClinic($clinicId, ClinicPanelScope::selectedOrganizationId())
+                ->where('template_key', $this->selectedTemplateKey)
+                ->where('template_version_id', $version->getKey())
+                ->pluck('parent_section_key', 'section_key');
+        }
+
+        $sections = $sections->map(function (array $section) use ($parentMap, $clinicId): array {
+            $section['parent_key'] = $parentMap->get($section['key'])
+                ?: VerificationFormQuestion::parentSectionKeyFor(
+                    $section['key'],
+                    $this->selectedTemplateKey,
+                    $clinicId,
+                );
+
+            return $section;
+        });
+
+        return $this->templateBuilderSectionsCache = $sections
+            ->filter(fn (array $section): bool => blank($section['parent_key']))
+            ->map(function (array $section) use ($sections): array {
+                $children = $sections
+                    ->filter(fn (array $candidate): bool => $candidate['parent_key'] === $section['key'])
+                    ->values();
+
+                $section['children'] = $children->all();
+                $section['total_count'] = $section['count'] + $children->sum('count');
+                $section['total_active_count'] = $section['active_count'] + $children->sum('active_count');
+
+                return $section;
+            })
+            ->values();
+    }
+
+    public function getBuilderCounts(): array
+    {
+        $mainSections = $this->getTemplateBuilderSections();
+
+        return [
+            'main_sections' => $mainSections->count(),
+            'sub_sections' => $mainSections->sum(fn (array $section): int => count($section['children'])),
+            'questions' => $mainSections->sum('total_count'),
+            'active_questions' => $mainSections->sum('total_active_count'),
+        ];
+    }
+
+    public function getSelectedBuilderSection(): ?array
+    {
+        $sections = $this->getTemplateBuilderSections();
+        $flat = $sections->flatMap(fn (array $section): array => [
+            collect($section)->except('children')->all(),
+            ...$section['children'],
+        ]);
+
+        $selected = $flat->firstWhere('key', $this->selectedSectionKey)
+            ?? $flat->first();
+
+        return $selected;
+    }
+
+    public function getFilteredBuilderQuestions(): Collection
+    {
+        $selected = $this->getSelectedBuilderSection();
+
+        if (! $selected) {
+            return collect();
+        }
+
+        $sections = $this->getTemplateBuilderSections();
+        $mainSection = $sections->firstWhere('key', $selected['key']);
+        $questionGroups = collect();
+
+        if ($mainSection && count($mainSection['children']) > 0) {
+            $questionGroups = collect([$mainSection, ...$mainSection['children']]);
+        } else {
+            $questionGroups = collect([$selected]);
+        }
+
+        $questions = $questionGroups->flatMap(function (array $section): array {
+            return collect($section['questions'])
+                ->map(function (array $question) use ($section): array {
+                    $question['section_key'] = $section['key'];
+                    $question['section_title'] = $section['title'];
+
+                    return $question;
+                })
+                ->all();
+        });
+
+        $search = str($this->questionSearch)->trim()->lower()->toString();
+
+        return $questions
+            ->when($search !== '', fn (Collection $items): Collection => $items->filter(
+                fn (array $question): bool => str($question['prompt'])->lower()->contains($search)
+                    || str($question['section_title'])->lower()->contains($search)
+            ))
+            ->when($this->questionStatus === 'active', fn (Collection $items): Collection => $items->where('is_active', true))
+            ->when($this->questionStatus === 'inactive', fn (Collection $items): Collection => $items->where('is_active', false))
+            ->when($this->questionOwnership === 'system', fn (Collection $items): Collection => $items->where('is_builtin', true))
+            ->when($this->questionOwnership === 'clinic', fn (Collection $items): Collection => $items->where('is_builtin', false))
+            ->values();
+    }
+
+    protected function templateIdentifier(VerificationTemplateVersion $version): string
+    {
+        $publicId = strtoupper((string) $version->public_id);
+        $suffix = filled($publicId)
+            ? substr($publicId, -8)
+            : str_pad((string) $version->getKey(), 8, '0', STR_PAD_LEFT);
+
+        return 'CT-'.$suffix;
+    }
+
+    protected function clinicTemplateDisplayName(?string $name, ?string $clinicName, bool $draft = false): string
+    {
+        $fallback = trim(($clinicName ?: 'Clinic').' Clinic Template'.($draft ? ' Draft' : ''));
+        $displayName = trim(str_replace(
+            ['Master Template Draft', 'Master Template'],
+            ['Clinic Template Draft', 'Clinic Template'],
+            (string) $name,
+        ));
+
+        return $displayName !== '' ? $displayName : $fallback;
+    }
+
+    protected function getDisplayedClinicVersion(): ?VerificationTemplateVersion
+    {
+        if ($this->displayedVersionResolved) {
+            return $this->displayedVersionCache;
+        }
+
+        $this->displayedVersionResolved = true;
+
+        if ($this->showDraft && ($draft = $this->getDraftClinicVersion())) {
+            return $this->displayedVersionCache = $draft;
+        }
+
+        return $this->displayedVersionCache = $this->getActiveClinicVersion();
     }
 
     protected function isDraftEditingOpen(): bool
@@ -655,5 +944,17 @@ class ListVerificationQuestions extends ListRecords
         return $this->showDraft
             && $this->canManageSelectedClinicTemplateSections()
             && (bool) $this->getDraftClinicVersion();
+    }
+
+    protected function resetBuilderCaches(): void
+    {
+        $this->questionSectionsCache = null;
+        $this->templateBuilderSectionsCache = null;
+        $this->activeVersionResolved = false;
+        $this->activeVersionCache = null;
+        $this->draftVersionResolved = false;
+        $this->draftVersionCache = null;
+        $this->displayedVersionResolved = false;
+        $this->displayedVersionCache = null;
     }
 }

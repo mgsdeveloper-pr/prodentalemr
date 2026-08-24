@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Users\Pages;
 
 use App\Filament\Clinic\Resources\Users\UserResource;
+use App\Support\ClinicPanelScope;
 use App\Support\SaasNotifications;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
@@ -27,8 +28,8 @@ class EditUser extends EditRecord
 
         unset($data['selected_role'], $data['password_confirmation']);
 
-        $data['organization_id'] ??= auth()->user()?->organization_id;
-        $data['clinic_id'] ??= auth()->user()?->clinic_id;
+        $data['organization_id'] = ClinicPanelScope::selectedOrganizationId();
+        $data['clinic_id'] = ClinicPanelScope::selectedClinicId();
 
         return $data;
     }
@@ -50,7 +51,7 @@ class EditUser extends EditRecord
                 ->after(function (): void {
                     SaasNotifications::userDeleted($this->record->name, $this->record->email, auth()->user());
                 })
-                ->visible(fn (): bool => (auth()->user()?->canManageClinicUsers() ?? false) && $this->record->id !== auth()->id()),
+                ->visible(fn (): bool => UserResource::canDelete($this->record)),
         ];
     }
 }

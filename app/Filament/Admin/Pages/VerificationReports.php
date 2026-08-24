@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Models\BillingWorkItem;
-use App\Models\User;
 use App\Support\AdminClinicScope;
 use App\Support\VerificationReport;
 use BackedEnum;
@@ -29,7 +28,7 @@ class VerificationReports extends Page implements HasForms
 
     protected static string|UnitEnum|null $navigationGroup = 'Reports';
 
-    protected static ?string $navigationLabel = 'Reports';
+    protected static ?string $navigationLabel = 'Verification Reports';
 
     protected static ?int $navigationSort = 3;
 
@@ -190,28 +189,28 @@ class VerificationReports extends Page implements HasForms
             Action::make('downloadCsv')
                 ->label('CSV')
                 ->action(fn () => response()->streamDownload(
-                    fn () => print(VerificationReport::csv($this->exportRows())),
+                    fn () => print (VerificationReport::csv($this->exportRows())),
                     'verification-reports.csv',
                     ['Content-Type' => 'text/csv']
                 )),
             Action::make('downloadExcel')
                 ->label('Excel')
                 ->action(fn () => response()->streamDownload(
-                    fn () => print(VerificationReport::excelHtml($this->exportRows(), $this->exportMeta())),
+                    fn () => print (VerificationReport::excelHtml($this->exportRows(), $this->exportMeta())),
                     'verification-reports.xls',
                     ['Content-Type' => 'application/vnd.ms-excel']
                 )),
             Action::make('downloadWord')
                 ->label('Word')
                 ->action(fn () => response()->streamDownload(
-                    fn () => print(VerificationReport::wordHtml($this->exportRows(), $this->exportMeta())),
+                    fn () => print (VerificationReport::wordHtml($this->exportRows(), $this->exportMeta())),
                     'verification-reports.doc',
                     ['Content-Type' => 'application/msword']
                 )),
             Action::make('downloadPdf')
                 ->label('PDF')
                 ->action(fn () => response()->streamDownload(
-                    fn () => print(VerificationReport::pdf($this->exportRows(), $this->exportMeta())),
+                    fn () => print (VerificationReport::pdf($this->exportRows(), $this->exportMeta())),
                     'verification-reports.pdf',
                     ['Content-Type' => 'application/pdf']
                 )),
@@ -337,8 +336,8 @@ class VerificationReports extends Page implements HasForms
     {
         $query = AdminClinicScope::applyVerificationRequests(
             BillingWorkItem::query()
-            ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
-            ->where('source', '!=', 'clinic_self_service'),
+                ->whereHas('managedBillingService', fn (Builder $builder) => $builder->where('category', 'verification'))
+                ->where('source', '!=', 'clinic_self_service'),
             'billing_work_items.clinic_id'
         );
 

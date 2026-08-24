@@ -491,6 +491,7 @@ class BillingWorkItem extends Model
             self::STATUS_PENDING,
             self::STATUS_IN_PROGRESS,
             self::STATUS_RETURNED_FOR_REWORK,
+            self::STATUS_INCOMPLETE,
         ], true);
     }
 

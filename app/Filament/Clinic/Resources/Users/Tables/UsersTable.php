@@ -2,18 +2,20 @@
 
 namespace App\Filament\Clinic\Resources\Users\Tables;
 
+use App\Filament\Clinic\Resources\Users\UserResource;
 use App\Models\User;
+use App\Support\ClinicAdministrationAccess;
 use App\Support\SaasNotifications;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
 class UsersTable
@@ -58,14 +60,14 @@ class UsersTable
                     ->after(function (User $record): void {
                         SaasNotifications::userDeleted($record->name, $record->email, auth()->user());
                     })
-                    ->visible(fn (User $record): bool => auth()->user()?->canManageClinicUsers() && ! $record->trashed() && $record->id !== auth()->id()),
+                    ->visible(fn (User $record): bool => UserResource::canDelete($record) && ! $record->trashed()),
                 RestoreAction::make()
-                    ->visible(fn (): bool => auth()->user()?->canManageClinicUsers() ?? false),
+                    ->visible(fn (User $record): bool => UserResource::canDelete($record)),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
+                    DeleteBulkAction::make()->visible(fn (): bool => ClinicAdministrationAccess::canMutate('users', 'delete')),
+                    RestoreBulkAction::make()->visible(fn (): bool => ClinicAdministrationAccess::canMutate('users', 'delete')),
                 ]),
             ]);
     }

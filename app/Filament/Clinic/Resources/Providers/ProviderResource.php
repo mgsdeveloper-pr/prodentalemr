@@ -10,6 +10,8 @@ use App\Filament\Clinic\Resources\Providers\Schemas\ProviderForm;
 use App\Filament\Clinic\Resources\Providers\Schemas\ProviderInfolist;
 use App\Filament\Clinic\Resources\Providers\Tables\ProvidersTable;
 use App\Models\Provider;
+use App\Support\ClinicAdministrationAccess;
+use App\Support\ClinicPanelScope;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -27,7 +29,7 @@ class ProviderResource extends Resource
 
     protected static ?string $navigationLabel = 'Providers';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Clinic Data';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Management';
 
     protected static ?int $navigationSort = 3;
 
@@ -62,20 +64,21 @@ class ProviderResource extends Resource
             ->with(['user.roles', 'location'])
             ->withCount('appointments');
 
-        $user = auth()->user();
+        $clinicId = ClinicPanelScope::selectedClinicId();
+        $organizationId = ClinicPanelScope::selectedOrganizationId();
 
-        if (! $user?->organization_id || ! $user?->clinic_id) {
+        if (! $organizationId || ! $clinicId) {
             return $query->whereRaw('1 = 0');
         }
 
         return $query
-            ->where('organization_id', $user->organization_id)
-            ->where('clinic_id', $user->clinic_id);
+            ->where('organization_id', $organizationId)
+            ->where('clinic_id', $clinicId);
     }
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canAccessClinicProviders() ?? false;
+        return ClinicAdministrationAccess::canView('providers');
     }
 
     public static function canViewAny(): bool
@@ -85,22 +88,22 @@ class ProviderResource extends Resource
 
     public static function canCreate(): bool
     {
-        return auth()->user()?->canCreateClinicProviders() ?? false;
+        return ClinicAdministrationAccess::canMutate('providers', 'add');
     }
 
     public static function canView($record): bool
     {
-        return static::canAccess();
+        return static::canAccess() && (int) $record->clinic_id === ClinicPanelScope::selectedClinicId();
     }
 
     public static function canEdit($record): bool
     {
-        return auth()->user()?->canEditClinicProviders() ?? false;
+        return static::canView($record) && ClinicAdministrationAccess::canMutate('providers', 'update');
     }
 
     public static function canDelete($record): bool
     {
-        return auth()->user()?->canDeleteClinicProviders() ?? false;
+        return static::canView($record) && ClinicAdministrationAccess::canMutate('providers', 'delete');
     }
 
     public static function getPages(): array

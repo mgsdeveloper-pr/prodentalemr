@@ -14,6 +14,7 @@ use App\Models\Patient;
 use App\Support\AdminClinicScope;
 use BackedEnum;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -37,6 +38,8 @@ use UnitEnum;
 
 class PatientResource extends Resource
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $model = Patient::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserGroup;
@@ -235,7 +238,7 @@ class PatientResource extends Resource
             ])
             ->defaultSort('last_name')
             ->recordActions([
-                \Filament\Actions\ViewAction::make(),
+                ViewAction::make(),
                 EditAction::make()
                     ->visible(fn (): bool => static::canCreate()),
             ]);

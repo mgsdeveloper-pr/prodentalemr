@@ -8,7 +8,9 @@ use App\Models\User;
 class ClinicWorkspace
 {
     public const SESSION_KEY = 'clinic.selected_workspace';
+
     public const VERIFICATION = 'verification';
+
     public const CLINIC_PMS = 'clinic_pms';
 
     public static function selected(): ?string
@@ -158,7 +160,6 @@ class ClinicWorkspace
     {
         return [
             'patients',
-            'providers',
             'appointments',
             'encounters',
             'treatment_plans',
@@ -179,6 +180,8 @@ class ClinicWorkspace
     {
         return [
             'users',
+            'locations',
+            'providers',
             'roles_permissions',
         ];
     }

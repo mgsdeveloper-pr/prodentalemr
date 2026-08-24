@@ -97,7 +97,7 @@
                     </div>
                 @elseif ($availableQuestionSections->isEmpty())
                     <div style="border: 1px dashed #cbd5e1; border-radius: 18px; padding: 22px; background: #f8fafc; font-size: 14px; line-height: 1.7; color: #64748b;">
-                        No active questions are available in the selected sections yet. Use <strong>Manage verification questions</strong> to add them first.
+                        No active questions are available in the selected clinic template. Clinic templates are managed from the Clinic workspace; the platform Master Template remains managed in SaaS.
                     </div>
                 @else
                     @foreach ($availableQuestionSections as $section)

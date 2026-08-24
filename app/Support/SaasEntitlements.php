@@ -16,6 +16,7 @@ class SaasEntitlements
      */
     private const CORE_CLINIC_MODULES = [
         'appointments',
+        'locations',
     ];
 
     public static function currentSubscriptionFor(?Organization $organization): ?Subscription

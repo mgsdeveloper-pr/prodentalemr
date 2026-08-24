@@ -12,24 +12,27 @@ use App\Models\InsuranceCarrier;
 use App\Models\InsuranceCarrierNetworkProfile;
 use App\Models\User;
 use App\Models\VerificationCoverageCode;
-use App\Models\VerificationFormSubmission;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationFormSubmission;
+use App\Services\Verification\StatusService;
+use App\Services\Verification\VerificationAuditService;
+use App\Services\Verification\WorkflowService;
 use App\Support\VerificationAutoAssigner;
 use App\Support\VerificationTemplateVersionService;
 use App\Support\WorkContext\Providers\VerificationContextProvider;
 use App\Support\WorkContext\WorkContext;
-use App\Services\Verification\WorkflowService;
-use App\Services\Verification\VerificationAuditService;
+use Carbon\CarbonInterface;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
@@ -45,22 +48,39 @@ class EditVerificationRequest extends EditRecord
     protected Width|string|null $maxContentWidth = Width::Full;
 
     protected array $verificationProfileData = [];
+
     protected array $verificationFormAnswerData = [];
+
     protected array $verificationFormAnswerNoteData = [];
+
     protected array $verificationCoverageCodeData = [];
+
     protected array $templateThreeFieldVisibilityCache = [];
+
     public array $codeCoverageData = [];
+
     public array $clinicResponseAttachments = [];
+
     public bool $auditReady = false;
+
     public ?string $returnToQueue = null;
+
     public bool $focusMode = false;
+
     public bool $openInfoRequestModalOnLoad = false;
+
     public bool $showInfoRequestModal = false;
+
     public bool $showAddInsuranceModal = false;
+
     public array $newInsuranceCarrier = [];
+
     public string $formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+
     public string $waitingPeriodAnswer = 'no';
+
     public array $waitingPeriodDetails = [];
+
     protected bool $shouldSkipWorkflowSyncOnSave = false;
 
     public function mount(int|string $record): void
@@ -117,7 +137,7 @@ class EditVerificationRequest extends EditRecord
         return 'Verification Form';
     }
 
-    public function getHeading(): string | Htmlable | null
+    public function getHeading(): string|Htmlable|null
     {
         return null;
     }
@@ -372,7 +392,7 @@ class EditVerificationRequest extends EditRecord
         $clinicId = filled($this->record->clinic_id) ? (int) $this->record->clinic_id : null;
 
         return Cache::remember(
-            'verification.insurance-carrier-options.' . ($clinicId ?: 'global'),
+            'verification.insurance-carrier-options.'.($clinicId ?: 'global'),
             now()->addMinutes(10),
             fn (): array => InsuranceCarrier::query()
                 ->with(['overrides' => fn ($query) => $query->when(
@@ -455,14 +475,14 @@ class EditVerificationRequest extends EditRecord
             $carrier->update(['is_active' => true]);
         }
 
-        Cache::forget('verification.insurance-carrier-options.' . ($this->record->clinic_id ?: 'global'));
+        Cache::forget('verification.insurance-carrier-options.'.($this->record->clinic_id ?: 'global'));
         $this->data['vf_insurance_provider_name'] = $carrier->insurance_name;
         $this->applySelectedInsuranceCarrier($carrier->insurance_name);
         $this->closeAddInsuranceModal();
 
         Notification::make()
             ->title($carrier->wasRecentlyCreated ? 'Insurance added' : 'Insurance selected')
-            ->body($carrier->insurance_name . ' is now selected for this verification.')
+            ->body($carrier->insurance_name.' is now selected for this verification.')
             ->success()
             ->send();
     }
@@ -627,8 +647,8 @@ class EditVerificationRequest extends EditRecord
                 $isCodeField = str_starts_with((string) $fieldKey, 'codeCoverageData.');
 
                 $this->addError(
-                    $isCodeField ? $fieldKey : 'data.' . $fieldKey,
-                    $isCodeField ? $label . '.' : $label . ' is required before saving.'
+                    $isCodeField ? $fieldKey : 'data.'.$fieldKey,
+                    $isCodeField ? $label.'.' : $label.' is required before saving.'
                 );
             }
 
@@ -645,7 +665,7 @@ class EditVerificationRequest extends EditRecord
 
         $this->auditReady = true;
 
-        $statusService = app(\App\Services\Verification\StatusService::class);
+        $statusService = app(StatusService::class);
 
         // The form's user-facing flow is Save -> Audit. Assigned specialists should
         // not need a separate hidden Start Work action before submitting a complete form.
@@ -919,7 +939,7 @@ class EditVerificationRequest extends EditRecord
         $appointment = $record->appointment;
         $appointmentTime = $appointment?->start_time;
 
-        if ($appointmentTime instanceof \Illuminate\Support\Carbon || $appointmentTime instanceof \Carbon\CarbonInterface) {
+        if ($appointmentTime instanceof Carbon || $appointmentTime instanceof CarbonInterface) {
             $appointmentTime = $appointmentTime->format('h:i A');
         }
 
@@ -1083,6 +1103,70 @@ class EditVerificationRequest extends EditRecord
         return $this->getManagedTemplateQuestionsForSection($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY);
     }
 
+    public function getTemplateThreeVerificationInformationSection(): array
+    {
+        $formType = data_get($this->data, 'vf_form_type', 'full_form');
+        $templateVersionId = app(VerificationAuditService::class)->templateVersionId($this->record);
+
+        $questions = VerificationFormQuestion::query()
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('section_key', 'template_3_verification_information')
+            ->where('is_active', true)
+            ->where('input_type', '!=', 'frequency_row')
+            ->whereIn('form_type', ['both', $formType])
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('question_kind')
+                    ->orWhere('question_kind', VerificationFormQuestion::QUESTION_KIND_NORMAL);
+            })
+            ->where('template_version_id', $templateVersionId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get()
+            ->map(function (VerificationFormQuestion $question): array {
+                $promptKey = Str::lower(trim($question->prompt));
+                $isReference = $promptKey === 'reference number';
+                $isReadonly = $isReference || in_array($question->field_key, [
+                    'vf_verified_by',
+                    'vf_verification_date',
+                ], true);
+                $field = filled($question->field_key)
+                    ? $question->field_key
+                    : ($isReference ? null : $this->customQuestionFieldName($question->getKey()));
+                $value = match (true) {
+                    $isReference => $this->record->reference_number,
+                    $question->field_key === 'vf_verified_by' => data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-',
+                    $question->field_key === 'vf_verification_date' => data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d'),
+                    filled($field) => data_get($this->data, $field),
+                    default => null,
+                };
+
+                return [
+                    'id' => $question->getKey(),
+                    'label' => $question->prompt,
+                    'field' => $field,
+                    'note_field' => $this->customQuestionNoteFieldName($question->getKey()),
+                    'type' => $question->input_type,
+                    'help_text' => $question->help_text,
+                    'placeholder' => $question->placeholder,
+                    'options' => $question->getSelectOptionValues(),
+                    'has_note' => $question->has_note,
+                    'note_label' => $question->note_label ?: 'Note',
+                    'note_placeholder' => $question->note_placeholder ?: 'Add note',
+                    'readonly' => $isReadonly,
+                    'value' => $value,
+                    'completed' => filled($value),
+                ];
+            })
+            ->values();
+
+        return [
+            'rows' => $questions->all(),
+            'completed' => $questions->where('completed', true)->count(),
+            'total' => $questions->count(),
+        ];
+    }
+
     public function getManagedTemplateQuestionsForSection(string $sectionKey, ?string $templateKey = null): array
     {
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
@@ -1106,11 +1190,10 @@ class EditVerificationRequest extends EditRecord
             ->orderBy('sort_order')
             ->orderBy('id');
 
-        if (filled($this->record->verification_template_version_id)) {
-            $questionsQuery->where('template_version_id', $this->record->verification_template_version_id);
-        } else {
-            $questionsQuery->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null);
-        }
+        $questionsQuery->where(
+            'template_version_id',
+            app(VerificationAuditService::class)->templateVersionId($this->record),
+        );
 
         $fixedTemplateThreeFields = $this->fixedTemplateThreeFieldKeysForSection($resolvedSectionKey);
         $fixedTemplateThreePrompts = $this->fixedTemplateThreePromptsForSection($resolvedSectionKey);
@@ -1131,7 +1214,7 @@ class EditVerificationRequest extends EditRecord
         $questions = $questionsQuery->get();
 
         return $questions
-            ->map(function (VerificationFormQuestion $question) use ($formType, $templateKey, $resolvedSectionKey, $clinicId, $organizationId): array {
+            ->map(function (VerificationFormQuestion $question) use ($formType, $templateKey, $resolvedSectionKey): array {
                 $row = $this->mapManagedTemplateQuestionToRow($question);
                 $answer = data_get($this->data, $row['field']);
 
@@ -1146,11 +1229,10 @@ class EditVerificationRequest extends EditRecord
                     ->orderBy('sort_order')
                     ->orderBy('id');
 
-                if (filled($this->record->verification_template_version_id)) {
-                    $childrenQuery->where('template_version_id', $this->record->verification_template_version_id);
-                } else {
-                    $childrenQuery->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null);
-                }
+                $childrenQuery->where(
+                    'template_version_id',
+                    app(VerificationAuditService::class)->templateVersionId($this->record),
+                );
 
                 $row['children'] = $childrenQuery
                     ->get()
@@ -1266,16 +1348,20 @@ class EditVerificationRequest extends EditRecord
             return collect();
         }
 
-        return VerificationFormQuestion::query()
-            ->where('is_active', true)
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+        return app(VerificationAuditService::class)
+            ->applicableQuestions(
+                $this->record,
+                VerificationFormQuestion::defaultTemplateKey(),
+                $formType,
+                frequencyRows: false,
+            )
             ->where('section_key', $sectionKey)
             ->where('is_builtin', $builtIn)
-            ->where('clinic_id', $clinicId)
-            ->whereIn('form_type', ['both', $formType])
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+            ->sortBy([
+                ['sort_order', 'asc'],
+                ['id', 'asc'],
+            ])
+            ->values();
     }
 
     protected function mapQuestionToRow(VerificationFormQuestion $question): array
@@ -1322,7 +1408,7 @@ class EditVerificationRequest extends EditRecord
                     continue;
                 }
 
-                $data['vf_' . $key] = $value;
+                $data['vf_'.$key] = $value;
             }
         }
 
@@ -1599,9 +1685,9 @@ class EditVerificationRequest extends EditRecord
             ->map(function (array $row): string {
                 $period = filled($row['period'] ?? null) ? trim((string) $row['period']) : '0';
                 $unit = filled($row['unit'] ?? null) ? trim((string) $row['unit']) : 'Months';
-                $notes = filled($row['notes'] ?? null) ? ' | ' . trim((string) $row['notes']) : '';
+                $notes = filled($row['notes'] ?? null) ? ' | '.trim((string) $row['notes']) : '';
 
-                return trim((string) $row['category']) . ': ' . $period . ' ' . $unit . $notes;
+                return trim((string) $row['category']).': '.$period.' '.$unit.$notes;
             })
             ->values();
 
@@ -1731,7 +1817,13 @@ class EditVerificationRequest extends EditRecord
         foreach ($questions as $question) {
             if ($question->isConditionalQuestion()) {
                 $parentQuestion = $questions->firstWhere('id', $question->parent_question_id)
-                    ?? VerificationFormQuestion::query()->find($question->parent_question_id);
+                    ?? VerificationFormQuestion::query()
+                        ->whereKey($question->parent_question_id)
+                        ->where(
+                            'template_version_id',
+                            app(VerificationAuditService::class)->templateVersionId($this->record),
+                        )
+                        ->first();
 
                 if (! $parentQuestion instanceof VerificationFormQuestion
                     || ! $question->matchesTrigger($this->auditQuestionAnswer($parentQuestion))) {
@@ -1780,13 +1872,13 @@ class EditVerificationRequest extends EditRecord
 
             $match = $savedRowsBySignature->get($signature);
             $row = $match['row'] ?? [];
-            $fieldKey = 'codeCoverageData.' . ($match['index'] ?? 'required_' . $question->getKey()) . '.coverage_status';
+            $fieldKey = 'codeCoverageData.'.($match['index'] ?? 'required_'.$question->getKey()).'.coverage_status';
             $label = filled($question->code)
                 ? "{$question->code} - {$question->prompt}"
                 : $question->prompt;
 
             if (! filled($row['coverage_status'] ?? null) && ! filled($row['coverage_percent'] ?? null)) {
-                $missingFields[$fieldKey] = 'Coverage status or percent is required for ' . $label;
+                $missingFields[$fieldKey] = 'Coverage status or percent is required for '.$label;
             }
         }
 
@@ -1838,11 +1930,11 @@ class EditVerificationRequest extends EditRecord
             }
 
             $originalName = $attachment->getClientOriginalName();
-            $storedName = now()->format('YmdHis') . '_' . Str::uuid()->toString() . '_' . Str::slug(pathinfo($originalName, PATHINFO_FILENAME));
+            $storedName = now()->format('YmdHis').'_'.Str::uuid()->toString().'_'.Str::slug(pathinfo($originalName, PATHINFO_FILENAME));
             $extension = $attachment->getClientOriginalExtension();
             $finalName = filled($extension) ? "{$storedName}.{$extension}" : $storedName;
             $storedPath = $attachment->storeAs(
-                'billing-work-items/' . $this->record->getKey() . '/clinic-response',
+                'billing-work-items/'.$this->record->getKey().'/clinic-response',
                 $finalName,
                 'local'
             );
@@ -1928,7 +2020,7 @@ class EditVerificationRequest extends EditRecord
                 : 'Verification updated')
             ->body($wasAlreadyWaitingOnClinic && $normalizedTargetStatus === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE
                 ? 'The follow-up was added to the request history without replacing the earlier request.'
-                : 'Status moved to ' . (BillingWorkItem::STATUS_OPTIONS[$this->record->normalized_status] ?? str($this->record->normalized_status)->headline()->toString()) . '.')
+                : 'Status moved to '.(BillingWorkItem::STATUS_OPTIONS[$this->record->normalized_status] ?? str($this->record->normalized_status)->headline()->toString()).'.')
             ->success()
             ->send();
 
@@ -2116,25 +2208,23 @@ class EditVerificationRequest extends EditRecord
 
     protected function templateThreeFrequencyQuestionRows(): array
     {
-        $clinicId = $this->record->clinic_id;
-        $organizationId = $this->record->organization_id;
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
 
         $templateKey = VerificationFormQuestion::normalizeTemplateKey($this->formTemplate);
         $sectionKeys = $this->frequencySectionKeysForTemplate($templateKey);
-        $orderExpression = $this->frequencySectionOrderExpression($sectionKeys);
+        $questions = app(VerificationAuditService::class)
+            ->applicableQuestions($this->record, $templateKey, $formType, frequencyRows: true)
+            ->sortBy(function (VerificationFormQuestion $question) use ($sectionKeys): string {
+                $sectionOrder = array_search($question->section_key, $sectionKeys, true);
 
-        $questions = VerificationFormQuestion::query()
-            ->visibleForClinic(filled($clinicId) ? (int) $clinicId : null, filled($organizationId) ? (int) $organizationId : null)
-            ->where('template_key', $templateKey)
-            ->whereIn('section_key', $sectionKeys)
-            ->where('input_type', 'frequency_row')
-            ->where('is_active', true)
-            ->whereIn('form_type', ['both', $formType])
-            ->orderByRaw($orderExpression)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+                return sprintf(
+                    '%03d-%010d-%010d',
+                    $sectionOrder === false ? count($sectionKeys) : $sectionOrder,
+                    (int) $question->sort_order,
+                    (int) $question->getKey(),
+                );
+            })
+            ->values();
 
         return $questions
             ->map(fn (VerificationFormQuestion $question): array => [
@@ -2158,19 +2248,14 @@ class EditVerificationRequest extends EditRecord
             return $this->templateThreeFieldVisibilityCache[$fieldKey];
         }
 
-        $clinicId = $this->record?->clinic_id;
-
         $question = VerificationFormQuestion::query()
+            ->where(
+                'template_version_id',
+                app(VerificationAuditService::class)->templateVersionId($this->record),
+            )
             ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
             ->where('field_key', $fieldKey)
-            ->where(function ($query) use ($clinicId): void {
-                $query->whereNull('clinic_id');
-
-                if ($clinicId) {
-                    $query->orWhere('clinic_id', $clinicId);
-                }
-            })
-            ->orderByRaw('CASE WHEN clinic_id IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('id')
             ->first();
 
         return $this->templateThreeFieldVisibilityCache[$fieldKey] = $question
@@ -2286,7 +2371,7 @@ class EditVerificationRequest extends EditRecord
     protected function frequencySectionOrderExpression(array $sectionKeys): string
     {
         $quoted = collect($sectionKeys)
-            ->map(fn (string $key): string => "'" . str_replace("'", "\\'", $key) . "'")
+            ->map(fn (string $key): string => "'".str_replace("'", "\\'", $key)."'")
             ->implode(', ');
 
         return "FIELD(section_key, {$quoted})";
@@ -2299,6 +2384,7 @@ class EditVerificationRequest extends EditRecord
 
         $rows = collect($rows)
             ->filter(fn (array $row): bool => $configuredRowsBySignature->has($this->codeCoverageRowSignature($row)))
+            ->unique(fn (array $row): string => $this->codeCoverageRowSignature($row))
             ->map(function (array $row) use ($configuredRowsBySignature): array {
                 $defaultRow = $configuredRowsBySignature->get($this->codeCoverageRowSignature($row), []);
 
@@ -2496,12 +2582,12 @@ class EditVerificationRequest extends EditRecord
 
     protected function customQuestionFieldName(int $questionId): string
     {
-        return 'custom_question_' . $questionId;
+        return 'custom_question_'.$questionId;
     }
 
     protected function customQuestionNoteFieldName(int $questionId): string
     {
-        return 'custom_question_note_' . $questionId;
+        return 'custom_question_note_'.$questionId;
     }
 
     protected function getSubmissionPanel(): string
@@ -2815,12 +2901,12 @@ class EditVerificationRequest extends EditRecord
             return null;
         }
 
-        if ($value instanceof \Illuminate\Support\Carbon || $value instanceof \Carbon\CarbonInterface) {
+        if ($value instanceof Carbon || $value instanceof CarbonInterface) {
             return $value->format($format);
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($value)->format($format);
+            return Carbon::parse($value)->format($format);
         } catch (\Throwable) {
             return null;
         }
@@ -2878,10 +2964,10 @@ class EditVerificationRequest extends EditRecord
     protected function buildInternalSummary(BillingWorkItem $record, $patient, ?string $clinicDisplayName): ?string
     {
         $segments = collect([
-            filled($patient?->full_name) ? 'Verification request for ' . $patient->full_name : null,
-            filled($clinicDisplayName) ? 'Clinic: ' . $clinicDisplayName : null,
-            optional($record->appointment?->appointment_date)->format('M d, Y') ? 'Appointment: ' . optional($record->appointment?->appointment_date)->format('M d, Y') : null,
-            $record->priority ? 'Priority: ' . (BillingWorkItem::PRIORITY_OPTIONS[$record->priority] ?? str($record->priority)->headline()->toString()) : null,
+            filled($patient?->full_name) ? 'Verification request for '.$patient->full_name : null,
+            filled($clinicDisplayName) ? 'Clinic: '.$clinicDisplayName : null,
+            optional($record->appointment?->appointment_date)->format('M d, Y') ? 'Appointment: '.optional($record->appointment?->appointment_date)->format('M d, Y') : null,
+            $record->priority ? 'Priority: '.(BillingWorkItem::PRIORITY_OPTIONS[$record->priority] ?? str($record->priority)->headline()->toString()) : null,
         ])->filter(fn ($value): bool => filled($value));
 
         return $segments->isNotEmpty() ? $segments->implode(' | ') : null;

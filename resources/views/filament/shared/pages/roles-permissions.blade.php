@@ -4,6 +4,7 @@
         $modules = $this->visibleModules;
         $actions = $this->actionLabels;
         $canEditSelectedRole = $this->canEditSelectedRole();
+        $canCreateRole = $this->canCreateRole();
     @endphp
 
     <div style="display:flex;flex-direction:column;gap:22px;">
@@ -18,6 +19,8 @@
                 <button
                     type="button"
                     wire:click="openCreateRoleModal"
+                    @disabled(! $canCreateRole)
+                    @if (! $canCreateRole) title="Start Support Mode for this clinic to create roles." @endif
                     style="display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:700;cursor:pointer;"
                 >
                     Create role
@@ -46,7 +49,7 @@
             </section>
         @endunless
 
-        @if ($this->showCreateRoleModal)
+        @if ($this->showCreateRoleModal && $canCreateRole)
             <div style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,0.36);">
                 <div style="width:min(100%,560px);border:1px solid #dbe4ee;border-radius:26px;background:#ffffff;box-shadow:0 28px 70px rgba(15,23,42,0.18);overflow:hidden;">
                     <div style="padding:22px 24px;border-bottom:1px solid #edf2f7;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">

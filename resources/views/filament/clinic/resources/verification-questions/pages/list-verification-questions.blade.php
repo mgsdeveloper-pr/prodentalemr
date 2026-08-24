@@ -1,627 +1,229 @@
 <x-filament-panels::page>
     @php
-        $questionSections = $this->getQuestionSections();
         $selectedClinicName = $this->getSelectedClinicName();
-        $templateOptions = $this->getTemplateOptions();
-        $selectedTemplateLabel = $this->getSelectedTemplateLabel();
         $versionSummary = $this->getVersionSummary();
+        $builderSections = $this->getTemplateBuilderSections();
+        $builderCounts = $this->getBuilderCounts();
+        $selectedSection = $this->getSelectedBuilderSection();
+        $builderQuestions = $this->getFilteredBuilderQuestions();
         $templateVersionHistory = $this->getTemplateVersionHistory();
-        $showPortalCredentials = \App\Support\VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService();
-        $verificationNavItems = [
-            [
-                'key' => 'settings',
-                'label' => 'PDF Settings',
-                'description' => 'Control PDF output and default verification template rules.',
-                'url' => \App\Filament\Clinic\Pages\VerificationSettings::getUrl(),
-            ],
-        ];
-        if ($showPortalCredentials) {
-            $verificationNavItems[] = [
-                'key' => 'credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Keep clinic-specific website and payer portal credentials without using spreadsheets.',
-                'url' => \App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getUrl('index'),
-            ];
-        }
-        $verificationNavItems[] = [
-            'key' => 'questions',
-            'label' => 'Clinic Template',
-            'description' => 'Manage this clinic-specific template without changing the platform template.',
-            'url' => \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::getUrl('index'),
-        ];
-        if ($versionSummary['showing_draft']) {
-            $verificationNavItems[] = [
-                'key' => 'arrangement',
-                'label' => 'Question Arrangement',
-                'description' => 'Reorder questions inside each verification section.',
-                'url' => \App\Filament\Clinic\Pages\VerificationQuestionArrangement::getUrl(),
-            ];
-        }
     @endphp
 
     <style>
-        .ct-page {
-            display: flex;
-            flex-direction: column;
-            gap: 18px;
-        }
-
-        .ct-card {
-            border: 1px solid #dbe4ee;
-            border-radius: 18px;
-            background: #ffffff;
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-            overflow: hidden;
-        }
-
-        .ct-hero {
-            border: 1px solid #dbe4ee;
-            border-radius: 24px;
-            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-            overflow: hidden;
-        }
-
-        .ct-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            min-height: 38px;
-            padding: 9px 13px;
-            border: 1px solid #dbe4ee;
-            border-radius: 12px;
-            background: #ffffff;
-            color: #0f172a;
-            font-size: 13px;
-            font-weight: 800;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .ct-button--primary {
-            border-color: #0f766e;
-            background: #0f766e;
-            color: #ffffff;
-        }
-
-        .ct-button--success {
-            border-color: #10b981;
-            background: #10b981;
-            color: #052e16;
-        }
-
-        .ct-button--muted {
-            background: #f8fafc;
-            color: #334155;
-        }
-
-        .ct-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-            justify-content: flex-end;
-        }
-
-        .ct-label {
-            font-size: 11px;
-            font-weight: 900;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: #64748b;
-        }
-
-        .ct-chip {
-            display: inline-flex;
-            align-items: center;
-            padding: 5px 9px;
-            border-radius: 999px;
-            border: 1px solid #dbe4ee;
-            background: #f8fafc;
-            color: #475569;
-            font-size: 11px;
-            font-weight: 900;
-        }
-
-        .ct-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 60;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: rgba(15, 23, 42, 0.42);
-        }
-
-        .ct-modal {
-            width: min(640px, 100%);
-            max-height: calc(100vh - 48px);
-            overflow: auto;
-            border: 1px solid #dbe4ee;
-            border-radius: 20px;
-            background: #ffffff;
-            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
-        }
-
-        .ct-field {
-            display: flex;
-            flex-direction: column;
-            gap: 7px;
-        }
-
-        .ct-input,
-        .ct-select {
-            width: 100%;
-            min-height: 42px;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            background: #ffffff;
-            padding: 9px 12px;
-            color: #0f172a;
-            font-size: 14px;
-        }
-
-        @media (max-width: 760px) {
-            .ct-actions {
-                justify-content: flex-start;
-            }
-        }
+        .tb-page { --tb-teal:#0f8f86; --tb-teal-dark:#08756f; --tb-navy:#101936; --tb-text:#334155; --tb-muted:#64748b; --tb-line:#dfe7f1; --tb-soft:#f7f9fc; display:grid; gap:16px; color:var(--tb-text); }
+        .tb-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding:20px 22px; border:1px solid var(--tb-line); border-radius:8px; background:#fff; }
+        .tb-eyebrow { color:var(--tb-teal-dark); font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+        .tb-title { margin:5px 0 0; color:var(--tb-navy); font-size:25px; line-height:1.2; font-weight:800; }
+        .tb-subtitle { margin:7px 0 0; max-width:760px; color:var(--tb-muted); font-size:13px; line-height:1.55; }
+        .tb-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+        .tb-button { display:inline-flex; min-height:38px; align-items:center; justify-content:center; gap:7px; padding:8px 13px; border:1px solid #cfd9e7; border-radius:7px; background:#fff; color:var(--tb-navy); font-size:12px; font-weight:800; text-decoration:none; cursor:pointer; }
+        .tb-button:hover { border-color:#9fb2c8; background:#f8fafc; }
+        .tb-button--primary { border-color:var(--tb-teal-dark); background:var(--tb-teal-dark); color:#fff; }
+        .tb-button--primary:hover { background:#06645f; color:#fff; }
+        .tb-button[disabled] { opacity:.55; cursor:not-allowed; }
+        .tb-strip { display:grid; grid-template-columns:1.35fr .8fr .8fr .8fr 1fr; border:1px solid var(--tb-line); border-radius:8px; background:#fff; overflow:hidden; }
+        .tb-stat { min-width:0; padding:14px 16px; border-right:1px solid var(--tb-line); }
+        .tb-stat:last-child { border-right:0; }
+        .tb-label { color:var(--tb-muted); font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+        .tb-value { margin-top:6px; overflow:hidden; color:var(--tb-navy); font-size:13px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+        .tb-pill { display:inline-flex; align-items:center; padding:4px 8px; border:1px solid #cfe6e3; border-radius:999px; background:#effaf8; color:#08756f; font-size:10px; font-weight:800; }
+        .tb-pill--draft { border-color:#f5d58b; background:#fff9e8; color:#8a5b00; }
+        .tb-notice { display:flex; gap:10px; align-items:flex-start; padding:11px 14px; border:1px solid {{ $versionSummary['showing_draft'] ? '#f2d28b' : '#d9e2ed' }}; border-radius:7px; background:{{ $versionSummary['showing_draft'] ? '#fffbeb' : '#f8fafc' }}; color:#475569; font-size:12px; line-height:1.5; }
+        .tb-notice-dot { width:8px; height:8px; margin-top:5px; flex:0 0 auto; border-radius:999px; background:{{ $versionSummary['showing_draft'] ? '#d99a16' : '#7b8ba3' }}; }
+        .tb-workspace { display:grid; grid-template-columns:270px minmax(0,1fr); min-height:650px; border:1px solid var(--tb-line); border-radius:8px; background:#fff; overflow:hidden; }
+        .tb-tree { border-right:1px solid var(--tb-line); background:#fbfcfe; }
+        .tb-tree-head { padding:16px; border-bottom:1px solid var(--tb-line); }
+        .tb-tree-list { display:grid; gap:4px; padding:10px; }
+        .tb-section-button { width:100%; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; padding:10px 11px; border:1px solid transparent; border-radius:6px; background:transparent; color:#334155; text-align:left; cursor:pointer; }
+        .tb-section-button:hover { background:#f0f5f9; }
+        .tb-section-button.is-active { border-color:#b9ddd8; background:#eaf8f6; color:#08756f; }
+        .tb-section-name { min-width:0; font-size:12px; font-weight:800; line-height:1.35; }
+        .tb-section-count { color:#7b8ba3; font-size:10px; font-weight:800; white-space:nowrap; }
+        .tb-subsections { display:grid; gap:3px; margin:1px 0 4px 15px; padding-left:9px; border-left:1px solid #d6e0eb; }
+        .tb-subsections .tb-section-button { padding:8px 9px; }
+        .tb-main { min-width:0; }
+        .tb-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--tb-line); }
+        .tb-toolbar-title { color:var(--tb-navy); font-size:17px; font-weight:800; }
+        .tb-toolbar-meta { margin-top:3px; color:var(--tb-muted); font-size:11px; }
+        .tb-segment { display:inline-flex; padding:3px; border:1px solid var(--tb-line); border-radius:7px; background:#f8fafc; }
+        .tb-segment button { min-height:31px; padding:6px 10px; border:0; border-radius:5px; background:transparent; color:#64748b; font-size:11px; font-weight:800; cursor:pointer; }
+        .tb-segment button.is-active { background:#fff; color:#08756f; box-shadow:0 1px 3px rgba(15,23,42,.12); }
+        .tb-filters { display:grid; grid-template-columns:minmax(220px,1fr) 150px 150px auto; gap:8px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--tb-line); background:#fbfcfe; }
+        .tb-input,.tb-select { width:100%; min-height:38px; border:1px solid #cfd9e7; border-radius:7px; background:#fff; padding:8px 10px; color:#1e293b; font-size:12px; }
+        .tb-table-wrap { overflow:auto; }
+        .tb-table { width:100%; min-width:790px; border-collapse:collapse; table-layout:fixed; }
+        .tb-table th { padding:11px 13px; border-bottom:1px solid var(--tb-line); background:#f7f9fc; color:#65758f; font-size:10px; font-weight:800; letter-spacing:.08em; text-align:left; text-transform:uppercase; }
+        .tb-table td { padding:12px 13px; border-bottom:1px solid #e8eef5; color:#40506a; font-size:12px; vertical-align:top; }
+        .tb-question { color:var(--tb-navy); font-size:13px; font-weight:800; line-height:1.45; }
+        .tb-question-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+        .tb-mini { display:inline-flex; padding:3px 6px; border:1px solid #dbe4ee; border-radius:999px; background:#f8fafc; color:#687892; font-size:9px; font-weight:800; }
+        .tb-mini--system { border-color:#cfe0f6; background:#eff6ff; color:#2563a6; }
+        .tb-row-actions { display:flex; justify-content:flex-end; align-items:center; gap:6px; flex-wrap:wrap; }
+        .tb-icon-button { display:inline-flex; width:auto; min-width:29px; height:29px; align-items:center; justify-content:center; padding:0 7px; border:1px solid #d6e0eb; border-radius:6px; background:#fff; color:#506078; font-size:11px; font-weight:900; text-decoration:none; cursor:pointer; }
+        .tb-reorder-note { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 16px; border-bottom:1px solid var(--tb-line); background:#effaf8; color:#315a57; font-size:11px; line-height:1.5; }
+        .tb-order-number { display:inline-flex; min-width:42px; min-height:30px; align-items:center; justify-content:center; border:1px solid #d5dfeb; border-radius:6px; background:#f8fafc; color:#334155; font-size:11px; font-weight:800; }
+        .tb-empty { padding:42px 20px; color:#64748b; font-size:13px; line-height:1.6; text-align:center; }
+        .tb-preview { display:grid; gap:12px; padding:18px; background:#f8fafc; }
+        .tb-preview-row { padding:13px 14px; border:1px solid #dfe7f1; border-radius:7px; background:#fff; }
+        .tb-preview-label { margin-bottom:8px; color:var(--tb-navy); font-size:12px; font-weight:800; }
+        .tb-preview-control { min-height:37px; border:1px solid #d5dfeb; border-radius:6px; background:#fbfcfe; color:#94a3b8; padding:9px 11px; font-size:11px; }
+        .tb-history { border:1px solid var(--tb-line); border-radius:8px; background:#fff; }
+        .tb-history summary { display:flex; justify-content:space-between; gap:12px; padding:14px 16px; color:var(--tb-navy); font-size:13px; font-weight:800; cursor:pointer; list-style:none; }
+        .tb-history-list { display:grid; gap:8px; padding:0 16px 16px; }
+        .tb-history-row { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #e3eaf2; border-radius:6px; color:#475569; font-size:11px; }
+        .tb-modal-backdrop { position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(15,23,42,.45); }
+        .tb-modal { width:min(600px,100%); max-height:calc(100vh - 40px); overflow:auto; border:1px solid var(--tb-line); border-radius:8px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.24); }
+        .tb-modal-head,.tb-modal-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; border-bottom:1px solid var(--tb-line); }
+        .tb-modal-foot { justify-content:flex-end; border-top:1px solid var(--tb-line); border-bottom:0; }
+        .tb-modal-body { display:grid; gap:14px; padding:18px; }
+        .tb-confirm-box { display:grid; gap:7px; padding:13px 14px; border:1px solid #dbe5ef; border-radius:7px; background:#f8fafc; }
+        .tb-confirm-label { color:var(--tb-muted); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+        .tb-confirm-value { color:var(--tb-navy); font-size:13px; font-weight:800; }
+        .tb-confirm-note { margin:0; color:#52627a; font-size:12px; line-height:1.55; }
+        .tb-field { display:grid; gap:6px; }
+        @media(max-width:1050px){ .tb-strip{grid-template-columns:repeat(2,minmax(0,1fr));}.tb-stat{border-bottom:1px solid var(--tb-line)}.tb-workspace{grid-template-columns:220px minmax(0,1fr)}.tb-filters{grid-template-columns:1fr 1fr}.tb-filters .tb-search{grid-column:1/-1} }
+        @media(max-width:760px){ .tb-header{display:grid}.tb-actions{justify-content:flex-start}.tb-strip{grid-template-columns:1fr}.tb-stat{border-right:0}.tb-workspace{grid-template-columns:1fr}.tb-tree{border-right:0;border-bottom:1px solid var(--tb-line)}.tb-tree-list{max-height:280px;overflow:auto}.tb-toolbar{align-items:flex-start;flex-direction:column}.tb-filters{grid-template-columns:1fr}.tb-filters .tb-search{grid-column:auto}.tb-history-row{display:grid} }
     </style>
 
-    <div class="ct-page">
-        @if ($selectedClinicName)
-            <section class="ct-card" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;">
-                <div style="padding: 16px 18px; border-right: 1px solid #e2e8f0;">
-                    <div class="ct-label">Clinic</div>
-                    <div style="margin-top: 7px; font-size: 15px; font-weight: 900; color: #0f172a;">{{ $selectedClinicName }}</div>
-                </div>
-                <div style="padding: 16px 18px; border-right: 1px solid #e2e8f0;">
-                    <div class="ct-label">Current Template</div>
-                    <div style="margin-top: 7px; font-size: 15px; font-weight: 900; color: #0f172a;">{{ $selectedTemplateLabel }}</div>
-                </div>
-                <div style="padding: 16px 18px; border-right: 1px solid #e2e8f0;">
-                    <div class="ct-label">Status</div>
-                    <div style="margin-top: 7px;">
-                        <span class="ct-chip" style="border-color: {{ $versionSummary['showing_draft'] ? '#fbbf24' : '#99f6e4' }}; background: {{ $versionSummary['showing_draft'] ? '#fffbeb' : '#f0fdfa' }}; color: {{ $versionSummary['showing_draft'] ? '#92400e' : '#0f766e' }};">
-                            {{ $versionSummary['showing_draft'] ? 'Draft Open' : 'Published' }}
-                        </span>
-                    </div>
-                </div>
-                <div style="padding: 16px 18px; border-right: 1px solid #e2e8f0;">
-                    <div class="ct-label">Structure</div>
-                    <div style="margin-top: 7px; font-size: 15px; font-weight: 900; color: #0f172a;">{{ $questionSections->count() }} sections / {{ $questionSections->sum('count') }} questions</div>
-                </div>
-                <div style="padding: 16px 18px;">
-                    <div class="ct-label">Last Published</div>
-                    <div style="margin-top: 7px; font-size: 13px; font-weight: 800; color: #475569;">{{ $versionSummary['active_published_at'] }}</div>
-                </div>
-            </section>
-        @endif
-
-        <section class="ct-hero">
-            <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;">
-                <div>
-                    <div style="display: inline-flex; align-items: center; padding: 6px 11px; border-radius: 999px; background: #ecfeff; border: 1px solid #99f6e4; color: #0f766e; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;">
-                        Clinic Workspace
-                    </div>
-                    <h2 style="margin: 10px 0 0; font-size: 28px; line-height: 1.08; font-weight: 800; color: #0f172a;">
-                        Clinic Template
-                    </h2>
-                    <p style="margin: 8px 0 0; max-width: 900px; font-size: 14px; line-height: 1.6; color: #64748b;">
-                        Manage the clinic copy, add questions, adjust ordering, and publish changes from one place.
-                    </p>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-end;">
-                    @if ($selectedClinicName)
-                        @if ($versionSummary['can_manage'])
-                            <div class="ct-actions">
-                                @if (! $versionSummary['has_draft'])
-                                    <button type="button" class="ct-button ct-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled" wire:target="openCreateDraftModal">
-                                        Create Draft
-                                    </button>
-                                @elseif (! $versionSummary['showing_draft'])
-                                    <button type="button" class="ct-button" wire:click="openDraftVersion" wire:loading.attr="disabled" wire:target="openDraftVersion">
-                                        Open Draft
-                                    </button>
-                                @else
-                                    <a href="{{ $this->getCreateUrl() }}" class="ct-button ct-button--primary">
-                                        New Question
-                                    </a>
-                                    <button type="button" class="ct-button ct-button--muted" wire:click="openTemplateSectionModal('section')" wire:loading.attr="disabled" wire:target="openTemplateSectionModal">
-                                        Add Section
-                                    </button>
-                                    <button type="button" class="ct-button ct-button--muted" wire:click="openTemplateSectionModal('sub_section')" wire:loading.attr="disabled" wire:target="openTemplateSectionModal">
-                                        Add Sub-section
-                                    </button>
-                                    <a href="{{ \App\Filament\Clinic\Pages\VerificationQuestionArrangement::getUrl() }}" class="ct-button ct-button--muted">
-                                        Rearrange
-                                    </a>
-                                    <button type="button" class="ct-button ct-button--success" wire:click="publishDraftVersion" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishDraftVersion">
-                                        Publish Draft
-                                    </button>
-                                    <button type="button" class="ct-button" wire:click="closeDraftVersion" wire:loading.attr="disabled" wire:target="closeDraftVersion">
-                                        View Published
-                                    </button>
-                                @endif
-                            </div>
-                        @endif
-                    @endif
-                </div>
+    <div class="tb-page">
+        <section class="tb-header">
+            <div>
+                <div class="tb-eyebrow">Clinic Template Builder</div>
+                <h2 class="tb-title">{{ $versionSummary['showing_draft'] ? $versionSummary['working_name'] : $versionSummary['active_name'] }}</h2>
+                <p class="tb-subtitle">Build the clinic verification form by section, manage clinic questions, confirm ordering, and preview the form before publishing.</p>
             </div>
-
-            @if ($selectedClinicName)
-                <div style="padding: 14px 24px; border-bottom: 1px solid #edf2f7; background: {{ $versionSummary['showing_draft'] ? '#fffbeb' : '#f8fafc' }};">
-                    <div style="display: flex; align-items: flex-start; gap: 12px; max-width: 960px;">
-                        <div style="width: 10px; height: 10px; margin-top: 7px; border-radius: 999px; background: {{ $versionSummary['showing_draft'] ? '#f59e0b' : '#64748b' }}; flex: 0 0 auto;"></div>
-                        <div>
-                            <div style="font-size: 13px; font-weight: 900; color: #0f172a;">
-                                {{ $versionSummary['showing_draft'] ? 'You are editing a clinic draft. Publish when ready.' : ($versionSummary['has_draft'] ? 'You are viewing the published clinic template. Open Draft to edit unpublished changes.' : 'Published clinic template is locked. Create Draft Version to edit.') }}
-                            </div>
-                            <p style="margin: 4px 0 0; color: #475569; font-size: 13px; line-height: 1.6;">
-                                {{ $versionSummary['showing_draft'] ? 'New questions, sections, and ordering changes stay isolated to this clinic until the draft is published.' : 'Existing verification requests keep their current template snapshot until the user refreshes them.' }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="padding: 18px 22px; display: grid; gap: 16px;">
-                    <section style="border: 1px solid #dbe4ee; border-radius: 20px; background: #ffffff; overflow: hidden;">
-                        <div style="padding: 15px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-                            <div>
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 900; color: #0f172a;">Template Versions</h3>
-                                <p style="margin: 5px 0 0; color: #64748b; font-size: 13px; line-height: 1.55;">One active clinic template is used for new verification requests. Older templates stay available for existing snapshots.</p>
-                            </div>
-                            @if ($versionSummary['can_manage'] && ! $versionSummary['has_draft'])
-                                <button type="button" class="ct-button ct-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled" wire:target="openCreateDraftModal">
-                                    Create Draft
-                                </button>
-                            @endif
-                        </div>
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; min-width: 920px; border-collapse: collapse; table-layout: fixed;">
-                                <thead>
-                                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                                        <th style="width: 28%; padding: 12px 16px; text-align: left;" class="ct-label">Template</th>
-                                        <th style="width: 14%; padding: 12px 16px; text-align: left;" class="ct-label">Status</th>
-                                        <th style="width: 14%; padding: 12px 16px; text-align: left;" class="ct-label">Form Type</th>
-                                        <th style="width: 20%; padding: 12px 16px; text-align: left;" class="ct-label">Structure</th>
-                                        <th style="width: 14%; padding: 12px 16px; text-align: left;" class="ct-label">Updated</th>
-                                        <th style="width: 10%; padding: 12px 16px; text-align: right;" class="ct-label">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr style="border-bottom: 1px solid #edf2f7;">
-                                        <td style="padding: 14px 16px;">
-                                            <div style="font-size: 14px; font-weight: 900; color: #0f172a;">{{ $versionSummary['active_name'] }}</div>
-                                            <div style="margin-top: 4px; font-size: 12px; color: #64748b;">Active clinic template</div>
-                                        </td>
-                                        <td style="padding: 14px 16px;"><span class="ct-chip" style="border-color: #99f6e4; background: #f0fdfa; color: #0f766e;">Published</span></td>
-                                        <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $versionSummary['active_form_type'] }}</td>
-                                        <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $questionSections->count() }} sections / {{ $questionSections->sum('active_count') }}/{{ $questionSections->sum('count') }} active questions</td>
-                                        <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $versionSummary['active_published_at'] }}</td>
-                                        <td style="padding: 14px 16px; text-align: right;">
-                                            @if ($versionSummary['has_draft'] && ! $versionSummary['showing_draft'])
-                                                <button type="button" class="ct-button" wire:click="openDraftVersion" wire:loading.attr="disabled" wire:target="openDraftVersion">Open Draft</button>
-                                            @elseif ($versionSummary['showing_draft'])
-                                                <button type="button" class="ct-button" wire:click="closeDraftVersion" wire:loading.attr="disabled" wire:target="closeDraftVersion">View Published</button>
-                                            @else
-                                                <span style="font-size: 12px; color: #94a3b8; font-weight: 800;">Current</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                    @if ($versionSummary['has_draft'])
-                                        <tr style="border-bottom: 1px solid #edf2f7; background: #fffbeb;">
-                                            <td style="padding: 14px 16px;">
-                                                <div style="font-size: 14px; font-weight: 900; color: #0f172a;">{{ $versionSummary['working_name'] ?? 'Clinic Template Draft' }}</div>
-                                                <div style="margin-top: 4px; font-size: 12px; color: #64748b;">Working draft</div>
-                                            </td>
-                                            <td style="padding: 14px 16px;"><span class="ct-chip" style="border-color: #fbbf24; background: #fff7ed; color: #92400e;">Draft</span></td>
-                                            <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $versionSummary['working_form_type'] }}</td>
-                                            <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $questionSections->count() }} sections / {{ $questionSections->sum('active_count') }}/{{ $questionSections->sum('count') }} active questions</td>
-                                            <td style="padding: 14px 16px; font-size: 13px; color: #334155;">{{ $versionSummary['working_status'] }}</td>
-                                            <td style="padding: 14px 16px; text-align: right;">
-                                                @if (! $versionSummary['showing_draft'])
-                                                    <button type="button" class="ct-button" wire:click="openDraftVersion" wire:loading.attr="disabled" wire:target="openDraftVersion">Open Draft</button>
-                                                @else
-                                                    <button type="button" class="ct-button ct-button--success" wire:click="publishDraftVersion" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishDraftVersion">Publish</button>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endif
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-
-                    <section style="border: 1px solid #bfdbfe; border-radius: 20px; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 78%); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-                        <div>
-                            <div style="font-size: 12px; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: #1d4ed8;">Active Template</div>
-                            <div style="margin-top: 6px; font-size: 20px; font-weight: 900; color: #0f172a;">{{ $selectedTemplateLabel }}</div>
-                            <div style="margin-top: 4px; font-size: 13px; color: #64748b;">Clinic-specific sections and questions are versioned separately from the platform template.</div>
-                        </div>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <span style="display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 999px; border: 1px solid #bfdbfe; background: #ffffff; color: #1d4ed8; font-size: 12px; font-weight: 900;">
-                                {{ $questionSections->count() }} sections
-                            </span>
-                            <span style="display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 999px; border: 1px solid #99f6e4; background: #f0fdfa; color: #0f766e; font-size: 12px; font-weight: 900;">
-                                {{ $questionSections->sum('active_count') }} active
-                            </span>
-                            <span style="display: inline-flex; align-items: center; padding: 9px 13px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 12px; font-weight: 900;">
-                                {{ $questionSections->sum('count') }} questions
-                            </span>
-                        </div>
-                    </section>
-
-                    <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05); overflow: hidden;">
-                        <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;">
-                            <div>
-                                <h3 style="margin: 0; font-size: 20px; font-weight: 900; color: #0f172a;">Template Structure</h3>
-                                <p style="margin: 6px 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">
-                                    {{ $versionSummary['showing_draft'] ? 'Review and edit this clinic draft by section.' : 'Review the published clinic template. Open Draft before making changes.' }}
-                                </p>
-                            </div>
-                            <span style="display: inline-flex; align-items: center; padding: 7px 11px; border-radius: 999px; border: 1px solid {{ $versionSummary['showing_draft'] ? '#fbbf24' : '#99f6e4' }}; background: {{ $versionSummary['showing_draft'] ? '#fffbeb' : '#f0fdfa' }}; color: {{ $versionSummary['showing_draft'] ? '#92400e' : '#0f766e' }}; font-size: 12px; font-weight: 900;">
-                                {{ $versionSummary['showing_draft'] ? 'Draft Open' : 'Published View' }}
-                            </span>
-                        </div>
-
-                        <div style="overflow-x: auto;">
-                            <table style="width: 100%; min-width: 980px; border-collapse: collapse; table-layout: fixed;">
-                                <thead>
-                                    <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                                        <th style="width: 22%; padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Section</th>
-                                        <th style="width: 34%; padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Question</th>
-                                        <th style="width: 12%; padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Form</th>
-                                        <th style="width: 12%; padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Answer</th>
-                                        <th style="width: 10%; padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Status</th>
-                                        <th style="width: 10%; padding: 13px 16px; text-align: right; font-size: 11px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($questionSections as $section)
-                                        @forelse ($section['questions'] as $question)
-                                            <tr style="border-bottom: 1px solid #edf2f7; background: {{ $question['is_active'] ? '#ffffff' : '#fff7f7' }};">
-                                                <td style="padding: 14px 16px; vertical-align: top;">
-                                                    <div style="font-size: 13px; font-weight: 900; color: #0f172a; line-height: 1.45;">{{ $section['title'] }}</div>
-                                                    <div style="margin-top: 4px; font-size: 12px; color: #64748b;">{{ $section['active_count'] }}/{{ $section['count'] }} active</div>
-                                                </td>
-                                                <td style="padding: 14px 16px; vertical-align: top;">
-                                                    <div style="font-size: 14px; line-height: 1.55; font-weight: 800; color: #0f172a;">{{ $question['prompt'] }}</div>
-                                                    <div style="margin-top: 7px; display: flex; gap: 6px; flex-wrap: wrap;">
-                                                        <span style="display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 11px; font-weight: 800;">Order #{{ $question['sort_order'] }}</span>
-                                                        @if ($question['is_builtin'])
-                                                            <span style="display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; border: 1px solid #dbeafe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 800;">System</span>
-                                                        @endif
-                                                    </div>
-                                                </td>
-                                                <td style="padding: 14px 16px; vertical-align: top; font-size: 13px; color: #334155;">{{ $question['form_type'] }}</td>
-                                                <td style="padding: 14px 16px; vertical-align: top; font-size: 13px; color: #334155;">{{ $question['input_type'] }}</td>
-                                                <td style="padding: 14px 16px; vertical-align: top;">
-                                                    @if ($question['is_active'])
-                                                        <span style="display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 999px; border: 1px solid #bbf7d0; background: #f0fdf4; color: #166534; font-size: 11px; font-weight: 900;">Active</span>
-                                                    @else
-                                                        <span style="display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 999px; border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: 900;">Inactive</span>
-                                                    @endif
-                                                </td>
-                                                <td style="padding: 14px 16px; vertical-align: top; text-align: right;">
-                                                    @if ($versionSummary['showing_draft'])
-                                                        <div style="display: inline-flex; gap: 10px; align-items: center;">
-                                                            <a
-                                                                href="{{ $this->getEditUrl($question['id']) }}"
-                                                                style="display: inline-flex; align-items: center; color: #c2410c; font-size: 13px; font-weight: 900; text-decoration: none;"
-                                                            >
-                                                                Edit
-                                                            </a>
-                                                            <button
-                                                                type="button"
-                                                                wire:click="deleteQuestion({{ $question['id'] }})"
-                                                                wire:confirm="Delete this verification question?"
-                                                                style="display: inline-flex; align-items: center; color: #dc2626; font-size: 13px; font-weight: 900; background: transparent; border: none; padding: 0; cursor: pointer;"
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    @else
-                                                        <span style="font-size: 12px; font-weight: 800; color: #94a3b8;">Read-only</span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr style="border-bottom: 1px solid #edf2f7;">
-                                                <td style="padding: 14px 16px; vertical-align: top;">
-                                                    <div style="font-size: 13px; font-weight: 900; color: #0f172a;">{{ $section['title'] }}</div>
-                                                    <div style="margin-top: 4px; font-size: 12px; color: #64748b;">0 active</div>
-                                                </td>
-                                                <td colspan="5" style="padding: 14px 16px; color: #64748b; font-size: 13px; line-height: 1.6;">
-                                                    No questions are configured in this section yet. {{ $versionSummary['showing_draft'] ? 'Use New Question and choose this section to add one.' : ($versionSummary['has_draft'] ? 'Open the draft before adding questions.' : 'Create a draft before adding questions.') }}
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                </div>
-            @else
-                <div style="padding: 22px 24px;">
-                    <div style="border: 1px dashed #cbd5e1; border-radius: 20px; background: #f8fafc; padding: 26px; text-align: center;">
-                        <div style="margin-bottom: 8px; font-size: 16px; font-weight: 800; color: #0f172a;">Select a clinic to manage its question set</div>
-                        <div style="font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Choose a clinic from the Workspace menu first. The question library and PDF output settings both follow the selected clinic scope.
-                        </div>
-                    </div>
-                </div>
-            @endif
+            <div class="tb-actions">
+                <a href="{{ \App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']) }}" wire:navigate class="tb-button">Back to Templates</a>
+                @if ($selectedClinicName && $versionSummary['can_manage'])
+                    @if (! $versionSummary['has_draft'])
+                        <button type="button" class="tb-button tb-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled">Create Draft</button>
+                    @elseif (! $versionSummary['showing_draft'])
+                        <button type="button" class="tb-button tb-button--primary" wire:click="openDraftVersion" wire:loading.attr="disabled">Open Draft</button>
+                    @else
+                        <button type="button" class="tb-button" wire:click="closeDraftVersion">View Published</button>
+                        <button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled">Publish Draft</button>
+                    @endif
+                @endif
+            </div>
         </section>
 
         @if ($selectedClinicName)
-            <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06); overflow: hidden;">
-                <div style="padding: 20px 24px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 20px; font-weight: 900; color: #0f172a;">Clinic Version History</h3>
-                        <p style="margin: 8px 0 0; max-width: 760px; font-size: 13px; line-height: 1.65; color: #64748b;">
-                            Published versions remain available for existing request snapshots. Draft versions are working copies until published.
-                        </p>
+            <section class="tb-strip">
+                <div class="tb-stat"><div class="tb-label">Clinic</div><div class="tb-value">{{ $selectedClinicName }}</div></div>
+                <div class="tb-stat"><div class="tb-label">Template ID</div><div class="tb-value">{{ $versionSummary['template_id'] }}</div></div>
+                <div class="tb-stat"><div class="tb-label">Status</div><div class="tb-value"><span class="tb-pill {{ $versionSummary['showing_draft'] ? 'tb-pill--draft' : '' }}">{{ $versionSummary['showing_draft'] ? 'Draft' : 'Published & Active' }}</span></div></div>
+                <div class="tb-stat"><div class="tb-label">Form Type</div><div class="tb-value">{{ $versionSummary['showing_draft'] ? $versionSummary['working_form_type'] : $versionSummary['active_form_type'] }}</div></div>
+                <div class="tb-stat"><div class="tb-label">Structure</div><div class="tb-value">{{ $builderCounts['main_sections'] }} main / {{ $builderCounts['sub_sections'] }} sub / {{ $builderCounts['active_questions'] }}/{{ $builderCounts['questions'] }} active</div></div>
+            </section>
+
+            <div class="tb-notice"><span class="tb-notice-dot"></span><span><strong>{{ $versionSummary['showing_draft'] ? 'Draft editing is active.' : 'Published template is protected.' }}</strong> {{ $versionSummary['showing_draft'] ? 'Clinic changes remain isolated until this draft is published.' : 'Create or open a draft to add, edit, or reorder clinic questions. Existing verification snapshots never change automatically.' }}</span></div>
+
+            <section class="tb-workspace">
+                <aside class="tb-tree">
+                    <div class="tb-tree-head"><div class="tb-eyebrow">Template Structure</div><div class="tb-toolbar-meta">{{ $builderCounts['main_sections'] }} main sections and {{ $builderCounts['sub_sections'] }} nested sub-sections</div></div>
+                    <div class="tb-tree-list">
+                        @foreach ($builderSections as $section)
+                            <button type="button" wire:click="selectBuilderSection('{{ $section['key'] }}')" class="tb-section-button {{ ($selectedSection['key'] ?? null) === $section['key'] ? 'is-active' : '' }}"><span class="tb-section-name">{{ $section['title'] }}</span><span class="tb-section-count">{{ $section['total_active_count'] }}/{{ $section['total_count'] }}</span></button>
+                            @if (count($section['children']) > 0)
+                                <div class="tb-subsections">
+                                    @foreach ($section['children'] as $child)
+                                        <button type="button" wire:click="selectBuilderSection('{{ $child['key'] }}')" class="tb-section-button {{ ($selectedSection['key'] ?? null) === $child['key'] ? 'is-active' : '' }}"><span class="tb-section-name">{{ str($child['title'])->afterLast(' / ') }}</span><span class="tb-section-count">{{ $child['active_count'] }}/{{ $child['count'] }}</span></button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endforeach
                     </div>
-                    <span style="display: inline-flex; align-items: center; padding: 7px 11px; border-radius: 999px; border: 1px solid #dbe4ee; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 800;">
-                        {{ count($templateVersionHistory) }} versions
-                    </span>
-                </div>
+                    @if ($versionSummary['showing_draft'])
+                        <div style="display:grid;gap:7px;padding:12px;border-top:1px solid var(--tb-line);"><button type="button" class="tb-button" wire:click="openTemplateSectionModal('section')">Add Section</button><button type="button" class="tb-button" wire:click="openTemplateSectionModal('sub_section')">Add Sub-section</button></div>
+                    @endif
+                </aside>
 
-                <div style="padding: 14px 24px 20px; display: flex; flex-direction: column; gap: 10px;">
-                    @forelse ($templateVersionHistory as $version)
-                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 13px 14px; border: 1px solid #e5e7eb; border-radius: 14px; background: #ffffff;">
-                            <div>
-                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                    <strong style="font-size: 14px; color: #0f172a;">{{ $version['name'] }}</strong>
-                                    <span style="display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid #dbe4ee; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 800;">{{ $version['version'] }}</span>
-                                    <span style="display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid {{ $version['status'] === 'Draft' ? '#fbbf24' : ($version['is_active'] ? '#99f6e4' : '#e2e8f0') }}; background: {{ $version['status'] === 'Draft' ? '#fffbeb' : ($version['is_active'] ? '#f0fdfa' : '#f8fafc') }}; color: {{ $version['status'] === 'Draft' ? '#92400e' : ($version['is_active'] ? '#0f766e' : '#64748b') }}; font-size: 11px; font-weight: 800;">{{ $version['status'] }}</span>
-                                    @if ($version['is_working_draft'])
-                                        <span style="display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid #fed7aa; background: #fff7ed; color: #c2410c; font-size: 11px; font-weight: 800;">Working Draft</span>
-                                    @endif
-                                    <span style="display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid #dbe4ee; background: #f8fafc; color: #475569; font-size: 11px; font-weight: 800;">{{ $version['form_type'] }}</span>
-                                    <span style="display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 11px; font-weight: 800;">{{ $version['clinic_visibility'] }}</span>
-                                </div>
-                                <div style="margin-top: 6px; font-size: 12px; line-height: 1.55; color: #64748b;">
-                                    {{ $version['published_at'] ? 'Published ' . $version['published_at'] : 'Not published yet' }}
-                                </div>
-                                @if (filled($version['notes']))
-                                    <div style="margin-top: 6px; max-width: 760px; font-size: 12px; line-height: 1.55; color: #475569;">
-                                        {{ $version['notes'] }}
-                                    </div>
+                <div class="tb-main">
+                    <div class="tb-toolbar">
+                        <div><div class="tb-toolbar-title">{{ $selectedSection['title'] ?? 'Template Questions' }}</div><div class="tb-toolbar-meta">{{ $builderQuestions->count() }} matching questions · {{ $versionSummary['showing_draft'] ? 'Draft workspace' : 'Published review' }}</div></div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button><button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">Reorder</button><button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
+                            @if ($selectedSection)
+                                @if ($versionSummary['showing_draft'])
+                                    <a href="{{ $this->getCreateUrl($selectedSection['key']) }}" wire:navigate class="tb-button tb-button--primary">Add Question</a>
+                                @elseif ($versionSummary['can_manage'])
+                                    <button type="button" wire:click="beginTemplateChange('questions')" wire:loading.attr="disabled" class="tb-button tb-button--primary">Add Question</button>
                                 @endif
-                            </div>
-
-                            @if ($version['is_active'])
-                                <span style="font-size: 12px; font-weight: 800; color: #0f766e;">Active</span>
                             @endif
                         </div>
-                    @empty
-                        <div style="border: 1px dashed #cbd5e1; border-radius: 16px; background: #f8fafc; padding: 18px; text-align: center; color: #64748b; font-size: 14px;">
-                            No clinic template versions have been created yet.
+                    </div>
+
+                    <div class="tb-filters">
+                        <input type="search" wire:model.live.debounce.250ms="questionSearch" class="tb-input tb-search" placeholder="Search questions in this section">
+                        <select wire:model.live="questionStatus" class="tb-select" aria-label="Question status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+                        <select wire:model.live="questionOwnership" class="tb-select" aria-label="Question ownership"><option value="all">All questions</option><option value="system">Inherited from Master</option><option value="clinic">Added by Clinic</option></select>
+                        <button type="button" wire:click="clearQuestionFilters" class="tb-button">Clear</button>
+                    </div>
+
+                    @if ($builderView === 'reorder')
+                        <div class="tb-reorder-note"><span><strong>Reorder {{ $selectedSection['title'] ?? 'questions' }}</strong><br>Use the arrow controls to move each question. Changes remain inside the draft until it is published.</span><button type="button" wire:click="setBuilderView('questions')" class="tb-button">Done</button></div>
+                        <div class="tb-table-wrap"><table class="tb-table" style="min-width:640px"><thead><tr><th style="width:13%">Position</th><th>Question</th><th style="width:22%;text-align:right">Move</th></tr></thead><tbody>
+                            @forelse ($builderQuestions as $question)
+                                <tr>
+                                    <td><span class="tb-order-number">{{ $question['sort_order'] }}</span></td>
+                                    <td><div class="tb-question">{{ $question['prompt'] }}</div><div class="tb-question-meta"><span class="tb-mini">{{ $question['section_title'] }}</span><span class="tb-mini {{ $question['is_builtin'] ? 'tb-mini--system' : '' }}">{{ $question['is_builtin'] ? 'Inherited from Master' : 'Added by Clinic' }}</span></div></td>
+                                    <td><div class="tb-row-actions"><button type="button" class="tb-icon-button" title="Move question up" aria-label="Move {{ $question['prompt'] }} up" wire:click="repositionQuestion({{ $question['id'] }}, 'up')">↑</button><button type="button" class="tb-icon-button" title="Move question down" aria-label="Move {{ $question['prompt'] }} down" wire:click="repositionQuestion({{ $question['id'] }}, 'down')">↓</button></div></td>
+                                </tr>
+                            @empty<tr><td colspan="3"><div class="tb-empty">No questions are available to reorder in this section.</div></td></tr>@endforelse
+                        </tbody></table></div>
+                    @elseif ($builderView === 'questions')
+                        <div class="tb-table-wrap"><table class="tb-table"><thead><tr><th style="width:48%">Question</th><th style="width:14%">Form</th><th style="width:14%">Answer</th><th style="width:10%">Status</th><th style="width:14%;text-align:right">Actions</th></tr></thead><tbody>
+                            @forelse ($builderQuestions as $question)
+                                <tr>
+                                    <td><div class="tb-question">{{ $question['prompt'] }}</div><div class="tb-question-meta"><span class="tb-mini">{{ $question['section_title'] }}</span><span class="tb-mini">Order {{ $question['sort_order'] }}</span><span class="tb-mini {{ $question['is_builtin'] ? 'tb-mini--system' : '' }}">{{ $question['is_builtin'] ? 'Inherited from Master' : 'Added by Clinic' }}</span></div></td>
+                                    <td>{{ $question['form_type'] }}</td><td>{{ $question['input_type'] }}</td><td><span class="tb-pill {{ $question['is_active'] ? '' : 'tb-pill--draft' }}">{{ $question['is_active'] ? 'Active' : 'Inactive' }}</span></td>
+                                    <td><div class="tb-row-actions">
+                                        @if ($versionSummary['showing_draft'])
+                                            @if (! $question['is_builtin'])<a href="{{ $this->getEditUrl($question['id']) }}" wire:navigate class="tb-icon-button" title="Edit question">Edit</a><button type="button" class="tb-icon-button" title="Delete question" wire:click="deleteQuestion({{ $question['id'] }})" wire:confirm="Delete this clinic question?">×</button>@else<span class="tb-mini tb-mini--system">Locked</span>@endif
+                                        @else<span class="tb-mini">Read-only</span>@endif
+                                    </div></td>
+                                </tr>
+                            @empty<tr><td colspan="5"><div class="tb-empty">No questions match this section and filter.{{ $versionSummary['showing_draft'] ? ' Add a clinic question here or clear the filters.' : '' }}</div></td></tr>@endforelse
+                        </tbody></table></div>
+                    @else
+                        <div class="tb-preview">
+                            @forelse ($builderQuestions->where('is_active', true) as $question)
+                                <div class="tb-preview-row"><div class="tb-preview-label">{{ $question['prompt'] }}</div>
+                                    @if (in_array($question['input_type'], ['Checkbox', 'Boolean', 'Toggle'], true))<label style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:11px;"><input type="checkbox" disabled> Yes</label>
+                                    @elseif ($question['input_type'] === 'Textarea')<div class="tb-preview-control" style="min-height:66px;">Response</div>
+                                    @elseif (in_array($question['input_type'], ['Dropdown', 'Select'], true))<div class="tb-preview-control">Select an option</div>
+                                    @else<div class="tb-preview-control">{{ $question['input_type'] }} response</div>@endif
+                                </div>
+                            @empty<div class="tb-empty">No active questions are available for preview.</div>@endforelse
                         </div>
-                    @endforelse
+                    @endif
                 </div>
             </section>
+
+            <details class="tb-history"><summary><span>Previous Template Versions</span><span style="color:#64748b;font-size:11px;">{{ count($templateVersionHistory) }} records</span></summary><div class="tb-history-list">
+                @forelse ($templateVersionHistory as $version)<div class="tb-history-row"><span><strong style="color:var(--tb-navy)">{{ $version['name'] }}</strong> · {{ $version['status'] }} · {{ $version['form_type'] }}</span><span>{{ $version['published_at'] ? 'Published '.$version['published_at'] : 'Not published' }}</span></div>@empty<div class="tb-empty">No previous versions are available.</div>@endforelse
+            </div></details>
+        @else
+            <div class="tb-empty" style="border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">Select a clinic from Clinic Scope to manage its template.</div>
         @endif
 
         @if ($showCreateDraftModal)
-            <div class="ct-modal-backdrop" role="dialog" aria-modal="true">
-                <form wire:submit.prevent="submitCreateDraftVersion" class="ct-modal">
-                    <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
-                        <div>
-                            <h3 style="margin: 0; font-size: 20px; font-weight: 900; color: #0f172a;">Create Clinic Draft</h3>
-                            <p style="margin: 6px 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">
-                                Name the draft and decide whether clinic users can see this template after it is published.
-                            </p>
-                        </div>
-                        <button type="button" class="ct-button" wire:click="closeCreateDraftModal">Close</button>
-                    </div>
-
-                    <div style="padding: 18px 20px; display: grid; gap: 14px;">
-                        <div class="ct-field">
-                            <label class="ct-label" for="clinic-template-draft-name">Template name</label>
-                            <input id="clinic-template-draft-name" class="ct-input" type="text" wire:model.defer="newDraftData.template_name">
-                            @error('newDraftData.template_name')
-                                <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-                            <div class="ct-field">
-                                <label class="ct-label" for="clinic-template-form-type">Type of form</label>
-                                <select id="clinic-template-form-type" class="ct-select" wire:model.defer="newDraftData.form_type">
-                                    @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newDraftData.form_type')
-                                    <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="ct-field">
-                                <label class="ct-label" for="clinic-template-visibility">Clinic visibility</label>
-                                <select id="clinic-template-visibility" class="ct-select" wire:model.defer="newDraftData.clinic_visibility">
-                                    @foreach (\App\Models\VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newDraftData.clinic_visibility')
-                                    <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <div style="border: 1px solid #dbe4ee; border-radius: 14px; background: #f8fafc; padding: 13px 14px; color: #475569; font-size: 13px; line-height: 1.6;">
-                            This draft starts from the active published clinic template. Existing verification requests stay on their current snapshot until refreshed.
-                        </div>
-                    </div>
-
-                    <div style="padding: 16px 20px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="ct-button" wire:click="closeCreateDraftModal">Cancel</button>
-                        <button type="submit" class="ct-button ct-button--primary" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">
-                            Create Draft
-                        </button>
-                    </div>
-                </form>
-            </div>
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="draft-confirm-title" x-on:keydown.escape.window="$wire.closeCreateDraftModal()"><form wire:submit.prevent="submitCreateDraftVersion" class="tb-modal" style="width:min(520px,100%);">
+                <div class="tb-modal-head"><div><div id="draft-confirm-title" class="tb-title" style="font-size:19px;">Create an editable copy?</div><div class="tb-subtitle">The published clinic template cannot be changed directly.</div></div><button type="button" class="tb-icon-button" wire:click="closeCreateDraftModal" aria-label="Close">×</button></div>
+                <div class="tb-modal-body">
+                    <p class="tb-confirm-note">A protected working draft will be created automatically. Existing verification requests, completed forms, and historical snapshots will remain unchanged.</p>
+                    <div class="tb-confirm-box"><span class="tb-confirm-label">Continue with</span><span class="tb-confirm-value">{{ $pendingBuilderAction === 'reorder' ? 'Reorder questions' : ($pendingBuilderAction === 'questions' ? 'Add question to '.($selectedSection['title'] ?? 'selected section') : 'Edit clinic template') }}</span></div>
+                </div>
+                <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeCreateDraftModal" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion" autofocus><span wire:loading.remove wire:target="submitCreateDraftVersion">{{ $pendingBuilderAction === 'reorder' ? 'Continue to Reorder' : ($pendingBuilderAction === 'questions' ? 'Continue to Add Question' : 'Create Working Draft') }}</span><span wire:loading wire:target="submitCreateDraftVersion">Preparing draft...</span></button></div>
+            </form></div>
         @endif
 
         @if ($showTemplateSectionModal)
-            <div class="ct-modal-backdrop" role="dialog" aria-modal="true">
-                <form wire:submit.prevent="submitTemplateSection" class="ct-modal">
-                    <div style="padding: 18px 20px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
-                        <div>
-                            <h3 style="margin: 0; font-size: 20px; font-weight: 900; color: #0f172a;">
-                                {{ $templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section' }}
-                            </h3>
-                            <p style="margin: 6px 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">
-                                This will be added only to the open clinic draft.
-                            </p>
-                        </div>
-                        <button type="button" class="ct-button" wire:click="closeTemplateSectionModal">Close</button>
-                    </div>
-
-                    <div style="padding: 18px 20px; display: grid; gap: 14px;">
-                        @if ($templateSectionMode === 'sub_section')
-                            <div class="ct-field">
-                                <label class="ct-label" for="clinic-template-parent-section">Parent section</label>
-                                <select id="clinic-template-parent-section" class="ct-select" wire:model.defer="newTemplateSectionData.parent_section_key">
-                                    <option value="">Select a section</option>
-                                    @foreach ($questionSections as $section)
-                                        <option value="{{ $section['key'] }}">{{ $section['title'] }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newTemplateSectionData.parent_section_key')
-                                    <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        @endif
-
-                        <div class="ct-field">
-                            <label class="ct-label" for="clinic-template-section-name">
-                                {{ $templateSectionMode === 'sub_section' ? 'Sub-section name' : 'Section name' }}
-                            </label>
-                            <input id="clinic-template-section-name" class="ct-input" type="text" wire:model.defer="newTemplateSectionData.label" placeholder="Example: Implant Coverage">
-                            @error('newTemplateSectionData.label')
-                                <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div style="padding: 16px 20px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="ct-button" wire:click="closeTemplateSectionModal">Cancel</button>
-                        <button type="submit" class="ct-button ct-button--primary" wire:loading.attr="disabled" wire:target="submitTemplateSection">
-                            Save
-                        </button>
-                    </div>
-                </form>
-            </div>
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true"><form wire:submit.prevent="submitTemplateSection" class="tb-modal">
+                <div class="tb-modal-head"><div><div class="tb-title" style="font-size:19px;">{{ $templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section' }}</div><div class="tb-subtitle">This structure change applies only to the open clinic draft.</div></div><button type="button" class="tb-icon-button" wire:click="closeTemplateSectionModal">×</button></div>
+                <div class="tb-modal-body">@if ($templateSectionMode === 'sub_section')<div class="tb-field"><label class="tb-label" for="parent-section">Parent section</label><select id="parent-section" class="tb-select" wire:model.defer="newTemplateSectionData.parent_section_key"><option value="">Select a main section</option>@foreach ($builderSections as $section)<option value="{{ $section['key'] }}">{{ $section['title'] }}</option>@endforeach</select>@error('newTemplateSectionData.parent_section_key')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div>@endif<div class="tb-field"><label class="tb-label" for="section-name">{{ $templateSectionMode === 'sub_section' ? 'Sub-section name' : 'Section name' }}</label><input id="section-name" class="tb-input" wire:model.defer="newTemplateSectionData.label">@error('newTemplateSectionData.label')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div></div>
+                <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeTemplateSectionModal">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled">Add to Draft</button></div>
+            </form></div>
         @endif
     </div>
 </x-filament-panels::page>

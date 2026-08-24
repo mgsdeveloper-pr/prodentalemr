@@ -96,7 +96,7 @@ it('renders the reusable workspace readiness card', function (): void {
         ->toContain('Portal Credentials');
 });
 
-it('renders the clinic dashboard as the organization workspace for an authorized clinic admin', function (): void {
+it('renders a focused clinic profile for an authorized clinic admin', function (): void {
     $this->seed(RoleSeeder::class);
 
     $organization = Organization::create([
@@ -132,8 +132,28 @@ it('renders the clinic dashboard as the organization workspace for an authorized
         ->actingAs($user)
         ->get('/clinic/organization-operations')
         ->assertOk()
-        ->assertSee('Bright Dental Group')
-        ->assertSee('Bright Dental Downtown')
-        ->assertSee('Organization Context')
-        ->assertSee('Verification Readiness');
+        ->assertSee('Clinic Profile')
+        ->assertSee('Clinic Information')
+        ->assertSee('Address &amp; Contact', false)
+        ->assertSee('Business Hours')
+        ->assertSee('Verification Contact')
+        ->assertSee('Branding &amp; Notifications', false)
+        ->assertSee('Tax ID / EIN')
+        ->assertSee('Clinic NPI')
+        ->assertDontSee('Organization Context')
+        ->assertDontSee('Workspace Readiness')
+        ->assertDontSee('Future Workspace Intelligence');
+});
+
+it('keeps the clinic profile separate from saas organization controls', function (): void {
+    $view = file_get_contents(resource_path('views/filament/clinic/pages/clinic-profile.blade.php'));
+    $page = file_get_contents(app_path('Filament/Clinic/Pages/OrganizationOperations.php'));
+
+    expect($view)
+        ->toContain("@vite('resources/css/app.css')")
+        ->toContain('Save Clinic Profile')
+        ->not->toContain('Workspace Readiness')
+        ->and($page)
+        ->toContain("'support_clinic_profile_updated'")
+        ->not->toContain('InteractsWithOrganizationOperationsWorkspace');
 });

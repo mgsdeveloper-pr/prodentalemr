@@ -1,10 +1,16 @@
 <?php
 
+use App\Actions\Verification\CreateVerificationRequestAction;
+use App\Actions\Verification\RefreshVerificationTemplateAction;
+use App\Actions\Verification\SaveVerificationAnswerAction;
+use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationRequestResponse;
+use App\Filament\Clinic\Pages\VerificationRequestResponse as ClinicVerificationRequestResponse;
+use App\Filament\Clinic\Resources\VerificationRequests\Tables\VerificationRequestsTable;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemAttachment;
-use App\Models\Clinic;
 use App\Models\ClientServiceEnrollment;
+use App\Models\Clinic;
 use App\Models\Location;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
@@ -17,12 +23,6 @@ use App\Models\VerificationNotification;
 use App\Models\VerificationProfile;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
-use App\Actions\Verification\RefreshVerificationTemplateAction;
-use App\Actions\Verification\CreateVerificationRequestAction;
-use App\Actions\Verification\SaveVerificationAnswerAction;
-use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationRequestResponse;
-use App\Filament\Clinic\Pages\VerificationRequestResponse as ClinicVerificationRequestResponse;
-use App\Filament\Clinic\Resources\VerificationRequests\Tables\VerificationRequestsTable;
 use App\Services\Verification\DeliveryService;
 use App\Services\Verification\PdfPresetService;
 use App\Services\Verification\SLAService;
@@ -30,15 +30,17 @@ use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationResultService;
 use App\Services\Verification\WorkflowService;
 use App\Support\SaasSupportAccess;
-use App\Support\VerificationTemplateVersionService;
 use App\Support\VerificationResultPdf;
+use App\Support\VerificationTemplateThreeDefaults;
+use App\Support\VerificationTemplateVersionService;
 use Database\Seeders\RoleSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Illuminate\Support\Facades\Storage;
-use Filament\Facades\Filament;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -189,14 +191,15 @@ it('keeps template management routes scoped to their registered panels', functio
         ->toContain('clinic/verification-settings')
         ->toContain('clinic/verification-question-arrangement')
         ->toContain('verification/verification-settings')
-        ->toContain('verification/verification-question-arrangement')
+        ->not->toContain('verification/master-template')
+        ->not->toContain('verification/verification-question-arrangement')
         ->not->toContain('saas/verification-settings')
         ->not->toContain('saas/verification-question-arrangement');
 
     expect($names)
         ->toContain('filament.saas.resources.master-template.index')
         ->toContain('saas.master-template.legacy.index')
-        ->toContain('admin.master-template.legacy.index')
+        ->not->toContain('admin.master-template.legacy.index')
         ->not->toContain('filament.saas.pages.verification-settings')
         ->not->toContain('filament.saas.pages.verification-question-arrangement');
 
@@ -206,7 +209,7 @@ it('keeps template management routes scoped to their registered panels', functio
 
     $this->actingAs($this->saasUser)
         ->get('/verification/verification-form-questions')
-        ->assertRedirect('/verification/master-template');
+        ->assertNotFound();
 });
 
 it('logs creation and status changes for verification requests', function () {
@@ -395,7 +398,7 @@ it('coordinates the verification workflow foundation through services', function
         ->channel->toBe('Email');
 
     expect(fn () => $workflow->reopen($request, '  ', $this->saasUser))
-        ->toThrow(\Illuminate\Validation\ValidationException::class);
+        ->toThrow(ValidationException::class);
 
     $request = $workflow->reopen($request, 'Payer supplied corrected benefit information.', $this->saasUser);
     expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
@@ -470,7 +473,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
     $request = $workflow->start($request, $specialist);
 
     expect(fn () => $workflow->submitForQa($request, $specialist))
-        ->toThrow(\Illuminate\Validation\ValidationException::class);
+        ->toThrow(ValidationException::class);
     expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_IN_PROGRESS);
 
     $request->info_request_reason = 'Please confirm the payer reference with the clinic.';
@@ -577,7 +580,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
         $request,
         'Please correct the confirmation number.',
         $clinicUser,
-        ['answers.' . $requiredQuestion->code => $requiredQuestion->prompt],
+        ['answers.'.$requiredQuestion->code => $requiredQuestion->prompt],
     );
 
     expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
@@ -817,7 +820,7 @@ it('allows clinic users to respond to verification information requests', functi
 
     expect(VerificationRequestsTable::responseUrl($workItem))
         ->toContain('/clinic/request-response')
-        ->toContain('respond=' . $workItem->getKey());
+        ->toContain('respond='.$workItem->getKey());
 
     $this->actingAs($clinicUser);
 
@@ -836,13 +839,13 @@ it('allows clinic users to respond to verification information requests', functi
         ->where('billing_work_item_id', $workItem->getKey())
         ->exists())->toBeTrue();
 
-    Storage::disk('local')->put('billing-work-items/' . $workItem->getKey() . '/clinic-response/test-response.png', 'fake image content');
+    Storage::disk('local')->put('billing-work-items/'.$workItem->getKey().'/clinic-response/test-response.png', 'fake image content');
 
     $attachment = BillingWorkItemAttachment::create([
         'billing_work_item_id' => $workItem->getKey(),
         'user_id' => $clinicUser->getKey(),
         'title' => 'Clinic response attachment',
-        'file_path' => 'billing-work-items/' . $workItem->getKey() . '/clinic-response/test-response.png',
+        'file_path' => 'billing-work-items/'.$workItem->getKey().'/clinic-response/test-response.png',
         'original_file_name' => 'test-response.png',
         'mime_type' => 'image/png',
         'file_size' => 18,
@@ -1066,6 +1069,54 @@ it('shows refresh only for editable requests using an older template version', f
     expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeFalse();
 });
 
+it('lets the assigned verification user continue and refresh an incomplete request', function () {
+    $specialist = User::factory()->create([
+        'name' => 'Assigned Template Refresh Specialist',
+        'email' => 'assigned-template-refresh-specialist@example.com',
+        'status' => true,
+    ]);
+    $specialist->assignRole('verification_user');
+
+    $otherSpecialist = User::factory()->create([
+        'name' => 'Other Template Refresh Specialist',
+        'email' => 'other-template-refresh-specialist@example.com',
+        'status' => true,
+    ]);
+    $otherSpecialist->assignRole('verification_user');
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $refresh = app(RefreshVerificationTemplateAction::class);
+    $published = $versions->ensureClinicPublishedVersion($this->clinic);
+
+    $workItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $specialist->id,
+        'title' => 'Incomplete request using an older template',
+        'status' => BillingWorkItem::STATUS_INCOMPLETE,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+    ]);
+    $workItem = $versions->attachSnapshotToWorkItem($workItem);
+
+    $versions->publishDraft($versions->createDraftFromPublished($published));
+    $workItem->refresh();
+
+    expect($workItem->verificationUserCanEditVerification($specialist))->toBeTrue()
+        ->and($refresh->canRefresh($workItem, $specialist))->toBeTrue()
+        ->and($workItem->verificationUserCanEditVerification($otherSpecialist))->toBeFalse()
+        ->and($refresh->canRefresh($workItem, $otherSpecialist))->toBeFalse();
+
+    $refreshed = $refresh->execute($workItem);
+
+    expect($refreshed->normalized_status)->toBe(BillingWorkItem::STATUS_INCOMPLETE)
+        ->and($refresh->isAlreadyCurrent($refreshed))->toBeTrue();
+});
+
 it('keeps completed verification template snapshots locked for audit history', function () {
     $verificationManager = User::factory()->create([
         'name' => 'Completed Template Refresh Manager',
@@ -1169,6 +1220,72 @@ it('replicates the platform master template into a clinic template copy', functi
         ->whereNull('clinic_id')
         ->whereNull('organization_id')
         ->exists())->toBeTrue();
+});
+
+it('keeps retired fixed frequency rows out of new template versions', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $master = $versions->ensureMasterVersion();
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $master->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'frequency_basic',
+        'prompt' => 'Retired fixed Frequency question',
+        'field_key' => 'vf_basic_scaling_root_planing',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 10,
+        'is_builtin' => true,
+        'is_active' => true,
+    ]);
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $master->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'frequency_basic',
+        'prompt' => 'Intentionally added Frequency question',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 20,
+        'is_builtin' => false,
+        'is_active' => true,
+    ]);
+
+    $draft = $versions->createDraftFromPublished($master);
+
+    expect(VerificationTemplateThreeDefaults::questions())
+        ->not->toContain(fn (array $question): bool => $question['field_key'] === 'vf_basic_scaling_root_planing');
+
+    expect($draft->questions()->where('field_key', 'vf_basic_scaling_root_planing')->exists())->toBeFalse()
+        ->and($draft->questions()
+            ->where('prompt', 'Intentionally added Frequency question')
+            ->where('section_key', 'template_3_frequency_basic')
+            ->exists())->toBeTrue();
+});
+
+it('blocks publication when a retired template row is reintroduced', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $draft->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'frequency_basic',
+        'prompt' => 'Retired row reintroduced after normalization',
+        'field_key' => 'vf_basic_scaling_root_planing',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 10,
+        'is_builtin' => true,
+        'is_active' => true,
+    ]);
+
+    expect(fn () => $versions->publishDraft($draft))
+        ->toThrow(ValidationException::class);
 });
 
 it('publishes a template draft without deleting earlier published versions', function () {

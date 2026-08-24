@@ -29,15 +29,15 @@ class AppointmentResource extends Resource
 
     protected static ?string $navigationLabel = 'Appointments';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Daily Work';
+    protected static string|UnitEnum|null $navigationGroup = 'Scheduling';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'appointment_type';
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return 'Daily Work';
+        return 'Scheduling';
     }
 
     public static function getNavigationLabel(): string
@@ -47,7 +47,7 @@ class AppointmentResource extends Resource
 
     public static function getNavigationSort(): ?int
     {
-        return 2;
+        return 1;
     }
 
     public static function form(Schema $schema): Schema

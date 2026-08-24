@@ -8,6 +8,7 @@
         body { font-family: DejaVu Sans, sans-serif; color: #0f172a; font-size: 11px; line-height: 1.45; }
         h1, h2, h3, p { margin: 0; }
         .header { margin-bottom: 20px; }
+        .clinic-logo { max-width: 110px; max-height: 38px; margin-bottom: 8px; }
         .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #0f766e; }
         .title { margin-top: 8px; font-size: 24px; font-weight: 700; color: #0f172a; }
         .subtitle { margin-top: 6px; font-size: 12px; color: #64748b; }
@@ -25,10 +26,12 @@
         .matrix th, .matrix td { padding: 10px 12px; border-bottom: 1px solid #eef2f7; text-align: left; }
         .matrix th { background: #f8fafc; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
         .matrix tr:last-child td { border-bottom: none; }
+        .report-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dbe4ee; color: #64748b; font-size: 9px; text-align: center; }
     </style>
 </head>
 <body>
     <div class="header">
+        @if ($summary['clinic_logo'])<img src="{{ $summary['clinic_logo'] }}" class="clinic-logo" alt="">@endif
         <div class="eyebrow">Verification Result</div>
         <div class="title">{{ $summary['reference_number'] }}</div>
         <div class="subtitle">{{ $summary['patient_name'] }} | {{ $summary['insurance_name'] }} | {{ $summary['clinic_name'] }}</div>
@@ -77,5 +80,7 @@
             @endif
         </div>
     @endforeach
+
+    @if (filled($summary['report_footer']))<div class="report-footer">{{ $summary['report_footer'] }}</div>@endif
 </body>
 </html>

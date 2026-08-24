@@ -54,7 +54,22 @@ abstract class RolePermissionsPage extends Page
 
     public function getRoleOptions(): array
     {
-        return PanelPermissionMatrix::roles(static::panelKey());
+        $configured = PanelPermissionMatrix::roles(static::panelKey());
+        $prefix = static::panelKey().'_';
+        $custom = Role::query()
+            ->where('guard_name', 'web')
+            ->where('name', 'like', $prefix.'%')
+            ->orderBy('name')
+            ->pluck('name')
+            ->mapWithKeys(fn (string $name): array => [$name => Str::of($name)->after($prefix)->replace('_', ' ')->title()->value()])
+            ->all();
+
+        return $configured + $custom;
+    }
+
+    public function canCreateRole(): bool
+    {
+        return true;
     }
 
     public function canEditSelectedRole(): bool
@@ -64,6 +79,8 @@ abstract class RolePermissionsPage extends Page
 
     public function openCreateRoleModal(): void
     {
+        abort_unless($this->canCreateRole(), 403);
+
         $this->resetValidation();
         $this->newRoleName = '';
         $this->showCreateRoleModal = true;
@@ -100,6 +117,8 @@ abstract class RolePermissionsPage extends Page
 
     public function createRole(): void
     {
+        abort_unless($this->canCreateRole(), 403);
+
         $this->validate([
             'newRoleName' => ['required', 'string', 'min:3', 'max:80'],
         ]);
@@ -242,13 +261,14 @@ abstract class RolePermissionsPage extends Page
             'saas' => $role === 'saas_admin',
             'verification' => $role === 'verification_admin',
             'dso' => $role === 'dso_admin',
+            'clinic' => $role === 'clinic_admin',
             default => false,
         };
     }
 
     protected function normalizedRoleName(string $label): string
     {
-        $prefix = static::panelKey() . '_';
+        $prefix = static::panelKey().'_';
         $slug = Str::of($label)
             ->trim()
             ->replaceMatches('/[^A-Za-z0-9]+/', ' ')
@@ -258,11 +278,11 @@ abstract class RolePermissionsPage extends Page
         $slug = Str::of($slug)->ltrim('_')->value();
 
         if (blank($slug)) {
-            return $prefix . 'role';
+            return $prefix.'role';
         }
 
         if (! Str::startsWith($slug, $prefix)) {
-            $slug = $prefix . $slug;
+            $slug = $prefix.$slug;
         }
 
         return $slug;

@@ -2,7 +2,9 @@
 
 namespace App\Filament\Clinic\Resources\Providers\Tables;
 
+use App\Filament\Clinic\Resources\Providers\ProviderResource;
 use App\Models\Provider;
+use App\Support\ClinicAdministrationAccess;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -73,17 +75,17 @@ class ProvidersTable
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()
-                    ->visible(fn (): bool => auth()->user()?->canEditClinicProviders() ?? false),
+                    ->visible(fn (Provider $record): bool => ProviderResource::canEdit($record)),
                 DeleteAction::make()
                     ->label('Deactivate')
                     ->modalHeading('Deactivate provider')
                     ->modalDescription('This keeps historical appointments, verification requests, and reports intact while removing the provider from active use.')
                     ->successNotificationTitle('Provider deactivated')
-                    ->visible(fn (Provider $record): bool => (auth()->user()?->canDeleteClinicProviders() ?? false) && ! $record->trashed()),
+                    ->visible(fn (Provider $record): bool => ProviderResource::canDelete($record) && ! $record->trashed()),
                 RestoreAction::make()
                     ->label('Restore')
                     ->successNotificationTitle('Provider restored')
-                    ->visible(fn (): bool => auth()->user()?->canDeleteClinicProviders() ?? false),
+                    ->visible(fn (Provider $record): bool => ProviderResource::canDelete($record)),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -92,11 +94,11 @@ class ProvidersTable
                         ->modalHeading('Deactivate selected providers')
                         ->modalDescription('Selected providers will be soft-deleted. Historical records remain available.')
                         ->successNotificationTitle('Selected providers deactivated')
-                        ->visible(fn (): bool => auth()->user()?->canDeleteClinicProviders() ?? false),
+                        ->visible(fn (): bool => ClinicAdministrationAccess::canMutate('providers', 'delete')),
                     RestoreBulkAction::make()
                         ->label('Restore selected')
                         ->successNotificationTitle('Selected providers restored')
-                        ->visible(fn (): bool => auth()->user()?->canDeleteClinicProviders() ?? false),
+                        ->visible(fn (): bool => ClinicAdministrationAccess::canMutate('providers', 'delete')),
                 ]),
             ])
             ->emptyStateHeading('No providers added yet')

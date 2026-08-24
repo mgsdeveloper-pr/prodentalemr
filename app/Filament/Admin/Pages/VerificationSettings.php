@@ -2,7 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
-use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
+use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\Clinic;
 use App\Models\PortalCredential;
@@ -119,7 +119,7 @@ class VerificationSettings extends Page implements HasForms
                                 $clinic = $this->resolveClinic();
 
                                 return $clinic?->clinic_name
-                                    ? $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')
+                                    ? $clinic->clinic_name.' - '.($clinic->organization?->name ?? '')
                                     : 'Select a clinic from the Workspace menu before changing verification settings.';
                             }),
                         Select::make('verification_pdf_preset_id')
@@ -191,11 +191,6 @@ class VerificationSettings extends Page implements HasForms
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('manageQuestions')
-                ->label('Manage verification questions')
-                ->icon('heroicon-o-rectangle-stack')
-                ->url(fn (): string => VerificationFormQuestionResource::getUrl('index'))
-                ->color('gray'),
             Action::make('newPreset')
                 ->label('Create New Preset')
                 ->icon('heroicon-o-document-plus')
@@ -510,12 +505,12 @@ class VerificationSettings extends Page implements HasForms
 
     public function createPortalCredential(): RedirectResponse
     {
-        return redirect()->to(\App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource::getUrl('create'));
+        return redirect()->to(PortalCredentialResource::getUrl('create'));
     }
 
     public function editPortalCredential(int $credentialId): RedirectResponse
     {
-        return redirect()->to(\App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource::getUrl('edit', ['record' => $credentialId]));
+        return redirect()->to(PortalCredentialResource::getUrl('edit', ['record' => $credentialId]));
     }
 
     public function deletePortalCredential(int $credentialId): void

@@ -2,14 +2,13 @@
 
 namespace App\Models;
 
+use App\Support\VerificationResultPdf;
 use App\Traits\HasPublicId;
-
-use App\Models\VerificationFormQuestion;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Clinic extends Model
@@ -20,6 +19,32 @@ class Clinic extends Model
         'organization_id',
         'clinic_name',
         'clinic_code',
+        'tax_id',
+        'clinic_npi',
+        'logo_path',
+        'email',
+        'phone',
+        'fax',
+        'website',
+        'address',
+        'city',
+        'state',
+        'zip_code',
+        'country',
+        'business_hours',
+        'primary_contact_name',
+        'primary_contact_email',
+        'primary_contact_phone',
+        'billing_contact_name',
+        'billing_contact_email',
+        'billing_contact_phone',
+        'verification_contact_name',
+        'verification_contact_email',
+        'verification_contact_phone',
+        'report_display_name',
+        'report_footer',
+        'notification_email',
+        'notification_preferences',
         'timezone',
         'status',
         'verification_services_enabled',
@@ -46,6 +71,9 @@ class Clinic extends Model
     {
         return [
             'status' => 'boolean',
+            'tax_id' => 'encrypted',
+            'business_hours' => 'array',
+            'notification_preferences' => 'array',
             'verification_services_enabled' => 'boolean',
             'clinic_operations_enabled' => 'boolean',
             'trial_ends_at' => 'date',
@@ -182,7 +210,7 @@ class Clinic extends Model
     {
         $mode = (string) ($this->verification_pdf_output_mode ?: 'standard');
 
-        return array_key_exists($mode, \App\Support\VerificationResultPdf::OUTPUT_MODE_OPTIONS)
+        return array_key_exists($mode, VerificationResultPdf::OUTPUT_MODE_OPTIONS)
             ? $mode
             : 'standard';
     }

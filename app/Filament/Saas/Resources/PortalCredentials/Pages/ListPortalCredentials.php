@@ -2,44 +2,75 @@
 
 namespace App\Filament\Saas\Resources\PortalCredentials\Pages;
 
+use App\Filament\Concerns\ManagesPortalCredentialSecurityQuestions;
 use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
+use App\Models\AuditLog;
 use App\Models\PortalCredential;
 use App\Support\AdminClinicScope;
+use App\Support\SaasSupportAccess;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Collection;
 
 class ListPortalCredentials extends ListRecords
 {
+    use ManagesPortalCredentialSecurityQuestions;
+
     protected static string $resource = PortalCredentialResource::class;
 
     protected string $view = 'filament.saas.resources.portal-credentials.pages.list-portal-credentials';
 
     public string $search = '';
+
     public bool $passwordModalOpen = false;
+
     public ?int $editingCredentialId = null;
+
     public ?string $editingCredentialName = null;
+
     public ?string $editingCredentialLink = null;
+
     public ?string $editingCredentialUsername = null;
+
     public string $newPassword = '';
+
     public string $newPasswordConfirmation = '';
+
     public bool $createModalOpen = false;
+
     public string $createPortalName = '';
+
     public string $createPortalCategory = 'insurance';
+
     public string $createLoginUrl = '';
+
     public string $createSupportContact = '';
+
     public string $createUsername = '';
+
     public string $createPassword = '';
+
     public string $createAccountReference = '';
+
     public string $createRegistrationQaNotes = '';
+
     public string $createGeneralNotes = '';
+
     public bool $createMfaRequired = false;
+
     public string $createMfaMethod = 'none';
+
     public bool $createIsActive = true;
+
     public bool $createVisibleToClinic = false;
+
     public bool $infoModalOpen = false;
+
     public ?string $infoCredentialName = null;
+
     public ?string $infoCredentialRegistrationQaNotes = null;
+
     public ?string $infoCredentialGeneralNotes = null;
 
     public function getSelectedClinicName(): ?string
@@ -50,13 +81,14 @@ class ListPortalCredentials extends ListRecords
     public function getPortalCredentials(): Collection
     {
         return $this->getScopedPortalCredentialQuery()
+            ->withCount('securityQuestions')
             ->when(filled($this->search), function ($query): void {
                 $query->where(function ($builder): void {
                     $builder
-                        ->where('portal_name', 'like', '%' . $this->search . '%')
-                        ->orWhere('login_url', 'like', '%' . $this->search . '%')
-                        ->orWhere('portal_category', 'like', '%' . $this->search . '%')
-                        ->orWhere('account_reference', 'like', '%' . $this->search . '%');
+                        ->where('portal_name', 'like', '%'.$this->search.'%')
+                        ->orWhere('login_url', 'like', '%'.$this->search.'%')
+                        ->orWhere('portal_category', 'like', '%'.$this->search.'%')
+                        ->orWhere('account_reference', 'like', '%'.$this->search.'%');
                 });
             })
             ->orderByDesc('is_active')
@@ -64,19 +96,41 @@ class ListPortalCredentials extends ListRecords
             ->get();
     }
 
+    public function getCredentialSummary(): array
+    {
+        $credentials = $this->getPortalCredentials();
+
+        return [
+            'total' => $credentials->count(),
+            'active' => $credentials->where('is_active', true)->count(),
+            'mfa' => $credentials->where('mfa_required', true)->count(),
+        ];
+    }
+
     public function canUpdatePasswords(): bool
     {
-        return filled(AdminClinicScope::selectedClinicId())
-            && PortalCredentialResource::canCreate()
-            && (
-                (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update') ?? false)
-                || (auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update') ?? false)
-            );
+        $clinic = AdminClinicScope::selectedClinic();
+
+        if (! $clinic) {
+            return false;
+        }
+
+        if (Filament::getCurrentPanel()?->getId() === 'admin') {
+            return auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update') ?? false;
+        }
+
+        return SaasSupportAccess::matchesScope((int) $clinic->organization_id, (int) $clinic->getKey())
+            && (auth()->user()?->canPerformSaasModuleAction('portal_credentials', 'update') ?? false);
     }
 
     public function canCreatePortalCredentials(): bool
     {
         return PortalCredentialResource::canCreate();
+    }
+
+    public function createCredentialUrl(): string
+    {
+        return PortalCredentialResource::getUrl('create');
     }
 
     public function openCreatePortalCredentialModal(): void
@@ -113,7 +167,7 @@ class ListPortalCredentials extends ListRecords
 
         $validated = $this->validate([
             'createPortalName' => ['required', 'string', 'max:255'],
-            'createPortalCategory' => ['required', 'string', 'in:' . implode(',', array_keys(PortalCredential::CATEGORY_OPTIONS))],
+            'createPortalCategory' => ['required', 'string', 'in:'.implode(',', array_keys(PortalCredential::CATEGORY_OPTIONS))],
             'createLoginUrl' => ['nullable', 'url', 'max:255'],
             'createSupportContact' => ['nullable', 'string', 'max:255'],
             'createUsername' => ['nullable', 'string', 'max:255'],
@@ -121,7 +175,7 @@ class ListPortalCredentials extends ListRecords
             'createAccountReference' => ['nullable', 'string', 'max:255'],
             'createRegistrationQaNotes' => ['nullable', 'string'],
             'createGeneralNotes' => ['nullable', 'string'],
-            'createMfaMethod' => ['required', 'string', 'in:' . implode(',', array_keys(PortalCredential::MFA_METHOD_OPTIONS))],
+            'createMfaMethod' => ['required', 'string', 'in:'.implode(',', array_keys(PortalCredential::MFA_METHOD_OPTIONS))],
             'createIsActive' => ['boolean'],
             'createMfaRequired' => ['boolean'],
             'createVisibleToClinic' => ['boolean'],
@@ -186,7 +240,7 @@ class ListPortalCredentials extends ListRecords
         $this->editingCredentialId = $credential->getKey();
         $this->editingCredentialName = $credential->portal_name;
         $this->editingCredentialLink = $credential->login_url;
-        $this->editingCredentialUsername = $credential->username;
+        $this->editingCredentialUsername = PortalCredential::maskSecret($credential->username);
         $this->newPassword = '';
         $this->newPasswordConfirmation = '';
         $this->passwordModalOpen = true;
@@ -232,6 +286,37 @@ class ListPortalCredentials extends ListRecords
         $this->closePasswordEditor();
     }
 
+    public function revealCredentialSecret(int $credentialId, string $field): void
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId);
+        $this->guardSecretField($field);
+        $this->recordSecretAccess($credential, $field, 'revealed');
+
+        $this->revealPortalCredentialValue(
+            "portal-{$field}-{$credential->getKey()}",
+            (string) ($credential->{$field} ?? ''),
+        );
+    }
+
+    public function copyCredentialSecret(int $credentialId, string $field): string
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId);
+        $this->guardSecretField($field);
+        $this->recordSecretAccess($credential, $field, 'copied');
+
+        Notification::make()
+            ->success()
+            ->title(ucfirst($field).' copied')
+            ->send();
+
+        return (string) ($credential->{$field} ?? '');
+    }
+
+    public function editCredentialUrl(PortalCredential $credential): string
+    {
+        return PortalCredentialResource::getUrl('edit', ['record' => $credential]);
+    }
+
     protected function getScopedPortalCredentialQuery()
     {
         return PortalCredential::query()->when(
@@ -239,6 +324,41 @@ class ListPortalCredentials extends ListRecords
             fn ($query) => $query->where('clinic_id', AdminClinicScope::selectedClinicId()),
             fn ($query) => $query->whereRaw('1 = 0')
         );
+    }
+
+    protected function resolveAccessibleCredential(int $credentialId): PortalCredential
+    {
+        abort_unless($this->canUpdatePasswords(), 403);
+
+        $credential = $this->getScopedPortalCredentialQuery()->findOrFail($credentialId);
+        abort_unless(PortalCredentialResource::canEdit($credential), 403);
+
+        return $credential;
+    }
+
+    protected function guardSecretField(string $field): void
+    {
+        abort_unless(in_array($field, ['username', 'password'], true), 422);
+    }
+
+    protected function recordSecretAccess(PortalCredential $credential, string $field, string $action): void
+    {
+        AuditLog::query()->forceCreate([
+            'user_id' => auth()->id(),
+            'organization_id' => $credential->organization_id,
+            'clinic_id' => $credential->clinic_id,
+            'module' => 'portal_credentials',
+            'action' => "{$field}_{$action}",
+            'old_values' => null,
+            'new_values' => json_encode([
+                'portal_credential_id' => $credential->getKey(),
+                'portal_name' => $credential->portal_name,
+                'field' => $field,
+                'access' => $action,
+            ], JSON_THROW_ON_ERROR),
+            'ip_address' => request()->ip(),
+            'device_info' => request()->userAgent(),
+        ]);
     }
 
     public function getHeading(): string

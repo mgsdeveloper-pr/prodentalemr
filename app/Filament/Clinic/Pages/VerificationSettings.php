@@ -2,11 +2,10 @@
 
 namespace App\Filament\Clinic\Pages;
 
-use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
-use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
 use App\Actions\Verification\ArchiveClinicTemplateVersionAction;
 use App\Actions\Verification\CreateClinicTemplateDraftAction;
 use App\Actions\Verification\PublishClinicTemplateDraftAction;
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
@@ -33,11 +32,11 @@ class VerificationSettings extends Page
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Settings';
 
     protected static ?string $navigationLabel = 'Verification Settings';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $title = 'Verification Settings';
 
@@ -339,11 +338,6 @@ class VerificationSettings extends Page
         return VerificationQuestionResource::getUrl('create', panel: 'clinic');
     }
 
-    public function getPortalCredentialsUrl(): string
-    {
-        return PortalCredentialResource::getUrl('index', panel: 'clinic');
-    }
-
     public function createClinicTemplateDraft(): void
     {
         $this->openCreateClinicTemplateDraftModal();
@@ -393,7 +387,7 @@ class VerificationSettings extends Page
 
         $validated = $this->validate([
             'newClinicTemplateDraftData.template_name' => ['required', 'string', 'max:255'],
-            'newClinicTemplateDraftData.form_type' => ['required', 'in:' . implode(',', array_keys(VerificationTemplateVersion::FORM_TYPE_OPTIONS))],
+            'newClinicTemplateDraftData.form_type' => ['required', 'in:'.implode(',', array_keys(VerificationTemplateVersion::FORM_TYPE_OPTIONS))],
             'newClinicTemplateDraftData.starting_point' => ['required', 'in:active,fresh,specific_version'],
             'newClinicTemplateDraftData.source_version_id' => ['nullable', 'integer'],
         ]);
@@ -450,7 +444,7 @@ class VerificationSettings extends Page
 
         Notification::make()
             ->title('Draft template ready')
-            ->body($this->clinicTemplateDisplayName($draft) . ' is ready for editing.')
+            ->body($this->clinicTemplateDisplayName($draft).' is ready for editing.')
             ->success()
             ->send();
     }
@@ -473,8 +467,8 @@ class VerificationSettings extends Page
             ->get()
             ->mapWithKeys(function (VerificationTemplateVersion $version): array {
                 $label = $this->clinicTemplateIdentifier($version)
-                    . ' - ' . str($version->status)->headline()
-                    . ' - ' . $this->clinicTemplateDisplayName($version);
+                    .' - '.str($version->status)->headline()
+                    .' - '.$this->clinicTemplateDisplayName($version);
 
                 return [$version->getKey() => $label];
             })
@@ -484,7 +478,7 @@ class VerificationSettings extends Page
     protected function resetNewClinicTemplateDraftData(): void
     {
         $clinic = $this->resolveClinic();
-        $defaultName = trim((string) ($clinic?->clinic_name ?: 'Clinic')) . ' Template Draft';
+        $defaultName = trim((string) ($clinic?->clinic_name ?: 'Clinic')).' Template Draft';
 
         $this->newClinicTemplateDraftData = [
             'template_name' => $defaultName,
@@ -539,7 +533,7 @@ class VerificationSettings extends Page
 
         Notification::make()
             ->title('Clinic template published')
-            ->body($this->clinicTemplateDisplayName($published) . ' is now active for this clinic.')
+            ->body($this->clinicTemplateDisplayName($published).' is now active for this clinic.')
             ->success()
             ->send();
     }
@@ -581,7 +575,7 @@ class VerificationSettings extends Page
 
         Notification::make()
             ->title('Template archived')
-            ->body($version->name . ' was removed from the active clinic template list.')
+            ->body($version->name.' was removed from the active clinic template list.')
             ->success()
             ->send();
     }
@@ -623,7 +617,7 @@ class VerificationSettings extends Page
                     'id' => (int) $version->getKey(),
                     'template_id' => $this->clinicTemplateIdentifier($version),
                     'name' => $this->clinicTemplateDisplayName($version),
-                    'version' => 'v' . $version->version_number,
+                    'version' => 'v'.$version->version_number,
                     'row_group' => $this->clinicTemplateRowGroup($version),
                     'status' => $this->clinicTemplateStatusLabel($version),
                     'status_key' => $version->status,
@@ -645,9 +639,9 @@ class VerificationSettings extends Page
                 ];
             })
             ->sortBy(fn (array $row): string => match ($row['row_group']) {
-                'active' => '1-' . $row['version'],
-                'draft' => '2-' . $row['version'],
-                default => '3-' . $row['version'],
+                'active' => '1-'.$row['version'],
+                'draft' => '2-'.$row['version'],
+                default => '3-'.$row['version'],
             })
             ->values()
             ->all();
@@ -717,7 +711,7 @@ class VerificationSettings extends Page
         $publicId = strtoupper((string) $version->public_id);
         $suffix = filled($publicId) ? substr($publicId, -8) : str_pad((string) $version->getKey(), 8, '0', STR_PAD_LEFT);
 
-        return 'CT-' . $suffix;
+        return 'CT-'.$suffix;
     }
 
     protected function clinicTemplateRowGroup(VerificationTemplateVersion $version): string
@@ -853,7 +847,7 @@ class VerificationSettings extends Page
         }
 
         if ($usedRequestCount > 0) {
-            return $usedRequestCount . ' verification request(s) use this template.';
+            return $usedRequestCount.' verification request(s) use this template.';
         }
 
         if (! $this->canManageSelectedClinicTemplate()) {
@@ -944,7 +938,7 @@ class VerificationSettings extends Page
             ->get()
             ->mapWithKeys(function (VerificationTemplateVersion $version): array {
                 $label = $this->clinicTemplateDisplayName($version)
-                    . ' (' . $this->clinicTemplateIdentifier($version) . ')';
+                    .' ('.$this->clinicTemplateIdentifier($version).')';
 
                 if ($version->is_active) {
                     $label .= ' - Active';
@@ -1010,7 +1004,7 @@ class VerificationSettings extends Page
         return [
             'Format' => 'PDF',
             'Preset' => $presetName,
-            'Sections' => $sectionCount . ' included',
+            'Sections' => $sectionCount.' included',
             'Orientation' => $mode === 'custom_landscape' ? 'Landscape' : 'Portrait',
             'Last Saved' => optional($clinic?->updated_at)->format('M d, Y h:i A') ?: '-',
             'Saved By' => auth()->user()?->name ?? 'Current user',

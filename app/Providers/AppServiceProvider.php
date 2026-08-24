@@ -2,8 +2,8 @@
 
 namespace App\Providers;
 
-use App\Models\AuditLog;
 use App\Models\AdaProcedureCode;
+use App\Models\AuditLog;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemAttachment;
 use App\Models\Clinic;
@@ -22,8 +22,8 @@ use App\Models\VerificationInboxMessage;
 use App\Models\VerificationNotification;
 use App\Models\VerificationProfile;
 use App\Models\VerificationTemplateVersion;
-use App\Policies\AuditLogPolicy;
 use App\Policies\AdaProcedureCodePolicy;
+use App\Policies\AuditLogPolicy;
 use App\Policies\BillingWorkItemAttachmentPolicy;
 use App\Policies\BillingWorkItemPolicy;
 use App\Policies\ClinicPolicy;
@@ -42,18 +42,19 @@ use App\Policies\VerificationInboxMessagePolicy;
 use App\Policies\VerificationNotificationPolicy;
 use App\Policies\VerificationProfilePolicy;
 use App\Policies\VerificationTemplateVersionPolicy;
-use App\Support\ClinicTemplateSettingsSupportAudit;
-use App\Support\ProviderSupportAudit;
-use App\Support\PortalCredentialSupportAudit;
-use App\Support\SaasMailSettings;
-use App\Support\SaasEntitlementAudit;
 use App\Services\Notifications\ProductNotificationService;
+use App\Support\ClinicAdministrationSupportAudit;
+use App\Support\ClinicTemplateSettingsSupportAudit;
+use App\Support\PortalCredentialSupportAudit;
+use App\Support\ProviderSupportAudit;
+use App\Support\SaasEntitlementAudit;
+use App\Support\SaasMailSettings;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Console\Events\CommandStarting;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 use Throwable;
@@ -107,6 +108,7 @@ class AppServiceProvider extends ServiceProvider
         ProviderSupportAudit::register();
         PortalCredentialSupportAudit::register();
         ClinicTemplateSettingsSupportAudit::register();
+        ClinicAdministrationSupportAudit::register();
         $this->registerSecurityNotificationListeners();
         $this->guardDestructiveLocalDatabaseCommands();
     }
@@ -126,7 +128,7 @@ class AppServiceProvider extends ServiceProvider
                 'account_locked',
                 'Account temporarily locked',
                 'Multiple unsuccessful sign-in attempts temporarily locked your account.',
-                'security.lockout.' . $user->getKey() . '.' . now()->format('YmdHi'),
+                'security.lockout.'.$user->getKey().'.'.now()->format('YmdHi'),
             );
         });
 
@@ -137,7 +139,7 @@ class AppServiceProvider extends ServiceProvider
                     'password_reset',
                     'Password changed',
                     'Your ProDental password was successfully changed.',
-                    'security.password-reset.' . $event->user->getKey() . '.' . now()->timestamp,
+                    'security.password-reset.'.$event->user->getKey().'.'.now()->timestamp,
                 );
             }
         });
@@ -149,7 +151,7 @@ class AppServiceProvider extends ServiceProvider
                     'account_verified',
                     'Account verified',
                     'Your ProDental account email was successfully verified.',
-                    'security.verified.' . $event->user->getKey(),
+                    'security.verified.'.$event->user->getKey(),
                 );
             }
         });
@@ -183,7 +185,7 @@ class AppServiceProvider extends ServiceProvider
             }
 
             throw new RuntimeException(sprintf(
-                'Blocked "%s" for data safety. This command can wipe local project data. ' .
+                'Blocked "%s" for data safety. This command can wipe local project data. '.
                 'Set PRODENTAL_ALLOW_DESTRUCTIVE_DB_COMMANDS=true only when you intentionally want to reset this database.',
                 $event->command,
             ));

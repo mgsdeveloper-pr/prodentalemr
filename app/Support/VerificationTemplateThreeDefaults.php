@@ -59,12 +59,29 @@ class VerificationTemplateThreeDefaults
             ...self::coverageCategoryQuestions(),
             ...self::planProvisionQuestions(),
             ...self::serviceHistoryQuestions(),
+            ...self::verificationInformationQuestions(),
+        ];
+    }
+
+    /**
+     * These rows belonged to the retired fixed Frequency worksheet. Frequency
+     * questions are now added intentionally through the template builder.
+     *
+     * @return array<int, string>
+     */
+    public static function legacyFrequencyFieldKeys(): array
+    {
+        return collect([
             ...self::frequencyDiagnosticPreventativeQuestions(),
             ...self::frequencyBasicQuestions(),
             ...self::frequencyMajorQuestions(),
             ...self::frequencyOrthodonticsQuestions(),
-            ...self::verificationInformationQuestions(),
-        ];
+        ])
+            ->pluck('field_key')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     protected static function patientSubscriberQuestions(): array

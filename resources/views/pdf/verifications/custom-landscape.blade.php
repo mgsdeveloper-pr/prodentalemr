@@ -10,6 +10,7 @@
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .pdf-head { width: 100%; border-bottom: 1px solid #cbd8e2; margin-bottom: 3px; padding-bottom: 2px; }
         .clinic-title { font-size: 11.5px; font-weight: 700; line-height: 1; color: #102033; }
+        .clinic-logo { max-width: 64px; max-height: 18px; margin-right: 4px; vertical-align: middle; }
         .report-title { text-align: right; font-size: 10.5px; font-weight: 700; line-height: 1; color: #102033; }
         .subtle { color: #66758a; font-size: 6.8px; line-height: 1; }
         .metadata { border: 1px solid #aebdca; background: #f8fbfa; margin-bottom: 4px; }
@@ -30,6 +31,7 @@
         .label { width: 60%; font-weight: 700; color: #102033; }
         .value { width: 40%; color: #334155; }
         .empty { color: #8ca0af; }
+        .report-footer { margin-top: 2px; padding-top: 2px; border-top: 1px solid #cbd8e2; color: #66758a; font-size: 5.8px; text-align: center; }
     </style>
 </head>
 <body>
@@ -69,7 +71,10 @@
 
 <table class="pdf-head">
     <tr>
-        <td><div class="clinic-title">{{ $summary['clinic_name'] }}</div></td>
+        <td>
+            @if ($summary['clinic_logo'])<img src="{{ $summary['clinic_logo'] }}" class="clinic-logo" alt="">@endif
+            <span class="clinic-title">{{ $summary['clinic_name'] }}</span>
+        </td>
         <td><div class="report-title">Insurance Verification</div></td>
     </tr>
     <tr>
@@ -101,5 +106,6 @@
         </td>
     </tr>
 </table>
+@if (filled($summary['report_footer']))<div class="report-footer">{{ $summary['report_footer'] }}</div>@endif
 </body>
 </html>

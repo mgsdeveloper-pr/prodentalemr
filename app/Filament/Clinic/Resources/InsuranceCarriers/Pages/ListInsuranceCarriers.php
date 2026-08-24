@@ -5,10 +5,8 @@ namespace App\Filament\Clinic\Resources\InsuranceCarriers\Pages;
 use App\Filament\Clinic\Pages\VerificationQuestionArrangement;
 use App\Filament\Clinic\Pages\VerificationSettings;
 use App\Filament\Clinic\Resources\InsuranceCarriers\InsuranceCarrierResource;
-use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Support\ClinicPanelScope;
-use App\Support\VerificationManagedServiceAccess;
 use Filament\Resources\Pages\ListRecords;
 
 class ListInsuranceCarriers extends ListRecords
@@ -22,8 +20,8 @@ class ListInsuranceCarriers extends ListRecords
         $items = [
             [
                 'key' => 'settings',
-                'label' => 'PDF Settings',
-                'description' => 'Control PDF output and default verification template rules.',
+                'label' => 'Verification Settings',
+                'description' => 'Choose the active template and control PDF output.',
                 'url' => VerificationSettings::getUrl(),
             ],
             [
@@ -33,15 +31,6 @@ class ListInsuranceCarriers extends ListRecords
                 'url' => InsuranceCarrierResource::getUrl('index'),
             ],
         ];
-
-        if (VerificationManagedServiceAccess::selectedClinicHasActiveVerificationService()) {
-            $items[] = [
-                'key' => 'credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Keep clinic-specific website and payer portal credentials without using spreadsheets.',
-                'url' => PortalCredentialResource::getUrl('index'),
-            ];
-        }
 
         $items[] = [
             'key' => 'questions',

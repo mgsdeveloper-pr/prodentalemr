@@ -17,7 +17,7 @@ class ViewUser extends ViewRecord
     {
         return [
             EditAction::make()
-                ->visible(fn (): bool => auth()->user()?->canManageClinicUsers() ?? false),
+                ->visible(fn (): bool => UserResource::canEdit($this->record)),
         ];
     }
 }

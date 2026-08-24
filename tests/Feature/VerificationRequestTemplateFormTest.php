@@ -2,18 +2,20 @@
 
 use App\Actions\Verification\CreateVerificationRequestAction;
 use App\Actions\Verification\SaveVerificationAnswerAction;
+use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Filament\Saas\Resources\Verifications\Tables\VerificationRequestsTable;
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\BillingWorkItem;
-use App\Models\Clinic;
 use App\Models\ClientServiceEnrollment;
+use App\Models\Clinic;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateVersion;
-use App\Support\VerificationTemplateVersionService;
 use App\Services\Verification\VerificationAuditService;
+use App\Support\VerificationResultPdf;
+use App\Support\VerificationTemplateVersionService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Validation\ValidationException;
 
@@ -88,6 +90,90 @@ it('attaches the active clinic template snapshot when a verification request is 
         ->and($request->verification_template_snapshot)->toBeArray()
         ->and(data_get($request->verification_template_snapshot, 'version.id'))->toBe($version->id)
         ->and($request->verification_template_snapshot_at)->not->toBeNull();
+});
+
+it('renders verification information from the request template order and counts every configured question', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+
+    $modeQuestion = VerificationFormQuestion::create([
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_verification_information',
+        'prompt' => 'Mode of Verification',
+        'form_type' => 'both',
+        'input_type' => 'select',
+        'select_options' => "On Call\nWeb",
+        'sort_order' => 0,
+        'is_builtin' => true,
+        'is_active' => true,
+    ]);
+
+    foreach ([
+        ['Reference Number', null, 'text', 10],
+        ['Insurance Representative', 'vf_insurance_representative_name', 'text', 20],
+        ['Verified By', 'vf_verified_by', 'text', 30],
+        ['Verification Date', 'vf_verification_date', 'date', 40],
+        ['Additional Information', 'vf_verification_notes', 'textarea', 50],
+    ] as [$prompt, $fieldKey, $inputType, $sortOrder]) {
+        VerificationFormQuestion::create([
+            'template_version_id' => $version->id,
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => 'template_3_verification_information',
+            'prompt' => $prompt,
+            'field_key' => $fieldKey,
+            'form_type' => 'both',
+            'input_type' => $inputType,
+            'sort_order' => $sortOrder,
+            'is_builtin' => true,
+            'is_active' => true,
+        ]);
+    }
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Template ordered verification information',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function useRecord(BillingWorkItem $record): void
+        {
+            $this->record = $record;
+        }
+
+        public function useData(array $data): void
+        {
+            $this->data = $data;
+        }
+    };
+    $page->useRecord($request);
+    $page->useData([
+        'vf_form_type' => 'full_form',
+        'custom_question_'.$modeQuestion->id => 'Web',
+    ]);
+
+    $section = $page->getTemplateThreeVerificationInformationSection();
+
+    expect(collect($section['rows'])->pluck('label')->all())
+        ->toBe([
+            'Mode of Verification',
+            'Reference Number',
+            'Insurance Representative',
+            'Verified By',
+            'Verification Date',
+            'Additional Information',
+        ])
+        ->and($section['total'])->toBe(6)
+        ->and($section['completed'])->toBe(4)
+        ->and(data_get($section, 'rows.0.field'))->toBe('custom_question_'.$modeQuestion->id);
 });
 
 it('builds form links for active requests and read-only links for completed requests', function () {
@@ -202,6 +288,152 @@ it('evaluates audit questions from the request template snapshot instead of the 
     expect($questions->modelKeys())
         ->toContain($originalQuestion->id)
         ->not->toContain($latestQuestion->id);
+});
+
+it('never mixes frequency rows from draft current or historical template versions', function () {
+    $versions = app(VerificationTemplateVersionService::class);
+    $original = $versions->ensureClinicPublishedVersion($this->clinic);
+
+    foreach ([
+        ['', 'Test CDT Code Here', 10],
+        ['D0140', 'Limited oral evaluation - problem focused', 20],
+    ] as [$code, $prompt, $sortOrder]) {
+        VerificationFormQuestion::create([
+            'template_version_id' => $original->id,
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => 'template_3_frequency_basic',
+            'code' => $code,
+            'prompt' => $prompt,
+            'form_type' => 'both',
+            'input_type' => 'frequency_row',
+            'sort_order' => $sortOrder,
+            'is_active' => true,
+        ]);
+    }
+
+    $payerQuestion = VerificationFormQuestion::query()
+        ->where('template_version_id', $original->id)
+        ->where('field_key', 'vf_payer_id')
+        ->first();
+
+    if ($payerQuestion) {
+        VerificationFormQuestion::query()
+            ->where('template_version_id', $original->id)
+            ->where('field_key', 'vf_payer_id')
+            ->update(['is_active' => false]);
+    } else {
+        VerificationFormQuestion::create([
+            'template_version_id' => $original->id,
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => 'template_3_insurance',
+            'field_key' => 'vf_payer_id',
+            'prompt' => 'Payer ID',
+            'form_type' => 'both',
+            'input_type' => 'text',
+            'sort_order' => 10,
+            'is_builtin' => true,
+            'is_active' => false,
+        ]);
+    }
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Frequency snapshot request',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $latest = $versions->publishDraft($versions->createDraftFromPublished($original));
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $latest->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_frequency_basic',
+        'code' => 'D9999',
+        'prompt' => 'Latest template only row',
+        'form_type' => 'both',
+        'input_type' => 'frequency_row',
+        'sort_order' => 30,
+        'is_active' => true,
+    ]);
+
+    VerificationFormQuestion::create([
+        'template_version_id' => $latest->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_insurance',
+        'field_key' => 'vf_payer_id',
+        'prompt' => 'Payer ID',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 10,
+        'is_builtin' => true,
+        'is_active' => true,
+    ]);
+
+    foreach ([1, 2] as $sortOrder) {
+        $request->verificationCoverageCodes()->create([
+            'category' => 'Basic',
+            'code' => '',
+            'description' => 'Test CDT Code Here',
+            'coverage_percent' => 80,
+            'sort_order' => $sortOrder,
+        ]);
+    }
+
+    $request->verificationCoverageCodes()->create([
+        'category' => 'Basic',
+        'code' => 'D9999',
+        'description' => 'Latest template only row',
+        'coverage_percent' => 50,
+        'sort_order' => 3,
+    ]);
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function useRequest(BillingWorkItem $request): void
+        {
+            $this->record = $request;
+            $this->data = ['vf_form_type' => 'full_form'];
+            $this->formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+        }
+
+        public function frequencyRows(): array
+        {
+            return $this->templateThreeFrequencyQuestionRows();
+        }
+
+        public function resolvedCoverageRows(): array
+        {
+            return $this->resolveCodeCoverageRows();
+        }
+    };
+    $page->useRequest($request->fresh());
+
+    expect(collect($page->frequencyRows())->pluck('description')->all())
+        ->toBe([
+            'Test CDT Code Here',
+            'Limited oral evaluation - problem focused',
+        ])
+        ->and($page->resolvedCoverageRows())->toHaveCount(2)
+        ->and(collect($page->resolvedCoverageRows())->pluck('description')->all())
+        ->toBe([
+            'Test CDT Code Here',
+            'Limited oral evaluation - problem focused',
+        ])
+        ->and($page->templateThreeFieldIsVisible('vf_payer_id'))->toBeFalse();
+
+    $pdfCoverageRows = (new ReflectionMethod(VerificationResultPdf::class, 'mapCoverageCodeRowsForSection'))
+        ->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_basic');
+
+    expect($pdfCoverageRows)->toHaveCount(1)
+        ->and($pdfCoverageRows->pluck('label')->all())
+        ->toBe(['Test CDT Code Here']);
 });
 
 it('limits the audit checklist to active required questions applicable to the selected form type', function () {

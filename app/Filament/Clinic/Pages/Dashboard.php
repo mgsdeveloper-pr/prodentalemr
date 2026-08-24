@@ -10,6 +10,8 @@ use UnitEnum;
 
 class Dashboard extends BaseDashboard
 {
+    protected static string|UnitEnum|null $navigationGroup = 'Overview';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
     protected static ?string $navigationLabel = 'Dashboard';
@@ -24,7 +26,7 @@ class Dashboard extends BaseDashboard
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
-        return 'Daily Work';
+        return 'Overview';
     }
 
     public static function getNavigationSort(): ?int

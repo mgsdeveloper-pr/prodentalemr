@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Traits\HasPublicId;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -86,6 +85,13 @@ class PortalCredential extends Model
             ->latest('id');
     }
 
+    public function securityQuestions(): HasMany
+    {
+        return $this->hasMany(PortalCredentialSecurityQuestion::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     public function overrideForClinic(?int $clinicId): ?ClinicPortalCredentialOverride
     {
         if (! $clinicId) {
@@ -141,7 +147,7 @@ class PortalCredential extends Model
             return str_repeat('*', strlen($string));
         }
 
-        return substr($string, 0, 2) . str_repeat('*', max(strlen($string) - 4, 2)) . substr($string, -2);
+        return substr($string, 0, 2).str_repeat('*', max(strlen($string) - 4, 2)).substr($string, -2);
     }
 
     protected static function booted(): void

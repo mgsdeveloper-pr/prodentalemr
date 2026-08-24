@@ -11,7 +11,7 @@ class Dashboard extends BaseDashboard
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHome;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Dashboard';
+    protected static string|UnitEnum|null $navigationGroup = 'Overview';
 
     protected static ?string $navigationLabel = 'Dashboard';
 

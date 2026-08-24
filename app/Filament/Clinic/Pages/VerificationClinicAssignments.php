@@ -9,13 +9,15 @@ use UnitEnum;
 
 class VerificationClinicAssignments extends AdminVerificationClinicAssignments
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
     protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     protected static ?string $navigationLabel = 'Clinic Access';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $slug = 'assign-clinic';
 

@@ -25,7 +25,7 @@ class VerificationUnassignedRequests extends Page implements HasTable
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserPlus;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Verifications';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Work';
 
     protected static ?string $navigationLabel = 'Unassigned Requests';
 
@@ -86,9 +86,9 @@ class VerificationUnassignedRequests extends Page implements HasTable
                     ->label('Patient')
                     ->state(fn (BillingWorkItem $record): HtmlString => new HtmlString(
                         '<div style="display:flex;flex-direction:column;gap:2px;min-width:160px;">'
-                        . '<span style="font-weight:700;color:#0f172a;">' . e($record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? '-')) . '</span>'
-                        . '<span style="font-size:11px;color:#64748b;">' . e($record->reference_number ?: 'No reference') . '</span>'
-                        . '</div>'
+                        .'<span style="font-weight:700;color:#0f172a;">'.e($record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? '-')).'</span>'
+                        .'<span style="font-size:11px;color:#64748b;">'.e($record->reference_number ?: 'No reference').'</span>'
+                        .'</div>'
                     ))
                     ->html()
                     ->searchable(query: function (Builder $query, string $search): void {

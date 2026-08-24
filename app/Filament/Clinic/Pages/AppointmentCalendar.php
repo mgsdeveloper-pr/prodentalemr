@@ -20,11 +20,11 @@ class AppointmentCalendar extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Daily Work';
+    protected static string|UnitEnum|null $navigationGroup = 'Scheduling';
 
     protected static ?string $navigationLabel = 'Calendar';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $title = 'Appointment Calendar';
 

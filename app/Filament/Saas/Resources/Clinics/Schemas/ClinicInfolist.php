@@ -39,6 +39,15 @@ class ClinicInfolist
                                     ->label('Clinic code')
                                     ->badge()
                                     ->color('gray'),
+                                TextEntry::make('clinic_npi')
+                                    ->label('Clinic NPI')
+                                    ->placeholder('-'),
+                                TextEntry::make('tax_id')
+                                    ->label('Tax ID / EIN')
+                                    ->formatStateUsing(fn (?string $state): string => filled($state)
+                                        ? '***-**-'.substr(preg_replace('/\D/', '', $state), -4)
+                                        : '-')
+                                    ->placeholder('-'),
                                 TextEntry::make('timezone')
                                     ->badge()
                                     ->color('info'),

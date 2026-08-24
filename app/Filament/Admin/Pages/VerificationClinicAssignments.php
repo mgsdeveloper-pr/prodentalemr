@@ -5,7 +5,6 @@ namespace App\Filament\Admin\Pages;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\User;
 use BackedEnum;
-use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -23,9 +22,9 @@ class VerificationClinicAssignments extends Page implements HasForms
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Access Management';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
-    protected static ?string $navigationLabel = 'Assign Clinic';
+    protected static ?string $navigationLabel = 'Clinic Assignments';
 
     protected static ?int $navigationSort = 2;
 

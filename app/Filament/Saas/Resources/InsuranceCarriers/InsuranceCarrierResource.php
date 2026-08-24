@@ -9,10 +9,10 @@ use App\Models\InsuranceCarrier;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -41,7 +41,19 @@ class InsuranceCarrierResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return Filament::getCurrentPanel()?->getId() === 'saas';
+        return in_array(Filament::getCurrentPanel()?->getId(), ['saas', 'admin'], true);
+    }
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin'
+            ? 'Resources'
+            : 'Master Data';
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin' ? 1 : 10;
     }
 
     public static function getModelLabel(): string

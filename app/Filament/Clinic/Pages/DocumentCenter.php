@@ -2,8 +2,8 @@
 
 namespace App\Filament\Clinic\Pages;
 
-use App\Support\ClinicWorkspace;
 use App\Support\ClinicPanelScope;
+use App\Support\ClinicWorkspace;
 use App\Support\DocumentCenter as DocumentCenterData;
 use App\Support\SaasEntitlements;
 use BackedEnum;
@@ -13,13 +13,13 @@ use UnitEnum;
 
 class DocumentCenter extends Page
 {
-    protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-document-magnifying-glass';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-document-magnifying-glass';
 
-    protected static string | UnitEnum | null $navigationGroup = 'Documents';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Directory';
 
     protected static ?string $navigationLabel = 'Documents';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $title = '';
 

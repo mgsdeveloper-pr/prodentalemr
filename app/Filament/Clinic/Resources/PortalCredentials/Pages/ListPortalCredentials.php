@@ -3,27 +3,37 @@
 namespace App\Filament\Clinic\Resources\PortalCredentials\Pages;
 
 use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
+use App\Filament\Concerns\ManagesPortalCredentialSecurityQuestions;
+use App\Models\AuditLog;
+use App\Models\PortalCredential;
 use App\Support\ClinicPanelScope;
+use App\Support\VerificationManagedServiceAccess;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Support\Collection;
-use App\Models\PortalCredential;
-use App\Models\AuditLog;
-use App\Support\VerificationManagedServiceAccess;
 
 class ListPortalCredentials extends ListRecords
 {
+    use ManagesPortalCredentialSecurityQuestions;
+
     protected static string $resource = PortalCredentialResource::class;
 
     protected string $view = 'filament.clinic.resources.portal-credentials.pages.portal-credential-workspace';
 
     public string $search = '';
+
     public bool $passwordModalOpen = false;
+
     public ?int $editingCredentialId = null;
+
     public ?string $editingCredentialName = null;
+
     public ?string $editingCredentialLink = null;
+
     public ?string $editingCredentialUsername = null;
+
     public string $newPassword = '';
+
     public string $newPasswordConfirmation = '';
 
     public function getSelectedClinicName(): ?string
@@ -34,13 +44,14 @@ class ListPortalCredentials extends ListRecords
     public function getPortalCredentials(): Collection
     {
         return $this->getScopedPortalCredentialQuery()
+            ->withCount('securityQuestions')
             ->when(filled($this->search), function ($query): void {
                 $query->where(function ($builder): void {
                     $builder
-                        ->where('portal_name', 'like', '%' . $this->search . '%')
-                        ->orWhere('login_url', 'like', '%' . $this->search . '%')
-                        ->orWhere('portal_category', 'like', '%' . $this->search . '%')
-                        ->orWhere('account_reference', 'like', '%' . $this->search . '%');
+                        ->where('portal_name', 'like', '%'.$this->search.'%')
+                        ->orWhere('login_url', 'like', '%'.$this->search.'%')
+                        ->orWhere('portal_category', 'like', '%'.$this->search.'%')
+                        ->orWhere('account_reference', 'like', '%'.$this->search.'%');
                 });
             })
             ->orderByDesc('is_active')
@@ -135,28 +146,24 @@ class ListPortalCredentials extends ListRecords
         $this->guardSecretField($field);
         $this->recordSecretAccess($credential, $field, 'revealed');
 
-        $this->dispatch(
-            'portal-credential-revealed',
-            targetId: "portal-{$field}-{$credential->getKey()}",
-            value: (string) ($credential->{$field} ?? ''),
+        $this->revealPortalCredentialValue(
+            "portal-{$field}-{$credential->getKey()}",
+            (string) ($credential->{$field} ?? ''),
         );
     }
 
-    public function copyCredentialSecret(int $credentialId, string $field): void
+    public function copyCredentialSecret(int $credentialId, string $field): string
     {
         $credential = $this->resolveAccessibleCredential($credentialId);
         $this->guardSecretField($field);
         $this->recordSecretAccess($credential, $field, 'copied');
 
-        $this->dispatch(
-            'portal-credential-copy',
-            value: (string) ($credential->{$field} ?? ''),
-        );
-
         Notification::make()
             ->success()
-            ->title(ucfirst($field) . ' copied')
+            ->title(ucfirst($field).' copied')
             ->send();
+
+        return (string) ($credential->{$field} ?? '');
     }
 
     public function editCredentialUrl(PortalCredential $credential): string

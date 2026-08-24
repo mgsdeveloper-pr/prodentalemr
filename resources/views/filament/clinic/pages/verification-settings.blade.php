@@ -9,9 +9,6 @@
         $previewPdfUrl = $this->getPreviewPdfUrl();
         $summaryRows = $this->getSummaryRows();
         $templateUrl = $this->getManageQuestionsUrl();
-        $reorderUrl = $this->getReorderQuestionsUrl();
-        $createQuestionUrl = $this->getCreateQuestionUrl();
-        $portalCredentialsUrl = $this->getPortalCredentialsUrl();
         $clinicTemplateRows = $this->getClinicTemplateVersionRows();
         $canManageClinicTemplate = $this->canManageSelectedClinicTemplate();
         $hasWorkingClinicDraft = collect($clinicTemplateRows)->contains(fn (array $row): bool => $row['is_working_draft']);
@@ -20,14 +17,6 @@
             ['key' => 'template-selection', 'label' => 'Template Selection', 'description' => 'Choose the verification form this clinic will use.', 'active' => $activeSettingsSection === 'template-selection', 'icon' => '01', 'url' => null],
             ['key' => 'template-management', 'label' => 'Template Management', 'description' => 'Manage templates, sections, questions, and preview.', 'active' => $activeSettingsSection === 'template-management', 'icon' => '02', 'url' => null],
             ['key' => 'pdf-settings', 'label' => 'PDF Settings', 'description' => 'Select the user PDF output and preset profile.', 'active' => $activeSettingsSection === 'pdf-settings', 'icon' => '03', 'url' => null],
-            ...(\App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::canViewAny() ? [[
-                'key' => 'portal-credentials',
-                'label' => 'Portal Credentials',
-                'description' => 'Open the secure clinic credential workspace.',
-                'active' => false,
-                'icon' => '04',
-                'url' => $portalCredentialsUrl,
-            ]] : []),
         ];
     @endphp
 
@@ -913,7 +902,7 @@
                             @if ($canManageClinicTemplate)
                                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
                                     @if ($hasWorkingClinicDraft)
-                                        <a href="{{ $templateUrl }}" wire:navigate class="vs-button">Open Working Draft</a>
+                                        <a href="{{ $templateUrl }}?draft=1" wire:navigate class="vs-button">Open Working Draft</a>
                                     @endif
                                     <button type="button" wire:click.prevent="createClinicTemplateDraft" wire:loading.attr="disabled" wire:target="createClinicTemplateDraft" class="vs-button">
                                         <span wire:loading.remove wire:target="createClinicTemplateDraft">Create Draft Template</span>
@@ -995,11 +984,9 @@
                                         </td>
                                         <td>
                                             <div class="vs-table-actions">
-                                                <a href="{{ $templateUrl }}" wire:navigate class="vs-button">View</a>
-                                                @if ($row['can_edit'])
-                                                    <a href="{{ $createQuestionUrl }}" wire:navigate class="vs-button">Add Question</a>
-                                                    <a href="{{ $reorderUrl }}" wire:navigate class="vs-button">Re-order</a>
-                                                @endif
+                                                <a href="{{ $templateUrl }}{{ $row['is_draft'] ? '?draft=1' : '' }}" wire:navigate class="vs-button">
+                                                    {{ $row['is_draft'] ? 'Open Builder' : 'View Builder' }}
+                                                </a>
                                                 @if ($row['is_draft'] && $row['can_edit'])
                                                     <button type="button" wire:click.prevent="publishClinicTemplateDraft" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishClinicTemplateDraft" class="vs-button vs-button--primary">
                                                         <span wire:loading.remove wire:target="publishClinicTemplateDraft">Publish</span>

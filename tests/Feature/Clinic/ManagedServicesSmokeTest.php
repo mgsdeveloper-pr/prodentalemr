@@ -1,23 +1,33 @@
 <?php
 
+use App\Filament\Clinic\Pages\PortalCredentialSettings;
+use App\Filament\Clinic\Pages\VerificationSettings;
+use App\Filament\Clinic\Resources\PortalCredentials\Pages\ListPortalCredentials;
+use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
+use App\Filament\Clinic\Resources\VerificationQuestions\Pages\CreateVerificationQuestion;
+use App\Filament\Clinic\Resources\VerificationQuestions\Pages\ListVerificationQuestions;
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
+use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\BillingWorkItem;
-use App\Models\Clinic;
 use App\Models\ClientServiceEnrollment;
+use App\Models\Clinic;
 use App\Models\Location;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\PortalCredential;
+use App\Models\PortalCredentialSecurityQuestion;
 use App\Models\Provider;
 use App\Models\User;
+use App\Models\VerificationFormQuestion;
 use App\Models\VerificationPdfPreset;
 use App\Models\VerificationTemplateVersion;
-use App\Filament\Clinic\Pages\VerificationSettings;
-use App\Filament\Clinic\Resources\PortalCredentials\Pages\ListPortalCredentials;
+use App\Services\Verification\WorkflowService;
 use Database\Seeders\RoleSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -245,12 +255,12 @@ it('freezes self-managed and managed-service processing rules on each request', 
 });
 
 it('offers per-request routing only when the managed enrollment allows clinic workspace', function () {
-    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+    expect(VerificationRequestForm::processingModeOptions(
         $this->organization->id,
         $this->clinic->id,
         $this->location->id,
     ))->toBe([BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed'])
-        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+        ->and(VerificationRequestForm::processingModeHelperText(
             $this->organization->id,
             $this->clinic->id,
             $this->location->id,
@@ -266,12 +276,12 @@ it('offers per-request routing only when the managed enrollment allows clinic wo
         'clinic_workspace_enabled' => false,
     ]);
 
-    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+    expect(VerificationRequestForm::processingModeOptions(
         $this->organization->id,
         $this->clinic->id,
         $this->location->id,
     ))->toBe([BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service'])
-        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+        ->and(VerificationRequestForm::processingModeHelperText(
             $this->organization->id,
             $this->clinic->id,
             $this->location->id,
@@ -279,19 +289,19 @@ it('offers per-request routing only when the managed enrollment allows clinic wo
 
     $managedEnrollment->update(['clinic_workspace_enabled' => true]);
 
-    expect(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeOptions(
+    expect(VerificationRequestForm::processingModeOptions(
         $this->organization->id,
         $this->clinic->id,
         $this->location->id,
     ))->toBe([
         BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service',
         BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Self-Managed',
-    ])->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+    ])->and(VerificationRequestForm::processingModeHelperText(
         $this->organization->id,
         $this->clinic->id,
         $this->location->id,
     ))->toBe('Choose whether the clinic will self-manage this request or send it to Managed Service.')
-        ->and(\App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm::processingModeHelperText(
+        ->and(VerificationRequestForm::processingModeHelperText(
             null,
             null,
             null,
@@ -331,7 +341,7 @@ it('preserves the completed form snapshot when a clinic requests a correction', 
         'payload' => ['answers' => [['prompt' => 'Eligibility status', 'value' => 'Active']]],
     ]);
 
-    $updated = app(\App\Services\Verification\WorkflowService::class)->requestCorrection(
+    $updated = app(WorkflowService::class)->requestCorrection(
         $request,
         'Please confirm the annual maximum remaining.',
         $this->clinicUser,
@@ -390,6 +400,125 @@ it('keeps verification settings page actions wired', function () {
 
     expect(Livewire::test(VerificationSettings::class)->instance()->getPreviewPdfUrl())
         ->toBe(route('clinic.verification-requests.pdf.preview', $workItem));
+});
+
+it('renders the clinic template builder as one focused workspace', function () {
+    $this->actingAs($this->clinicUser);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    $component = Livewire::test(ListVerificationQuestions::class)
+        ->assertSee('Clinic Template Builder')
+        ->assertSee('Template Structure')
+        ->assertSee('Frequency & Percentage')
+        ->assertSee('Reorder')
+        ->assertSee('Add Question')
+        ->assertSee('Form Preview')
+        ->call('beginTemplateChange', 'reorder')
+        ->assertSet('pendingBuilderAction', 'reorder')
+        ->assertSet('showCreateDraftModal', true)
+        ->assertSee('Create an editable copy?')
+        ->assertSee('Continue to Reorder')
+        ->assertDontSee('Clinic visibility');
+
+    expect($component->instance()->getBuilderCounts())
+        ->toMatchArray([
+            'main_sections' => 8,
+            'sub_sections' => 4,
+        ]);
+});
+
+it('continues add question and reorder actions inside a clinic draft', function () {
+    $this->actingAs($this->clinicUser);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    $component = Livewire::test(ListVerificationQuestions::class);
+    $sectionKey = $component->instance()->getSelectedBuilderSection()['key'];
+
+    $component
+        ->call('selectBuilderSection', $sectionKey)
+        ->call('beginTemplateChange', 'questions')
+        ->assertSet('showCreateDraftModal', true)
+        ->assertSee('Continue to Add Question')
+        ->call('submitCreateDraftVersion')
+        ->assertHasNoErrors()
+        ->assertRedirect(VerificationQuestionResource::getUrl('create', ['section' => $sectionKey]));
+
+    $draft = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+        ->where('is_working_draft', true)
+        ->latest('id')
+        ->firstOrFail();
+
+    Livewire::withQueryParams(['section' => 'template_3_verification_information'])
+        ->test(CreateVerificationQuestion::class)
+        ->assertSet('requestedSectionKey', 'template_3_verification_information')
+        ->assertSet('data.section_key', 'template_3_verification_information')
+        ->assertSet('data.sub_section_key', null)
+        ->assertSee('Add Question')
+        ->assertSee('Verification Information')
+        ->assertSee('Question placement')
+        ->assertDontSee('Create and organize verification questions')
+        ->assertDontSee('Clinic Clinic Template');
+
+    Livewire::test(CreateVerificationQuestion::class)
+        ->fillForm([
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => $sectionKey,
+            'form_type' => 'both',
+            'prompt' => 'Clinic action test question',
+            'input_type' => 'text',
+            'is_active' => true,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(VerificationFormQuestion::query()
+        ->where('template_version_id', $draft->id)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('section_key', $sectionKey)
+        ->where('prompt', 'Clinic action test question')
+        ->exists())->toBeTrue();
+
+    $reorderSectionKey = VerificationFormQuestion::query()
+        ->where('template_version_id', $draft->id)
+        ->selectRaw('section_key, count(*) as total')
+        ->groupBy('section_key')
+        ->havingRaw('count(*) >= 2')
+        ->orderBy('section_key')
+        ->value('section_key');
+
+    expect($reorderSectionKey)->not->toBeNull();
+
+    $questions = VerificationFormQuestion::query()
+        ->where('template_version_id', $draft->id)
+        ->where('section_key', $reorderSectionKey)
+        ->orderBy('sort_order')
+        ->orderBy('id')
+        ->take(2)
+        ->get();
+
+    expect($questions)->toHaveCount(2);
+
+    Livewire::test(ListVerificationQuestions::class)
+        ->call('selectBuilderSection', $reorderSectionKey)
+        ->call('beginTemplateChange', 'reorder')
+        ->assertSet('showDraft', true)
+        ->assertSet('builderView', 'reorder')
+        ->call('repositionQuestion', $questions[1]->id, 'up')
+        ->assertHasNoErrors();
+
+    $reorderedIds = VerificationFormQuestion::query()
+        ->where('template_version_id', $draft->id)
+        ->where('section_key', $reorderSectionKey)
+        ->orderBy('sort_order')
+        ->orderBy('id')
+        ->take(2)
+        ->pluck('id')
+        ->all();
+
+    expect($reorderedIds)->toBe([$questions[1]->id, $questions[0]->id]);
 });
 
 it('archives only unused clinic template versions from settings', function () {
@@ -496,7 +625,7 @@ it('maps only visible selected clinic portal credentials into verification setti
         'visible_to_clinic' => false,
     ]);
 
-    $credentials = \App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getEloquentQuery()->get();
+    $credentials = PortalCredentialResource::getEloquentQuery()->get();
 
     expect($credentials)->toHaveCount(1);
     expect($credentials->first()->is($visibleCredential))->toBeTrue();
@@ -532,13 +661,41 @@ it('keeps portal secrets out of the initial clinic credential page and audits ex
         'visible_to_clinic' => true,
     ]);
 
+    $securityQuestion = $credential->securityQuestions()->create([
+        'question' => 'What was the first office street?',
+        'answer' => 'Protected Oak Answer',
+        'is_required' => true,
+        'sort_order' => 1,
+    ]);
+
+    $rawSecurityQuestion = DB::table('portal_credential_security_questions')
+        ->where('id', $securityQuestion->id)
+        ->first();
+
+    expect($rawSecurityQuestion->question)->not->toContain('first office street')
+        ->and($rawSecurityQuestion->answer)->not->toContain('Protected Oak Answer')
+        ->and(PortalCredentialSecurityQuestion::find($securityQuestion->id)?->answer)->toBe('Protected Oak Answer');
+
     $this->actingAs($this->clinicUser);
 
     $component = Livewire::test(ListPortalCredentials::class)
         ->assertDontSee('private-portal-user')
         ->assertDontSee('private-portal-password')
+        ->assertDontSee('Protected Oak Answer')
+        ->call('openSecurityQuestions', $credential->id)
+        ->assertSet('securityQuestionsModalOpen', true)
+        ->assertSee('What was the first office street?')
+        ->assertDontSee('Protected Oak Answer')
+        ->call('revealSecurityQuestionAnswer', $credential->id, $securityQuestion->id)
+        ->call('copySecurityQuestionAnswer', $credential->id, $securityQuestion->id)
+        ->call('copyCredentialSecret', $credential->id, 'username')
         ->call('revealCredentialSecret', $credential->id, 'password')
-        ->assertDispatched('portal-credential-revealed');
+        ->call('openPasswordEditor', $credential->id)
+        ->assertSet('passwordModalOpen', true)
+        ->call('closePasswordEditor')
+        ->assertSet('passwordModalOpen', false)
+        ->call('closeSecurityQuestions')
+        ->assertSet('securityQuestionsModalOpen', false);
 
     expect($component->instance()->getPortalCredentials())->toHaveCount(1);
     expect(AuditLog::query()
@@ -557,6 +714,17 @@ it('keeps portal secrets out of the initial clinic credential page and audits ex
         ->not->toContain('private-portal-password')
         ->toContain('Secure Payer Portal');
 
-    Livewire::test(\App\Filament\Clinic\Pages\PortalCredentialSettings::class)
-        ->assertRedirect(\App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::getUrl('index'));
+    $securityAuditPayload = AuditLog::query()
+        ->where('module', 'portal_credentials')
+        ->where('action', 'security_answer_revealed')
+        ->latest('id')
+        ->value('new_values');
+
+    expect($securityAuditPayload)
+        ->not->toContain('Protected Oak Answer')
+        ->not->toContain('first office street')
+        ->toContain('Secure Payer Portal');
+
+    Livewire::test(PortalCredentialSettings::class)
+        ->assertRedirect(PortalCredentialResource::getUrl('index'));
 });

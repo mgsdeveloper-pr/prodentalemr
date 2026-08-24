@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Providers\Schemas;
 
 use App\Models\Location;
 use App\Models\User;
+use App\Support\ClinicPanelScope;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -19,9 +20,9 @@ class ProviderForm
         return $schema
             ->components([
                 Hidden::make('organization_id')
-                    ->default(fn () => auth()->user()?->organization_id),
+                    ->default(fn () => ClinicPanelScope::selectedOrganizationId()),
                 Hidden::make('clinic_id')
-                    ->default(fn () => auth()->user()?->clinic_id),
+                    ->default(fn () => ClinicPanelScope::selectedClinicId()),
                 Section::make('Provider Identity')
                     ->description('Link the clinical provider profile to an existing clinic user account.')
                     ->schema([
@@ -31,12 +32,12 @@ class ProviderForm
                                     ->label('Linked user')
                                     ->options(fn (): array => User::query()
                                         ->with('roles')
-                                        ->where('organization_id', auth()->user()?->organization_id)
-                                        ->where('clinic_id', auth()->user()?->clinic_id)
+                                        ->where('organization_id', ClinicPanelScope::selectedOrganizationId())
+                                        ->where('clinic_id', ClinicPanelScope::selectedClinicId())
                                         ->whereHas('roles', fn ($query) => $query->whereIn('name', ['doctor', 'clinic_admin', 'clinic_manager']))
                                         ->orderBy('name')
                                         ->get()
-                                        ->mapWithKeys(fn (User $user) => [$user->id => $user->name . ' · ' . ($user->getPrimaryRoleLabel() ?? 'Clinic user')])
+                                        ->mapWithKeys(fn (User $user) => [$user->id => $user->name.' · '.($user->getPrimaryRoleLabel() ?? 'Clinic user')])
                                         ->all())
                                     ->searchable()
                                     ->preload()
@@ -45,7 +46,7 @@ class ProviderForm
                                 Select::make('location_id')
                                     ->label('Primary location')
                                     ->options(fn (): array => Location::query()
-                                        ->where('clinic_id', auth()->user()?->clinic_id)
+                                        ->where('clinic_id', ClinicPanelScope::selectedClinicId())
                                         ->orderBy('location_name')
                                         ->pluck('location_name', 'id')
                                         ->all())

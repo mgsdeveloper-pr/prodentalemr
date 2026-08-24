@@ -5,19 +5,20 @@ namespace App\Filament\Saas\Resources\PortalCredentials;
 use App\Filament\Saas\Resources\PortalCredentials\Pages\CreatePortalCredential;
 use App\Filament\Saas\Resources\PortalCredentials\Pages\EditPortalCredential;
 use App\Filament\Saas\Resources\PortalCredentials\Pages\ListPortalCredentials;
+use App\Models\PortalCredential;
 use App\Support\AdminClinicScope;
 use App\Support\SaasSupportAccess;
-use App\Models\PortalCredential;
 use BackedEnum;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Facades\Filament;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Placeholder;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -43,7 +44,19 @@ class PortalCredentialResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return Filament::getCurrentPanel()?->getId() !== 'admin';
+        return in_array(Filament::getCurrentPanel()?->getId(), ['saas', 'admin'], true);
+    }
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin'
+            ? 'Resources'
+            : 'Verifications';
+    }
+
+    public static function getNavigationSort(): ?int
+    {
+        return Filament::getCurrentPanel()?->getId() === 'admin' ? 2 : 4;
     }
 
     public static function form(Schema $schema): Schema
@@ -103,9 +116,41 @@ class PortalCredentialResource extends Resource
                                     ->label('MFA Method')
                                     ->options(PortalCredential::MFA_METHOD_OPTIONS)
                                     ->native(false)
+                                    ->live()
                                     ->default('none')
                                     ->visible(fn ($get): bool => (bool) $get('mfa_required'))
                                     ->columnSpan(3),
+                                Repeater::make('securityQuestions')
+                                    ->relationship()
+                                    ->label('Security Questions & Answers')
+                                    ->helperText('Add each portal challenge exactly as shown. Questions and answers are encrypted and only revealed through audited actions.')
+                                    ->visible(fn ($get): bool => (bool) $get('mfa_required') && $get('mfa_method') === 'security_question')
+                                    ->required(fn ($get): bool => (bool) $get('mfa_required') && $get('mfa_method') === 'security_question')
+                                    ->minItems(1)
+                                    ->orderColumn('sort_order')
+                                    ->addActionLabel('Add security question')
+                                    ->columns(12)
+                                    ->schema([
+                                        TextInput::make('question')
+                                            ->label('Security Question')
+                                            ->required()
+                                            ->maxLength(500)
+                                            ->columnSpan(6),
+                                        TextInput::make('answer')
+                                            ->label('Protected Answer')
+                                            ->password()
+                                            ->revealable()
+                                            ->required()
+                                            ->maxLength(500)
+                                            ->columnSpan(4),
+                                        Toggle::make('is_required')
+                                            ->label('Required')
+                                            ->helperText('Mark when the portal asks this question during sign-in.')
+                                            ->default(true)
+                                            ->inline(false)
+                                            ->columnSpan(2),
+                                    ])
+                                    ->columnSpan(12),
                                 Toggle::make('is_active')
                                     ->label('Active')
                                     ->default(true)
@@ -194,6 +239,12 @@ class PortalCredentialResource extends Resource
     {
         $clinic = AdminClinicScope::selectedClinic();
 
+        if (Filament::getCurrentPanel()?->getId() === 'admin') {
+            return $clinic !== null
+                && (auth()->user()?->can('create', PortalCredential::class) ?? false)
+                && (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'add') ?? false);
+        }
+
         return $clinic !== null
             && SaasSupportAccess::matchesScope((int) $clinic->organization_id, (int) $clinic->getKey())
             && (auth()->user()?->can('create', PortalCredential::class) ?? false);
@@ -201,16 +252,30 @@ class PortalCredentialResource extends Resource
 
     public static function canEdit(Model $record): bool
     {
-        return (auth()->user()?->can('update', $record) ?? false)
-            && $record instanceof PortalCredential
-            && SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
+        if (! $record instanceof PortalCredential || ! (auth()->user()?->can('update', $record) ?? false)) {
+            return false;
+        }
+
+        if (Filament::getCurrentPanel()?->getId() === 'admin') {
+            return (int) AdminClinicScope::selectedClinicId() === (int) $record->clinic_id
+                && (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'update') ?? false);
+        }
+
+        return SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
     }
 
     public static function canDelete(Model $record): bool
     {
-        return (auth()->user()?->can('delete', $record) ?? false)
-            && $record instanceof PortalCredential
-            && SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
+        if (! $record instanceof PortalCredential || ! (auth()->user()?->can('delete', $record) ?? false)) {
+            return false;
+        }
+
+        if (Filament::getCurrentPanel()?->getId() === 'admin') {
+            return (int) AdminClinicScope::selectedClinicId() === (int) $record->clinic_id
+                && (auth()->user()?->canPerformVerificationModuleAction('portal_credentials', 'delete') ?? false);
+        }
+
+        return SaasSupportAccess::matchesScope((int) $record->organization_id, (int) $record->clinic_id);
     }
 
     public static function canRestore(Model $record): bool

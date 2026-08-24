@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Filament\Admin\Pages\PortalCredentialSettings;
 use App\Filament\Admin\Pages\UserMailboxSettingsPage;
 use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationGeneralSettings;
@@ -10,6 +9,7 @@ use App\Filament\Admin\Pages\VerificationInboxSettings;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationSettings;
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
+use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use Filament\Facades\Filament;
 
@@ -54,12 +54,12 @@ class VerificationSettingsNavigation
             ];
         }
 
-        if (PortalCredentialSettings::canAccess()) {
+        if (PortalCredentialResource::canViewAny()) {
             $items[] = [
                 'key' => 'credentials',
                 'label' => 'Portal Credentials',
                 'icon' => 'heroicon-o-key',
-                'url' => PortalCredentialSettings::getUrl(),
+                'url' => PortalCredentialResource::getUrl('index'),
             ];
         }
 

@@ -17,6 +17,8 @@ use UnitEnum;
 
 class UserMailboxPage extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     use WithFileUploads;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-envelope-open';
@@ -118,7 +120,7 @@ class UserMailboxPage extends Page
     {
         $status = $this->getConnectionStatus();
 
-        return 'Review live inbox, spam, and sent mail from your connected mailbox. Connection: ' . $status['label'] . '.';
+        return 'Review live inbox, spam, and sent mail from your connected mailbox. Connection: '.$status['label'].'.';
     }
 
     public function getBreadcrumbs(): array
@@ -180,7 +182,7 @@ class UserMailboxPage extends Page
             'composeFormData.bcc' => ['nullable', 'string'],
             'composeFormData.subject' => ['required', 'string'],
             'composeFormData.body' => ['required', 'string'],
-            'composeAttachments.*' => ['file', 'max:' . $this->attachmentLimitKilobytes()],
+            'composeAttachments.*' => ['file', 'max:'.$this->attachmentLimitKilobytes()],
         ]);
 
         try {
@@ -392,7 +394,7 @@ class UserMailboxPage extends Page
 
     protected function replySubject(string $subject): string
     {
-        return Str::startsWith(Str::lower($subject), 're:') ? $subject : 'Re: ' . $subject;
+        return Str::startsWith(Str::lower($subject), 're:') ? $subject : 'Re: '.$subject;
     }
 
     protected function isOwnMailboxAddress(string $email): bool

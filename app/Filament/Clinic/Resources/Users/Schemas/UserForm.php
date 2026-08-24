@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Users\Schemas;
 
 use App\Models\Location;
 use App\Models\User;
+use App\Support\ClinicPanelScope;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -17,9 +18,9 @@ class UserForm
         return $schema
             ->components([
                 Hidden::make('organization_id')
-                    ->default(fn () => auth()->user()?->organization_id),
+                    ->default(fn () => ClinicPanelScope::selectedOrganizationId()),
                 Hidden::make('clinic_id')
-                    ->default(fn () => auth()->user()?->clinic_id),
+                    ->default(fn () => ClinicPanelScope::selectedClinicId()),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),
@@ -40,7 +41,7 @@ class UserForm
                 Select::make('location_id')
                     ->label('Location')
                     ->options(fn (): array => Location::query()
-                        ->when(auth()->user()?->clinic_id, fn ($query, $clinicId) => $query->where('clinic_id', $clinicId))
+                        ->where('clinic_id', ClinicPanelScope::selectedClinicId())
                         ->orderBy('location_name')
                         ->pluck('location_name', 'id')
                         ->all())

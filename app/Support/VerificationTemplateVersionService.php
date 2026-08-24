@@ -8,6 +8,7 @@ use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class VerificationTemplateVersionService
 {
@@ -99,7 +100,7 @@ class VerificationTemplateVersionService
                 'parent_version_id' => $master->id,
                 'source_version_id' => $master->id,
                 'version_number' => 1,
-                'name' => $clinic->clinic_name . ' Master Template',
+                'name' => $clinic->clinic_name.' Master Template',
                 'form_type' => $master->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
                 'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
@@ -120,7 +121,7 @@ class VerificationTemplateVersionService
     public function createDraftFromPublished(VerificationTemplateVersion $published): VerificationTemplateVersion
     {
         return $this->createDraftFromSource($published, [
-            'name' => $published->name . ' Draft',
+            'name' => $published->name.' Draft',
             'form_type' => $published->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
             'clinic_visibility' => $published->clinic_visibility ?: VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
         ]);
@@ -192,14 +193,14 @@ class VerificationTemplateVersionService
         };
 
         if (! $source) {
-            return 'Fresh draft created for ' . $formLabel . '.';
+            return 'Fresh draft created for '.$formLabel.'.';
         }
 
         $sourceLabel = $startingPoint === 'specific_version'
-            ? 'specific version ' . $source->version_number
-            : 'current master version ' . $source->version_number;
+            ? 'specific version '.$source->version_number
+            : 'current master version '.$source->version_number;
 
-        return 'Draft replicated from ' . $sourceLabel . ' for ' . $formLabel . '.';
+        return 'Draft replicated from '.$sourceLabel.' for '.$formLabel.'.';
     }
 
     protected function filterDraftQuestionsForFormType(VerificationTemplateVersion $draft, string $formType): void
@@ -258,7 +259,7 @@ class VerificationTemplateVersionService
                 );
             }
 
-            $frequencySectionMap = [
+            $legacyFrequencySectionMap = [
                 'frequency_diagnostic_preventative' => 'template_3_frequency_diagnostic_preventative',
                 'template_3_frequency_general' => 'template_3_frequency_diagnostic_preventative',
                 'frequency_basic' => 'template_3_frequency_basic',
@@ -266,13 +267,30 @@ class VerificationTemplateVersionService
                 'frequency_orthodontics_benefit' => 'template_3_frequency_orthodontics',
             ];
 
-            foreach ($frequencySectionMap as $from => $to) {
+            foreach ($legacyFrequencySectionMap as $from => $to) {
+                // Preserve questions deliberately added by an administrator or
+                // clinic, but do not promote the retired fixed worksheet rows.
                 VerificationFormQuestion::query()
                     ->where('template_version_id', $version->id)
                     ->where('template_key', $version->template_key)
                     ->where('section_key', $from)
+                    ->where('is_builtin', false)
                     ->update(['section_key' => $to]);
+
+                VerificationFormQuestion::query()
+                    ->where('template_version_id', $version->id)
+                    ->where('template_key', $version->template_key)
+                    ->where('section_key', $from)
+                    ->where('is_builtin', true)
+                    ->delete();
             }
+
+            VerificationFormQuestion::query()
+                ->where('template_version_id', $version->id)
+                ->where('template_key', $version->template_key)
+                ->where('is_builtin', true)
+                ->whereIn('field_key', VerificationTemplateThreeDefaults::legacyFrequencyFieldKeys())
+                ->delete();
 
             VerificationFormQuestion::query()
                 ->where('template_version_id', $version->id)
@@ -310,7 +328,7 @@ class VerificationTemplateVersionService
             ->get()
             ->groupBy(fn (VerificationFormQuestion $question): string => implode('|', [
                 $question->section_key,
-                $question->field_key ?: 'prompt:' . trim((string) $question->prompt),
+                $question->field_key ?: 'prompt:'.trim((string) $question->prompt),
                 $question->code ?: '',
             ]))
             ->each(function ($duplicates): void {
@@ -322,8 +340,9 @@ class VerificationTemplateVersionService
         VerificationTemplateVersion $draft,
         ?string $name = null,
         ?string $notes = null,
-    ): VerificationTemplateVersion
-    {
+    ): VerificationTemplateVersion {
+        $this->assertPublishable($draft);
+
         return DB::transaction(function () use ($draft, $name, $notes): VerificationTemplateVersion {
             VerificationTemplateVersion::query()
                 ->where('scope', $draft->scope)
@@ -345,6 +364,59 @@ class VerificationTemplateVersionService
 
             return $draft->refresh();
         });
+    }
+
+    public function assertPublishable(VerificationTemplateVersion $version): void
+    {
+        if ($version->template_key !== VerificationFormQuestion::DEFAULT_TEMPLATE_KEY) {
+            return;
+        }
+
+        $legacySectionKeys = [
+            'core_details',
+            'coverage_matrix',
+            'frequency_diagnostic_preventative',
+            'frequency_basic',
+            'frequency_major',
+            'frequency_orthodontics_benefit',
+            'history',
+            'plan_provisions',
+            'service_history',
+            'verification_information',
+            'template_3_frequency_general',
+        ];
+
+        $hasLegacyRows = $version->questions()
+            ->where(function ($query) use ($legacySectionKeys): void {
+                $query
+                    ->whereIn('section_key', $legacySectionKeys)
+                    ->orWhere(function ($query): void {
+                        $query
+                            ->where('is_builtin', true)
+                            ->whereIn('field_key', VerificationTemplateThreeDefaults::legacyFrequencyFieldKeys());
+                    });
+            })
+            ->exists();
+
+        if ($hasLegacyRows) {
+            throw ValidationException::withMessages([
+                'template' => 'This draft still contains retired template questions. Rebuild the draft from the current Master Template before publishing.',
+            ]);
+        }
+
+        $duplicateFieldKey = $version->questions()
+            ->whereNotNull('field_key')
+            ->where('field_key', '!=', '')
+            ->selectRaw('field_key, count(*) as copies')
+            ->groupBy('field_key')
+            ->havingRaw('count(*) > 1')
+            ->value('field_key');
+
+        if ($duplicateFieldKey) {
+            throw ValidationException::withMessages([
+                'template' => "The field {$duplicateFieldKey} is included more than once. Remove the duplicate before publishing.",
+            ]);
+        }
     }
 
     public function markWorkingDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion

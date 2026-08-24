@@ -72,34 +72,15 @@ class VerificationQuestionResource extends Resource
                         Hidden::make('order_position')
                             ->default('bottom'),
                         Hidden::make('order_reference_id'),
-                        Section::make('Step 1 - Scope & Template')
-                            ->description('Choose where this question belongs before writing it. This keeps the clinic template clean and organized.')
+                        Section::make('Question Location')
+                            ->description('Confirm where this question belongs in the clinic template.')
                             ->columnSpan(12)
                             ->schema([
-                                Placeholder::make('clinic_scope')
-                                    ->label('Clinic scope')
-                                    ->content(function (): string {
-                                        $clinic = ClinicPanelScope::selectedClinic();
-
-                                        return $clinic?->clinic_name
-                                            ? $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')
-                                            : 'Select a clinic from the Workspace menu first.';
-                                    }),
                                 Grid::make(12)
                                     ->schema([
-                                        Select::make('template_key')
-                                            ->label('Template')
-                                            ->options(fn (): array => static::clinicTemplateOptions())
+                                        Hidden::make('template_key')
                                             ->default(VerificationFormQuestion::defaultTemplateKey())
-                                            ->required()
-                                            ->disabled()
-                                            ->dehydrated()
-                                            ->native(false)
-                                            ->afterStateUpdated(function (Set $set): void {
-                                                $set('section_key', null);
-                                                $set('sub_section_key', null);
-                                            })
-                                            ->columnSpan(4),
+                                            ->dehydrated(),
                                         Select::make('section_key')
                                             ->label('Template section')
                                             ->options(fn (Get $get): array => VerificationFormQuestion::topLevelSectionOptionsForTemplate($get('template_key'), ClinicPanelScope::selectedClinicId()))
@@ -110,7 +91,11 @@ class VerificationQuestionResource extends Resource
                                                 $set('sub_section_key', null);
                                                 $set('input_type', 'text');
                                             })
-                                            ->columnSpan(4),
+                                            ->columnSpan(fn (Get $get): int => count(VerificationFormQuestion::childSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                ClinicPanelScope::selectedClinicId(),
+                                                $get('section_key'),
+                                            )) > 0 ? 4 : 6),
                                         Select::make('sub_section_key')
                                             ->label('Template sub-section')
                                             ->options(fn (Get $get): array => VerificationFormQuestion::childSectionOptionsForTemplate(
@@ -139,13 +124,17 @@ class VerificationQuestionResource extends Resource
                                             })
                                             ->columnSpan(4),
                                         Select::make('form_type')
-                                            ->label('Visible on')
+                                            ->label('Form visibility')
                                             ->options(VerificationFormQuestion::FORM_TYPE_OPTIONS)
                                             ->default('both')
                                             ->required()
                                             ->live()
                                             ->native(false)
-                                            ->columnSpan(4),
+                                            ->columnSpan(fn (Get $get): int => count(VerificationFormQuestion::childSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                ClinicPanelScope::selectedClinicId(),
+                                                $get('section_key'),
+                                            )) > 0 ? 4 : 6),
                                     ]),
                             ]),
                         Section::make('Step 2 - Question & Response')
@@ -305,11 +294,8 @@ class VerificationQuestionResource extends Resource
                                             ->default(true)
                                             ->inline(false)
                                             ->columnSpan(3),
-                                        Toggle::make('is_builtin')
-                                            ->label('System question')
-                                            ->default(false)
-                                            ->inline(false)
-                                            ->columnSpan(3),
+                                        Hidden::make('is_builtin')
+                                            ->default(false),
                                         Toggle::make('is_required_for_audit')
                                             ->label('Required for Audit')
                                             ->helperText('Audit will block completion until this answer is filled. Conditional questions are checked only when visible.')
@@ -480,12 +466,14 @@ class VerificationQuestionResource extends Resource
     public static function canEdit(Model $record): bool
     {
         return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            && ! (bool) $record->is_builtin
             && static::isEditableClinicTemplateVersion($record->templateVersion);
     }
 
     public static function canDelete(Model $record): bool
     {
         return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            && ! (bool) $record->is_builtin
             && static::isEditableClinicTemplateVersion($record->templateVersion);
     }
 
@@ -555,7 +543,7 @@ class VerificationQuestionResource extends Resource
         }
 
         if (filled($clinic?->clinic_name)) {
-            return $clinic->clinic_name . ' Template';
+            return $clinic->clinic_name.' Template';
         }
 
         return 'Clinic Template';
@@ -568,6 +556,8 @@ class VerificationQuestionResource extends Resource
             ['Clinic Template Draft', 'Clinic Template'],
             $name,
         ));
+
+        $displayName = preg_replace('/\bClinic\s+Clinic\s+Template\b/i', 'Clinic Template', $displayName) ?: $displayName;
 
         if (
             filled($clinic?->clinic_name)

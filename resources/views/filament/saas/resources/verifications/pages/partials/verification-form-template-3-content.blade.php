@@ -35,7 +35,7 @@
     $templateThreeMaximumQuestions = $this->getTemplateThreeQuestionsForSection('template_3_maximums_deductibles');
     $templateThreePlanProvisionQuestions = $this->getTemplateThreeQuestionsForSection('template_3_plan_provisions');
     $templateThreeServiceHistoryQuestions = $this->getTemplateThreeQuestionsForSection('template_3_service_history');
-    $templateThreeVerificationQuestions = $this->getTemplateThreeQuestionsForSection('template_3_verification_information');
+    $templateThreeVerificationSection = $this->getTemplateThreeVerificationInformationSection();
     $templateThreeSectionProgress = collect($this->getVerificationSectionProgress());
     $templateThreeContextRows = $this->getContextRows();
     $templateThreeSidebarBlocks = [
@@ -162,14 +162,8 @@
             'total' => 5,
         ],
         'verification' => [
-            'completed' => collect([
-                $record->reference_number,
-                data_get($this->data, 'vf_insurance_representative_name'),
-                data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name,
-                data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d'),
-                data_get($this->data, 'vf_verification_notes'),
-            ])->filter(fn ($value): bool => filled($value))->count(),
-            'total' => 5,
+            'completed' => $templateThreeVerificationSection['completed'],
+            'total' => $templateThreeVerificationSection['total'],
         ],
     ];
     $templateThreeCoverageCategoryRows = [
@@ -1499,19 +1493,14 @@
             <span class="uel2-pill">{{ $templateThreeSectionCounts['verification']['completed'] }}/{{ $templateThreeSectionCounts['verification']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
-            <div class="uel2-field"><label>Reference Number</label><div style="{{ $templateThreeReadonly }}">{{ $record->reference_number }}</div></div>
-            <div class="uel2-field"><label>Insurance Representative</label><input wire:model.blur="data.vf_insurance_representative_name" style="{{ $templateThreeInput }}"></div>
-            <div class="uel2-field"><label>Verified By</label><div style="{{ $templateThreeReadonly }}">{{ data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-' }}</div></div>
-            <div class="uel2-field"><label>Verification Date</label><div style="{{ $templateThreeReadonly }}">{{ data_get($this->data, 'vf_verification_date') ?: now()->format('m-d-Y') }}</div></div>
-            <div class="uel2-field uel2-wide"><label>Additional Information</label><textarea wire:model.blur="data.vf_verification_notes" placeholder="Add final verification notes" style="{{ $templateThreeInput }}"></textarea></div>
-        </div>
-        @if (! empty($templateThreeVerificationQuestions))
-            <div class="uel2-body" style="padding-top:0;">
-                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
-                    'questions' => $templateThreeVerificationQuestions,
+            @foreach ($templateThreeVerificationSection['rows'] as $question)
+                @include('filament.saas.resources.verifications.pages.partials.template-3-verification-information-row', [
+                    'question' => $question,
+                    'templateThreeInput' => $templateThreeInput,
+                    'templateThreeReadonly' => $templateThreeReadonly,
                 ])
-            </div>
-        @endif
+            @endforeach
+        </div>
     </section>
                 </div>
             </div>

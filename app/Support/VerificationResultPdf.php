@@ -3,11 +3,16 @@
 namespace App\Support;
 
 use App\Models\BillingWorkItem;
+use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationFormSubmission;
+use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\VerificationResultService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 class VerificationResultPdf
 {
@@ -53,7 +58,7 @@ class VerificationResultPdf
     public static function fileName(BillingWorkItem $workItem, string $mode = 'standard', ?VerificationFormSubmission $submission = null): string
     {
         $base = $workItem->reference_number ?: 'verification-result';
-        $base .= $submission ? '-result-v' . $submission->version : '';
+        $base .= $submission ? '-result-v'.$submission->version : '';
 
         return match ($mode) {
             'custom_landscape' => "{$base}-custom-landscape.pdf",
@@ -122,6 +127,10 @@ class VerificationResultPdf
                 ->all(),
             'selectedQuestionTitles' => VerificationFormQuestion::query()
                 ->whereIn('id', $selectedQuestionIds)
+                ->where(
+                    'template_version_id',
+                    app(VerificationAuditService::class)->templateVersionId($workItem),
+                )
                 ->orderBy('section_key')
                 ->orderBy('sort_order')
                 ->orderBy('id')
@@ -158,7 +167,7 @@ class VerificationResultPdf
             ->first();
 
         $state = [
-            'context_clinic_name' => $clinic?->clinic_name ?: $location?->location_name ?: $workItem->organization?->name,
+            'context_clinic_name' => $clinic?->report_display_name ?: $clinic?->clinic_name ?: $location?->location_name ?: $workItem->organization?->name,
             'vf_patient_full_name' => $profile?->patient_full_name ?: $patient?->full_name,
             'vf_patient_dob' => static::formatDateForInput($profile?->patient_dob ?: $patient?->dob),
             'vf_patient_identifier' => $profile?->patient_identifier ?: $policy?->member_id ?: $primaryPlan?->member_id ?: $patient?->insurance_number,
@@ -195,7 +204,7 @@ class VerificationResultPdf
                     continue;
                 }
 
-                $state['vf_' . $key] ??= $value;
+                $state['vf_'.$key] ??= $value;
             }
         }
 
@@ -207,7 +216,7 @@ class VerificationResultPdf
                     return;
                 }
 
-                $state['custom_question_' . $answer->verification_form_question_id] = $answer->answer_value;
+                $state['custom_question_'.$answer->verification_form_question_id] = $answer->answer_value;
             });
 
         return $state;
@@ -226,7 +235,26 @@ class VerificationResultPdf
             'insurance_name' => $state['vf_insurance_provider_name'] ?? '-',
             'appointment_date' => static::displayValue($state['vf_appointment_date'] ?? null, 'date'),
             'assigned_to' => $workItem->assignedTo?->name ?: 'Unassigned',
+            'clinic_logo' => static::clinicLogoDataUri($workItem->clinic),
+            'report_footer' => $workItem->clinic?->report_footer,
         ];
+    }
+
+    protected static function clinicLogoDataUri(?Clinic $clinic): ?string
+    {
+        if (blank($clinic?->logo_path)) {
+            return null;
+        }
+
+        $disk = Storage::disk('branding');
+
+        if (! $disk->exists($clinic->logo_path)) {
+            return null;
+        }
+
+        $mimeType = $disk->mimeType($clinic->logo_path) ?: 'image/png';
+
+        return 'data:'.$mimeType.';base64,'.base64_encode($disk->get($clinic->logo_path));
     }
 
     protected static function buildSections(BillingWorkItem $workItem, array $state, bool $showBlankRows = true): array
@@ -238,19 +266,11 @@ class VerificationResultPdf
             return [];
         }
 
-        $questions = VerificationFormQuestion::query()
-            ->where('is_active', true)
-            ->where('clinic_id', $clinicId)
-            ->whereIn('form_type', ['both', $formType])
-            ->when(
-                filled($workItem->verification_template_version_id),
-                fn ($query) => $query->where('template_version_id', $workItem->verification_template_version_id),
-                fn ($query) => $query->whereNull('template_version_id')
-            )
-            ->orderBy('section_key')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get();
+        $questions = app(VerificationAuditService::class)->applicableQuestions(
+            $workItem,
+            VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            $formType,
+        );
 
         $hasLiveTemplateThreeSections = $questions->contains(
             fn (VerificationFormQuestion $question): bool => in_array(
@@ -283,6 +303,7 @@ class VerificationResultPdf
             }
 
             $rows = $sectionQuestions
+                ->reject(fn (VerificationFormQuestion $question): bool => $question->input_type === 'frequency_row')
                 ->map(fn (VerificationFormQuestion $question): ?array => static::mapQuestionRow($question, $state))
                 ->filter()
                 ->merge(static::mapCoverageCodeRowsForSection($workItem, $sectionKey))
@@ -321,23 +342,40 @@ class VerificationResultPdf
             return collect();
         }
 
+        $formType = $workItem->verificationProfile?->form_type ?: 'full_form';
+        $allowedSignatures = app(VerificationAuditService::class)
+            ->applicableQuestions(
+                $workItem,
+                VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+                $formType,
+                frequencyRows: true,
+            )
+            ->where('section_key', $sectionKey)
+            ->mapWithKeys(fn (VerificationFormQuestion $question): array => [
+                static::coverageRowSignature($question->code, $question->prompt) => true,
+            ]);
+
         return $workItem->verificationCoverageCodes
             ->filter(fn ($row): bool => strcasecmp((string) $row->category, $category) === 0)
+            ->filter(fn ($row): bool => $allowedSignatures->has(
+                static::coverageRowSignature($row->code, $row->description),
+            ))
+            ->unique(fn ($row): string => static::coverageRowSignature($row->code, $row->description))
             ->sortBy([
                 ['sort_order', 'asc'],
                 ['id', 'asc'],
             ])
             ->map(function ($row): array {
                 $parts = collect([
-                    filled($row->coverage_percent) ? number_format((float) $row->coverage_percent, 0) . '%' : null,
-                    filled($row->frequency) ? 'Freq: ' . $row->frequency : null,
+                    filled($row->coverage_percent) ? number_format((float) $row->coverage_percent, 0).'%' : null,
+                    filled($row->frequency) ? 'Freq: '.$row->frequency : null,
                     filled($row->coverage_status) ? $row->coverage_status : null,
-                    filled($row->age_limit) ? 'Age: ' . $row->age_limit : null,
-                    filled($row->waiting_period) ? 'WP: ' . $row->waiting_period : null,
-                    filled($row->service_history) ? 'History: ' . $row->service_history : null,
-                    filled($row->pre_auth_required) ? 'Pre-auth: ' . $row->pre_auth_required : null,
-                    filled($row->downgrade_applies) ? 'Downgrade: ' . $row->downgrade_applies : null,
-                    filled($row->notes) ? 'Notes: ' . $row->notes : null,
+                    filled($row->age_limit) ? 'Age: '.$row->age_limit : null,
+                    filled($row->waiting_period) ? 'WP: '.$row->waiting_period : null,
+                    filled($row->service_history) ? 'History: '.$row->service_history : null,
+                    filled($row->pre_auth_required) ? 'Pre-auth: '.$row->pre_auth_required : null,
+                    filled($row->downgrade_applies) ? 'Downgrade: '.$row->downgrade_applies : null,
+                    filled($row->notes) ? 'Notes: '.$row->notes : null,
                 ])->filter()->implode(' | ');
 
                 return [
@@ -348,6 +386,15 @@ class VerificationResultPdf
                 ];
             })
             ->values();
+    }
+
+    protected static function coverageRowSignature(mixed $code, mixed $description): string
+    {
+        $code = strtolower(trim((string) $code));
+
+        return $code !== ''
+            ? 'code:'.$code
+            : 'description:'.strtolower(trim((string) $description));
     }
 
     protected static function normalizeSectionKey(?string $sectionKey): string
@@ -488,7 +535,7 @@ class VerificationResultPdf
     protected static function resolveField(VerificationFormQuestion $question): ?string
     {
         if (! $question->is_builtin) {
-            return 'custom_question_' . $question->id;
+            return 'custom_question_'.$question->id;
         }
 
         return match ($question->prompt) {
@@ -530,8 +577,8 @@ class VerificationResultPdf
 
         return match ($type) {
             'date' => static::displayDate($value),
-            'currency' => '$' . number_format((float) $value, 2),
-            'percent' => number_format((float) $value, 0) . '%',
+            'currency' => '$'.number_format((float) $value, 2),
+            'percent' => number_format((float) $value, 0).'%',
             'yes_no' => match ((string) $value) {
                 '1', 'Yes', 'yes', 'true', 'True' => 'Yes',
                 '0', 'No', 'no', 'false', 'False' => 'No',
@@ -548,7 +595,7 @@ class VerificationResultPdf
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($value)->format('M d, Y');
+            return Carbon::parse($value)->format('M d, Y');
         } catch (\Throwable) {
             return (string) $value;
         }
@@ -560,12 +607,12 @@ class VerificationResultPdf
             return null;
         }
 
-        if ($value instanceof \Illuminate\Support\Carbon || $value instanceof \Carbon\CarbonInterface) {
+        if ($value instanceof Carbon || $value instanceof CarbonInterface) {
             return $value->format('Y-m-d');
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+            return Carbon::parse($value)->format('Y-m-d');
         } catch (\Throwable) {
             return null;
         }
@@ -601,10 +648,10 @@ class VerificationResultPdf
     protected static function buildInternalSummary(BillingWorkItem $record, mixed $patient, ?string $clinicDisplayName): ?string
     {
         $segments = collect([
-            filled($patient?->full_name) ? 'Verification request for ' . $patient->full_name : null,
-            filled($clinicDisplayName) ? 'Clinic: ' . $clinicDisplayName : null,
-            optional($record->appointment?->appointment_date)->format('M d, Y') ? 'Appointment: ' . optional($record->appointment?->appointment_date)->format('M d, Y') : null,
-            $record->priority ? 'Priority: ' . (BillingWorkItem::PRIORITY_OPTIONS[$record->priority] ?? str($record->priority)->headline()->toString()) : null,
+            filled($patient?->full_name) ? 'Verification request for '.$patient->full_name : null,
+            filled($clinicDisplayName) ? 'Clinic: '.$clinicDisplayName : null,
+            optional($record->appointment?->appointment_date)->format('M d, Y') ? 'Appointment: '.optional($record->appointment?->appointment_date)->format('M d, Y') : null,
+            $record->priority ? 'Priority: '.(BillingWorkItem::PRIORITY_OPTIONS[$record->priority] ?? str($record->priority)->headline()->toString()) : null,
         ])->filter(fn ($value): bool => filled($value));
 
         return $segments->isNotEmpty() ? $segments->implode(' | ') : null;

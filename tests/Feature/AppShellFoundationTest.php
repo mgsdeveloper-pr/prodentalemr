@@ -37,7 +37,12 @@ it('renders the enterprise appshell foundation partials', function (): void {
 
     expect(view('filament.appshell.compact-footer', ['workspace' => 'verification'])->render())
         ->toContain('pd-appshell-footer')
-        ->toContain('Verification');
+        ->toContain('ProDental')
+        ->toContain('&copy; '.now()->year)
+        ->not->toContain('Verification')
+        ->not->toContain('Development')
+        ->not->toContain('Build local')
+        ->not->toContain('ProDental v');
 });
 
 it('keeps appshell styling available as a shared shell asset', function (): void {

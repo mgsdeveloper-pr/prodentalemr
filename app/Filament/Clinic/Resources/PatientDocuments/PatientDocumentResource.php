@@ -27,9 +27,9 @@ class PatientDocumentResource extends Resource
 
     protected static ?string $navigationLabel = 'Patient Documents';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Documents';
+    protected static string|UnitEnum|null $navigationGroup = 'Clinic Directory';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $recordTitleAttribute = 'display_title';
 
