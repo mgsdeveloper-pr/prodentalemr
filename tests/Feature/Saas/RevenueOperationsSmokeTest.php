@@ -6,6 +6,7 @@ use App\Actions\Verification\SaveVerificationAnswerAction;
 use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationRequestResponse;
 use App\Filament\Clinic\Pages\VerificationRequestResponse as ClinicVerificationRequestResponse;
 use App\Filament\Clinic\Resources\VerificationRequests\Tables\VerificationRequestsTable;
+use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\ListVerificationFormQuestions;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemAttachment;
@@ -639,6 +640,16 @@ it('protects the complete cross panel verification lifecycle and historical outp
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 
+    $this->actingAs($manager)
+        ->get(route('admin.verifications.pdf.download', [
+            'billingWorkItem' => $request,
+            'mode' => 'custom_landscape',
+            'submission_id' => $originalCompletion->id,
+        ]))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertDownload();
+
     $this->actingAs($clinicUser)
         ->get(route('clinic.verification-requests.pdf.preview', [
             'billingWorkItem' => $request,
@@ -647,6 +658,16 @@ it('protects the complete cross panel verification lifecycle and historical outp
         ]))
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
+
+    $this->actingAs($clinicUser)
+        ->get(route('clinic.verification-requests.pdf.download', [
+            'billingWorkItem' => $request,
+            'mode' => 'custom_portrait',
+            'submission_id' => $originalCompletion->id,
+        ]))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertDownload();
 
     expect($request->activities()->where('activity_type', 'info_requested_from_clinic')->exists())->toBeTrue()
         ->and($request->activities()->where('activity_type', 'clinic_response_received')->exists())->toBeTrue()
@@ -1377,4 +1398,257 @@ it('allows multiple master template drafts while keeping one working draft', fun
 
     expect($fullDraft->fresh()->is_working_draft)->toBeTrue()
         ->and($shortDraft->fresh()->is_working_draft)->toBeFalse();
+});
+
+it('opens a master draft without silently changing the working draft', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $published = $versions->ensureMasterVersion();
+    $firstDraft = $versions->createDraftFromSource($published, ['name' => 'First Draft']);
+    $secondDraft = $versions->createDraftFromSource($published, ['name' => 'Second Draft']);
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $firstDraft->id)
+        ->assertSet('selectedTemplateVersionId', $firstDraft->id);
+
+    expect($firstDraft->fresh()->is_working_draft)->toBeFalse()
+        ->and($secondDraft->fresh()->is_working_draft)->toBeTrue();
+});
+
+it('requires an explicitly selected master draft before publishing', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('publishDraftVersion');
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT)
+        ->and($draft->fresh()->published_at)->toBeNull();
+});
+
+it('opens the create master template draft action without a schema type error', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('mountAction', 'createDraftVersion')
+        ->assertActionMounted('createDraftVersion')
+        ->assertSchemaComponentExists('template_name', 'mountedActionSchema0')
+        ->assertSchemaComponentExists('starting_point', 'mountedActionSchema0')
+        ->assertSchemaComponentExists('source_version_id', 'mountedActionSchema0')
+        ->assertHasNoErrors();
+});
+
+it('requires an explicit clinic release choice when publishing a master template', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $draft->id)
+        ->call('publishDraftVersion', [
+            'version_name' => 'Missing Release Choice',
+            'change_description' => 'This should remain a draft.',
+        ]);
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT);
+});
+
+it('publishes and releases a master template to clinics when selected', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $draft->id)
+        ->call('publishDraftVersion', [
+            'version_name' => 'Clinic Release',
+            'change_description' => 'Released for clinic use.',
+            'release_mode' => 'release_to_clinics',
+        ]);
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->and($draft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE)
+        ->and($draft->fresh()->isAvailableToClinics())->toBeTrue();
+});
+
+it('publishes an internal-only master template when selected', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $draft->id)
+        ->call('publishDraftVersion', [
+            'version_name' => 'Internal Release',
+            'change_description' => 'Published for SaaS review only.',
+            'release_mode' => 'internal_only',
+        ]);
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->and($draft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
+        ->and($draft->fresh()->isAvailableToClinics())->toBeFalse();
+});
+
+it('rejects clinic template versions in the saas master template workspace', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $clinicVersion = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $clinicVersion->id)
+        ->assertSet('selectedTemplateVersionId', null)
+        ->call('setWorkingDraft', $clinicVersion->id)
+        ->assertSet('selectedTemplateVersionId', null);
+});
+
+it('targets question creation at the explicitly opened master draft', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $published = $versions->ensureMasterVersion();
+    $firstDraft = $versions->createDraftFromSource($published, ['name' => 'First Draft']);
+    $versions->createDraftFromSource($published, ['name' => 'Second Draft']);
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $firstDraft->id)
+        ->assertSet('selectedTemplateVersionId', $firstDraft->id)
+        ->assertSee('version='.$firstDraft->id, escape: false);
+});
+
+it('allows an unused unpublished template draft to be edited and permanently deleted', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromSource($versions->ensureMasterVersion(), [
+        'name' => 'Editable Draft',
+    ]);
+
+    expect($draft->canEditDirectly())->toBeTrue()
+        ->and($draft->canDeletePermanently())->toBeTrue();
+
+    $updated = $versions->updateUnusedDraft($draft, [
+        'name' => 'Updated Editable Draft',
+        'form_type' => VerificationTemplateVersion::FORM_TYPE_FULL,
+        'notes' => 'Ready for builder changes.',
+    ]);
+
+    expect($updated->name)->toBe('Updated Editable Draft')
+        ->and($updated->form_type)->toBe(VerificationTemplateVersion::FORM_TYPE_FULL);
+
+    $versions->deleteUnusedDraft($updated);
+
+    expect(VerificationTemplateVersion::withTrashed()->find($draft->id))->toBeNull()
+        ->and(VerificationFormQuestion::query()->where('template_version_id', $draft->id)->exists())->toBeFalse()
+        ->and(VerificationTemplateSection::query()->where('template_version_id', $draft->id)->exists())->toBeFalse();
+});
+
+it('protects published and source template versions from direct edits and deletion', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $published = $versions->ensureMasterVersion();
+    $sourceDraft = $versions->createDraftFromSource($published, ['name' => 'Source Draft']);
+    $versions->createDraftFromSource($sourceDraft, ['name' => 'Derived Draft']);
+
+    expect($published->fresh()->canEditDirectly())->toBeFalse()
+        ->and($published->fresh()->canDeletePermanently())->toBeFalse()
+        ->and($sourceDraft->fresh()->canEditDirectly())->toBeFalse()
+        ->and($sourceDraft->fresh()->lifecycleLockReason())->toContain('source record');
+
+    expect(fn () => $versions->updateUnusedDraft($sourceDraft, ['name' => 'Unsafe Rename']))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $versions->deleteUnusedDraft($sourceDraft))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $versions->markWorkingDraft($sourceDraft))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $versions->archiveUnusedDraft($sourceDraft))
+        ->toThrow(ValidationException::class);
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('setWorkingDraft', $sourceDraft->id)
+        ->call('archiveDraft', $sourceDraft->id);
+
+    expect($sourceDraft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT)
+        ->and($sourceDraft->fresh()->is_working_draft)->toBeFalse();
+});
+
+it('protects a template draft once a verification request references it', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromSource($versions->ensureClinicPublishedVersion($this->clinic), [
+        'name' => 'Request Referenced Draft',
+    ]);
+
+    BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'appointment_id' => $this->appointment->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'patient_insurance_policy_id' => $this->policy->id,
+        'verification_template_version_id' => $draft->id,
+        'assigned_to' => $this->saasUser->id,
+        'title' => 'Template retention test',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'clinic_request',
+    ]);
+
+    expect($draft->fresh()->requestUsageCount())->toBe(1)
+        ->and($draft->fresh()->canEditDirectly())->toBeFalse()
+        ->and($draft->fresh()->canDeletePermanently())->toBeFalse()
+        ->and($draft->fresh()->lifecycleLockReason())->toContain('verification request');
+
+    expect(fn () => $versions->deleteUnusedDraft($draft))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $versions->markWorkingDraft($draft))
+        ->toThrow(ValidationException::class);
+    expect(fn () => $versions->archiveUnusedDraft($draft))
+        ->toThrow(ValidationException::class);
+});
+
+it('does not replicate a hidden master template into a new clinic', function () {
+    $this->actingAs($this->saasUser);
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $visibleMaster = $versions->ensureMasterVersion();
+    $hiddenDraft = $versions->createDraftFromSource($visibleMaster, [
+        'name' => 'Internal Master Draft',
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
+    ]);
+    $hiddenMaster = $versions->publishDraft($hiddenDraft);
+
+    $newClinic = Clinic::create([
+        'organization_id' => $this->organization->id,
+        'clinic_name' => 'Revenue Uptown',
+        'clinic_code' => 'CLN-REV-UP',
+        'timezone' => 'America/New_York',
+        'status' => true,
+    ]);
+
+    $clinicVersion = $versions->ensureClinicPublishedVersion($newClinic);
+
+    expect($hiddenMaster->fresh()->is_active)->toBeTrue()
+        ->and($hiddenMaster->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
+        ->and($clinicVersion->source_version_id)->toBe($visibleMaster->id)
+        ->and($clinicVersion->source_version_id)->not->toBe($hiddenMaster->id);
 });

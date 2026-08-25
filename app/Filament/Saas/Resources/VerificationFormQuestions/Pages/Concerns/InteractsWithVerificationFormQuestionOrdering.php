@@ -6,6 +6,21 @@ use App\Models\VerificationFormQuestion;
 
 trait InteractsWithVerificationFormQuestionOrdering
 {
+    protected function resolveOrderingTemplateVersionId(): ?int
+    {
+        if (property_exists($this, 'templateVersionId') && filled($this->templateVersionId)) {
+            return (int) $this->templateVersionId;
+        }
+
+        if (method_exists($this, 'getRecord') && $this->getRecord()) {
+            return filled($this->getRecord()->template_version_id)
+                ? (int) $this->getRecord()->template_version_id
+                : null;
+        }
+
+        return null;
+    }
+
     protected function resolveOrderingClinicId(): ?int
     {
         $clinicId = $this->data['clinic_id'] ?? null;
@@ -42,6 +57,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         $organizationId = $this->resolveOrderingOrganizationId();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
+        $templateVersionId = $this->resolveOrderingTemplateVersionId();
 
         if (! filled($sectionKey)) {
             return [];
@@ -51,7 +67,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         if (($this->data['sub_section_key'] ?? null) === null) {
             $childSectionKeys = array_keys(
-                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey)
+                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey, $templateVersionId)
             );
 
             $sectionKeys = array_values(array_unique([...$sectionKeys, ...$childSectionKeys]));
@@ -63,6 +79,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         return VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
+            ->when($templateVersionId, fn ($query) => $query->where('template_version_id', $templateVersionId))
             ->where('template_key', $templateKey)
             ->whereIn('section_key', $sectionKeys)
             ->where('is_active', true)
@@ -100,6 +117,7 @@ trait InteractsWithVerificationFormQuestionOrdering
         $organizationId = $this->resolveOrderingOrganizationId();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
+        $templateVersionId = $this->resolveOrderingTemplateVersionId();
 
         if (! filled($sectionKey)) {
             return;
@@ -109,7 +127,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         if (($this->data['sub_section_key'] ?? null) === null) {
             $childSectionKeys = array_keys(
-                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey)
+                VerificationFormQuestion::childSectionOptionsForTemplate($templateKey, $clinicId, $sectionKey, $templateVersionId)
             );
 
             $sectionKeys = array_values(array_unique([...$sectionKeys, ...$childSectionKeys]));
@@ -117,6 +135,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
+            ->when($templateVersionId, fn ($query) => $query->where('template_version_id', $templateVersionId))
             ->where('template_key', $templateKey)
             ->whereIn('section_key', $sectionKeys)
             ->where('is_active', true)
@@ -170,6 +189,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
+            ->when($record->template_version_id, fn ($query) => $query->where('template_version_id', $record->template_version_id))
             ->where('template_key', $templateKey)
             ->where('section_key', $sectionKey)
             ->where('is_active', true)
@@ -217,6 +237,7 @@ trait InteractsWithVerificationFormQuestionOrdering
     {
         $clinicId = $clinicId ?: $this->resolveOrderingClinicId();
         $organizationId = $this->resolveOrderingOrganizationId();
+        $templateVersionId = $this->resolveOrderingTemplateVersionId();
 
         if (! filled($sectionKey)) {
             return;
@@ -224,6 +245,7 @@ trait InteractsWithVerificationFormQuestionOrdering
 
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
+            ->when($templateVersionId, fn ($query) => $query->where('template_version_id', $templateVersionId))
             ->where('template_key', $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey())
             ->where('section_key', $sectionKey)
             ->where('is_active', true)

@@ -4,9 +4,11 @@ namespace App\Filament\Saas\Resources\InsuranceCarriers;
 
 use App\Filament\Saas\Resources\InsuranceCarriers\Pages\CreateInsuranceCarrier;
 use App\Filament\Saas\Resources\InsuranceCarriers\Pages\EditInsuranceCarrier;
+use App\Filament\Saas\Resources\InsuranceCarriers\Pages\ImportInsuranceCarriers;
 use App\Filament\Saas\Resources\InsuranceCarriers\Pages\ListInsuranceCarriers;
 use App\Models\InsuranceCarrier;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
@@ -30,6 +32,8 @@ class InsuranceCarrierResource extends Resource
     protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $model = InsuranceCarrier::class;
+
+    protected static ?string $slug = 'insurance';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
 
@@ -150,6 +154,17 @@ class InsuranceCarrierResource extends Resource
                 DeleteAction::make()
                     ->iconButton()
                     ->tooltip('Delete'),
+            ])
+            ->emptyStateIcon('heroicon-o-identification')
+            ->emptyStateHeading('No insurance payers configured')
+            ->emptyStateDescription('Add the first payer to build the central directory inherited by clinics. Patient policy names are kept separate and are not added automatically.')
+            ->emptyStateActions([
+                Action::make('createInsurance')
+                    ->label('Add Insurance')
+                    ->icon('heroicon-o-plus')
+                    ->color('primary')
+                    ->url(fn (): string => static::getUrl('create'))
+                    ->visible(fn (): bool => static::canCreate()),
             ]);
     }
 
@@ -189,6 +204,7 @@ class InsuranceCarrierResource extends Resource
     {
         return [
             'index' => ListInsuranceCarriers::route('/'),
+            'import' => ImportInsuranceCarriers::route('/import'),
             'create' => CreateInsuranceCarrier::route('/create'),
             'edit' => EditInsuranceCarrier::route('/{record}/edit'),
         ];

@@ -80,7 +80,6 @@ class VerificationTemplateVersionService
                     ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
                     ->where('template_key', $templateKey)
                     ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
-                    ->where('is_active', true)
                     ->whereIn('clinic_visibility', [
                         VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
                         VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT,
@@ -89,7 +88,13 @@ class VerificationTemplateVersionService
                     ->latest('id')
                     ->first();
 
-                $master = $visibleMaster ?: $master;
+                if (! $visibleMaster) {
+                    throw ValidationException::withMessages([
+                        'template' => 'No published Master Template is currently available to clinics.',
+                    ]);
+                }
+
+                $master = $visibleMaster;
             }
 
             $version = VerificationTemplateVersion::query()->create([
@@ -125,6 +130,112 @@ class VerificationTemplateVersionService
             'form_type' => $published->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
             'clinic_visibility' => $published->clinic_visibility ?: VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
         ]);
+    }
+
+    public function updateUnusedDraft(VerificationTemplateVersion $draft, array $data): VerificationTemplateVersion
+    {
+        return DB::transaction(function () use ($draft, $data): VerificationTemplateVersion {
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->lockForUpdate()
+                ->findOrFail($draft->getKey());
+
+            if (! $lockedDraft->canEditDirectly()) {
+                throw ValidationException::withMessages([
+                    'template' => $lockedDraft->lifecycleLockReason()
+                        ?? 'Only an unused, unpublished draft can be edited directly.',
+                ]);
+            }
+
+            $name = trim((string) ($data['name'] ?? $lockedDraft->name));
+            $formType = (string) ($data['form_type'] ?? $lockedDraft->form_type);
+
+            if ($name === '') {
+                throw ValidationException::withMessages([
+                    'name' => 'Enter a template name.',
+                ]);
+            }
+
+            if (! array_key_exists($formType, VerificationTemplateVersion::FORM_TYPE_OPTIONS)) {
+                throw ValidationException::withMessages([
+                    'form_type' => 'Choose a valid form type.',
+                ]);
+            }
+
+            $lockedDraft->forceFill([
+                'name' => $name,
+                'form_type' => $formType,
+                'notes' => array_key_exists('notes', $data)
+                    ? trim((string) $data['notes']) ?: null
+                    : $lockedDraft->notes,
+            ])->save();
+
+            return $lockedDraft->refresh();
+        });
+    }
+
+    public function deleteUnusedDraft(VerificationTemplateVersion $draft): void
+    {
+        DB::transaction(function () use ($draft): void {
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->lockForUpdate()
+                ->findOrFail($draft->getKey());
+
+            if (! $lockedDraft->canDeletePermanently()) {
+                throw ValidationException::withMessages([
+                    'template' => $lockedDraft->lifecycleLockReason()
+                        ?? 'Only an unused, unpublished draft can be deleted permanently.',
+                ]);
+            }
+
+            $scope = $lockedDraft->scope;
+            $templateKey = $lockedDraft->template_key;
+            $clinicId = $lockedDraft->clinic_id;
+            $wasWorkingDraft = (bool) $lockedDraft->is_working_draft;
+
+            $lockedDraft->questions()->delete();
+            $lockedDraft->sections()->delete();
+            $lockedDraft->forceDelete();
+
+            if ($wasWorkingDraft) {
+                $replacementDraft = VerificationTemplateVersion::query()
+                    ->where('scope', $scope)
+                    ->where('template_key', $templateKey)
+                    ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+                    ->when($clinicId, fn ($query) => $query->where('clinic_id', $clinicId))
+                    ->when(! $clinicId, fn ($query) => $query->whereNull('clinic_id'))
+                    ->latest('version_number')
+                    ->latest('id')
+                    ->first();
+
+                if ($replacementDraft) {
+                    $replacementDraft->forceFill(['is_working_draft' => true])->save();
+                }
+            }
+        });
+    }
+
+    public function archiveUnusedDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
+    {
+        return DB::transaction(function () use ($draft): VerificationTemplateVersion {
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->lockForUpdate()
+                ->findOrFail($draft->getKey());
+
+            if (! $lockedDraft->canEditDirectly()) {
+                throw ValidationException::withMessages([
+                    'template' => $lockedDraft->lifecycleLockReason()
+                        ?? 'Only an unused, unpublished draft can be archived.',
+                ]);
+            }
+
+            $lockedDraft->forceFill([
+                'status' => VerificationTemplateVersion::STATUS_ARCHIVED,
+                'is_active' => false,
+                'is_working_draft' => false,
+            ])->save();
+
+            return $lockedDraft->refresh();
+        });
     }
 
     public function createDraftFromSource(?VerificationTemplateVersion $source, array $options = []): VerificationTemplateVersion
@@ -340,29 +451,48 @@ class VerificationTemplateVersionService
         VerificationTemplateVersion $draft,
         ?string $name = null,
         ?string $notes = null,
+        ?string $clinicVisibility = null,
     ): VerificationTemplateVersion {
-        $this->assertPublishable($draft);
+        if ($clinicVisibility !== null && ! array_key_exists($clinicVisibility, VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS)) {
+            throw ValidationException::withMessages([
+                'clinic_visibility' => 'Select a valid clinic release option.',
+            ]);
+        }
 
-        return DB::transaction(function () use ($draft, $name, $notes): VerificationTemplateVersion {
+        return DB::transaction(function () use ($draft, $name, $notes, $clinicVisibility): VerificationTemplateVersion {
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->lockForUpdate()
+                ->findOrFail($draft->getKey());
+
+            if (! $lockedDraft->canEditDirectly()) {
+                throw ValidationException::withMessages([
+                    'template' => $lockedDraft->lifecycleLockReason()
+                        ?? 'Only an unused, unpublished draft can be published.',
+                ]);
+            }
+
+            $this->assertPublishable($lockedDraft);
+
             VerificationTemplateVersion::query()
-                ->where('scope', $draft->scope)
-                ->where('template_key', $draft->template_key)
+                ->where('scope', $lockedDraft->scope)
+                ->where('template_key', $lockedDraft->template_key)
                 ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
                 ->where('is_active', true)
-                ->when($draft->clinic_id, fn ($query) => $query->where('clinic_id', $draft->clinic_id))
-                ->when(! $draft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
+                ->when($lockedDraft->clinic_id, fn ($query) => $query->where('clinic_id', $lockedDraft->clinic_id))
+                ->when(! $lockedDraft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
                 ->update(['is_active' => false]);
 
-            $draft->forceFill([
-                'name' => filled($name) ? trim((string) $name) : $draft->name,
-                'notes' => filled($notes) ? trim((string) $notes) : $draft->notes,
+            $lockedDraft->forceFill([
+                'name' => filled($name) ? trim((string) $name) : $lockedDraft->name,
+                'notes' => filled($notes) ? trim((string) $notes) : $lockedDraft->notes,
+                'clinic_visibility' => $clinicVisibility ?? $lockedDraft->clinic_visibility,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
                 'is_active' => true,
                 'is_working_draft' => false,
                 'published_at' => now(),
             ])->save();
 
-            return $draft->refresh();
+            return $lockedDraft->refresh();
         });
     }
 
@@ -421,23 +551,30 @@ class VerificationTemplateVersionService
 
     public function markWorkingDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
     {
-        if ($draft->status !== VerificationTemplateVersion::STATUS_DRAFT) {
-            return $draft;
-        }
-
         return DB::transaction(function () use ($draft): VerificationTemplateVersion {
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->lockForUpdate()
+                ->findOrFail($draft->getKey());
+
+            if (! $lockedDraft->canEditDirectly()) {
+                throw ValidationException::withMessages([
+                    'template' => $lockedDraft->lifecycleLockReason()
+                        ?? 'Only an unused, unpublished draft can be selected as the working draft.',
+                ]);
+            }
+
             VerificationTemplateVersion::query()
-                ->where('scope', $draft->scope)
-                ->where('template_key', $draft->template_key)
+                ->where('scope', $lockedDraft->scope)
+                ->where('template_key', $lockedDraft->template_key)
                 ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
-                ->when($draft->clinic_id, fn ($query) => $query->where('clinic_id', $draft->clinic_id))
-                ->when(! $draft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
-                ->whereKeyNot($draft->getKey())
+                ->when($lockedDraft->clinic_id, fn ($query) => $query->where('clinic_id', $lockedDraft->clinic_id))
+                ->when(! $lockedDraft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
+                ->whereKeyNot($lockedDraft->getKey())
                 ->update(['is_working_draft' => false]);
 
-            $draft->forceFill(['is_working_draft' => true])->save();
+            $lockedDraft->forceFill(['is_working_draft' => true])->save();
 
-            return $draft->refresh();
+            return $lockedDraft->refresh();
         });
     }
 

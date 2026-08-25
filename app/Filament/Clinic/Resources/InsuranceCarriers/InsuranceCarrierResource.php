@@ -30,6 +30,8 @@ class InsuranceCarrierResource extends Resource
 
     protected static ?string $model = InsuranceCarrier::class;
 
+    protected static ?string $slug = 'insurance';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
 
     protected static ?string $navigationLabel = 'Insurance Directory';

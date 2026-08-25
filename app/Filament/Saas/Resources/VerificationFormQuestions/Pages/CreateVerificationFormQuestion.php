@@ -5,6 +5,7 @@ namespace App\Filament\Saas\Resources\VerificationFormQuestions\Pages;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\Concerns\InteractsWithVerificationFormQuestionOrdering;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateVersion;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
 
@@ -16,11 +17,18 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     protected string $view = 'filament.saas.resources.verification-form-questions.pages.verification-form-question-editor';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
+
+    public ?int $templateVersionId = null;
 
     public function mount(): void
     {
         parent::mount();
+
+        $this->templateVersionId = request()->integer('version') ?: null;
+        $version = $this->resolveTargetVersion();
+
+        abort_unless($version, 404, 'Master Template draft not found.');
 
         $sectionKey = request()->query('section');
 
@@ -29,9 +37,17 @@ class CreateVerificationFormQuestion extends CreateRecord
         }
 
         $templateKey = VerificationFormQuestion::defaultTemplateKey();
-        $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor($sectionKey, $templateKey, null);
+        $section = $version->sections()
+            ->where('template_key', $templateKey)
+            ->where('section_key', $sectionKey)
+            ->first();
+
+        abort_unless($section, 404, 'Template section not found in this draft.');
+
+        $parentSectionKey = $section->parent_section_key;
 
         $this->data['template_key'] = $templateKey;
+        $this->data['template_version_id'] = $version->getKey();
 
         if ($parentSectionKey) {
             $this->data['section_key'] = $parentSectionKey;
@@ -51,7 +67,11 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), null))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate(
+            $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(),
+            null,
+            $this->templateVersionId,
+        ))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -63,6 +83,7 @@ class CreateVerificationFormQuestion extends CreateRecord
     public function getCurrentSectionLabel(): string
     {
         $key = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
+
         return filled($key)
             ? str_replace(' Snapshot', '', VerificationFormQuestion::sectionLabel($key, $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), null))
             : 'Choose section';
@@ -105,12 +126,16 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     public function getCancelUrl(): string
     {
-        return $this->previousUrl ?: VerificationFormQuestionResource::getUrl();
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->templateVersionId]);
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['template_version_id'] = VerificationFormQuestionResource::currentMasterWorkingVersion()?->getKey();
+        $version = $this->resolveTargetVersion();
+
+        abort_unless($version, 404, 'Master Template draft not found.');
+
+        $data['template_version_id'] = $version->getKey();
         $data['organization_id'] = null;
         $data['clinic_id'] = null;
 
@@ -158,6 +183,24 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return VerificationFormQuestionResource::getUrl('create');
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->templateVersionId]);
+    }
+
+    protected function resolveTargetVersion(): ?VerificationTemplateVersion
+    {
+        if (! $this->templateVersionId) {
+            return null;
+        }
+
+        $version = VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereNull('organization_id')
+            ->whereNull('clinic_id')
+            ->whereKey($this->templateVersionId)
+            ->first();
+
+        return $version?->canEditDirectly() ? $version : null;
     }
 }

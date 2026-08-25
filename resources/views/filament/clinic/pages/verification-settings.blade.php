@@ -916,7 +916,7 @@
                     <div class="vs-section-intro">
                         <span>
                             <div style="color:var(--vs-navy);font-size:13px;font-weight:900;">Clinic template workspace</div>
-                            <div class="vs-small">Only one clinic template can be active. Active templates can be edited; older templates stay as Not Active and can be archived only when no requests use them.</div>
+                            <div class="vs-small">Only unused drafts can be edited or deleted directly. Published, copied, or request-used templates are protected; create a new draft to change them.</div>
                         </span>
                     </div>
 
@@ -938,7 +938,7 @@
                                     $currentTemplateGroup = null;
                                     $templateGroupLabels = [
                                         'active' => 'Active Template',
-                                        'draft' => 'Working Draft',
+                                        'draft' => 'Draft Templates',
                                         'previous' => 'Template History',
                                     ];
                                 @endphp
@@ -984,14 +984,26 @@
                                         </td>
                                         <td>
                                             <div class="vs-table-actions">
-                                                <a href="{{ $templateUrl }}{{ $row['is_draft'] ? '?draft=1' : '' }}" wire:navigate class="vs-button">
-                                                    {{ $row['is_draft'] ? 'Open Builder' : 'View Builder' }}
+                                                <a href="{{ $templateUrl }}?version={{ $row['id'] }}{{ $row['is_draft'] ? '&draft=1' : '' }}" wire:navigate class="vs-button">
+                                                    {{ $row['is_draft'] && $row['can_edit'] ? 'Open Builder' : 'View Structure' }}
                                                 </a>
                                                 @if ($row['is_draft'] && $row['can_edit'])
-                                                    <button type="button" wire:click.prevent="publishClinicTemplateDraft" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishClinicTemplateDraft" class="vs-button vs-button--primary">
+                                                    <button type="button" wire:click.prevent="openEditClinicTemplateDraftModal({{ $row['id'] }})" class="vs-button">Edit Details</button>
+                                                    <button type="button" wire:click.prevent="publishClinicTemplateDraft({{ $row['id'] }})" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishClinicTemplateDraft" class="vs-button vs-button--primary">
                                                         <span wire:loading.remove wire:target="publishClinicTemplateDraft">Publish</span>
                                                         <span wire:loading wire:target="publishClinicTemplateDraft">Publishing...</span>
                                                     </button>
+                                                @endif
+                                                @if ($row['can_delete'])
+                                                    <button
+                                                        type="button"
+                                                        wire:click.prevent="deleteUnusedClinicTemplateDraft({{ $row['id'] }})"
+                                                        wire:confirm="Permanently delete this unused draft? This cannot be undone."
+                                                        class="vs-button"
+                                                        style="border-color:#fecdd3;color:#be123c;background:#fff1f2;"
+                                                    >Delete Draft</button>
+                                                @elseif ($row['is_draft'] && ! $row['can_edit'] && $row['lock_reason'])
+                                                    <span class="vs-small" style="max-width:210px;text-align:right;">{{ $row['lock_reason'] }}</span>
                                                 @endif
                                                 @if ($row['can_archive'])
                                                     <button
@@ -1325,6 +1337,55 @@
                             <button type="button" wire:click.prevent="submitCreateClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitCreateClinicTemplateDraft" class="vs-button vs-button--primary">
                                 <span wire:loading.remove wire:target="submitCreateClinicTemplateDraft">Create Draft Template</span>
                                 <span wire:loading wire:target="submitCreateClinicTemplateDraft">Creating...</span>
+                            </button>
+                        </span>
+                    </footer>
+                </section>
+            </div>
+        @endif
+
+        @if ($this->showEditTemplateDraftModal)
+            <div class="vs-modal-backdrop" wire:key="clinic-edit-template-draft-modal">
+                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-edit-template-draft-title">
+                    <header class="vs-modal-header">
+                        <span>
+                            <h2 id="clinic-edit-template-draft-title" class="vs-modal-title">Edit Draft Details</h2>
+                            <p class="vs-card-subtitle">Update this unused draft before opening the builder or publishing it.</p>
+                        </span>
+                        <button type="button" wire:click.prevent="closeEditClinicTemplateDraftModal" class="vs-button">Close</button>
+                    </header>
+
+                    <div class="vs-modal-body">
+                        <div class="vs-field">
+                            <label>Template Name <span class="vs-required">*</span></label>
+                            <input type="text" class="vs-input" wire:model.defer="editClinicTemplateDraftData.template_name">
+                            @error('editClinicTemplateDraftData.template_name')<div class="vs-error">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="vs-field">
+                            <label>Form Type</label>
+                            <select class="vs-select" wire:model.defer="editClinicTemplateDraftData.form_type">
+                                @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $formType => $formTypeLabel)
+                                    <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
+                                @endforeach
+                            </select>
+                            @error('editClinicTemplateDraftData.form_type')<div class="vs-error">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="vs-field">
+                            <label>Change Notes</label>
+                            <textarea class="vs-textarea" wire:model.defer="editClinicTemplateDraftData.notes" placeholder="Describe the purpose of this draft."></textarea>
+                            @error('editClinicTemplateDraftData.notes')<div class="vs-error">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+
+                    <footer class="vs-modal-footer">
+                        <span class="vs-small">Published and referenced templates remain read-only.</span>
+                        <span style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
+                            <button type="button" wire:click.prevent="closeEditClinicTemplateDraftModal" class="vs-button">Cancel</button>
+                            <button type="button" wire:click.prevent="submitEditClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitEditClinicTemplateDraft" class="vs-button vs-button--primary">
+                                <span wire:loading.remove wire:target="submitEditClinicTemplateDraft">Save Changes</span>
+                                <span wire:loading wire:target="submitEditClinicTemplateDraft">Saving...</span>
                             </button>
                         </span>
                     </footer>

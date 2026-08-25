@@ -104,5 +104,9 @@ it('keeps central master data out of the verification workspace', function () {
 
     $this->actingAs($user)
         ->get('/saas/master-template/create')
-        ->assertForbidden();
+        ->assertRedirect('/saas/master-template/questions/create');
+
+    $this->actingAs($user)
+        ->get('/saas/master-template/questions/create')
+        ->assertNotFound();
 });

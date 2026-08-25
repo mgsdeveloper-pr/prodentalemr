@@ -168,3 +168,18 @@ it('supports code management lifecycle filters and audit selection', function ()
 
     expect($page->selectedAuditCodeId)->toBeNull();
 });
+
+it('uses the compact master data workspace without the previous promotional hero', function (): void {
+    $page = file_get_contents(resource_path('views/filament/saas/pages/ada-procedure-code-import.blade.php'));
+    $pageClass = file_get_contents(app_path('Filament/Saas/Pages/AdaProcedureCodeImport.php'));
+
+    expect($page)
+        ->toContain('Code Library')
+        ->toContain('View History')
+        ->toContain('Import ADA/CDT Codes')
+        ->not->toContain('Govern ADA/CDT codes cleanly')
+        ->not->toContain('ada-import-hero')
+        ->and($pageClass)
+        ->toContain("return 'ADA/CDT Codes';")
+        ->toContain("->label('Import Codes')");
+});

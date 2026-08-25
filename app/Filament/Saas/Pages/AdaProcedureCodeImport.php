@@ -38,7 +38,7 @@ class AdaProcedureCodeImport extends Page implements HasForms
 
     protected static ?int $navigationSort = 20;
 
-    protected static ?string $title = 'ADA/CDT Code Import';
+    protected static ?string $title = 'ADA/CDT Codes';
 
     protected static ?string $slug = 'ada-cdt-codes';
 
@@ -51,6 +51,8 @@ class AdaProcedureCodeImport extends Page implements HasForms
     public ?array $previewResult = null;
 
     public ?array $lastImportResult = null;
+
+    public bool $showImportPanel = false;
 
     public string $codeSearch = '';
 
@@ -70,7 +72,12 @@ class AdaProcedureCodeImport extends Page implements HasForms
 
     public function getHeading(): string
     {
-        return '';
+        return 'ADA/CDT Codes';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Maintain the central ADA/CDT code library used by verification templates.';
     }
 
     public function form(Schema $schema): Schema
@@ -104,6 +111,13 @@ class AdaProcedureCodeImport extends Page implements HasForms
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('showImport')
+                ->label('Import Codes')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->color('gray')
+                ->action(function (): void {
+                    $this->showImportPanel = true;
+                }),
             Action::make('addCode')
                 ->label('Add code')
                 ->icon('heroicon-o-plus')
@@ -147,6 +161,14 @@ class AdaProcedureCodeImport extends Page implements HasForms
                 ])
                 ->action(fn (array $data): null => $this->retireGovernedCode($data)),
         ];
+    }
+
+    public function closeImportPanel(): void
+    {
+        $this->showImportPanel = false;
+        $this->previewResult = null;
+        $this->lastImportResult = null;
+        $this->form->fill();
     }
 
     public function previewCodes(AdaProcedureCodeImportService $importService): void

@@ -13,9 +13,10 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
 
 class ListVerificationFormQuestions extends ListRecords
@@ -23,6 +24,8 @@ class ListVerificationFormQuestions extends ListRecords
     protected static string $resource = VerificationFormQuestionResource::class;
 
     protected string $view = 'filament.saas.resources.verification-form-questions.pages.list-verification-form-questions';
+
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     public ?int $selectedTemplateVersionId = null;
 
@@ -57,36 +60,22 @@ class ListVerificationFormQuestions extends ListRecords
         'label' => '',
     ];
 
-    public bool $showCreateDraftModal = false;
-
-    public array $newDraftData = [
-        'template_name' => 'Master Template Draft',
-        'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
-        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
-        'starting_point' => 'current_master',
-        'source_version_id' => null,
-    ];
-
-    public bool $showPublishDraftModal = false;
-
-    public array $publishDraftData = [
-        'version_name' => '',
-        'change_description' => '',
-    ];
-
     public function getHeading(): string
     {
-        return '';
+        return 'Master Template';
     }
 
     public function getSubheading(): ?string
     {
-        return null;
+        return 'Create, manage, preview, and publish the platform Master Template from one workspace.';
     }
 
     public function getBreadcrumbs(): array
     {
-        return [];
+        return [
+            'Master Data',
+            'Master Template',
+        ];
     }
 
     public function mount(): void
@@ -102,11 +91,17 @@ class ListVerificationFormQuestions extends ListRecords
         if (! $hasMasterQuestions) {
             VerificationTemplateThreeDefaults::syncMasterQuestions();
         }
+
+        $requestedVersionId = request()->integer('version');
+
+        if ($requestedVersionId > 0) {
+            $this->selectTemplateVersion($requestedVersionId);
+        }
     }
 
     protected function getHeaderActions(): array
     {
-        return [];
+        return $this->getTemplateHeaderActions();
     }
 
     protected function getTemplateHeaderActions(): array
@@ -117,9 +112,9 @@ class ListVerificationFormQuestions extends ListRecords
 
         $actions = [
             Action::make('createDraftVersion')
-                ->label('Create Draft Version')
+                ->label('Create Draft Template')
                 ->icon('heroicon-o-document-duplicate')
-                ->color('gray')
+                ->color('primary')
                 ->modalHeading('Create template draft')
                 ->modalDescription('Name this draft, choose the form type, and decide whether to start fresh or replicate an existing version.')
                 ->form([
@@ -138,17 +133,11 @@ class ListVerificationFormQuestions extends ListRecords
                         ->default('both')
                         ->required()
                         ->native(false),
-                    Select::make('clinic_visibility')
-                        ->label('Clinic visibility')
-                        ->options(VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS)
-                        ->default(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
-                        ->required()
-                        ->native(false),
                     Select::make('starting_point')
                         ->label('Starting point')
                         ->options([
                             'current_master' => 'Start from current Master Template',
-                            'fresh' => 'Start fresh',
+                            'fresh' => 'Start with standard sections and no copied questions',
                             'specific_version' => 'Replicate from a specific version',
                         ])
                         ->default('current_master')
@@ -173,7 +162,7 @@ class ListVerificationFormQuestions extends ListRecords
                 ->color('success')
                 ->requiresConfirmation()
                 ->modalHeading('Publish this template draft?')
-                ->modalDescription('This makes the opened draft the new active Master Template. Existing verification requests keep their original snapshot until refreshed.')
+                ->modalDescription('Choose whether this published Master Template is released to clinics or retained for internal SaaS use. Existing verification requests keep their original snapshot until refreshed.')
                 ->form([
                     TextInput::make('version_name')
                         ->label('Version name')
@@ -186,8 +175,54 @@ class ListVerificationFormQuestions extends ListRecords
                         ->required()
                         ->rows(4)
                         ->maxLength(2000),
+                    Select::make('release_mode')
+                        ->label('Clinic release')
+                        ->options([
+                            'release_to_clinics' => 'Publish & Release to Clinics',
+                            'internal_only' => 'Publish Internally',
+                        ])
+                        ->default('release_to_clinics')
+                        ->helperText('Released templates can be used for new clinic template copies. Internal templates remain available only in SaaS.')
+                        ->required()
+                        ->native(false),
                 ])
                 ->action(fn (array $data): null => $this->publishDraftVersion($data));
+        }
+
+        if ($this->selectedTemplateVersion()?->canEditDirectly()) {
+            $actions[] = Action::make('editDraftDetails')
+                ->label('Edit Draft Details')
+                ->icon('heroicon-o-pencil-square')
+                ->modalHeading('Edit template draft')
+                ->modalDescription('Unused drafts can be renamed and reconfigured directly. This option locks automatically once the template is published, copied, or used by a request.')
+                ->form([
+                    TextInput::make('name')
+                        ->label('Template name')
+                        ->default(fn (): string => $this->selectedTemplateVersion()?->name ?: 'Master Template Draft')
+                        ->required()
+                        ->maxLength(255),
+                    Select::make('form_type')
+                        ->label('Type of form')
+                        ->options(VerificationTemplateVersion::FORM_TYPE_OPTIONS)
+                        ->default(fn (): string => $this->selectedTemplateVersion()?->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH)
+                        ->required()
+                        ->native(false),
+                    Textarea::make('notes')
+                        ->label('Internal notes')
+                        ->default(fn (): ?string => $this->selectedTemplateVersion()?->notes)
+                        ->rows(3)
+                        ->maxLength(2000),
+                ])
+                ->action(fn (array $data): null => $this->updateDraftDetails($data));
+
+            $actions[] = Action::make('deleteUnusedDraft')
+                ->label('Delete Unused Draft')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Permanently delete this unused draft?')
+                ->modalDescription('The template, its sections, and its questions will be permanently removed. This action is available only because the draft has never been published, copied, or used by a verification request.')
+                ->action(fn (): null => $this->deleteSelectedUnusedDraft());
         }
 
         return $actions;
@@ -205,158 +240,19 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function getCreateQuestionUrl(?string $sectionKey = null): string
     {
-        $parameters = [];
+        $version = $this->selectedTemplateVersion();
+
+        if (! $version || $version->status !== VerificationTemplateVersion::STATUS_DRAFT) {
+            return VerificationFormQuestionResource::getUrl();
+        }
+
+        $parameters = ['version' => $version->getKey()];
 
         if (filled($sectionKey)) {
             $parameters['section'] = $sectionKey;
         }
 
         return VerificationFormQuestionResource::getUrl('create', $parameters);
-    }
-
-    public function openCreateDraftModal(): void
-    {
-        if (! $this->canManageVersions()) {
-            Notification::make()->title('Permission denied')->danger()->send();
-
-            return;
-        }
-
-        $this->newDraftData = [
-            'template_name' => 'Master Template Draft',
-            'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
-            'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
-            'starting_point' => 'current_master',
-            'source_version_id' => null,
-        ];
-
-        $this->showCreateDraftModal = true;
-    }
-
-    public function closeCreateDraftModal(): void
-    {
-        $this->showCreateDraftModal = false;
-    }
-
-    public function submitCreateDraftVersion(): void
-    {
-        $rules = [
-            'newDraftData.template_name' => ['required', 'string', 'max:255'],
-            'newDraftData.form_type' => ['required', 'string'],
-            'newDraftData.clinic_visibility' => ['required', 'string'],
-            'newDraftData.starting_point' => ['required', 'string'],
-        ];
-
-        if (($this->newDraftData['starting_point'] ?? null) === 'specific_version') {
-            $rules['newDraftData.source_version_id'] = ['required', 'integer'];
-        }
-
-        $data = $this->validate($rules)['newDraftData'];
-
-        $this->createDraftVersion($data);
-        $this->closeCreateDraftModal();
-    }
-
-    public function openPublishDraftModal(): void
-    {
-        if (! $this->canManageVersions()) {
-            Notification::make()->title('Permission denied')->danger()->send();
-
-            return;
-        }
-
-        $draft = $this->selectedTemplateVersion()?->status === VerificationTemplateVersion::STATUS_DRAFT
-            ? $this->selectedTemplateVersion()
-            : $this->getDraftMasterVersion();
-
-        if (! $draft) {
-            Notification::make()->title('No draft version found')->warning()->send();
-
-            return;
-        }
-
-        $this->publishDraftData = [
-            'version_name' => $draft->name ?: 'Master Template Draft',
-            'change_description' => '',
-        ];
-
-        $this->showPublishDraftModal = true;
-    }
-
-    public function closePublishDraftModal(): void
-    {
-        $this->showPublishDraftModal = false;
-    }
-
-    public function submitPublishDraftVersion(): void
-    {
-        $data = $this->validate([
-            'publishDraftData.version_name' => ['required', 'string', 'max:255'],
-            'publishDraftData.change_description' => ['required', 'string', 'max:2000'],
-        ])['publishDraftData'];
-
-        $this->publishDraftVersion($data);
-        $this->closePublishDraftModal();
-    }
-
-    public function createTemplateSection(array $data): void
-    {
-        if (! (auth()->user()?->canManageVerificationTemplateSections() ?? false)) {
-            Notification::make()->title('Permission denied')->danger()->send();
-
-            return;
-        }
-
-        $organizationId = null;
-        $clinicId = null;
-        $templateVersionId = VerificationFormQuestionResource::currentMasterWorkingVersion()?->getKey();
-
-        if (! $this->getDraftMasterVersion() || ! $templateVersionId) {
-            Notification::make()
-                ->title('Create a draft first')
-                ->body('Published master template versions are read-only. Create a draft before changing sections.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        $sectionKey = VerificationTemplateSection::makeSectionKey((string) $data['label'], $data['parent_section_key'] ?? null);
-        $baseKey = $sectionKey;
-        $counter = 2;
-
-        while (VerificationTemplateSection::query()
-            ->whereNull('organization_id')
-            ->whereNull('clinic_id')
-            ->where('template_version_id', $templateVersionId)
-            ->where('template_key', $data['template_key'])
-            ->where('section_key', $sectionKey)
-            ->exists()) {
-            $sectionKey = $baseKey . '_' . $counter++;
-        }
-
-        VerificationTemplateSection::query()->create([
-            'organization_id' => $organizationId,
-            'clinic_id' => $clinicId,
-            'template_version_id' => $templateVersionId,
-            'template_key' => $data['template_key'],
-            'section_key' => $sectionKey,
-            'parent_section_key' => $data['parent_section_key'] ?? null,
-            'label' => $data['label'],
-            'sort_order' => ((int) VerificationTemplateSection::query()
-                ->whereNull('organization_id')
-                ->whereNull('clinic_id')
-                ->where('template_version_id', $templateVersionId)
-                ->where('template_key', $data['template_key'])
-                ->max('sort_order')) + 10,
-            'is_active' => true,
-        ]);
-
-        Notification::make()
-            ->title('Template section created')
-            ->body('The new section is now available while creating questions.')
-            ->success()
-            ->send();
     }
 
     public function openTemplateSectionModal(?string $parentSectionKey = null): void
@@ -428,7 +324,7 @@ class ListVerificationFormQuestions extends ListRecords
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('section_key', $sectionKey)
             ->exists()) {
-            $sectionKey = $baseKey . '_' . $counter++;
+            $sectionKey = $baseKey.'_'.$counter++;
         }
 
         $sortOrder = ((int) VerificationTemplateSection::query()
@@ -467,8 +363,8 @@ class ListVerificationFormQuestions extends ListRecords
         $this->closeTemplateSectionModal();
 
         Notification::make()
-            ->title($sectionType . ' added')
-            ->body(filled($parentLabel) ? $label . ' was added under ' . $parentLabel . '.' : $label . ' was added to the draft.')
+            ->title($sectionType.' added')
+            ->body(filled($parentLabel) ? $label.' was added under '.$parentLabel.'.' : $label.' was added to the draft.')
             ->success()
             ->send();
     }
@@ -482,6 +378,16 @@ class ListVerificationFormQuestions extends ListRecords
         }
 
         $startingPoint = $data['starting_point'] ?? 'current_master';
+        $formType = $data['form_type'] ?? VerificationTemplateVersion::FORM_TYPE_BOTH;
+        $clinicVisibility = VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN;
+
+        if (! in_array($startingPoint, ['current_master', 'fresh', 'specific_version'], true)
+            || ! array_key_exists($formType, VerificationTemplateVersion::FORM_TYPE_OPTIONS)
+            || blank(trim((string) ($data['template_name'] ?? '')))) {
+            Notification::make()->title('Invalid draft configuration')->danger()->send();
+
+            return null;
+        }
         $source = match ($startingPoint) {
             'fresh' => null,
             'specific_version' => VerificationTemplateVersion::query()
@@ -505,9 +411,9 @@ class ListVerificationFormQuestions extends ListRecords
         $draft = app(VerificationTemplateVersionService::class)->createDraftFromSource($source, [
             'template_key' => VerificationFormQuestion::defaultTemplateKey(),
             'scope' => VerificationTemplateVersion::SCOPE_MASTER,
-            'name' => $data['template_name'] ?? 'Master Template Draft',
-            'form_type' => $data['form_type'] ?? 'both',
-            'clinic_visibility' => $data['clinic_visibility'] ?? VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN,
+            'name' => trim((string) $data['template_name']),
+            'form_type' => $formType,
+            'clinic_visibility' => $clinicVisibility,
             'starting_point' => $startingPoint,
         ]);
 
@@ -515,7 +421,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         Notification::make()
             ->title('Draft version ready')
-            ->body('You are now editing version ' . $draft->version_number . ' of the Master Template.')
+            ->body('You are now editing version '.$draft->version_number.' of the Master Template.')
             ->success()
             ->send();
 
@@ -527,12 +433,13 @@ class ListVerificationFormQuestions extends ListRecords
         return VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+            ->whereNull('organization_id')
             ->whereNull('clinic_id')
             ->orderByDesc('version_number')
             ->orderByDesc('id')
             ->get()
             ->mapWithKeys(fn (VerificationTemplateVersion $version): array => [
-                $version->getKey() => 'v' . $version->version_number . ' - ' . str($version->status)->headline()->toString() . ' - ' . $version->name,
+                $version->getKey() => 'v'.$version->version_number.' - '.str($version->status)->headline()->toString().' - '.$version->name,
             ])
             ->all();
     }
@@ -545,29 +452,105 @@ class ListVerificationFormQuestions extends ListRecords
             return null;
         }
 
-        $draft = $this->selectedTemplateVersion()?->status === VerificationTemplateVersion::STATUS_DRAFT
-            ? $this->selectedTemplateVersion()
-            : $this->getDraftMasterVersion();
+        $draft = $this->selectedTemplateVersion();
 
-        if (! $draft) {
-            Notification::make()->title('No draft version found')->warning()->send();
+        if (! $draft || $draft->status !== VerificationTemplateVersion::STATUS_DRAFT) {
+            Notification::make()
+                ->title('Open the draft you want to publish')
+                ->body('Publishing requires an explicitly selected Master Template draft.')
+                ->warning()
+                ->send();
 
             return null;
         }
+
+        $releaseMode = $data['release_mode'] ?? null;
+
+        if (! in_array($releaseMode, ['release_to_clinics', 'internal_only'], true)) {
+            Notification::make()
+                ->title('Choose how this template should be published')
+                ->body('Select clinic release or internal-only publication before continuing.')
+                ->warning()
+                ->send();
+
+            return null;
+        }
+
+        $clinicVisibility = $releaseMode === 'release_to_clinics'
+            ? VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE
+            : VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN;
 
         $published = app(VerificationTemplateVersionService::class)->publishDraft(
             $draft,
             $data['version_name'] ?? null,
             $data['change_description'] ?? null,
+            $clinicVisibility,
         );
 
         Notification::make()
-            ->title('Master Template published')
-            ->body('Version ' . $published->version_number . ' is now the active published template.')
+            ->title($published->isAvailableToClinics() ? 'Master Template published and released' : 'Master Template published internally')
+            ->body($published->isAvailableToClinics()
+                ? 'Version '.$published->version_number.' is available for new clinic template copies.'
+                : 'Version '.$published->version_number.' remains available only inside SaaS.')
             ->success()
             ->send();
 
         $this->selectTemplateVersion($published->getKey(), true);
+
+        return null;
+    }
+
+    public function updateDraftDetails(array $data): null
+    {
+        if (! $this->canManageVersions()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return null;
+        }
+
+        $draft = $this->selectedTemplateVersion();
+
+        if (! $draft) {
+            Notification::make()->title('Open a template draft first')->warning()->send();
+
+            return null;
+        }
+
+        $updated = app(VerificationTemplateVersionService::class)->updateUnusedDraft($draft, $data);
+
+        Notification::make()
+            ->title('Draft details updated')
+            ->body($updated->name.' remains an unpublished working draft.')
+            ->success()
+            ->send();
+
+        return null;
+    }
+
+    public function deleteSelectedUnusedDraft(): null
+    {
+        if (! $this->canManageVersions()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return null;
+        }
+
+        $draft = $this->selectedTemplateVersion();
+
+        if (! $draft) {
+            Notification::make()->title('Open a template draft first')->warning()->send();
+
+            return null;
+        }
+
+        app(VerificationTemplateVersionService::class)->deleteUnusedDraft($draft);
+        $this->closeTemplateVersionPanel();
+
+        Notification::make()
+            ->title('Unused draft deleted')
+            ->body('The unpublished template and its draft content were permanently removed.')
+            ->success()
+            ->send();
 
         return null;
     }
@@ -579,19 +562,18 @@ class ListVerificationFormQuestions extends ListRecords
         $working = $draft ?: $active;
 
         return [
-            'active_version' => 'v' . $active->version_number,
+            'active_version' => 'v'.$active->version_number,
             'active_published_at' => optional($active->published_at)->format('M d, Y h:i A') ?: 'Not published',
-            'working_version' => 'v' . $working->version_number,
+            'working_version' => 'v'.$working->version_number,
             'working_status' => str($working->status)->headline()->toString(),
             'has_draft' => (bool) $draft,
-            'draft_version' => $draft ? 'v' . $draft->version_number : null,
+            'draft_version' => $draft ? 'v'.$draft->version_number : null,
         ];
     }
 
     public function selectTemplateVersion(int $versionId, bool $showPreview = false): void
     {
-        $version = VerificationTemplateVersion::query()
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+        $version = $this->masterVersionQuery()
             ->whereKey($versionId)
             ->first();
 
@@ -607,15 +589,128 @@ class ListVerificationFormQuestions extends ListRecords
         $this->selectedTemplateVersionId = $version->getKey();
         $this->showTemplatePreview = $showPreview;
 
-        if ($version->status === VerificationTemplateVersion::STATUS_DRAFT) {
-            $version = app(VerificationTemplateVersionService::class)->markWorkingDraft($version);
-        }
-
         $this->expandedTemplateSectionKeys = collect($this->templateSectionRows($version))
             ->filter(fn (array $section): bool => ($section['child_count'] ?? 0) > 0)
             ->pluck('key')
             ->values()
             ->all();
+
+        $this->dispatch('master-template-version-opened');
+    }
+
+    public function setWorkingDraft(int $versionId): void
+    {
+        if (! $this->canManageVersions()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return;
+        }
+
+        $draft = $this->masterVersionQuery()
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereKey($versionId)
+            ->first();
+
+        if (! $draft) {
+            Notification::make()->title('Master Template draft not found')->danger()->send();
+
+            return;
+        }
+
+        if (! $draft->canEditDirectly()) {
+            Notification::make()
+                ->title('Draft is protected')
+                ->body($draft->lifecycleLockReason() ?? 'Only an unused, unpublished draft can be selected.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        app(VerificationTemplateVersionService::class)->markWorkingDraft($draft);
+        $this->selectedTemplateVersionId = $draft->getKey();
+        $this->showTemplatePreview = false;
+
+        Notification::make()
+            ->title('Working draft updated')
+            ->body('New Master Template questions will default to version '.$draft->version_number.'.')
+            ->success()
+            ->send();
+
+        $this->dispatch('master-template-version-opened');
+    }
+
+    public function archiveDraft(int $versionId): void
+    {
+        if (! $this->canManageVersions()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return;
+        }
+
+        $draft = $this->masterVersionQuery()
+            ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereKey($versionId)
+            ->first();
+
+        if (! $draft) {
+            Notification::make()->title('Master Template draft not found')->danger()->send();
+
+            return;
+        }
+
+        if (! $draft->canEditDirectly()) {
+            Notification::make()
+                ->title('Draft is protected')
+                ->body($draft->lifecycleLockReason() ?? 'Only an unused, unpublished draft can be archived.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        app(VerificationTemplateVersionService::class)->archiveUnusedDraft($draft);
+
+        if ($this->selectedTemplateVersionId === $draft->getKey()) {
+            $this->closeTemplateVersionPanel();
+        }
+
+        Notification::make()->title('Draft archived')->success()->send();
+    }
+
+    public function restoreArchivedDraft(int $versionId): void
+    {
+        if (! $this->canManageVersions()) {
+            Notification::make()->title('Permission denied')->danger()->send();
+
+            return;
+        }
+
+        $version = $this->masterVersionQuery()
+            ->where('status', VerificationTemplateVersion::STATUS_ARCHIVED)
+            ->whereNull('published_at')
+            ->whereKey($versionId)
+            ->first();
+
+        if (! $version) {
+            Notification::make()->title('Archived Master Template not found')->danger()->send();
+
+            return;
+        }
+
+        $version->forceFill([
+            'status' => VerificationTemplateVersion::STATUS_DRAFT,
+            'is_active' => false,
+            'is_working_draft' => false,
+        ])->save();
+
+        $this->selectTemplateVersion($version->getKey());
+
+        Notification::make()
+            ->title('Draft restored')
+            ->body('Open it in the builder or set it as the working draft when ready.')
+            ->success()
+            ->send();
     }
 
     public function showTemplateVersionPreview(int $versionId, string $formType = 'full_form'): void
@@ -784,7 +879,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         Notification::make()
             ->title('Question added')
-            ->body('The question was added to ' . $sectionLabel . '.')
+            ->body('The question was added to '.$sectionLabel.'.')
             ->success()
             ->send();
     }
@@ -794,7 +889,7 @@ class ListVerificationFormQuestions extends ListRecords
         $version = $this->selectedTemplateVersion();
 
         return $this->canManageVersions()
-            && $version?->status === VerificationTemplateVersion::STATUS_DRAFT
+            && ($version?->canEditDirectly() ?? false)
             && blank($version->organization_id)
             && blank($version->clinic_id);
     }
@@ -811,10 +906,18 @@ class ListVerificationFormQuestions extends ListRecords
             return null;
         }
 
-        return VerificationTemplateVersion::query()
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+        return $this->masterVersionQuery()
             ->whereKey($this->selectedTemplateVersionId)
             ->first();
+    }
+
+    protected function masterVersionQuery(): Builder
+    {
+        return VerificationTemplateVersion::query()
+            ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+            ->whereNull('organization_id')
+            ->whereNull('clinic_id');
     }
 
     protected function findSelectedSection(string $sectionKey): ?array
@@ -836,9 +939,8 @@ class ListVerificationFormQuestions extends ListRecords
             return null;
         }
 
-        $version = VerificationTemplateVersion::query()
+        $version = $this->masterVersionQuery()
             ->with(['parentVersion', 'sourceVersion', 'createdBy'])
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->whereKey($this->selectedTemplateVersionId)
             ->first();
 
@@ -857,21 +959,24 @@ class ListVerificationFormQuestions extends ListRecords
         return [
             'id' => $version->getKey(),
             'name' => $version->name,
-            'version' => 'v' . $version->version_number,
+            'version' => 'v'.$version->version_number,
             'status' => str($version->status)->headline()->toString(),
             'raw_status' => $version->status,
             'scope' => filled($version->clinic_id) ? 'Clinic' : 'Master',
             'form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$version->form_type] ?? 'Full + Short',
-            'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS[$version->clinic_visibility] ?? 'Hidden from Clinics',
+            'clinic_visibility' => $version->clinicAvailabilityLabel(),
             'is_active' => (bool) $version->is_active,
             'is_working_draft' => (bool) $version->is_working_draft,
             'is_draft' => $version->status === VerificationTemplateVersion::STATUS_DRAFT,
             'can_add_questions' => $this->canAddQuestionToSelectedVersion(),
+            'can_edit_directly' => $this->canManageVersions() && $version->canEditDirectly(),
+            'can_delete_permanently' => $this->canManageVersions() && $version->canDeletePermanently(),
+            'lock_reason' => $version->lifecycleLockReason(),
             'published_at' => optional($version->published_at)->format('M d, Y h:i A') ?: '-',
             'created_at' => optional($version->created_at)->format('M d, Y h:i A') ?: '-',
             'created_by' => $version->createdBy?->name ?: '-',
-            'source_version' => $version->sourceVersion ? 'v' . $version->sourceVersion->version_number : '-',
-            'parent_version' => $version->parentVersion ? 'v' . $version->parentVersion->version_number : '-',
+            'source_version' => $version->sourceVersion ? 'v'.$version->sourceVersion->version_number : '-',
+            'parent_version' => $version->parentVersion ? 'v'.$version->parentVersion->version_number : '-',
             'notes' => $version->notes ?: '-',
             'sections' => $sections,
             'section_count' => count($sections),
@@ -882,6 +987,21 @@ class ListVerificationFormQuestions extends ListRecords
             'full_question_count' => $questions->whereIn('form_type', ['full_form', 'both'])->count(),
             'short_question_count' => $questions->whereIn('form_type', ['short_form', 'both'])->count(),
             'preview_sections' => $this->templatePreviewSections($version, $this->templatePreviewFormType),
+            'question_rows' => $questions->map(fn (VerificationFormQuestion $question): array => [
+                'id' => $question->getKey(),
+                'prompt' => $question->prompt,
+                'section' => VerificationFormQuestion::sectionLabel($question->section_key, $question->template_key),
+                'form_type' => VerificationFormQuestion::FORM_TYPE_OPTIONS[$question->form_type] ?? str($question->form_type)->headline()->toString(),
+                'answer_type' => VerificationFormQuestion::INPUT_TYPE_OPTIONS[$question->input_type] ?? str($question->input_type)->headline()->toString(),
+                'sort_order' => $question->sort_order,
+                'is_active' => (bool) $question->is_active,
+                'edit_url' => $version->status === VerificationTemplateVersion::STATUS_DRAFT
+                    ? VerificationFormQuestionResource::getUrl('edit', [
+                        'record' => $question,
+                        'version' => $version->getKey(),
+                    ])
+                    : null,
+            ])->all(),
         ];
     }
 
@@ -936,8 +1056,8 @@ class ListVerificationFormQuestions extends ListRecords
         $sectionTree = $this->templateSectionRows($draft);
 
         return [
-            'version' => 'v' . $draft->version_number,
-            'source_version' => $draft->parentVersion ? 'v' . $draft->parentVersion->version_number : null,
+            'version' => 'v'.$draft->version_number,
+            'source_version' => $draft->parentVersion ? 'v'.$draft->parentVersion->version_number : null,
             'created_at' => optional($draft->created_at)->format('M d, Y h:i A'),
             'section_count' => count($sectionTree),
             'sub_section_count' => collect($sectionTree)->sum('child_count'),
@@ -988,8 +1108,8 @@ class ListVerificationFormQuestions extends ListRecords
                     'sort_order' => $draftSection['sort_order'] ?? $publishedSection['sort_order'] ?? 0,
                     'published_title' => $publishedSection['title'] ?? '-',
                     'draft_title' => $draftSection['title'] ?? '-',
-                    'published_count' => $publishedSection ? $publishedSection['active_count'] . '/' . $publishedSection['total_count'] : '-',
-                    'draft_count' => $draftSection ? $draftSection['active_count'] . '/' . $draftSection['total_count'] : '-',
+                    'published_count' => $publishedSection ? $publishedSection['active_count'].'/'.$publishedSection['total_count'] : '-',
+                    'draft_count' => $draftSection ? $draftSection['active_count'].'/'.$draftSection['total_count'] : '-',
                     'status' => $status,
                 ];
             })
@@ -1033,13 +1153,13 @@ class ListVerificationFormQuestions extends ListRecords
 
         return [
             'published' => [
-                'version' => 'v' . $published->version_number,
+                'version' => 'v'.$published->version_number,
                 'sections' => count($publishedSnapshot['sections']),
                 'questions' => count($publishedSnapshot['questions']),
                 'active_questions' => collect($publishedSnapshot['questions'])->where('is_active', true)->count(),
             ],
             'draft' => [
-                'version' => 'v' . $draft->version_number,
+                'version' => 'v'.$draft->version_number,
                 'sections' => count($draftSnapshot['sections']),
                 'questions' => count($draftSnapshot['questions']),
                 'active_questions' => collect($draftSnapshot['questions'])->where('is_active', true)->count(),
@@ -1122,8 +1242,8 @@ class ListVerificationFormQuestions extends ListRecords
             ->mapWithKeys(function (VerificationFormQuestion $question) use ($sectionRows, $version): array {
                 $sectionKey = $question->section_key ?: 'unassigned';
                 $reviewKey = filled($question->source_question_id)
-                    ? 'source:' . $question->source_question_id
-                    : ($version->status === VerificationTemplateVersion::STATUS_DRAFT ? 'draft:' . $question->id : 'source:' . $question->id);
+                    ? 'source:'.$question->source_question_id
+                    : ($version->status === VerificationTemplateVersion::STATUS_DRAFT ? 'draft:'.$question->id : 'source:'.$question->id);
 
                 return [$reviewKey => [
                     'prompt' => filled($question->code) ? "{$question->code} {$question->prompt}" : $question->prompt,
@@ -1159,6 +1279,7 @@ class ListVerificationFormQuestions extends ListRecords
             ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+            ->whereNull('organization_id')
             ->whereNull('clinic_id')
             ->orderByDesc('is_working_draft')
             ->latest('id')
@@ -1298,38 +1419,50 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function getTemplateVersionHistory(): array
     {
-        $clinicId = $this->getSelectedClinicId();
-
-        return VerificationTemplateVersion::query()
+        return $this->masterVersionQuery()
             ->with('clinic.organization')
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->when(
-                filled($clinicId),
-                fn (Builder $query) => $query->where('clinic_id', $clinicId),
-                fn (Builder $query) => $query->whereNull('clinic_id')
-            )
             ->orderByDesc('version_number')
             ->orderByDesc('id')
             ->get()
             ->map(function (VerificationTemplateVersion $version): array {
                 $isDraft = $version->status === VerificationTemplateVersion::STATUS_DRAFT;
+                $isAvailableToClinics = $version->isAvailableToClinics();
 
                 return [
                     'id' => $version->getKey(),
                     'name' => $version->name,
-                    'version' => 'v' . $version->version_number,
-                    'row_group' => $isDraft ? 'draft' : ((bool) $version->is_active ? 'active' : 'previous'),
+                    'version' => 'v'.$version->version_number,
+                    'row_group' => $isDraft
+                        ? 'draft'
+                        : ($version->status === VerificationTemplateVersion::STATUS_ARCHIVED
+                            ? 'archived'
+                            : ((bool) $version->is_active ? 'active' : 'previous')),
                     'description' => $isDraft
-                        ? 'Working draft. Publish when this template is ready.'
+                        ? ($version->is_working_draft
+                            ? 'Current working draft for new Master Template questions.'
+                            : 'Editable draft. Open the builder or set it as the working draft.')
                         : ((bool) $version->is_active ? 'Current active Master Template' : 'Previous Master Template version'),
                     'scope' => filled($version->clinic_id) ? 'Clinic' : 'Master',
                     'clinic' => $version->clinic?->clinic_name,
                     'form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$version->form_type] ?? 'Full + Short',
-                    'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS[$version->clinic_visibility] ?? 'Hidden from Clinics',
+                    'clinic_visibility' => $version->clinicAvailabilityLabel(),
                     'status' => str($version->status)->headline()->toString(),
+                    'status_label' => $isDraft
+                        ? ($version->is_working_draft ? 'Working Draft' : 'Draft')
+                        : ($version->status === VerificationTemplateVersion::STATUS_ARCHIVED
+                            ? 'Archived'
+                            : ((bool) $version->is_active
+                                ? ($isAvailableToClinics ? 'Published & Available' : 'Published - Internal Only')
+                                : 'Previous Published')),
+                    'is_available_to_clinics' => $isAvailableToClinics,
                     'is_active' => (bool) $version->is_active,
                     'is_working_draft' => (bool) $version->is_working_draft,
                     'is_draft' => $isDraft,
+                    'can_edit_directly' => $this->canManageVersions() && $version->canEditDirectly(),
+                    'can_delete_permanently' => $this->canManageVersions() && $version->canDeletePermanently(),
+                    'lock_reason' => $version->lifecycleLockReason(),
+                    'can_restore' => $version->status === VerificationTemplateVersion::STATUS_ARCHIVED
+                        && blank($version->published_at),
                     'updated_at' => optional($version->updated_at)->format('M d, Y h:i A') ?: '-',
                     'published_at' => optional($version->published_at)->format('M d, Y h:i A'),
                     'notes' => $version->notes,

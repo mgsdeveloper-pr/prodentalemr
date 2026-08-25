@@ -30,7 +30,11 @@ class EditVerificationFormQuestion extends EditRecord
     {
         $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : $this->record?->clinic_id;
 
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? $this->record?->template_key ?? VerificationFormQuestion::defaultTemplateKey(), $clinicId))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate(
+            $this->data['template_key'] ?? $this->record?->template_key ?? VerificationFormQuestion::defaultTemplateKey(),
+            $clinicId,
+            $this->record?->template_version_id,
+        ))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -86,7 +90,7 @@ class EditVerificationFormQuestion extends EditRecord
 
     public function getCancelUrl(): string
     {
-        return $this->previousUrl ?: VerificationFormQuestionResource::getUrl();
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->record?->template_version_id]);
     }
 
     protected function afterFill(): void
@@ -167,5 +171,10 @@ class EditVerificationFormQuestion extends EditRecord
             $this->data['order_position'] ?? 'bottom',
             filled($this->data['order_reference_id'] ?? null) ? (int) $this->data['order_reference_id'] : null,
         );
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->record?->template_version_id]);
     }
 }

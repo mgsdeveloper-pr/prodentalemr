@@ -74,7 +74,7 @@ class GlobalSearchService
         }
 
         if ($user->canAccessSaasModule('insurance_directory')) {
-            $this->add($groups, 'insurance', 'Insurance Directory', $this->insurance($query, 'filament.saas.resources.insurance-carriers.edit'));
+            $this->add($groups, 'insurance', 'Insurance Directory', $this->insurance($query, 'filament.saas.resources.insurance.edit'));
         }
 
         return $groups;

@@ -24,6 +24,9 @@ class CreateVerificationQuestion extends CreateRecord
     #[Url(as: 'section')]
     public ?string $requestedSectionKey = null;
 
+    #[Url(as: 'template_version_id')]
+    public ?int $requestedTemplateVersionId = null;
+
     public function mount(): void
     {
         parent::mount();
@@ -151,7 +154,13 @@ class CreateVerificationQuestion extends CreateRecord
         $data['template_key'] = $data['template_key'] ?: VerificationFormQuestion::defaultTemplateKey();
         $data['clinic_id'] = $data['clinic_id'] ?: ClinicPanelScope::selectedClinicId();
         $data['organization_id'] = $data['organization_id'] ?: ClinicPanelScope::selectedOrganizationId();
-        $data['template_version_id'] = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic())?->getKey();
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(
+            ClinicPanelScope::selectedClinic(),
+            $this->requestedTemplateVersionId,
+        );
+
+        abort_unless($version?->canEditDirectly(), 403, 'Only an unused clinic template draft can be changed.');
+        $data['template_version_id'] = $version->getKey();
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);
         $data['section_key'] = filled($data['sub_section_key'] ?? null)
             ? $data['sub_section_key']

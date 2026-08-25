@@ -483,11 +483,7 @@ class VerificationQuestionResource extends Resource
             return false;
         }
 
-        return $version->status === VerificationTemplateVersion::STATUS_DRAFT
-            || (
-                $version->status === VerificationTemplateVersion::STATUS_PUBLISHED
-                && (bool) $version->is_active
-            );
+        return $version->canEditDirectly();
     }
 
     public static function getPages(): array
@@ -500,7 +496,7 @@ class VerificationQuestionResource extends Resource
         ];
     }
 
-    public static function currentClinicWorkingVersion(?Clinic $clinic = null): ?VerificationTemplateVersion
+    public static function currentClinicWorkingVersion(?Clinic $clinic = null, ?int $versionId = null): ?VerificationTemplateVersion
     {
         $clinic ??= ClinicPanelScope::selectedClinic();
 
@@ -510,11 +506,16 @@ class VerificationQuestionResource extends Resource
 
         $templateKey = VerificationFormQuestion::defaultTemplateKey();
 
+        $versionId ??= filled(request()->query('template_version_id'))
+            ? (int) request()->query('template_version_id')
+            : null;
+
         $draft = VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
             ->where('template_key', $templateKey)
             ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
             ->where('clinic_id', $clinic->getKey())
+            ->when($versionId, fn (Builder $query) => $query->whereKey($versionId))
             ->orderByDesc('is_working_draft')
             ->latest('id')
             ->first();

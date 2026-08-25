@@ -570,7 +570,7 @@ class VerificationFormQuestion extends Model
         return $filtered;
     }
 
-    public static function sectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
+    public static function sectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null, ?int $templateVersionId = null): array
     {
         $templateKey = static::normalizeTemplateKey($templateKey);
 
@@ -584,11 +584,11 @@ class VerificationFormQuestion extends Model
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->when(
                 blank($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentMasterWorkingTemplateVersionId())
             )
             ->when(
                 filled($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentClinicWorkingTemplateVersionId($clinicId))
             )
             ->where('is_active', true)
             ->orderByRaw('parent_section_key is not null')
@@ -654,20 +654,20 @@ class VerificationFormQuestion extends Model
         return false;
     }
 
-    public static function topLevelSectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null): array
+    public static function topLevelSectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null, ?int $templateVersionId = null): array
     {
         $templateKey = static::normalizeTemplateKey($templateKey);
 
         $options = $templateKey === 'template_3'
-            ? static::templateThreeBuilderSectionOptions($clinicId)
-            : static::sectionOptionsForTemplate($templateKey, $clinicId);
+            ? static::templateThreeBuilderSectionOptions($clinicId, $templateVersionId)
+            : static::sectionOptionsForTemplate($templateKey, $clinicId, $templateVersionId);
 
         return collect($options)
             ->reject(fn (string $label): bool => str_contains($label, ' / '))
             ->all();
     }
 
-    public static function templateThreeBuilderSectionOptions(?int $clinicId = null): array
+    public static function templateThreeBuilderSectionOptions(?int $clinicId = null, ?int $templateVersionId = null): array
     {
         $builtInOptions = self::TEMPLATE_3_SECTION_OPTIONS;
 
@@ -676,11 +676,11 @@ class VerificationFormQuestion extends Model
             ->where('template_key', self::DEFAULT_TEMPLATE_KEY)
             ->when(
                 blank($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentMasterWorkingTemplateVersionId())
             )
             ->when(
                 filled($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentClinicWorkingTemplateVersionId($clinicId))
             )
             ->where('is_active', true)
             ->orderByRaw('parent_section_key is not null')
@@ -711,7 +711,7 @@ class VerificationFormQuestion extends Model
         return $builtInOptions + $customSectionOptions;
     }
 
-    public static function childSectionOptionsForTemplate(?string $templateKey, ?int $clinicId, ?string $parentSectionKey): array
+    public static function childSectionOptionsForTemplate(?string $templateKey, ?int $clinicId, ?string $parentSectionKey, ?int $templateVersionId = null): array
     {
         if (blank($parentSectionKey)) {
             return [];
@@ -732,11 +732,11 @@ class VerificationFormQuestion extends Model
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->when(
                 blank($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentMasterWorkingTemplateVersionId())
             )
             ->when(
                 filled($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentClinicWorkingTemplateVersionId($clinicId))
             )
             ->where('parent_section_key', $parentSectionKey)
             ->where('is_active', true)

@@ -1,0 +1,2 @@
+insurance_name,payer_id,payer_phone,claims_address,website,notes,is_active
+Example Dental Insurance,PAYER001,800-555-0100,"100 Example Avenue, Louisville, KY 40202",https://example.com,Replace this sample row before import,Yes

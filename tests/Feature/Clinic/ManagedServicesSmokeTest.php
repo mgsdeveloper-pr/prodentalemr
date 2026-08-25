@@ -410,8 +410,8 @@ it('renders the clinic template builder as one focused workspace', function () {
         ->assertSee('Clinic Template Builder')
         ->assertSee('Template Structure')
         ->assertSee('Frequency & Percentage')
-        ->assertSee('Reorder')
-        ->assertSee('Add Question')
+        ->assertSee('Create Draft to Reorder')
+        ->assertSee('Create Draft to Add Question')
         ->assertSee('Form Preview')
         ->call('beginTemplateChange', 'reorder')
         ->assertSet('pendingBuilderAction', 'reorder')
@@ -440,8 +440,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->assertSet('showCreateDraftModal', true)
         ->assertSee('Continue to Add Question')
         ->call('submitCreateDraftVersion')
-        ->assertHasNoErrors()
-        ->assertRedirect(VerificationQuestionResource::getUrl('create', ['section' => $sectionKey]));
+        ->assertHasNoErrors();
 
     $draft = VerificationTemplateVersion::query()
         ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -451,7 +450,15 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->latest('id')
         ->firstOrFail();
 
-    Livewire::withQueryParams(['section' => 'template_3_verification_information'])
+    $component->assertRedirect(VerificationQuestionResource::getUrl('create', [
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ]));
+
+    Livewire::withQueryParams([
+        'section' => 'template_3_verification_information',
+        'template_version_id' => $draft->id,
+    ])
         ->test(CreateVerificationQuestion::class)
         ->assertSet('requestedSectionKey', 'template_3_verification_information')
         ->assertSet('data.section_key', 'template_3_verification_information')
@@ -521,7 +528,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
     expect($reorderedIds)->toBe([$questions[1]->id, $questions[0]->id]);
 });
 
-it('archives only unused clinic template versions from settings', function () {
+it('deletes only unused clinic drafts and protects the active template', function () {
     $this->actingAs($this->clinicUser);
 
     Livewire::test(VerificationSettings::class)
@@ -540,10 +547,10 @@ it('archives only unused clinic template versions from settings', function () {
         ->firstOrFail();
 
     Livewire::test(VerificationSettings::class)
-        ->call('archiveClinicTemplateVersion', $draft->id)
+        ->call('deleteUnusedClinicTemplateDraft', $draft->id)
         ->assertHasNoErrors();
 
-    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_ARCHIVED);
+    expect(VerificationTemplateVersion::withTrashed()->find($draft->id))->toBeNull();
 
     $active = VerificationTemplateVersion::query()
         ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -562,13 +569,23 @@ it('archives only unused clinic template versions from settings', function () {
 it('lets clinics select the active published template from settings', function () {
     $this->actingAs($this->clinicUser);
 
-    Livewire::test(VerificationSettings::class)
+    $component = Livewire::test(VerificationSettings::class)
         ->call('createClinicTemplateDraft')
         ->set('newClinicTemplateDraftData.template_name', 'Selectable Clinic Template Draft')
         ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_BOTH)
         ->set('newClinicTemplateDraftData.starting_point', 'active')
         ->call('submitCreateClinicTemplateDraft')
-        ->call('publishClinicTemplateDraft')
+        ->assertHasNoErrors();
+
+    $draft = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+        ->latest('id')
+        ->firstOrFail();
+
+    $component
+        ->call('publishClinicTemplateDraft', $draft->id)
         ->assertHasNoErrors();
 
     $previousTemplate = VerificationTemplateVersion::query()

@@ -23,6 +23,8 @@ class ListVerificationQuestions extends Page
 
     public bool $showDraft = false;
 
+    public ?int $selectedTemplateVersionId = null;
+
     public bool $showCreateDraftModal = false;
 
     public bool $showTemplateSectionModal = false;
@@ -65,6 +67,7 @@ class ListVerificationQuestions extends Page
     protected $queryString = [
         'selectedTemplateKey' => ['except' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, 'as' => 'template'],
         'showDraft' => ['except' => false, 'as' => 'draft'],
+        'selectedTemplateVersionId' => ['except' => null, 'as' => 'version'],
         'selectedSectionKey' => ['except' => null, 'as' => 'section'],
     ];
 
@@ -312,13 +315,16 @@ class ListVerificationQuestions extends Page
 
     public function openDraftVersion(): null
     {
-        if (! $this->getDraftClinicVersion()) {
+        $draft = $this->getDraftClinicVersion();
+
+        if (! $draft) {
             Notification::make()->title('No draft version found')->warning()->send();
 
             return null;
         }
 
         $this->showDraft = true;
+        $this->selectedTemplateVersionId = $draft->getKey();
         $this->resetBuilderCaches();
 
         return null;
@@ -327,6 +333,7 @@ class ListVerificationQuestions extends Page
     public function closeDraftVersion(): null
     {
         $this->showDraft = false;
+        $this->selectedTemplateVersionId = null;
         $this->resetBuilderCaches();
 
         return null;
@@ -355,6 +362,8 @@ class ListVerificationQuestions extends Page
             'clinic_visibility' => $data['clinic_visibility'] ?? $draft->clinic_visibility,
         ])->save();
         $this->showDraft = true;
+        $this->selectedTemplateVersionId = $draft->getKey();
+        $this->resetBuilderCaches();
 
         Notification::make()
             ->title('Draft version ready')
@@ -429,6 +438,10 @@ class ListVerificationQuestions extends Page
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
             ->where('clinic_id', $clinic->getKey())
+            ->when(
+                filled($this->selectedTemplateVersionId),
+                fn ($query) => $query->whereKey($this->selectedTemplateVersionId),
+            )
             ->orderByDesc('is_working_draft')
             ->latest('id')
             ->first();
@@ -472,6 +485,7 @@ class ListVerificationQuestions extends Page
     {
         return VerificationQuestionResource::getUrl('create', array_filter([
             'section' => $sectionKey,
+            'template_version_id' => $this->getDraftClinicVersion()?->getKey(),
         ]));
     }
 
@@ -932,6 +946,22 @@ class ListVerificationQuestions extends Page
 
         $this->displayedVersionResolved = true;
 
+        if (filled($this->selectedTemplateVersionId)) {
+            $clinic = ClinicPanelScope::selectedClinic();
+            $selectedVersion = $clinic
+                ? VerificationTemplateVersion::query()
+                    ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+                    ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+                    ->where('clinic_id', $clinic->getKey())
+                    ->whereKey($this->selectedTemplateVersionId)
+                    ->first()
+                : null;
+
+            if ($selectedVersion) {
+                return $this->displayedVersionCache = $selectedVersion;
+            }
+        }
+
         if ($this->showDraft && ($draft = $this->getDraftClinicVersion())) {
             return $this->displayedVersionCache = $draft;
         }
@@ -941,9 +971,11 @@ class ListVerificationQuestions extends Page
 
     protected function isDraftEditingOpen(): bool
     {
+        $draft = $this->getDraftClinicVersion();
+
         return $this->showDraft
             && $this->canManageSelectedClinicTemplateSections()
-            && (bool) $this->getDraftClinicVersion();
+            && $draft?->canEditDirectly() === true;
     }
 
     protected function resetBuilderCaches(): void

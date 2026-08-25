@@ -49,12 +49,27 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::redirect('/saas/insurance-carriers', '/saas/insurance', 301)
+        ->name('saas.insurance.legacy.index');
+    Route::redirect('/saas/insurance-carriers/create', '/saas/insurance/create', 301)
+        ->name('saas.insurance.legacy.create');
+    Route::get('/saas/insurance-carriers/{record}/edit', fn (string $record) => redirect('/saas/insurance/'.$record.'/edit', 301))
+        ->name('saas.insurance.legacy.edit');
+    Route::redirect('/clinic/insurance-carriers', '/clinic/insurance', 301)
+        ->name('clinic.insurance.legacy.index');
+    Route::get('/clinic/insurance-carriers/{record}/edit', fn (string $record) => redirect('/clinic/insurance/'.$record.'/edit', 301))
+        ->name('clinic.insurance.legacy.edit');
     Route::redirect('/saas/verification-form-questions', '/saas/master-template')
         ->name('saas.master-template.legacy.index');
-    Route::redirect('/saas/verification-form-questions/create', '/saas/master-template/create')
+    Route::redirect('/saas/verification-form-questions/create', '/saas/master-template/questions/create')
         ->name('saas.master-template.legacy.create');
-    Route::get('/saas/verification-form-questions/{record}/edit', fn (string $record) => redirect('/saas/master-template/'.$record.'/edit'))
+    Route::get('/saas/verification-form-questions/{record}/edit', fn (string $record) => redirect('/saas/master-template/questions/'.$record.'/edit'))
         ->name('saas.master-template.legacy.edit');
+    Route::redirect('/saas/master-template/create', '/saas/master-template/questions/create', 301)
+        ->name('saas.master-template.legacy-question-create');
+    Route::get('/saas/master-template/{record}/edit', fn (string $record) => redirect('/saas/master-template/questions/'.$record.'/edit', 301))
+        ->whereNumber('record')
+        ->name('saas.master-template.legacy-question-edit');
     Route::get('/clinic/patient-documents/{document}/view', [PatientDocumentController::class, 'show'])->name('clinic.patient-documents.show');
     Route::get('/clinic/patient-documents/{document}/download', [PatientDocumentController::class, 'download'])->name('clinic.patient-documents.download');
     Route::get('/clinic/patient-consent-forms/{consent}/view', [PatientConsentFormController::class, 'show'])->name('clinic.patient-consent-forms.show');

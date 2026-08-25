@@ -142,12 +142,12 @@
                     <div class="tb-toolbar">
                         <div><div class="tb-toolbar-title">{{ $selectedSection['title'] ?? 'Template Questions' }}</div><div class="tb-toolbar-meta">{{ $builderQuestions->count() }} matching questions · {{ $versionSummary['showing_draft'] ? 'Draft workspace' : 'Published review' }}</div></div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button><button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">Reorder</button><button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
+                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button><button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">{{ $versionSummary['showing_draft'] ? 'Reorder' : 'Create Draft to Reorder' }}</button><button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
                             @if ($selectedSection)
                                 @if ($versionSummary['showing_draft'])
                                     <a href="{{ $this->getCreateUrl($selectedSection['key']) }}" wire:navigate class="tb-button tb-button--primary">Add Question</a>
                                 @elseif ($versionSummary['can_manage'])
-                                    <button type="button" wire:click="beginTemplateChange('questions')" wire:loading.attr="disabled" class="tb-button tb-button--primary">Add Question</button>
+                                    <button type="button" wire:click="beginTemplateChange('questions')" wire:loading.attr="disabled" class="tb-button tb-button--primary">Create Draft to Add Question</button>
                                 @endif
                             @endif
                         </div>

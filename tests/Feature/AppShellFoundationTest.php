@@ -70,6 +70,8 @@ it('keeps the desktop navigation mounted when the page is refreshed', function (
     expect($theme)
         ->toContain('.fi-main-sidebar[x-cloak]')
         ->toContain('.fi-main-sidebar[x-cloak="-lg"]')
+        ->toContain('width: var(--pd-app-sidebar-width) !important;')
+        ->toContain('transform: translateX(0) !important;')
         ->toContain('Render-safe desktop shell');
 });
 

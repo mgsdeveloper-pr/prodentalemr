@@ -1654,16 +1654,26 @@
             top: 0 !important;
             bottom: 0 !important;
             inset-inline-start: 0 !important;
+            inset-inline-end: auto !important;
+            width: var(--pd-app-sidebar-width) !important;
+            min-width: var(--pd-app-sidebar-width) !important;
+            max-width: var(--pd-app-sidebar-width) !important;
             height: 100vh !important;
             height: 100dvh !important;
             max-height: 100vh !important;
             max-height: 100dvh !important;
             overflow: hidden !important;
+            transform: translateX(0) !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
 
         .fi-sidebar {
             top: 0 !important;
             bottom: 0 !important;
+            width: var(--pd-app-sidebar-width) !important;
+            min-width: var(--pd-app-sidebar-width) !important;
+            max-width: var(--pd-app-sidebar-width) !important;
             height: 100vh !important;
             height: 100dvh !important;
             max-height: 100vh !important;

@@ -434,6 +434,35 @@ it('never mixes frequency rows from draft current or historical template version
     expect($pdfCoverageRows)->toHaveCount(1)
         ->and($pdfCoverageRows->pluck('label')->all())
         ->toBe(['Test CDT Code Here']);
+
+    foreach (['standard', 'custom_portrait', 'custom_landscape'] as $mode) {
+        expect(VerificationResultPdf::output($request->fresh(), $mode))->toStartWith('%PDF-');
+    }
+
+    $snapshot = $request->formSubmissions()->create([
+        'user_id' => $this->user->id,
+        'panel' => 'verification',
+        'status' => BillingWorkItem::STATUS_DONE,
+        'outcome_status' => 'verified',
+        'priority' => 'normal',
+        'version' => 1,
+        'payload' => [
+            'coverage_codes' => [[
+                'category' => 'Basic',
+                'code' => '',
+                'description' => 'Test CDT Code Here',
+                'coverage_percent' => 65,
+                'sort_order' => 1,
+            ]],
+        ],
+    ]);
+
+    $snapshotRows = (new ReflectionMethod(VerificationResultPdf::class, 'mapCoverageCodeRowsForSection'))
+        ->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_basic', $snapshot);
+
+    expect($snapshotRows)->toHaveCount(1)
+        ->and($snapshotRows->first()['value'])->toBe('65%')
+        ->and(VerificationResultPdf::output($request->fresh(), 'standard', submission: $snapshot))->toStartWith('%PDF-');
 });
 
 it('limits the audit checklist to active required questions applicable to the selected form type', function () {

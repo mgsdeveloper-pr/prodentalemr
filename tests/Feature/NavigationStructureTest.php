@@ -69,7 +69,7 @@ it('keeps clinic template building in one focused workspace', function (): void 
 
     expect($settingsView)
         ->toContain('Open Builder')
-        ->toContain('View Builder')
+        ->toContain('View Structure')
         ->not->toContain('>Add Question</a>')
         ->not->toContain('>Re-order</a>')
         ->and($builderView)
@@ -77,6 +77,32 @@ it('keeps clinic template building in one focused workspace', function (): void 
         ->toContain('Form Preview')
         ->toContain('Add Question')
         ->toContain('Previous Template Versions');
+});
+
+it('keeps the saas master template workspace focused on versions and draft actions', function (): void {
+    $masterTemplateView = file_get_contents(resource_path(
+        'views/filament/saas/resources/verification-form-questions/pages/list-verification-form-questions.blade.php'
+    ));
+    $masterTemplatePage = file_get_contents(app_path(
+        'Filament/Saas/Resources/VerificationFormQuestions/Pages/ListVerificationFormQuestions.php'
+    ));
+
+    expect($masterTemplateView)
+        ->toContain('Current Master Template')
+        ->toContain('Draft Templates')
+        ->toContain('Previous Published')
+        ->toContain('Template Versions')
+        ->toContain('Open Builder')
+        ->toContain('Set as Working')
+        ->toContain('Preview')
+        ->not->toContain('Search sections or questions from the table below')
+        ->not->toContain('Master Scope')
+        ->not->toContain('>Export</button>')
+        ->not->toContain('>Columns</button>')
+        ->and($masterTemplatePage)
+        ->toContain("return 'Master Template';")
+        ->toContain("->label('Create Draft Template')")
+        ->toContain('return $this->getTemplateHeaderActions();');
 });
 
 it('keeps verification navigation focused on requests and resources', function (): void {

@@ -12,6 +12,7 @@ use App\Support\VerificationTemplateVersionService;
 use BackedEnum;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -19,7 +20,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -83,6 +83,7 @@ class VerificationFormQuestionResource extends Resource
                                             ->default(null),
                                         Hidden::make('clinic_id')
                                             ->default(null),
+                                        Hidden::make('template_version_id'),
                                         Select::make('template_key')
                                             ->label('Template')
                                             ->options(VerificationFormQuestion::templateOptionsForUi())
@@ -97,7 +98,11 @@ class VerificationFormQuestionResource extends Resource
                                             ->columnSpan(4),
                                         Select::make('section_key')
                                             ->label('Template section')
-                                            ->options(fn (Get $get): array => VerificationFormQuestion::topLevelSectionOptionsForTemplate($get('template_key'), filled($get('clinic_id')) ? (int) $get('clinic_id') : null))
+                                            ->options(fn (Get $get): array => VerificationFormQuestion::topLevelSectionOptionsForTemplate(
+                                                $get('template_key'),
+                                                filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
+                                                filled($get('template_version_id')) ? (int) $get('template_version_id') : null,
+                                            ))
                                             ->required()
                                             ->live()
                                             ->native(false)
@@ -112,16 +117,19 @@ class VerificationFormQuestionResource extends Resource
                                                 $get('template_key'),
                                                 filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
                                                 $get('section_key'),
+                                                filled($get('template_version_id')) ? (int) $get('template_version_id') : null,
                                             ))
                                             ->visible(fn (Get $get): bool => count(VerificationFormQuestion::childSectionOptionsForTemplate(
                                                 $get('template_key'),
                                                 filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
                                                 $get('section_key'),
+                                                filled($get('template_version_id')) ? (int) $get('template_version_id') : null,
                                             )) > 0)
                                             ->required(fn (Get $get): bool => count(VerificationFormQuestion::childSectionOptionsForTemplate(
                                                 $get('template_key'),
                                                 filled($get('clinic_id')) ? (int) $get('clinic_id') : null,
                                                 $get('section_key'),
+                                                filled($get('template_version_id')) ? (int) $get('template_version_id') : null,
                                             )) > 0)
                                             ->live()
                                             ->native(false)
@@ -499,10 +507,7 @@ class VerificationFormQuestionResource extends Resource
 
     public static function canCreate(): bool
     {
-        $version = static::currentMasterWorkingVersion();
-
-        return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
-            && $version?->status === VerificationTemplateVersion::STATUS_DRAFT;
+        return auth()->user()?->canManageVerificationTemplateSections() ?? false;
     }
 
     public static function canEdit(Model $record): bool
@@ -510,7 +515,7 @@ class VerificationFormQuestionResource extends Resource
         return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
             && blank($record->organization_id)
             && blank($record->clinic_id)
-            && $record->templateVersion?->status === VerificationTemplateVersion::STATUS_DRAFT;
+            && ($record->templateVersion?->canEditDirectly() ?? false);
     }
 
     public static function canDelete(Model $record): bool
@@ -518,28 +523,29 @@ class VerificationFormQuestionResource extends Resource
         return (auth()->user()?->canManageVerificationTemplateSections() ?? false)
             && blank($record->organization_id)
             && blank($record->clinic_id)
-            && $record->templateVersion?->status === VerificationTemplateVersion::STATUS_DRAFT;
+            && ! $record->is_builtin
+            && ! $record->is_locked_by_admin
+            && ($record->templateVersion?->canEditDirectly() ?? false);
     }
 
     public static function getEloquentQuery(): Builder
     {
-        $version = static::currentMasterWorkingVersion();
-
         return parent::getEloquentQuery()
             ->whereNull('organization_id')
             ->whereNull('clinic_id')
-            ->when(
-                $version,
-                fn (Builder $query) => $query->where('template_version_id', $version->getKey())
-            );
+            ->whereHas('templateVersion', fn (Builder $query) => $query
+                ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
+                ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+                ->whereNull('organization_id')
+                ->whereNull('clinic_id'));
     }
 
     public static function getPages(): array
     {
         return [
             'index' => ListVerificationFormQuestions::route('/'),
-            'create' => CreateVerificationFormQuestion::route('/create'),
-            'edit' => EditVerificationFormQuestion::route('/{record}/edit'),
+            'create' => CreateVerificationFormQuestion::route('/questions/create'),
+            'edit' => EditVerificationFormQuestion::route('/questions/{record}/edit'),
         ];
     }
 

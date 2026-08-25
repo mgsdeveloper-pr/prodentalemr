@@ -1,19 +1,21 @@
 <x-filament-panels::page>
     @php
-        $versionSummary = $this->getVersionSummary();
-        $workspaceStats = $this->getTemplateWorkspaceStats();
         $templateVersionHistory = collect($this->getTemplateVersionHistory());
         $publishedCount = $templateVersionHistory->where('status', 'Published')->count();
         $draftCount = $templateVersionHistory->where('status', 'Draft')->count();
         $archivedCount = max(0, $templateVersionHistory->count() - $publishedCount - $draftCount);
-        $hasDraft = (bool) ($versionSummary['has_draft'] ?? false);
+        $activeTemplate = $templateVersionHistory->first(fn (array $version): bool => (bool) ($version['is_active'] ?? false));
+        $previousPublishedCount = max(0, $publishedCount - ($activeTemplate ? 1 : 0));
         $selectedTemplateVersion = $this->getSelectedTemplateVersionDetail();
     @endphp
 
     <style>
         .df-page {
-            max-width: 1600px;
-            margin: 0 auto;
+            display: grid;
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            gap: 18px;
             color: #0f172a;
         }
 
@@ -51,17 +53,10 @@
             justify-content: flex-end;
         }
 
-        .df-grid-4 {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 16px;
-            margin-top: 24px;
-        }
-
         .df-card,
         .df-panel {
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
+            border-radius: 8px;
             background: #ffffff;
             box-shadow: none;
         }
@@ -85,13 +80,45 @@
             color: #0f172a;
         }
 
-        .df-filter {
-            margin-top: 24px;
-            padding: 16px;
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
+        .df-summary {
+            display: grid;
+            grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(130px, 0.7fr));
+            margin-top: 0;
+            overflow: hidden;
+            order: 1;
+        }
+
+        .df-version-list {
+            order: 3;
+        }
+
+        .df-selected-builder {
+            order: 2;
+        }
+
+        .df-summary__item {
+            min-width: 0;
+            padding: 14px 16px;
+            border-right: 1px solid #e2e8f0;
+        }
+
+        .df-summary__item:last-child {
+            border-right: 0;
+        }
+
+        .df-summary__value {
+            margin-top: 5px;
+            color: #0f172a;
+            font-size: 15px;
+            line-height: 1.35;
+            font-weight: 700;
+        }
+
+        .df-summary__note {
+            margin-top: 2px;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.4;
         }
 
         .df-input,
@@ -114,7 +141,7 @@
         }
 
         .df-panel {
-            margin-top: 24px;
+            margin-top: 0;
             overflow: hidden;
         }
 
@@ -156,6 +183,17 @@
             text-decoration: none;
         }
 
+        .df-button--primary {
+            border-color: #0f766e;
+            background: #0f766e;
+            color: #ffffff;
+        }
+
+        .df-button--primary:hover {
+            border-color: #115e59;
+            background: #115e59;
+        }
+
         .df-table-wrap {
             overflow-x: auto;
         }
@@ -164,6 +202,75 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
+        }
+
+        .df-table--versions {
+            min-width: 820px;
+        }
+
+        .df-table--versions th:nth-child(1),
+        .df-table--versions td:nth-child(1) {
+            width: 34%;
+        }
+
+        .df-table--versions th:nth-child(4),
+        .df-table--versions td:nth-child(4) {
+            min-width: 170px;
+        }
+
+        .df-table--versions th:last-child,
+        .df-table--versions td:last-child {
+            min-width: 190px;
+        }
+
+        .df-row-actions {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .df-row-menu {
+            position: relative;
+        }
+
+        .df-row-menu > summary {
+            list-style: none;
+        }
+
+        .df-row-menu > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .df-row-menu__panel {
+            position: absolute;
+            z-index: 20;
+            top: calc(100% + 6px);
+            right: 0;
+            display: grid;
+            min-width: 180px;
+            padding: 6px;
+            border: 1px solid #dbe4ee;
+            border-radius: 6px;
+            background: #ffffff;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+        }
+
+        .df-row-menu__action {
+            padding: 9px 10px;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .df-row-menu__action:hover {
+            background: #f1f5f9;
+            color: #0f766e;
         }
 
         .df-table thead {
@@ -399,8 +506,16 @@
         }
 
         @media (max-width: 1100px) {
-            .df-grid-4 {
+            .df-summary {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .df-summary__item:nth-child(2) {
+                border-right: 0;
+            }
+
+            .df-summary__item:nth-child(-n+2) {
+                border-bottom: 1px solid #e2e8f0;
             }
         }
 
@@ -415,9 +530,19 @@
                 justify-content: flex-start;
             }
 
-            .df-grid-4,
+            .df-summary,
             .df-detail-grid {
                 grid-template-columns: minmax(0, 1fr);
+            }
+
+            .df-summary__item,
+            .df-summary__item:nth-child(2) {
+                border-right: 0;
+                border-bottom: 1px solid #e2e8f0;
+            }
+
+            .df-summary__item:last-child {
+                border-bottom: 0;
             }
 
             .df-preview-row {
@@ -430,81 +555,50 @@
         }
     </style>
 
-    <div class="df-page">
-        <section class="df-header">
-            <div>
-                <h1 class="df-title">Master Template</h1>
-                <p class="df-subtitle">Create, manage, preview, and publish the platform Master Template from one workspace.</p>
+    <div
+        class="df-page"
+        x-data
+        x-on:master-template-version-opened.window="$nextTick(() => setTimeout(() => document.getElementById('master-template-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 75))"
+    >
+        <section class="df-panel df-summary" aria-label="Master Template summary">
+            <div class="df-summary__item">
+                <div class="df-label">Current Master Template</div>
+                <div class="df-summary__value">{{ $activeTemplate['version'] ?? 'Not published' }}</div>
+                <div class="df-summary__note">
+                    {{ $activeTemplate ? ($activeTemplate['form_type'] . ' · ' . $activeTemplate['clinic_visibility']) : 'Publish a draft to activate the template.' }}
+                </div>
             </div>
-
-            <div class="df-actions">
-                @if ($this->canManageTemplateVersions())
-                    <button type="button" class="df-button" wire:click="openCreateDraftModal" wire:loading.attr="disabled" wire:target="openCreateDraftModal">
-                        Create Draft Template
-                    </button>
-                    @if ($selectedTemplateVersion && ($selectedTemplateVersion['is_draft'] ?? false))
-                        <button type="button" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;" wire:click="openPublishDraftModal" wire:loading.attr="disabled" wire:target="openPublishDraftModal">
-                            Publish This Draft
-                        </button>
-                    @endif
-                @endif
+            <div class="df-summary__item">
+                <div class="df-label">Draft Templates</div>
+                <div class="df-summary__value">{{ $draftCount }}</div>
+                <div class="df-summary__note">Editable working copies</div>
             </div>
-        </section>
-
-        <section class="df-grid-4" aria-label="Template version summary">
-            <div class="df-card">
-                <div class="df-label">Total Versions</div>
-                <div class="df-value">{{ $templateVersionHistory->count() }}</div>
+            <div class="df-summary__item">
+                <div class="df-label">Previous Published</div>
+                <div class="df-summary__value">{{ $previousPublishedCount }}</div>
+                <div class="df-summary__note">Retained for history</div>
             </div>
-            <div class="df-card">
-                <div class="df-label">Published</div>
-                <div class="df-value" style="color:#059669;">{{ $publishedCount }}</div>
-            </div>
-            <div class="df-card">
-                <div class="df-label">Drafts</div>
-                <div class="df-value" style="color:#d97706;">{{ $draftCount }}</div>
-            </div>
-            <div class="df-card">
+            <div class="df-summary__item">
                 <div class="df-label">Archived</div>
-                <div class="df-value" style="color:#64748b;">{{ $archivedCount }}</div>
+                <div class="df-summary__value">{{ $archivedCount }}</div>
+                <div class="df-summary__note">No longer in use</div>
             </div>
         </section>
 
-        <section class="df-panel df-filter" aria-label="Template filters">
-            <input class="df-input" type="text" value="" placeholder="Search sections or questions from the table below..." disabled>
-            <select class="df-select" disabled>
-                <option>{{ $hasDraft ? 'Draft Active' : 'Published Only' }}</option>
-            </select>
-            <select class="df-select" disabled>
-                <option>Master Scope</option>
-            </select>
-            <select class="df-select" disabled>
-                <option>{{ $versionSummary['working_version'] }}</option>
-            </select>
-            <button type="button" class="df-button" disabled>Filters</button>
-        </section>
-
-        <section class="df-panel">
+        <section class="df-panel df-version-list">
             <div class="df-panel-header">
                 <div>
-                    <h2 class="df-panel-title">Template List</h2>
-                    <div class="df-panel-meta">{{ $templateVersionHistory->count() }} master template records found</div>
-                </div>
-                <div class="df-actions">
-                    <button type="button" class="df-button" disabled>Export</button>
-                    <button type="button" class="df-button" disabled>Columns</button>
+                    <h2 class="df-panel-title">Template Versions</h2>
+                    <div class="df-panel-meta">Open a draft to manage sections and questions, or preview any retained version.</div>
                 </div>
             </div>
 
             <div class="df-table-wrap">
-                <table class="df-table">
+                <table class="df-table df-table--versions">
                     <thead>
                         <tr>
                             <th>Template</th>
-                            <th>Scope</th>
-                            <th>Mode</th>
-                            <th>Clinic Visibility</th>
-                            <th>Version</th>
+                            <th>Clinic Availability</th>
                             <th>Status</th>
                             <th>Updated</th>
                             <th style="text-align:right;">Actions</th>
@@ -515,15 +609,16 @@
                             $currentTemplateGroup = null;
                             $templateGroupLabels = [
                                 'active' => 'Active Master Template',
-                                'draft' => 'Working Draft',
+                                'draft' => 'Draft Templates',
                                 'previous' => 'Template History',
+                                'archived' => 'Archived Templates',
                             ];
                         @endphp
                         @forelse ($templateVersionHistory as $version)
                             @if ($currentTemplateGroup !== $version['row_group'])
                                 @php $currentTemplateGroup = $version['row_group']; @endphp
                                 <tr>
-                                    <td colspan="8" style="padding:10px 16px;background:#fbfdff;color:#64748b;font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
+                                    <td colspan="5" style="padding:10px 16px;background:#fbfdff;color:#64748b;font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
                                         {{ $templateGroupLabels[$version['row_group']] ?? 'Templates' }}
                                     </td>
                                 </tr>
@@ -532,17 +627,13 @@
                                 <td>
                                     <div class="df-name">{{ $version['name'] }}</div>
                                     <div class="df-small">{{ $version['description'] }}</div>
+                                    <div class="df-small">{{ $version['version'] }} &middot; {{ $version['form_type'] }}</div>
                                 </td>
-                                <td>
-                                    <span class="df-badge df-badge--blue">Master</span>
-                                </td>
-                                <td>{{ $version['form_type'] }}</td>
                                 <td>{{ $version['clinic_visibility'] }}</td>
-                                <td>{{ $version['version'] }}</td>
                                 <td>
-                                    <span class="df-badge {{ $version['status'] === 'Draft' ? 'df-badge--amber' : ($version['is_active'] ? 'df-badge--teal' : '') }}">
+                                    <span class="df-badge {{ $version['is_draft'] ? 'df-badge--amber' : (($version['is_active'] && $version['is_available_to_clinics']) ? 'df-badge--teal' : '') }}">
                                         <span class="df-dot"></span>
-                                        {{ $version['is_working_draft'] ? 'Working Draft' : $version['status'] }}
+                                        {{ $version['status_label'] }}
                                     </span>
                                 </td>
                                 <td>
@@ -550,19 +641,48 @@
                                     <div class="df-small">Published: {{ $version['published_at'] ?: '-' }}</div>
                                 </td>
                                 <td>
-                                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;">
+                                    <div class="df-row-actions">
                                         <button type="button" class="df-button" wire:click="selectTemplateVersion({{ $version['id'] }})" title="Open Version">
-                                            {{ $version['is_draft'] ? 'Open Draft' : 'View' }}
+                                            {{ $version['is_draft'] ? 'Open Builder' : 'View Structure' }}
                                         </button>
-                                        <button type="button" class="df-button" wire:click="showTemplateVersionPreview({{ $version['id'] }})" title="Preview">
-                                            Preview
-                                        </button>
+                                        <details class="df-row-menu">
+                                            <summary class="df-button" title="More template actions">More</summary>
+                                            <div class="df-row-menu__panel">
+                                                @if ($version['is_draft'] && $version['can_edit_directly'] && ! $version['is_working_draft'])
+                                                    <button
+                                                        type="button"
+                                                        class="df-row-menu__action"
+                                                        wire:click="setWorkingDraft({{ $version['id'] }})"
+                                                        wire:confirm="Use this as the working Master Template draft for new question entry?"
+                                                    >
+                                                        Set as Working Draft
+                                                    </button>
+                                                @endif
+                                                @if ($version['is_draft'] && $version['can_edit_directly'])
+                                                    <button
+                                                        type="button"
+                                                        class="df-row-menu__action"
+                                                        wire:click="archiveDraft({{ $version['id'] }})"
+                                                        wire:confirm="Archive this draft? Published templates and saved verification snapshots will not be affected."
+                                                    >
+                                                        Archive Draft
+                                                    </button>
+                                                @elseif ($version['row_group'] === 'archived' && ($version['can_restore'] ?? false))
+                                                    <button type="button" class="df-row-menu__action" wire:click="restoreArchivedDraft({{ $version['id'] }})">
+                                                        Restore Draft
+                                                    </button>
+                                                @endif
+                                                <button type="button" class="df-row-menu__action" wire:click="showTemplateVersionPreview({{ $version['id'] }})">
+                                                    Preview Form
+                                                </button>
+                                            </div>
+                                        </details>
                                     </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" style="text-align:center;color:#64748b;padding:24px;">No templates found.</td>
+                                <td colspan="5" style="text-align:center;color:#64748b;padding:24px;">No templates found. Create a draft to begin.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -571,7 +691,7 @@
         </section>
 
         @if ($selectedTemplateVersion)
-            <section class="df-panel">
+            <section class="df-panel df-selected-builder" id="master-template-builder" style="scroll-margin-top:90px;">
                 <div class="df-panel-header">
                     <div>
                         <h2 class="df-panel-title">{{ $selectedTemplateVersion['name'] }}</h2>
@@ -580,6 +700,27 @@
                         </div>
                     </div>
                     <div class="df-actions">
+                        @if ($selectedTemplateVersion['is_draft'])
+                            <button
+                                type="button"
+                                class="df-button df-button--primary"
+                                wire:click="mountAction('publishDraftVersion')"
+                            >
+                                Publish Draft
+                            </button>
+                        @endif
+                        @if ($selectedTemplateVersion['can_edit_directly'])
+                            <button type="button" class="df-button" wire:click="mountAction('editDraftDetails')">
+                                Edit Draft Details
+                            </button>
+                        @endif
+                        @if ($selectedTemplateVersion['can_delete_permanently'])
+                            <button type="button" class="df-button" style="border-color:#fecdd3;color:#be123c;background:#fff1f2;" wire:click="mountAction('deleteUnusedDraft')">
+                                Delete Draft
+                            </button>
+                        @elseif ($selectedTemplateVersion['is_draft'] && filled($selectedTemplateVersion['lock_reason']))
+                            <span class="df-small" style="max-width:300px;text-align:right;">{{ $selectedTemplateVersion['lock_reason'] }}</span>
+                        @endif
                         @if ($selectedTemplateVersion['can_add_questions'])
                             <a href="{{ $this->getCreateQuestionUrl() }}" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;text-decoration:none;">
                                 New Question
@@ -601,7 +742,7 @@
                             ['label' => 'Full Form', 'value' => $selectedTemplateVersion['full_question_count']],
                             ['label' => 'Short Form', 'value' => $selectedTemplateVersion['short_question_count']],
                             ['label' => 'Form Type', 'value' => $selectedTemplateVersion['form_type']],
-                            ['label' => 'Clinic Visibility', 'value' => $selectedTemplateVersion['clinic_visibility']],
+                            ['label' => 'Clinic Availability', 'value' => $selectedTemplateVersion['clinic_visibility']],
                             ['label' => 'Published', 'value' => $selectedTemplateVersion['published_at']],
                             ['label' => 'Created By', 'value' => $selectedTemplateVersion['created_by']],
                         ] as $detail)
@@ -744,131 +885,51 @@
 
                             <details style="margin-top:16px;">
                                 <summary class="df-button" style="width:max-content;cursor:pointer;">Question Library</summary>
-                                <div class="df-table-slot" style="padding:16px 0 0;">
-                                    {{ $this->table }}
+                                <div class="df-table-wrap" style="margin-top:12px;">
+                                    <table class="df-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Question</th>
+                                                <th>Section</th>
+                                                <th>Form</th>
+                                                <th>Answer</th>
+                                                <th>Order</th>
+                                                <th>Status</th>
+                                                <th style="text-align:right;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse ($selectedTemplateVersion['question_rows'] as $question)
+                                                <tr>
+                                                    <td><div class="df-name">{{ $question['prompt'] }}</div></td>
+                                                    <td>{{ $question['section'] }}</td>
+                                                    <td>{{ $question['form_type'] }}</td>
+                                                    <td>{{ $question['answer_type'] }}</td>
+                                                    <td>#{{ $question['sort_order'] }}</td>
+                                                    <td>
+                                                        <span class="df-badge {{ $question['is_active'] ? 'df-badge--teal' : '' }}">
+                                                            {{ $question['is_active'] ? 'Active' : 'Inactive' }}
+                                                        </span>
+                                                    </td>
+                                                    <td style="text-align:right;">
+                                                        @if ($question['edit_url'])
+                                                            <a href="{{ $question['edit_url'] }}" class="df-button df-row-button" style="text-decoration:none;">Edit</a>
+                                                        @else
+                                                            <span class="df-small" style="margin:0;">Read only</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="7" style="padding:22px;text-align:center;color:#64748b;">No questions are stored in this version.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
                                 </div>
                             </details>
                         @endif
                     </div>
                 </div>
             </section>
-        @endif
-
-        @if ($showCreateDraftModal)
-            <div class="df-modal-backdrop" wire:key="create-draft-modal">
-                <div class="df-modal">
-                    <div class="df-panel-header">
-                        <div>
-                            <h2 class="df-panel-title">Create Template Draft</h2>
-                            <div class="df-panel-meta">Name the draft, choose the form type, and decide how it should start.</div>
-                        </div>
-                        <button type="button" class="df-button" wire:click="closeCreateDraftModal">Close</button>
-                    </div>
-                    <div class="df-modal-body">
-                        <div class="df-form-grid">
-                            <div class="df-field df-field--full">
-                                <label for="new-draft-name">Template name</label>
-                                <input id="new-draft-name" class="df-input" type="text" wire:model.defer="newDraftData.template_name">
-                                @error('newDraftData.template_name') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                            </div>
-
-                            <div class="df-field">
-                                <label for="new-draft-form-type">Type of form</label>
-                                <select id="new-draft-form-type" class="df-select" wire:model.defer="newDraftData.form_type">
-                                    @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newDraftData.form_type') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                            </div>
-
-                            <div class="df-field">
-                                <label for="new-draft-visibility">Clinic visibility</label>
-                                <select id="new-draft-visibility" class="df-select" wire:model.defer="newDraftData.clinic_visibility">
-                                    @foreach (\App\Models\VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newDraftData.clinic_visibility') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                            </div>
-
-                            <div class="df-field df-field--full">
-                                <label for="new-draft-starting-point">Starting point</label>
-                                <select id="new-draft-starting-point" class="df-select" wire:model.live="newDraftData.starting_point">
-                                    <option value="current_master">Start from current Master Template</option>
-                                    <option value="fresh">Start fresh</option>
-                                    <option value="specific_version">Replicate from a specific version</option>
-                                </select>
-                                @error('newDraftData.starting_point') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                                @if (($newDraftData['starting_point'] ?? null) === 'fresh')
-                                    <div class="df-small" style="color:#b45309;">Fresh drafts start empty except for the standard section structure.</div>
-                                @endif
-                            </div>
-
-                            @if (($newDraftData['starting_point'] ?? null) === 'specific_version')
-                                <div class="df-field df-field--full">
-                                    <label for="new-draft-source-version">Template version</label>
-                                    <select id="new-draft-source-version" class="df-select" wire:model.defer="newDraftData.source_version_id">
-                                        <option value="">Select a version</option>
-                                        @foreach ($this->draftSourceVersionOptions() as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                    @error('newDraftData.source_version_id') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="df-panel-header" style="border-top:1px solid #e2e8f0;border-bottom:0;">
-                        <div class="df-small">This creates a draft only. It will not affect active clinic forms until it is published.</div>
-                        <div class="df-actions">
-                            <button type="button" class="df-button" wire:click="closeCreateDraftModal">Cancel</button>
-                            <button type="button" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;" wire:click="submitCreateDraftVersion" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">
-                                <span wire:loading.remove wire:target="submitCreateDraftVersion">Create Draft</span>
-                                <span wire:loading wire:target="submitCreateDraftVersion">Creating...</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        @if ($showPublishDraftModal)
-            <div class="df-modal-backdrop" wire:key="publish-draft-modal">
-                <div class="df-modal">
-                    <div class="df-panel-header">
-                        <div>
-                            <h2 class="df-panel-title">Publish Template Draft</h2>
-                            <div class="df-panel-meta">Give this published version a clear name and describe what changed.</div>
-                        </div>
-                        <button type="button" class="df-button" wire:click="closePublishDraftModal">Close</button>
-                    </div>
-                    <div class="df-modal-body">
-                        <div class="df-form-grid">
-                            <div class="df-field df-field--full">
-                                <label for="publish-draft-name">Version name</label>
-                                <input id="publish-draft-name" class="df-input" type="text" wire:model.defer="publishDraftData.version_name">
-                                @error('publishDraftData.version_name') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                            </div>
-                            <div class="df-field df-field--full">
-                                <label for="publish-draft-description">Change description</label>
-                                <textarea id="publish-draft-description" class="df-input df-textarea" wire:model.defer="publishDraftData.change_description"></textarea>
-                                @error('publishDraftData.change_description') <div class="df-small" style="color:#dc2626;">{{ $message }}</div> @enderror
-                            </div>
-                        </div>
-                    </div>
-                    <div class="df-panel-header" style="border-top:1px solid #e2e8f0;border-bottom:0;">
-                        <div class="df-small">Existing verification requests keep their saved template until refreshed.</div>
-                        <div class="df-actions">
-                            <button type="button" class="df-button" wire:click="closePublishDraftModal">Cancel</button>
-                            <button type="button" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;" wire:click="submitPublishDraftVersion" wire:loading.attr="disabled" wire:target="submitPublishDraftVersion">
-                                <span wire:loading.remove wire:target="submitPublishDraftVersion">Publish Draft</span>
-                                <span wire:loading wire:target="submitPublishDraftVersion">Publishing...</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         @endif
 
         @if ($showTemplateSectionModal)
@@ -965,4 +1026,6 @@
             </div>
         @endif
     </div>
+
+    <x-filament-actions::modals />
 </x-filament-panels::page>

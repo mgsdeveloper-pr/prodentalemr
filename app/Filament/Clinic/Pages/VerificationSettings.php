@@ -50,11 +50,21 @@ class VerificationSettings extends Page
 
     public bool $showCreateTemplateDraftModal = false;
 
+    public bool $showEditTemplateDraftModal = false;
+
+    public ?int $editingClinicTemplateDraftId = null;
+
     public array $newClinicTemplateDraftData = [
         'template_name' => 'Clinic Template Draft',
         'form_type' => 'both',
         'starting_point' => 'active',
         'source_version_id' => null,
+    ];
+
+    public array $editClinicTemplateDraftData = [
+        'template_name' => '',
+        'form_type' => 'both',
+        'notes' => '',
     ];
 
     protected $queryString = [
@@ -488,7 +498,96 @@ class VerificationSettings extends Page
         ];
     }
 
-    public function publishClinicTemplateDraft(): void
+    public function openEditClinicTemplateDraftModal(int $versionId): void
+    {
+        $draft = $this->findSelectedClinicTemplateVersion($versionId);
+
+        if (! $draft || ! $this->canEditClinicTemplateVersion($draft)) {
+            Notification::make()
+                ->title('Template is protected')
+                ->body($draft?->lifecycleLockReason() ?? 'Only an unused, unpublished clinic draft can be edited directly.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->editingClinicTemplateDraftId = $draft->getKey();
+        $this->editClinicTemplateDraftData = [
+            'template_name' => (string) $draft->name,
+            'form_type' => (string) $draft->form_type,
+            'notes' => (string) ($draft->notes ?? ''),
+        ];
+        $this->showEditTemplateDraftModal = true;
+    }
+
+    public function closeEditClinicTemplateDraftModal(): void
+    {
+        $this->showEditTemplateDraftModal = false;
+        $this->editingClinicTemplateDraftId = null;
+        $this->resetErrorBag();
+    }
+
+    public function submitEditClinicTemplateDraft(): void
+    {
+        $draft = $this->findSelectedClinicTemplateVersion((int) $this->editingClinicTemplateDraftId);
+
+        if (! $draft || ! $this->canEditClinicTemplateVersion($draft)) {
+            Notification::make()->title('Template is protected')->warning()->send();
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'editClinicTemplateDraftData.template_name' => ['required', 'string', 'max:255'],
+            'editClinicTemplateDraftData.form_type' => ['required', 'in:'.implode(',', array_keys(VerificationTemplateVersion::FORM_TYPE_OPTIONS))],
+            'editClinicTemplateDraftData.notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            app(VerificationTemplateVersionService::class)->updateUnusedDraft($draft, [
+                'name' => $validated['editClinicTemplateDraftData']['template_name'],
+                'form_type' => $validated['editClinicTemplateDraftData']['form_type'],
+                'notes' => $validated['editClinicTemplateDraftData']['notes'] ?? null,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+            Notification::make()->title('Draft could not be updated')->body($exception->getMessage())->danger()->send();
+
+            return;
+        }
+
+        $this->closeEditClinicTemplateDraftModal();
+        Notification::make()->title('Draft details updated')->success()->send();
+    }
+
+    public function deleteUnusedClinicTemplateDraft(int $versionId): void
+    {
+        $draft = $this->findSelectedClinicTemplateVersion($versionId);
+
+        if (! $draft || ! $this->canManageSelectedClinicTemplate() || ! $draft->canDeletePermanently()) {
+            Notification::make()
+                ->title('Template cannot be deleted')
+                ->body($draft?->lifecycleLockReason() ?? 'Only an unused, unpublished clinic draft can be deleted.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            app(VerificationTemplateVersionService::class)->deleteUnusedDraft($draft);
+        } catch (Throwable $exception) {
+            report($exception);
+            Notification::make()->title('Template could not be deleted')->body($exception->getMessage())->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title('Unused draft deleted')->success()->send();
+    }
+
+    public function publishClinicTemplateDraft(int $versionId): void
     {
         if (! $this->canManageSelectedClinicTemplate()) {
             Notification::make()->title('Permission denied')->danger()->send();
@@ -496,10 +595,14 @@ class VerificationSettings extends Page
             return;
         }
 
-        $draft = $this->getDraftClinicTemplateVersion();
+        $draft = $this->findSelectedClinicTemplateVersion($versionId);
 
-        if (! $draft) {
-            Notification::make()->title('No draft template found')->warning()->send();
+        if (! $draft || ! $draft->canEditDirectly()) {
+            Notification::make()
+                ->title('Draft cannot be published')
+                ->body($draft?->lifecycleLockReason() ?? 'Select an unused, unpublished clinic draft.')
+                ->warning()
+                ->send();
 
             return;
         }
@@ -635,6 +738,8 @@ class VerificationSettings extends Page
                     'is_working_draft' => (bool) $version->is_working_draft,
                     'is_draft' => $version->status === VerificationTemplateVersion::STATUS_DRAFT,
                     'can_edit' => $this->canEditClinicTemplateVersion($version),
+                    'can_delete' => $this->canManageSelectedClinicTemplate() && $version->canDeletePermanently(),
+                    'lock_reason' => $version->lifecycleLockReason(),
                     'can_archive' => $canArchive,
                 ];
             })
@@ -686,8 +791,7 @@ class VerificationSettings extends Page
             return false;
         }
 
-        return $version->status === VerificationTemplateVersion::STATUS_DRAFT
-            || ($version->status === VerificationTemplateVersion::STATUS_PUBLISHED && (bool) $version->is_active);
+        return $version->canEditDirectly();
     }
 
     protected function clinicTemplateDisplayName(VerificationTemplateVersion $version): string
@@ -831,8 +935,8 @@ class VerificationSettings extends Page
 
         return $this->canManageSelectedClinicTemplate()
             && $version->scope === VerificationTemplateVersion::SCOPE_CLINIC
+            && $version->status === VerificationTemplateVersion::STATUS_PUBLISHED
             && ! $version->is_active
-            && $version->status !== VerificationTemplateVersion::STATUS_ARCHIVED
             && $usedRequestCount === 0;
     }
 
@@ -859,9 +963,7 @@ class VerificationSettings extends Page
 
     protected function templateVersionUsageCount(VerificationTemplateVersion $version): int
     {
-        return BillingWorkItem::query()
-            ->where('verification_template_version_id', $version->getKey())
-            ->count();
+        return $version->requestUsageCount();
     }
 
     public function getActiveClinicTemplateVersion(): ?VerificationTemplateVersion

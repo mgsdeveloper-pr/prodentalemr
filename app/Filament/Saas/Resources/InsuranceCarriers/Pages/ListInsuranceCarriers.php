@@ -2,16 +2,7 @@
 
 namespace App\Filament\Saas\Resources\InsuranceCarriers\Pages;
 
-use App\Filament\Admin\Pages\VerificationQuestionArrangement;
-use App\Filament\Admin\Pages\VerificationReadiness;
-use App\Filament\Admin\Pages\VerificationNotificationControl;
-use App\Filament\Admin\Pages\VerificationAssignmentManagement;
-use App\Filament\Saas\Resources\InsuranceCarrierNetworkProfiles\InsuranceCarrierNetworkProfileResource;
-use App\Filament\Admin\Pages\VerificationSettings;
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
-use App\Filament\Saas\Resources\PortalCredentials\PortalCredentialResource;
-use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
-use App\Support\VerificationSettingsNavigation;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
@@ -22,23 +13,29 @@ class ListInsuranceCarriers extends ListRecords
 
     protected string $view = 'filament.saas.resources.insurance-carriers.pages.list-insurance-carriers';
 
+    public function getHeading(): string
+    {
+        return 'Insurance Directory';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Maintain the central insurance payer directory inherited by clinics. Clinic-specific overrides remain isolated from the platform master.';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('importInsurance')
+                ->label('Import')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->color('gray')
+                ->url(InsuranceCarrierResource::getUrl('import'))
+                ->visible(fn (): bool => InsuranceCarrierResource::canCreate()),
             CreateAction::make()
                 ->label('Add Insurance')
                 ->icon('heroicon-o-plus')
                 ->color('primary'),
-            Action::make('manageQuestions')
-                ->label('Verification Questions')
-                ->icon('heroicon-o-rectangle-stack')
-                ->color('gray')
-                ->url(VerificationFormQuestionResource::getUrl('index')),
         ];
-    }
-
-    public function getVerificationNavItems(): array
-    {
-        return VerificationSettingsNavigation::items();
     }
 }

@@ -93,8 +93,10 @@ class VerificationResultPdf
         $showBlankRows ??= ! static::isCustomOutputMode($mode);
 
         $resultService = app(VerificationResultService::class);
-        $state = $resultService->applyRecordedDataToPdfState($workItem, static::buildState($workItem), $submission);
-        $sections = static::buildSections($workItem, $state, $showBlankRows);
+        $recordedData = $resultService->recordedData($workItem, $submission);
+        $recordedSubmission = $recordedData['submission'];
+        $state = $resultService->applyRecordedDataToPdfState($workItem, static::buildState($workItem), $recordedSubmission);
+        $sections = static::buildSections($workItem, $state, $showBlankRows, $recordedSubmission);
         $selectedSections = collect($selectedSections)
             ->filter(fn ($section): bool => filled($section))
             ->values()
@@ -257,7 +259,12 @@ class VerificationResultPdf
         return 'data:'.$mimeType.';base64,'.base64_encode($disk->get($clinic->logo_path));
     }
 
-    protected static function buildSections(BillingWorkItem $workItem, array $state, bool $showBlankRows = true): array
+    protected static function buildSections(
+        BillingWorkItem $workItem,
+        array $state,
+        bool $showBlankRows = true,
+        ?VerificationFormSubmission $submission = null,
+    ): array
     {
         $formType = $state['vf_form_type'] ?? $workItem->verificationProfile?->form_type ?? 'full_form';
         $clinicId = $workItem->clinic_id;
@@ -306,7 +313,8 @@ class VerificationResultPdf
                 ->reject(fn (VerificationFormQuestion $question): bool => $question->input_type === 'frequency_row')
                 ->map(fn (VerificationFormQuestion $question): ?array => static::mapQuestionRow($question, $state))
                 ->filter()
-                ->merge(static::mapCoverageCodeRowsForSection($workItem, $sectionKey))
+                ->toBase()
+                ->merge(static::mapCoverageCodeRowsForSection($workItem, $sectionKey, $submission))
                 ->when(! $showBlankRows, fn (Collection $rows): Collection => $rows->filter(
                     fn (array $row): bool => static::rowHasPrintableValue($row)
                 ))
@@ -328,7 +336,11 @@ class VerificationResultPdf
         return $sections;
     }
 
-    protected static function mapCoverageCodeRowsForSection(BillingWorkItem $workItem, string $sectionKey): Collection
+    protected static function mapCoverageCodeRowsForSection(
+        BillingWorkItem $workItem,
+        string $sectionKey,
+        ?VerificationFormSubmission $submission = null,
+    ): Collection
     {
         $category = match ($sectionKey) {
             'template_3_frequency_diagnostic_preventative' => 'Diagnostic & Preventative',
@@ -355,33 +367,38 @@ class VerificationResultPdf
                 static::coverageRowSignature($question->code, $question->prompt) => true,
             ]);
 
-        return $workItem->verificationCoverageCodes
-            ->filter(fn ($row): bool => strcasecmp((string) $row->category, $category) === 0)
+        $submissionPayload = $submission?->payload ?? [];
+        $coverageRows = $submission && array_key_exists('coverage_codes', $submissionPayload)
+            ? collect($submissionPayload['coverage_codes'] ?? [])
+            : $workItem->verificationCoverageCodes->toBase();
+
+        return $coverageRows
+            ->filter(fn ($row): bool => strcasecmp((string) data_get($row, 'category'), $category) === 0)
             ->filter(fn ($row): bool => $allowedSignatures->has(
-                static::coverageRowSignature($row->code, $row->description),
+                static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')),
             ))
-            ->unique(fn ($row): string => static::coverageRowSignature($row->code, $row->description))
+            ->unique(fn ($row): string => static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')))
             ->sortBy([
                 ['sort_order', 'asc'],
                 ['id', 'asc'],
             ])
             ->map(function ($row): array {
                 $parts = collect([
-                    filled($row->coverage_percent) ? number_format((float) $row->coverage_percent, 0).'%' : null,
-                    filled($row->frequency) ? 'Freq: '.$row->frequency : null,
-                    filled($row->coverage_status) ? $row->coverage_status : null,
-                    filled($row->age_limit) ? 'Age: '.$row->age_limit : null,
-                    filled($row->waiting_period) ? 'WP: '.$row->waiting_period : null,
-                    filled($row->service_history) ? 'History: '.$row->service_history : null,
-                    filled($row->pre_auth_required) ? 'Pre-auth: '.$row->pre_auth_required : null,
-                    filled($row->downgrade_applies) ? 'Downgrade: '.$row->downgrade_applies : null,
-                    filled($row->notes) ? 'Notes: '.$row->notes : null,
+                    filled(data_get($row, 'coverage_percent')) ? number_format((float) data_get($row, 'coverage_percent'), 0).'%' : null,
+                    filled(data_get($row, 'frequency')) ? 'Freq: '.data_get($row, 'frequency') : null,
+                    filled(data_get($row, 'coverage_status')) ? data_get($row, 'coverage_status') : null,
+                    filled(data_get($row, 'age_limit')) ? 'Age: '.data_get($row, 'age_limit') : null,
+                    filled(data_get($row, 'waiting_period')) ? 'WP: '.data_get($row, 'waiting_period') : null,
+                    filled(data_get($row, 'service_history')) ? 'History: '.data_get($row, 'service_history') : null,
+                    filled(data_get($row, 'pre_auth_required')) ? 'Pre-auth: '.data_get($row, 'pre_auth_required') : null,
+                    filled(data_get($row, 'downgrade_applies')) ? 'Downgrade: '.data_get($row, 'downgrade_applies') : null,
+                    filled(data_get($row, 'notes')) ? 'Notes: '.data_get($row, 'notes') : null,
                 ])->filter()->implode(' | ');
 
                 return [
                     'question_id' => null,
                     'kind' => 'frequency_code',
-                    'label' => trim(collect([$row->code, $row->description])->filter()->implode(' - ')) ?: 'Frequency row',
+                    'label' => trim(collect([data_get($row, 'code'), data_get($row, 'description')])->filter()->implode(' - ')) ?: 'Frequency row',
                     'value' => $parts !== '' ? $parts : '-',
                 ];
             })
