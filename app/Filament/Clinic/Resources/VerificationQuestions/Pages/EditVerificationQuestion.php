@@ -2,12 +2,13 @@
 
 namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages;
 
-use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns\InteractsWithVerificationQuestionOrdering;
+use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
 use App\Support\ClinicPanelScope;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
+use Livewire\Attributes\Url;
 
 class EditVerificationQuestion extends EditRecord
 {
@@ -17,9 +18,27 @@ class EditVerificationQuestion extends EditRecord
 
     protected string $view = 'filament.clinic.resources.verification-questions.pages.verification-question-editor';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     protected ?string $originalSectionKey = null;
+
+    #[Url(as: 'section')]
+    public ?string $requestedSectionKey = null;
+
+    #[Url(as: 'template_version_id')]
+    public ?int $requestedTemplateVersionId = null;
+
+    protected function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        abort_unless(
+            (int) $this->getRecord()->clinic_id === (int) ClinicPanelScope::selectedClinicId()
+                && filled($this->requestedTemplateVersionId)
+                && (int) $this->getRecord()->template_version_id === (int) $this->requestedTemplateVersionId,
+            404,
+        );
+    }
 
     public function getSelectedClinicName(): string
     {
@@ -83,7 +102,27 @@ class EditVerificationQuestion extends EditRecord
 
     public function getCancelUrl(): string
     {
-        return $this->previousUrl ?: VerificationQuestionResource::getUrl();
+        return $this->getBuilderReturnUrl();
+    }
+
+    public function getSecondarySubmitMethodName(): string
+    {
+        return 'saveAndAddAnother';
+    }
+
+    public function getSecondarySubmitButtonLabel(): string
+    {
+        return 'Save & Add Another';
+    }
+
+    public function saveAndAddAnother(): void
+    {
+        $this->save(shouldRedirect: false);
+
+        $this->redirect(VerificationQuestionResource::getUrl('create', [
+            'section' => $this->getRecord()->section_key,
+            'template_version_id' => $this->getRecord()->template_version_id,
+        ]), navigate: true);
     }
 
     protected function afterFill(): void
@@ -144,5 +183,19 @@ class EditVerificationQuestion extends EditRecord
             $this->data['order_position'] ?? 'bottom',
             filled($this->data['order_reference_id'] ?? null) ? (int) $this->data['order_reference_id'] : null,
         );
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getBuilderReturnUrl();
+    }
+
+    protected function getBuilderReturnUrl(): string
+    {
+        return VerificationQuestionResource::getUrl('index', [
+            'draft' => '1',
+            'version' => $this->getRecord()->template_version_id,
+            'section' => $this->getRecord()->section_key,
+        ]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns;
 
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
 
 trait InteractsWithVerificationQuestionOrdering
@@ -29,14 +30,15 @@ trait InteractsWithVerificationQuestionOrdering
 
     public function getWorkingDraftName(): string
     {
-        return VerificationQuestionResource::clinicTemplateOptionLabel(ClinicPanelScope::selectedClinic());
+        return $this->getEditorTemplateVersion()?->name
+            ?: VerificationQuestionResource::clinicTemplateOptionLabel(ClinicPanelScope::selectedClinic());
     }
 
     public function getSectionQuestionOrderCards(): array
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
-        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
+        $version = $this->getEditorTemplateVersion();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
@@ -96,7 +98,7 @@ trait InteractsWithVerificationQuestionOrdering
 
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
-        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
+        $version = $this->getEditorTemplateVersion();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
 
@@ -220,7 +222,7 @@ trait InteractsWithVerificationQuestionOrdering
     {
         $clinicId = ClinicPanelScope::selectedClinicId();
         $organizationId = ClinicPanelScope::selectedOrganizationId();
-        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
+        $version = $this->getEditorTemplateVersion();
 
         if (! $clinicId || ! filled($sectionKey)) {
             return;
@@ -243,5 +245,17 @@ trait InteractsWithVerificationQuestionOrdering
                 'sort_order' => ($index + 1) * 10,
             ])->saveQuietly();
         }
+    }
+
+    protected function getEditorTemplateVersion(): ?VerificationTemplateVersion
+    {
+        $versionId = filled($this->requestedTemplateVersionId ?? null)
+            ? (int) $this->requestedTemplateVersionId
+            : (method_exists($this, 'getRecord') ? $this->getRecord()?->template_version_id : null);
+
+        return VerificationQuestionResource::currentClinicWorkingVersion(
+            ClinicPanelScope::selectedClinic(),
+            $versionId ? (int) $versionId : null,
+        );
     }
 }

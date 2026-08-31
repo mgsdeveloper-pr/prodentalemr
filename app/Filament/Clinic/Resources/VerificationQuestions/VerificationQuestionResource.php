@@ -465,14 +465,22 @@ class VerificationQuestionResource extends Resource
 
     public static function canEdit(Model $record): bool
     {
-        return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+        $clinic = ClinicPanelScope::selectedClinic();
+
+        return filled($clinic?->getKey())
+            && (int) $record->clinic_id === (int) $clinic->getKey()
+            && (auth()->user()?->canManageClinicTemplateSections($clinic) ?? false)
             && ! (bool) $record->is_builtin
             && static::isEditableClinicTemplateVersion($record->templateVersion);
     }
 
     public static function canDelete(Model $record): bool
     {
-        return (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+        $clinic = ClinicPanelScope::selectedClinic();
+
+        return filled($clinic?->getKey())
+            && (int) $record->clinic_id === (int) $clinic->getKey()
+            && (auth()->user()?->canManageClinicTemplateSections($clinic) ?? false)
             && ! (bool) $record->is_builtin
             && static::isEditableClinicTemplateVersion($record->templateVersion);
     }

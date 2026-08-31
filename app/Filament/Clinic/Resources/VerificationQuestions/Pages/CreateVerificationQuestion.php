@@ -34,6 +34,23 @@ class CreateVerificationQuestion extends CreateRecord
         $this->applyRequestedSection();
     }
 
+    protected function authorizeAccess(): void
+    {
+        parent::authorizeAccess();
+
+        $version = VerificationQuestionResource::currentClinicWorkingVersion(
+            ClinicPanelScope::selectedClinic(),
+            $this->requestedTemplateVersionId,
+        );
+
+        abort_unless(
+            filled($this->requestedTemplateVersionId)
+                && (int) $version?->getKey() === (int) $this->requestedTemplateVersionId
+                && $version?->canEditDirectly(),
+            404,
+        );
+    }
+
     public function getTitle(): string
     {
         return 'Add Question';
@@ -111,7 +128,17 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getCancelUrl(): string
     {
-        return $this->previousUrl ?: VerificationQuestionResource::getUrl();
+        return $this->getBuilderReturnUrl();
+    }
+
+    public function getSecondarySubmitMethodName(): string
+    {
+        return 'createAnother';
+    }
+
+    public function getSecondarySubmitButtonLabel(): string
+    {
+        return 'Save & Add Another';
     }
 
     protected function afterFill(): void
@@ -201,6 +228,37 @@ class CreateVerificationQuestion extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return VerificationQuestionResource::getUrl();
+        return $this->getBuilderReturnUrl($this->getRecord());
+    }
+
+    protected function preserveFormDataWhenCreatingAnother(array $data): array
+    {
+        return collect($data)
+            ->only([
+                'organization_id',
+                'clinic_id',
+                'template_key',
+                'section_key',
+                'sub_section_key',
+                'form_type',
+            ])
+            ->merge([
+                'order_position' => 'bottom',
+                'order_reference_id' => null,
+            ])
+            ->all();
+    }
+
+    protected function getBuilderReturnUrl(?VerificationFormQuestion $record = null): string
+    {
+        $versionId = $record?->template_version_id ?: $this->requestedTemplateVersionId;
+        $sectionKey = $record?->section_key
+            ?: ($this->data['sub_section_key'] ?? $this->data['section_key'] ?? $this->requestedSectionKey);
+
+        return VerificationQuestionResource::getUrl('index', array_filter([
+            'draft' => $versionId ? '1' : null,
+            'version' => $versionId,
+            'section' => $sectionKey,
+        ]));
     }
 }

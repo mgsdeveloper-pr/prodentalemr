@@ -27,7 +27,7 @@
         }
         @media (max-width: 640px) {
             .pd-question-context, .pd-question-editor__actions { align-items: flex-start; flex-direction: column; }
-            .pd-question-editor__actions > div:last-child { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
+            .pd-question-editor__actions > div:last-child { display: grid !important; grid-template-columns: 1fr; width: 100%; }
         }
     </style>
 
@@ -66,7 +66,7 @@
                     <header style="padding: 16px 18px; border-bottom: 1px solid #edf2f7;">
                         <div style="color: #0f766e; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">Question placement</div>
                         <h3 style="margin: 6px 0 0; color: #0f172a; font-size: 18px; font-weight: 800;">Existing questions</h3>
-                        <p style="margin: 5px 0 0; color: #64748b; font-size: 12px; line-height: 1.55;">Place the new question at the top, bottom, or beside a specific question.</p>
+                        <p style="margin: 5px 0 0; color: #64748b; font-size: 12px; line-height: 1.55;">Place the question at the top, bottom, or beside a specific question.</p>
                     </header>
 
                     @if (! filled($this->data['section_key'] ?? null))
@@ -98,6 +98,10 @@
                 <div style="color: #64748b; font-size: 12px; line-height: 1.5;">Existing verification requests and completed snapshots will not change.</div>
                 <div style="display: flex; align-items: center; gap: 9px;">
                     <a href="{{ $this->getCancelUrl() }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 108px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 7px; background: #fff; color: #334155; font-size: 12px; font-weight: 800; text-decoration: none;">Cancel</a>
+                    <button type="button" wire:click="{{ $this->getSecondarySubmitMethodName() }}" wire:loading.attr="disabled" wire:target="{{ $this->getSecondarySubmitMethodName() }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 150px; padding: 10px 15px; border: 1px solid #94a3b8; border-radius: 7px; background: #fff; color: #334155; font-size: 12px; font-weight: 800; cursor: pointer;">
+                        <span wire:loading.remove wire:target="{{ $this->getSecondarySubmitMethodName() }}">{{ $this->getSecondarySubmitButtonLabel() }}</span>
+                        <span wire:loading wire:target="{{ $this->getSecondarySubmitMethodName() }}">Saving...</span>
+                    </button>
                     <button type="submit" wire:loading.attr="disabled" wire:target="{{ $this->getSubmitMethodName() }}" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 10px 15px; border: 1px solid #0f766e; border-radius: 7px; background: #0f766e; color: #fff; font-size: 12px; font-weight: 800; cursor: pointer;">
                         <span wire:loading.remove wire:target="{{ $this->getSubmitMethodName() }}">{{ $this->getSubmitButtonLabel() }}</span>
                         <span wire:loading wire:target="{{ $this->getSubmitMethodName() }}">Saving...</span>

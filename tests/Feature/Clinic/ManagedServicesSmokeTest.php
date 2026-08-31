@@ -5,6 +5,7 @@ use App\Filament\Clinic\Pages\VerificationSettings;
 use App\Filament\Clinic\Resources\PortalCredentials\Pages\ListPortalCredentials;
 use App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource;
 use App\Filament\Clinic\Resources\VerificationQuestions\Pages\CreateVerificationQuestion;
+use App\Filament\Clinic\Resources\VerificationQuestions\Pages\EditVerificationQuestion;
 use App\Filament\Clinic\Resources\VerificationQuestions\Pages\ListVerificationQuestions;
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
@@ -469,7 +470,11 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->assertDontSee('Create and organize verification questions')
         ->assertDontSee('Clinic Clinic Template');
 
-    Livewire::test(CreateVerificationQuestion::class)
+    Livewire::withQueryParams([
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ])
+        ->test(CreateVerificationQuestion::class)
         ->fillForm([
             'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
             'section_key' => $sectionKey,
@@ -481,12 +486,108 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->call('create')
         ->assertHasNoFormErrors();
 
-    expect(VerificationFormQuestion::query()
+    $createdQuestion = VerificationFormQuestion::query()
         ->where('template_version_id', $draft->id)
         ->where('clinic_id', $this->clinic->id)
         ->where('section_key', $sectionKey)
         ->where('prompt', 'Clinic action test question')
-        ->exists())->toBeTrue();
+        ->firstOrFail();
+
+    $editUrl = Livewire::test(ListVerificationQuestions::class)
+        ->instance()
+        ->getEditUrl($createdQuestion->id);
+    parse_str((string) parse_url($editUrl, PHP_URL_QUERY), $editQuery);
+
+    expect($editQuery)->toMatchArray([
+        'section' => $sectionKey,
+        'template_version_id' => (string) $draft->id,
+    ]);
+
+    $builderReturnUrl = VerificationQuestionResource::getUrl('index', [
+        'draft' => '1',
+        'version' => $draft->id,
+        'section' => $sectionKey,
+    ]);
+
+    Livewire::withQueryParams([
+        'draft' => '1',
+        'version' => $draft->id,
+        'section' => $sectionKey,
+    ])
+        ->test(ListVerificationQuestions::class)
+        ->assertSet('showDraft', true)
+        ->assertSet('selectedTemplateVersionId', $draft->id)
+        ->assertSet('selectedSectionKey', $sectionKey);
+
+    Livewire::withQueryParams([
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ])
+        ->test(EditVerificationQuestion::class, ['record' => $createdQuestion->getRouteKey()])
+        ->assertSee('Save & Add Another')
+        ->set('data.prompt', 'Updated clinic action test question')
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertRedirect($builderReturnUrl);
+
+    expect($createdQuestion->fresh()->prompt)->toBe('Updated clinic action test question');
+
+    $createNextUrl = VerificationQuestionResource::getUrl('create', [
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ]);
+
+    Livewire::withQueryParams([
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ])
+        ->test(EditVerificationQuestion::class, ['record' => $createdQuestion->getRouteKey()])
+        ->set('data.prompt', 'Updated before adding another question')
+        ->call('saveAndAddAnother')
+        ->assertHasNoFormErrors()
+        ->assertRedirect($createNextUrl);
+
+    expect($createdQuestion->fresh()->prompt)->toBe('Updated before adding another question');
+
+    $publishedVersion = VerificationTemplateVersion::query()
+        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    Livewire::withQueryParams([
+        'section' => $sectionKey,
+        'template_version_id' => $publishedVersion->id,
+    ])
+        ->test(EditVerificationQuestion::class, ['record' => $createdQuestion->getRouteKey()])
+        ->assertNotFound();
+
+    $createAnother = Livewire::withQueryParams([
+        'section' => $sectionKey,
+        'template_version_id' => $draft->id,
+    ])
+        ->test(CreateVerificationQuestion::class)
+        ->assertSee('Save & Add Another')
+        ->fillForm([
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => $sectionKey,
+            'form_type' => 'both',
+            'prompt' => 'First repeated-entry question',
+            'input_type' => 'text',
+            'is_active' => true,
+        ])
+        ->call('createAnother')
+        ->assertHasNoFormErrors()
+        ->assertSet('data.section_key', $sectionKey)
+        ->assertSet('data.form_type', 'both');
+
+    expect(VerificationFormQuestion::query()
+        ->where('template_version_id', $draft->id)
+        ->where('clinic_id', $this->clinic->id)
+        ->where('prompt', 'First repeated-entry question')
+        ->exists())->toBeTrue()
+        ->and($createAnother->get('data.prompt'))->toBeNull();
 
     $reorderSectionKey = VerificationFormQuestion::query()
         ->where('template_version_id', $draft->id)

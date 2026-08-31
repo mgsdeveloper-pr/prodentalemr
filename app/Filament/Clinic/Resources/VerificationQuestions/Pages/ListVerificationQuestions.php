@@ -491,7 +491,16 @@ class ListVerificationQuestions extends Page
 
     public function getEditUrl(int $questionId): string
     {
-        return VerificationQuestionResource::getUrl('edit', ['record' => $questionId]);
+        $question = VerificationFormQuestion::query()
+            ->whereKey($questionId)
+            ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+            ->firstOrFail();
+
+        return VerificationQuestionResource::getUrl('edit', [
+            'record' => $question->getRouteKey(),
+            'section' => $question->section_key,
+            'template_version_id' => $question->template_version_id,
+        ]);
     }
 
     public function updatedSelectedTemplateKey(): void
