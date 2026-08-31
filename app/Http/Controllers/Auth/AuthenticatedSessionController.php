@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Support\AuthenticatedUserHome;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
-use App\Support\ClinicWorkspace;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -28,29 +28,7 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        $user = auth()->user();
-
-        if ($user?->shouldLandInVerificationWorkspace() && ! $user->isSaasAdmin()) {
-            return redirect()->intended('/verification');
-        }
-
-        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('saas'))) {
-            return redirect()->intended('/saas');
-        }
-
-        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('dso'))) {
-            return redirect()->intended('/dso');
-        }
-
-        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('admin'))) {
-            return redirect()->intended('/verification');
-        }
-
-        if ($user?->canAccessPanel(app(\Filament\PanelRegistry::class)->get('clinic'))) {
-            return redirect()->intended(ClinicWorkspace::loginRedirectFor($user));
-        }
-
-        return redirect('/login');
+        return redirect()->intended(AuthenticatedUserHome::url($request->user()));
     }
 
     /**

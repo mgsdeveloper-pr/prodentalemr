@@ -27,6 +27,7 @@ use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationNotificationActionController;
 use App\Http\Controllers\Verification\VerificationRequestResponseExportController;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
+use App\Support\AuthenticatedUserHome;
 use App\Support\ClinicWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -38,9 +39,9 @@ Route::redirect('/admin/login', '/login');
 Route::redirect('/saas/login', '/login');
 Route::redirect('/clinic/login', '/login');
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', fn (Request $request) => redirect(AuthenticatedUserHome::url($request->user())))
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/global-search', GlobalSearchController::class)
