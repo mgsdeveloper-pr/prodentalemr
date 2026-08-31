@@ -7,7 +7,10 @@ use App\Support\SaasNotifications;
 use App\Support\UsTimezoneOptions;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -84,6 +87,13 @@ class SaasSettings extends Page implements HasForms
                 'tone' => 'rose',
             ],
             [
+                'eyebrow' => 'Release',
+                'title' => 'System Updates',
+                'description' => 'Review and apply pending database changes safely on shared hosting.',
+                'url' => SystemUpdates::getUrl(),
+                'tone' => 'emerald',
+            ],
+            [
                 'eyebrow' => 'Alerts',
                 'title' => 'Notification Centre',
                 'description' => 'Control operational alerts, recipients, and reminders.',
@@ -115,14 +125,14 @@ class SaasSettings extends Page implements HasForms
                 Section::make('Platform')
                     ->description('Core platform identity and support contacts for the SaaS admin side.')
                     ->schema([
-                        \Filament\Forms\Components\TextInput::make('platform_name')
+                        TextInput::make('platform_name')
                             ->label('Platform name')
                             ->required()
                             ->maxLength(255),
-                        \Filament\Forms\Components\TextInput::make('company_name')
+                        TextInput::make('company_name')
                             ->label('Company name')
                             ->maxLength(255),
-                        \Filament\Forms\Components\FileUpload::make('logo_path')
+                        FileUpload::make('logo_path')
                             ->label('Company logo')
                             ->disk('branding')
                             ->directory('branding')
@@ -130,7 +140,7 @@ class SaasSettings extends Page implements HasForms
                             ->imageEditor()
                             ->maxSize(2048)
                             ->helperText('Upload a JPG, PNG, or WebP logo for the SaaS panel header and login screen.'),
-                        \Filament\Forms\Components\FileUpload::make('login_image_path')
+                        FileUpload::make('login_image_path')
                             ->label('Login page image')
                             ->disk('branding')
                             ->directory('branding/login')
@@ -140,15 +150,15 @@ class SaasSettings extends Page implements HasForms
                             ->maxSize(6144)
                             ->helperText('Shown on the desktop login page. Recommended: a bright clinic image, up to 6 MB.')
                             ->columnSpanFull(),
-                        \Filament\Forms\Components\TextInput::make('support_email')
+                        TextInput::make('support_email')
                             ->label('Support email')
                             ->email()
                             ->maxLength(255),
-                        \Filament\Forms\Components\TextInput::make('support_phone')
+                        TextInput::make('support_phone')
                             ->label('Support phone')
                             ->tel()
                             ->maxLength(255),
-                        \Filament\Forms\Components\Textarea::make('address')
+                        Textarea::make('address')
                             ->label('Business address')
                             ->rows(3)
                             ->columnSpanFull(),
@@ -171,7 +181,7 @@ class SaasSettings extends Page implements HasForms
                             ->default('America/New_York')
                             ->required()
                             ->native(false),
-                        \Filament\Forms\Components\TextInput::make('default_currency')
+                        TextInput::make('default_currency')
                             ->label('Default currency')
                             ->default('USD')
                             ->required()

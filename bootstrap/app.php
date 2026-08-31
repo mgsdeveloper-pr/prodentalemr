@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Laravel validates this short-lived HMAC cookie before allowing the
+        // initiating administrator through maintenance mode during an update.
+        $middleware->encryptCookies(except: ['laravel_maintenance']);
+
         $middleware->validateCsrfTokens(except: [
             'logout',
             'admin/logout',

@@ -32,3 +32,37 @@ Code controls support tenant isolation, role permissions, support-mode auditing,
 6. Back up the database and private files.
 7. Deploy code and compiled frontend assets, run migrations once, restart workers, and clear/rebuild caches.
 8. Smoke-test login, tenant scope, verification, appointment, PDF, email, queue, scheduler, and logout.
+
+## Controlled Database Update
+
+The server terminal remains the preferred migration method. Shared-hosting deployments may use the protected SaaS update center described below.
+
+Preview the exact pending migration list without changing the application:
+
+```bash
+php artisan prodental:database-update --dry-run
+```
+
+After creating and verifying the production database backup, execute the controlled update:
+
+```bash
+php artisan prodental:database-update --force --backup-confirmed
+```
+
+The command checks production gates, prevents concurrent execution, enables maintenance mode, runs only pending migrations, verifies that none remain, rebuilds Laravel caches, restarts queue workers, and restores availability. If an update fails, maintenance mode remains enabled for investigation and recovery.
+
+Never edit an executed migration or overwrite production with a local SQL export for routine releases. Add a new migration for every database change and preserve the production `APP_KEY` so encrypted records remain readable.
+
+### Shared-hosting update center
+
+When shell access is unavailable, an active SaaS Administrator can open **Settings → System Updates**. The page:
+
+- lists pending migration names without exposing server paths or credentials;
+- checks the production environment before allowing an update;
+- requires the administrator's current password and confirmation of a verified backup;
+- enables maintenance mode while preserving a signed, short-lived bypass for the initiating administrator;
+- applies one migration per request to reduce shared-hosting timeout risk;
+- rebuilds caches, restarts queue workers, verifies completion, and restores public access;
+- stores a small server-local update history under private application storage.
+
+If a step fails, maintenance mode remains active and the page offers an authenticated recovery action. Investigate and correct the failed migration before attempting another update.
