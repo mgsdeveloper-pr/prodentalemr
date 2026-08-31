@@ -5,6 +5,7 @@
         $kpis = $this->kpis();
         $clinics = $this->clinics();
         $providers = $this->providers();
+        $clientUsers = $this->clientUsers();
         $quickActions = $this->quickActions();
         $supportAccess = $this->supportAccessSummary();
         $activeTab = $this->activeTab();
@@ -41,6 +42,10 @@
         .org-link { color: var(--pwdl-brand-primary, #0f766e); font-weight: 850; text-decoration: none; }
         .org-action { display: block; color: inherit; text-decoration: none; border: 1px solid var(--pwdl-border-subtle, #e2e8f0); border-radius: var(--pwdl-radius-md, 8px); padding: .75rem; }
         .org-empty { border: 1px dashed var(--pwdl-border-subtle, #e2e8f0); border-radius: var(--pwdl-radius-md, 8px); padding: 1rem; color: var(--pwdl-text-secondary, #475569); font-size: .84rem; }
+        .org-badge { display: inline-flex; align-items: center; min-height: 1.65rem; border-radius: 999px; padding: .2rem .55rem; background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 800; white-space: nowrap; }
+        .org-badge--ready { background: #ecfdf5; color: #047857; }
+        .org-badge--blocked { background: #fff7ed; color: #c2410c; }
+        .org-manage-button { display: inline-flex; align-items: center; justify-content: center; min-height: 2rem; border: 1px solid var(--pwdl-border-subtle, #cbd5e1); border-radius: var(--pwdl-radius-md, 8px); background: #fff; color: var(--pwdl-text-primary, #0f172a); cursor: pointer; font-size: .76rem; font-weight: 800; padding: .35rem .65rem; }
         .org-support { border-color: #fed7aa; background: #fff7ed; }
         .org-support strong, .org-support .org-label { color: #9a3412; }
         @media (max-width: 1280px) { .org-layout { grid-template-columns: 1fr; } .org-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -162,6 +167,53 @@
                             </table>
                         @else
                             <div class="org-empty" style="margin-top: .9rem;">No provider records are attached to this client yet. Normal provider setup should happen from the Clinic workspace.</div>
+                        @endif
+                    </section>
+                @elseif ($activeTab === 'users')
+                    <section class="org-card">
+                        <span class="org-label">Users &amp; Access</span>
+                        <h2 class="org-card-title">Client user access</h2>
+                        <p class="org-card-copy">Review each account's role, operating assignment, verification state, and effective Clinic workspace access.</p>
+                        @if (count($clientUsers))
+                            <div style="overflow-x: auto; margin-top: .9rem;">
+                                <table class="org-table" aria-label="Organization users and access">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Role</th>
+                                            <th>Clinic / Location</th>
+                                            <th>Account</th>
+                                            <th>Email</th>
+                                            <th>Access</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($clientUsers as $user)
+                                            <tr>
+                                                <td><strong>{{ $user['name'] }}</strong><div class="org-card-copy">{{ $user['email'] }}</div></td>
+                                                <td>{{ $user['role'] }}</td>
+                                                <td>{{ $user['clinic'] }}<div class="org-card-copy">{{ $user['location'] }}</div></td>
+                                                <td><span class="org-badge {{ $user['status'] === 'Active' ? 'org-badge--ready' : 'org-badge--blocked' }}">{{ $user['status'] }}</span></td>
+                                                <td>{{ $user['verified'] }}</td>
+                                                <td>
+                                                    <span class="org-badge {{ $user['access'] === 'Ready' ? 'org-badge--ready' : 'org-badge--blocked' }}">{{ $user['access'] }}</span>
+                                                    <div class="org-card-copy">{{ $user['access_detail'] }}</div>
+                                                </td>
+                                                <td>
+                                                    @if ($user['manageable'])
+                                                        <button type="button" class="org-manage-button" wire:click="mountAction('manageClientUser', { user: {{ $user['id'] }} })">Manage</button>
+                                                    @else
+                                                        <span class="org-badge">Platform managed</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="org-empty" style="margin-top: .9rem;">No users are attached to this client. Complete the owner-account step or add a clinic user.</div>
                         @endif
                     </section>
                 @else

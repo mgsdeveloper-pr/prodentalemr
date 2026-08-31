@@ -9,16 +9,20 @@ use App\Filament\Saas\Resources\Subscriptions\SubscriptionResource;
 use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\Provider;
+use App\Models\User;
+use App\Support\SaasNotifications;
 use App\Support\SaasSupportAccess;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Carbon;
 use UnitEnum;
 
 class OrganizationWorkspace extends Page
@@ -53,10 +57,10 @@ class OrganizationWorkspace extends Page
                 $query->where('public_id', $record);
 
                 if (ctype_digit($record)) {
-                    $query->orWhereKey((int) $record);
+                    $query->orWhere($query->getModel()->qualifyColumn('id'), (int) $record);
                 }
             })
-            ->firstOr(fn () => throw new ModelNotFoundException());
+            ->firstOr(fn () => throw new ModelNotFoundException);
     }
 
     protected function getHeaderActions(): array
@@ -229,6 +233,112 @@ class OrganizationWorkspace extends Page
             ->all();
     }
 
+    public function clientUsers(): array
+    {
+        return $this->organization->users()
+            ->with(['roles', 'clinic', 'location'])
+            ->orderByDesc('status')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (User $user): array => [
+                'id' => $user->getKey(),
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->getPrimaryRoleLabel() ?: 'Not assigned',
+                'clinic' => $user->clinic?->clinic_name ?: 'Not assigned',
+                'location' => $user->location?->location_name ?: 'Not assigned',
+                'status' => $user->status ? 'Active' : 'Inactive',
+                'verified' => $user->hasVerifiedEmail() ? 'Verified' : 'Pending',
+                'access' => $user->canAccessClinicWorkspace() ? 'Ready' : 'Blocked',
+                'access_detail' => $this->clientUserAccessDetail($user),
+                'manageable' => ! $user->hasAnyRole(array_keys(User::saasRoleOptions())),
+            ])
+            ->all();
+    }
+
+    public function manageClientUserAction(): Action
+    {
+        return Action::make('manageClientUser')
+            ->label('Manage')
+            ->icon('heroicon-o-user-circle')
+            ->color('gray')
+            ->modalHeading(fn (array $arguments): string => 'Manage access - '.$this->clientUser($arguments)->name)
+            ->modalDescription('Update the client role and operating assignment. Platform administrator roles cannot be changed here.')
+            ->modalSubmitActionLabel('Save Access')
+            ->fillForm(function (array $arguments): array {
+                $user = $this->clientUser($arguments);
+
+                return [
+                    'selected_role' => $user->getPrimaryRoleName(),
+                    'clinic_id' => $user->clinic_id,
+                    'location_id' => $user->location_id,
+                    'status' => $user->status,
+                ];
+            })
+            ->form([
+                Select::make('selected_role')
+                    ->label('Client role')
+                    ->options(User::clinicRoleOptions())
+                    ->native(false)
+                    ->required(),
+                Select::make('clinic_id')
+                    ->label('Clinic')
+                    ->options(fn (): array => $this->organization->clinics()
+                        ->orderBy('clinic_name')
+                        ->pluck('clinic_name', 'id')
+                        ->all())
+                    ->native(false)
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+                Select::make('location_id')
+                    ->label('Location')
+                    ->options(fn (): array => $this->organization->locations()
+                        ->with('clinic:id,clinic_name')
+                        ->orderBy('location_name')
+                        ->get()
+                        ->mapWithKeys(fn ($location): array => [
+                            $location->getKey() => ($location->clinic?->clinic_name ? $location->clinic->clinic_name.' - ' : '').$location->location_name,
+                        ])
+                        ->all())
+                    ->native(false)
+                    ->searchable()
+                    ->preload(),
+                Toggle::make('status')
+                    ->label('Account active')
+                    ->helperText('Inactive users can sign in only to the restricted profile fallback and cannot enter a workspace.'),
+            ])
+            ->action(function (array $arguments, array $data): void {
+                abort_unless(auth()->user()?->canPerformSaasModuleAction('users', 'update'), 403);
+
+                $user = $this->clientUser($arguments);
+                abort_if($user->hasAnyRole(array_keys(User::saasRoleOptions())), 403);
+
+                $clinic = $this->organization->clinics()->whereKey($data['clinic_id'])->firstOrFail();
+                $locationId = filled($data['location_id'] ?? null)
+                    ? $clinic->locations()->whereKey($data['location_id'])->value('id')
+                    : null;
+
+                abort_if(filled($data['location_id'] ?? null) && ! $locationId, 422, 'The selected location does not belong to this clinic.');
+
+                $user->update([
+                    'organization_id' => $this->organization->getKey(),
+                    'clinic_id' => $clinic->getKey(),
+                    'location_id' => $locationId,
+                    'status' => (bool) $data['status'],
+                ]);
+                $user->syncRoles([(string) $data['selected_role']]);
+
+                SaasNotifications::userUpdated($user->fresh(['roles']), auth()->user());
+
+                Notification::make()
+                    ->title('Client access updated')
+                    ->body($user->name.' can now be reviewed from the Users tab.')
+                    ->success()
+                    ->send();
+            });
+    }
+
     public function quickActions(): array
     {
         return [
@@ -256,7 +366,7 @@ class OrganizationWorkspace extends Page
             'clinic' => $supportAccess['clinic_name'] ?? 'Entire organization',
             'reason' => $supportAccess['reason'] ?? 'Start support mode before changing sensitive clinic data.',
             'started_at' => filled($supportAccess['started_at'] ?? null)
-                ? \Illuminate\Support\Carbon::parse($supportAccess['started_at'])->format('M d, Y h:i A')
+                ? Carbon::parse($supportAccess['started_at'])->format('M d, Y h:i A')
                 : null,
             'audit_url' => SaasEntitlementAuditLogResource::getUrl('index'),
         ];
@@ -307,5 +417,36 @@ class OrganizationWorkspace extends Page
     protected function formatState(?string $state): string
     {
         return filled($state) ? str($state)->replace('_', ' ')->headline()->toString() : 'Not set';
+    }
+
+    protected function clientUser(array $arguments): User
+    {
+        return $this->organization->users()
+            ->with(['roles', 'clinic', 'location'])
+            ->whereKey($arguments['user'] ?? null)
+            ->firstOrFail();
+    }
+
+    protected function clientUserAccessDetail(User $user): string
+    {
+        if (! $user->status) {
+            return 'Activate the account.';
+        }
+
+        if (! $user->hasAnyRole(array_keys(User::clinicRoleOptions()))) {
+            return 'Assign a client role.';
+        }
+
+        if (! $user->clinic) {
+            return 'Assign a clinic.';
+        }
+
+        if (! $user->clinic->hasActiveVerificationServices() && ! $user->clinic->hasActiveClinicOperations()) {
+            return 'Activate a clinic service.';
+        }
+
+        return $user->canAccessClinicWorkspace()
+            ? 'Clinic workspace available.'
+            : 'Review role permissions.';
     }
 }

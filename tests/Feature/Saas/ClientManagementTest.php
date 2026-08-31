@@ -1,12 +1,17 @@
 <?php
 
+use App\Filament\Saas\Pages\OrganizationWorkspace;
+use App\Filament\Saas\Resources\Clinics\Schemas\ClinicForm;
 use App\Models\Clinic;
 use App\Models\OnboardingDraft;
 use App\Models\Organization;
 use App\Models\User;
-use App\Filament\Saas\Resources\Clinics\Schemas\ClinicForm;
 use App\Services\ClientOnboardingService;
+use App\Support\PanelPermissionMatrix;
 use Database\Seeders\RoleSeeder;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 
 it('renders the focused client directory for an authorized SaaS user', function (): void {
     $this->seed(RoleSeeder::class);
@@ -59,7 +64,7 @@ it('renders the simplified clinic setup form', function (): void {
     $user->assignRole('saas_admin');
 
     $this->actingAs($user)
-        ->get('/saas/clinics/create?organization_id=' . $organization->id)
+        ->get('/saas/clinics/create?organization_id='.$organization->id)
         ->assertOk()
         ->assertSee('Clinic Information')
         ->assertSee('Verification Setup')
@@ -68,6 +73,78 @@ it('renders the simplified clinic setup form', function (): void {
         ->assertSee('Advanced Settings')
         ->assertDontSee('Customer Services')
         ->assertDontSee('Clinic PMS status');
+});
+
+it('shows client roles and access readiness in the manage client workspace', function (): void {
+    $this->seed(RoleSeeder::class);
+
+    $organization = Organization::create([
+        'name' => 'Access Review Dental',
+        'owner_name' => 'Client Owner',
+        'status' => true,
+        'lifecycle_status' => 'active',
+        'onboarding_status' => 'complete',
+    ]);
+
+    $clinic = Clinic::create([
+        'organization_id' => $organization->id,
+        'clinic_name' => 'Access Review Main',
+        'clinic_code' => 'ACCESS-01',
+        'timezone' => 'America/New_York',
+        'status' => true,
+        'verification_services_enabled' => true,
+        'verification_service_status' => 'active',
+        'service_status' => 'active',
+    ]);
+
+    $clientUser = User::factory()->create([
+        'name' => 'Dr. Access Review',
+        'organization_id' => $organization->id,
+        'clinic_id' => $clinic->id,
+        'status' => true,
+        'email_verified_at' => now(),
+    ]);
+    $clientUser->assignRole('clinic_admin');
+
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+    $admin->givePermissionTo(Permission::findOrCreate(
+        PanelPermissionMatrix::permissionName('saas', 'organizations', 'view'),
+        'web',
+    ));
+    $admin->givePermissionTo(Permission::findOrCreate(
+        PanelPermissionMatrix::permissionName('saas', 'users', 'update'),
+        'web',
+    ));
+
+    $this->actingAs($admin)
+        ->get('/saas/client-workspace/'.$organization->id.'?tab=users')
+        ->assertOk()
+        ->assertSee('Users &amp; Access', false)
+        ->assertSee('Dr. Access Review')
+        ->assertSee('Clinic Admin')
+        ->assertSee('Access Review Main')
+        ->assertSee('Verified')
+        ->assertSee('Manage');
+
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    Livewire::test(OrganizationWorkspace::class, ['record' => (string) $organization->id])
+        ->call('mountAction', 'manageClientUser', ['user' => $clientUser->id])
+        ->assertActionMounted('manageClientUser')
+        ->assertSchemaComponentExists('selected_role', 'mountedActionSchema0')
+        ->fillForm([
+            'selected_role' => 'clinic_manager',
+            'clinic_id' => $clinic->id,
+            'location_id' => null,
+            'status' => true,
+        ])
+        ->callMountedAction()
+        ->assertHasNoErrors();
+
+    expect($clientUser->fresh()->hasRole('clinic_manager'))->toBeTrue()
+        ->and($clientUser->fresh()->clinic_id)->toBe($clinic->id)
+        ->and($clientUser->fresh()->status)->toBeTrue();
 });
 
 it('normalizes a new clinic for verification-only operation', function (): void {
