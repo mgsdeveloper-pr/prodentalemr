@@ -20,6 +20,7 @@ use App\Support\AppointmentVerificationSender;
 use App\Support\AppointmentWorkspaceScope;
 use App\Support\ClinicWorkspace;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
@@ -262,6 +263,130 @@ it('maps an assigned active location into the appointment workspace', function (
     $this->actingAs($this->clinicUser);
 
     expect(AppointmentWorkspaceScope::mappedLocationId())->toBe($this->location->id);
+});
+
+it('uses the clinic default location when the user has no assigned location', function () {
+    $secondLocation = Location::create([
+        'clinic_id' => $this->clinic->id,
+        'location_name' => 'Second Office',
+        'status' => true,
+    ]);
+    $this->clinic->update(['default_location_id' => $secondLocation->id]);
+    $this->clinicUser->update(['location_id' => null]);
+
+    $this->actingAs($this->clinicUser);
+
+    expect(AppointmentWorkspaceScope::mappedLocationId())->toBe($secondLocation->id);
+});
+
+it('encrypts sensitive provider identifiers at rest', function () {
+    $this->provider->update([
+        'tax_id' => '12-3456789',
+        'dea_number' => 'AB1234567',
+    ]);
+
+    $stored = DB::table('providers')->where('id', $this->provider->id)->first(['tax_id', 'dea_number']);
+
+    expect($stored->tax_id)->not->toBe('12-3456789')
+        ->and($stored->dea_number)->not->toBe('AB1234567')
+        ->and($this->provider->fresh()->tax_id)->toBe('12-3456789')
+        ->and($this->provider->fresh()->dea_number)->toBe('AB1234567');
+});
+
+it('rejects appointments outside configured provider hours', function () {
+    $date = today()->next('Monday');
+    $this->provider->update([
+        'business_hours' => [
+            'monday' => ['open' => true, 'opens_at' => '10:00', 'closes_at' => '12:00'],
+        ],
+    ]);
+
+    $data = [
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'appointment_date' => $date->toDateString(),
+        'start_time' => '09:00:00',
+        'end_time' => '09:30:00',
+        'status' => 'scheduled',
+    ];
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize($data))
+        ->toThrow(ValidationException::class, 'Select a time within this provider and location schedule.');
+});
+
+it('rejects appointments during provider leave and respects scheduling buffers', function () {
+    $date = today()->next('Monday');
+    $hours = ['monday' => [
+        'open' => true,
+        'opens_at' => '09:00',
+        'closes_at' => '17:00',
+        'break_starts_at' => '10:00',
+        'break_ends_at' => '10:30',
+    ]];
+    $this->provider->update([
+        'business_hours' => $hours,
+        'schedule_exceptions' => [[
+            'date' => $date->toDateString(),
+            'all_day' => false,
+            'starts_at' => '12:00',
+            'ends_at' => '13:00',
+            'reason' => 'Lunch meeting',
+        ]],
+        'scheduling_buffer_minutes' => 15,
+    ]);
+
+    $base = [
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'appointment_date' => $date->toDateString(),
+        'status' => 'scheduled',
+    ];
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize([
+        ...$base,
+        'start_time' => '10:00:00',
+        'end_time' => '10:30:00',
+    ]))->toThrow(ValidationException::class, 'This time overlaps a configured break.');
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize([
+        ...$base,
+        'start_time' => '12:15:00',
+        'end_time' => '12:45:00',
+    ]))->toThrow(ValidationException::class, 'This time is unavailable because of a closure or provider leave.');
+
+    $this->operatory->update(['schedule_exceptions' => [[
+        'date' => $date->toDateString(),
+        'all_day' => false,
+        'starts_at' => '15:00',
+        'ends_at' => '16:00',
+        'reason' => 'Equipment maintenance',
+    ]]]);
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize([
+        ...$base,
+        'clinic_operatory_id' => $this->operatory->id,
+        'start_time' => '15:15:00',
+        'end_time' => '15:45:00',
+    ]))->toThrow(ValidationException::class, 'This time is unavailable because of a closure or provider leave.');
+
+    Appointment::create([
+        ...$base,
+        'start_time' => '14:00:00',
+        'end_time' => '14:30:00',
+        'duration_minutes' => 30,
+    ]);
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize([
+        ...$base,
+        'start_time' => '14:30:00',
+        'end_time' => '15:00:00',
+    ]))->toThrow(ValidationException::class, 'This provider already has an appointment during the selected time.');
 });
 
 it('rejects a location outside the active clinic', function () {

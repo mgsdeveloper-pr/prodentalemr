@@ -21,14 +21,34 @@ class Provider extends Model
         'user_id',
         'specialization',
         'license_number',
+        'license_state',
+        'license_expires_at',
         'npi_number',
+        'taxonomy_code',
+        'dea_number',
         'tax_id',
+        'credentialing_status',
+        'credentialing_effective_at',
+        'credentialing_expires_at',
+        'additional_licenses',
+        'business_hours',
+        'schedule_exceptions',
+        'scheduling_buffer_minutes',
         'status',
     ];
 
     protected function casts(): array
     {
         return [
+            'tax_id' => 'encrypted',
+            'dea_number' => 'encrypted',
+            'license_expires_at' => 'date',
+            'credentialing_effective_at' => 'date',
+            'credentialing_expires_at' => 'date',
+            'additional_licenses' => 'array',
+            'business_hours' => 'array',
+            'schedule_exceptions' => 'array',
+            'scheduling_buffer_minutes' => 'integer',
             'status' => 'boolean',
         ];
     }

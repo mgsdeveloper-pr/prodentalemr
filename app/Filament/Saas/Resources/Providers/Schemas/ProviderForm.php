@@ -7,6 +7,10 @@ use App\Models\Location;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\SaasSupportAccess;
+use App\Support\SchedulingFormSchema;
+use App\Support\UsLocationOptions;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -109,14 +113,66 @@ class ProviderForm
                                 TextInput::make('license_number')
                                     ->label('State license number')
                                     ->maxLength(255),
+                                Select::make('license_state')
+                                    ->label('License state')
+                                    ->options(UsLocationOptions::stateOptions())
+                                    ->searchable()
+                                    ->preload(),
+                                DatePicker::make('license_expires_at')->label('License expires'),
                                 TextInput::make('npi_number')
                                     ->label('Provider NPI')
-                                    ->maxLength(255),
+                                    ->length(10)
+                                    ->regex('/^\d{10}$/'),
+                                TextInput::make('taxonomy_code')->label('Taxonomy code')->maxLength(20),
                                 TextInput::make('tax_id')
                                     ->label('Tax ID / EIN')
-                                    ->maxLength(255),
+                                    ->password()
+                                    ->revealable()
+                                    ->helperText('Encrypted at rest. Reveal only when required.')
+                                    ->maxLength(20),
+                                TextInput::make('dea_number')
+                                    ->label('DEA number')
+                                    ->password()
+                                    ->revealable()
+                                    ->helperText('Optional. Encrypted at rest.')
+                                    ->maxLength(20),
+                                Select::make('credentialing_status')
+                                    ->label('Credentialing status')
+                                    ->options([
+                                        'not_started' => 'Not started',
+                                        'in_progress' => 'In progress',
+                                        'active' => 'Active',
+                                        'expiring' => 'Expiring',
+                                        'expired' => 'Expired',
+                                        'suspended' => 'Suspended',
+                                    ])
+                                    ->default('not_started')
+                                    ->native(false),
+                                DatePicker::make('credentialing_effective_at')->label('Credentialing effective'),
+                                DatePicker::make('credentialing_expires_at')->label('Credentialing expires'),
+                                TextInput::make('scheduling_buffer_minutes')
+                                    ->label('Scheduling buffer (minutes)')
+                                    ->numeric()
+                                    ->default(0)
+                                    ->minValue(0)
+                                    ->maxValue(120),
                             ]),
+                        Repeater::make('additional_licenses')
+                            ->label('Additional state licenses')
+                            ->schema([
+                                Grid::make(3)->schema([
+                                    Select::make('state')->options(UsLocationOptions::stateOptions())->searchable()->preload()->required(),
+                                    TextInput::make('number')->label('License number')->required()->maxLength(255),
+                                    DatePicker::make('expires_at')->label('Expires'),
+                                ]),
+                            ])
+                            ->defaultItems(0)
+                            ->addActionLabel('Add another license')
+                            ->reorderable(false)
+                            ->columnSpanFull(),
                     ]),
+                SchedulingFormSchema::hours(),
+                SchedulingFormSchema::exceptions(),
             ])
             ->columns(1);
     }

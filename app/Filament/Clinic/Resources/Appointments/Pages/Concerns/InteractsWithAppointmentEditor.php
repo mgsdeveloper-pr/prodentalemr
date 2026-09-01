@@ -4,10 +4,12 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages\Concerns;
 
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
+use App\Models\ClinicOperatory;
 use App\Models\Location;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
+use App\Services\Appointments\AppointmentAvailabilityService;
 use App\Support\AppointmentWorkspaceScope;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -213,7 +215,7 @@ trait InteractsWithAppointmentEditor
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))
             ->get(['start_time', 'end_time']);
 
-        return $this->buildAvailableSlotsForDate($date, $duration, $existing);
+        return $this->buildAvailableSlotsForDate($date, $duration, $existing, $this->getSchedulingContext());
     }
 
     public function getProviderDaySnapshotCount(): int
@@ -241,6 +243,7 @@ trait InteractsWithAppointmentEditor
         $providerId = $this->data['provider_id'] ?? null;
         $duration = max((int) ($this->data['duration_minutes'] ?? 30), 15);
         $appointmentsByDate = $this->getProviderAppointmentsByDateForRange($providerId, $month->copy()->startOfMonth(), $month->copy()->endOfMonth());
+        $schedulingContext = $this->getSchedulingContext();
 
         $weeks = [];
         $week = [];
@@ -252,6 +255,7 @@ trait InteractsWithAppointmentEditor
                 $providerId,
                 $duration,
                 $appointmentsByDate,
+                $schedulingContext,
             );
 
             $week[] = [
@@ -416,17 +420,17 @@ trait InteractsWithAppointmentEditor
             ->groupBy(fn (Appointment $appointment): string => (string) $appointment->appointment_date);
     }
 
-    protected function getCalendarDayAvailability(Carbon $date, ?int $providerId, int $duration, Collection $appointmentsByDate): array
+    protected function getCalendarDayAvailability(Carbon $date, ?int $providerId, int $duration, Collection $appointmentsByDate, array $schedulingContext): array
     {
         if (! filled($providerId)) {
             return ['tone' => 'idle', 'label' => null];
         }
 
-        if ($date->isWeekend()) {
+        if (! $this->getOperatingWindow($date->toDateString(), $schedulingContext)) {
             return ['tone' => 'blocked', 'label' => null];
         }
 
-        if ($date->isPast()) {
+        if ($date->toDateString() < now($this->getDisplayTimezone())->toDateString()) {
             return ['tone' => 'muted', 'label' => null];
         }
 
@@ -434,6 +438,7 @@ trait InteractsWithAppointmentEditor
             $date->toDateString(),
             $duration,
             $appointmentsByDate->get($date->toDateString(), collect()),
+            $schedulingContext,
         );
 
         $count = count($slots);
@@ -448,12 +453,19 @@ trait InteractsWithAppointmentEditor
         ];
     }
 
-    protected function buildAvailableSlotsForDate(string $date, int $duration, Collection $existingAppointments): array
+    protected function buildAvailableSlotsForDate(string $date, int $duration, Collection $existingAppointments, ?array $schedulingContext = null): array
     {
         $timezone = $this->getDisplayTimezone();
-        $dayStart = Carbon::parse($date.' 09:00:00', $timezone);
-        $dayEnd = Carbon::parse($date.' 17:00:00', $timezone);
+        $schedulingContext ??= $this->getSchedulingContext();
+        $window = $this->getOperatingWindow($date, $schedulingContext);
+
+        if (! $window) {
+            return [];
+        }
+
+        [$dayStart, $dayEnd] = $window;
         $now = now($timezone);
+        $bufferMinutes = max((int) ($schedulingContext['buffer_minutes'] ?? 0), 0);
         $slots = [];
         $cursor = $dayStart->copy();
         $selectedStart = $this->data['start_time'] ?? null;
@@ -469,13 +481,25 @@ trait InteractsWithAppointmentEditor
                 continue;
             }
 
-            $overlaps = $existingAppointments->contains(function (Appointment $appointment) use ($slotStart, $slotEnd, $date): bool {
+            $blockedByException = app(AppointmentAvailabilityService::class)
+                ->overlapsException($slotStart, $slotEnd, $schedulingContext);
+
+            $blockedByBreak = app(AppointmentAvailabilityService::class)
+                ->overlapsBreak($slotStart, $slotEnd, $schedulingContext);
+
+            if ($blockedByException || $blockedByBreak) {
+                $cursor->addMinutes(15);
+
+                continue;
+            }
+
+            $overlaps = $existingAppointments->contains(function (Appointment $appointment) use ($slotStart, $slotEnd, $date, $timezone, $bufferMinutes): bool {
                 if (! filled($appointment->start_time) || ! filled($appointment->end_time)) {
                     return false;
                 }
 
-                $existingStart = Carbon::parse($date.' '.$appointment->start_time);
-                $existingEnd = Carbon::parse($date.' '.$appointment->end_time);
+                $existingStart = Carbon::parse($date.' '.$appointment->start_time, $timezone)->subMinutes($bufferMinutes);
+                $existingEnd = Carbon::parse($date.' '.$appointment->end_time, $timezone)->addMinutes($bufferMinutes);
 
                 return $slotStart->lt($existingEnd) && $slotEnd->gt($existingStart);
             });
@@ -496,6 +520,34 @@ trait InteractsWithAppointmentEditor
         }
 
         return $slots;
+    }
+
+    protected function getSchedulingContext(): array
+    {
+        $clinic = AppointmentWorkspaceScope::selectedClinic();
+        $clinicId = AppointmentWorkspaceScope::selectedClinicId();
+        $locationId = $this->data['location_id'] ?? null;
+        $providerId = $this->data['provider_id'] ?? null;
+
+        $location = filled($locationId)
+            ? Location::query()->where('clinic_id', $clinicId)->whereKey($locationId)->first()
+            : null;
+        $provider = filled($providerId)
+            ? Provider::query()->where('clinic_id', $clinicId)->whereKey($providerId)->first()
+            : null;
+
+        $operatoryId = $this->data['clinic_operatory_id'] ?? null;
+        $operatory = filled($operatoryId)
+            ? ClinicOperatory::query()->where('clinic_id', $clinicId)->whereKey($operatoryId)->first()
+            : null;
+
+        return app(AppointmentAvailabilityService::class)->context($clinic, $location, $provider, $operatory);
+    }
+
+    protected function getOperatingWindow(string $date, array $schedulingContext): ?array
+    {
+        return app(AppointmentAvailabilityService::class)
+            ->operatingWindow($date, $this->getDisplayTimezone(), $schedulingContext);
     }
 
     protected function bookingPrerequisitesAreSelected(): bool

@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\ClinicOperatories\Schemas;
 
 use App\Models\Location;
+use App\Support\SchedulingFormSchema;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -56,6 +57,8 @@ class ClinicOperatoryForm
                             ->rows(3)
                             ->columnSpanFull(),
                     ]),
+                SchedulingFormSchema::hours(title: 'Operatory Availability'),
+                SchedulingFormSchema::exceptions(title: 'Operatory Downtime'),
             ])
             ->columns(1);
     }

@@ -58,6 +58,18 @@ class ClinicForm
                                     ->required()
                                     ->default('America/New_York')
                                     ->native(false),
+                                Select::make('default_location_id')
+                                    ->label('Default scheduling location')
+                                    ->relationship(
+                                        name: 'defaultLocation',
+                                        titleAttribute: 'location_name',
+                                        modifyQueryUsing: fn ($query, ?Clinic $record) => $record
+                                            ? $query->where('clinic_id', $record->id)->where('status', true)
+                                            : $query->whereRaw('1 = 0'),
+                                    )
+                                    ->helperText('Available after the clinic has at least one active location.')
+                                    ->searchable()
+                                    ->preload(),
                                 Toggle::make('status')
                                     ->label('Clinic active')
                                     ->helperText('Active clinics are available to assigned users after setup is complete.')

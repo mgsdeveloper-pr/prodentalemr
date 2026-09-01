@@ -22,8 +22,19 @@ class Location extends Model
         'zip_code',
         'country',
         'phone',
+        'business_hours',
+        'schedule_exceptions',
         'status',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'business_hours' => 'array',
+            'schedule_exceptions' => 'array',
+            'status' => 'boolean',
+        ];
+    }
 
     public function clinic(): BelongsTo
     {

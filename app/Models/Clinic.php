@@ -32,6 +32,7 @@ class Clinic extends Model
         'zip_code',
         'country',
         'business_hours',
+        'default_location_id',
         'primary_contact_name',
         'primary_contact_email',
         'primary_contact_phone',
@@ -143,6 +144,11 @@ class Clinic extends Model
     public function locations(): HasMany
     {
         return $this->hasMany(Location::class);
+    }
+
+    public function defaultLocation(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'default_location_id');
     }
 
     public function users(): HasMany

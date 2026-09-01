@@ -52,6 +52,20 @@ class AppointmentWorkspaceScope
             }
         }
 
+        $defaultLocationId = self::selectedClinic()?->default_location_id;
+
+        if ($defaultLocationId) {
+            $defaultLocation = Location::query()
+                ->whereKey($defaultLocationId)
+                ->where('clinic_id', $clinicId)
+                ->where('status', true)
+                ->first();
+
+            if ($defaultLocation) {
+                return $defaultLocation;
+            }
+        }
+
         $locations = Location::query()
             ->where('clinic_id', $clinicId)
             ->where('status', true)

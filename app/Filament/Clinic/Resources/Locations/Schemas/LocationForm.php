@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Resources\Locations\Schemas;
 
 use App\Support\ClinicPanelScope;
+use App\Support\SchedulingFormSchema;
 use App\Support\UsLocationOptions;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
@@ -43,6 +44,8 @@ class LocationForm
                         Toggle::make('status')->label('Active location')->default(true)->required(),
                     ]),
                 ]),
+            SchedulingFormSchema::hours(),
+            SchedulingFormSchema::exceptions(),
         ])->columns(1);
     }
 }

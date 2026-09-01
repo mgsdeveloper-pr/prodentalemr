@@ -22,6 +22,8 @@ class ClinicOperatory extends Model
         'display_order',
         'status',
         'notes',
+        'business_hours',
+        'schedule_exceptions',
     ];
 
     protected function casts(): array
@@ -29,6 +31,8 @@ class ClinicOperatory extends Model
         return [
             'display_order' => 'integer',
             'status' => 'boolean',
+            'business_hours' => 'array',
+            'schedule_exceptions' => 'array',
         ];
     }
 

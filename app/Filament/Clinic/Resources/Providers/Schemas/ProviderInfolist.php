@@ -57,12 +57,24 @@ class ProviderInfolist
                                 TextEntry::make('license_number')
                                     ->label('State license')
                                     ->placeholder('-'),
+                                TextEntry::make('license_state')->label('License state')->placeholder('-'),
+                                TextEntry::make('license_expires_at')->label('License expires')->date()->placeholder('-'),
                                 TextEntry::make('npi_number')
                                     ->label('NPI number')
                                     ->placeholder('-'),
+                                TextEntry::make('taxonomy_code')->label('Taxonomy code')->placeholder('-'),
                                 TextEntry::make('tax_id')
                                     ->label('Tax ID / EIN')
+                                    ->formatStateUsing(fn (?string $state): string => self::mask($state))
                                     ->placeholder('-'),
+                                TextEntry::make('dea_number')
+                                    ->label('DEA number')
+                                    ->formatStateUsing(fn (?string $state): string => self::mask($state))
+                                    ->placeholder('-'),
+                                TextEntry::make('credentialing_status')
+                                    ->label('Credentialing')
+                                    ->formatStateUsing(fn (?string $state): string => str($state ?: 'not_started')->replace('_', ' ')->title()->toString())
+                                    ->badge(),
                                 TextEntry::make('user.email')
                                     ->label('Email')
                                     ->placeholder('-')
@@ -71,5 +83,10 @@ class ProviderInfolist
                     ]),
             ])
             ->columns(1);
+    }
+
+    private static function mask(?string $value): string
+    {
+        return filled($value) ? str_repeat('*', max(strlen($value) - 4, 4)).substr($value, -4) : '-';
     }
 }

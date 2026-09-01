@@ -53,7 +53,7 @@
             <form wire:submit="create">
                 {{ $this->form }}
                 <div class="onboarding-actions">
-                    <x-filament::button type="submit">Review & Activate Client</x-filament::button>
+                    <x-filament::button type="submit">Activate Client</x-filament::button>
                 </div>
             </form>
         </section>

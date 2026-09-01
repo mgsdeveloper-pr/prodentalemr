@@ -3,6 +3,9 @@
 namespace App\Filament\Saas\Resources\Locations\Schemas;
 
 use App\Support\UsLocationOptions;
+use App\Support\SchedulingFormSchema;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
@@ -17,6 +20,8 @@ class LocationForm
     {
         return $schema
             ->components([
+                Section::make('Location Details')->schema([
+                    Grid::make(2)->schema([
                 Select::make('clinic_id')
                     ->label('Clinic')
                     ->relationship('clinic', 'clinic_name')
@@ -65,6 +70,10 @@ class LocationForm
                     ->label('Active')
                     ->default(true)
                     ->required(),
+                    ]),
+                ]),
+                SchedulingFormSchema::hours(),
+                SchedulingFormSchema::exceptions(),
             ]);
     }
 }

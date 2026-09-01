@@ -3,6 +3,7 @@
 namespace App\Filament\Clinic\Pages;
 
 use App\Models\Clinic;
+use App\Models\Location;
 use App\Support\ClinicPanelScope;
 use App\Support\ClinicWorkspace;
 use App\Support\SaasSupportAccess;
@@ -93,6 +94,17 @@ class OrganizationOperations extends Page implements HasForms
                                                 ->preload()
                                                 ->native(false)
                                                 ->required(),
+                                            Select::make('default_location_id')
+                                                ->label('Default scheduling location')
+                                                ->options(fn (): array => Location::query()
+                                                    ->where('clinic_id', $this->clinic?->id)
+                                                    ->where('status', true)
+                                                    ->orderBy('location_name')
+                                                    ->pluck('location_name', 'id')
+                                                    ->all())
+                                                ->helperText('Used automatically when a user is not assigned to a specific location.')
+                                                ->searchable()
+                                                ->preload(),
                                             TextInput::make('clinic_npi')
                                                 ->label('Clinic NPI')
                                                 ->helperText('The 10-digit clinic or organization NPI, separate from provider NPIs.')
@@ -287,7 +299,7 @@ class OrganizationOperations extends Page implements HasForms
     {
         $fields = [
             'clinic_name', 'clinic_npi', 'timezone', 'email', 'phone', 'fax', 'website',
-            'address', 'city', 'state', 'zip_code', 'country', 'business_hours',
+            'address', 'city', 'state', 'zip_code', 'country', 'business_hours', 'default_location_id',
             'primary_contact_name', 'primary_contact_email', 'primary_contact_phone',
             'billing_contact_name', 'billing_contact_email', 'billing_contact_phone',
             'verification_contact_name', 'verification_contact_email', 'verification_contact_phone',

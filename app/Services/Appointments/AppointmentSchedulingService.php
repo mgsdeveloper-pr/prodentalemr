@@ -3,6 +3,7 @@
 namespace App\Services\Appointments;
 
 use App\Models\Appointment;
+use App\Models\Clinic;
 use App\Models\ClinicOperatory;
 use App\Models\ClinicService;
 use App\Models\Location;
@@ -14,11 +15,14 @@ use Illuminate\Validation\ValidationException;
 
 class AppointmentSchedulingService
 {
+    public function __construct(private readonly AppointmentAvailabilityService $availability) {}
+
     public function validateAndNormalize(array $data, ?Appointment $appointment = null): array
     {
         $this->validateRelatedRecords($data);
         $data = $this->normalizeService($data);
         $data = $this->normalizeTiming($data);
+        $this->validateAvailability($data);
         $this->validateConflicts($data, $appointment);
 
         return $data;
@@ -145,6 +149,13 @@ class AppointmentSchedulingService
 
     protected function validateConflicts(array $data, ?Appointment $appointment): void
     {
+        $clinic = Clinic::query()->find($data['clinic_id']);
+        $provider = Provider::query()->find($data['provider_id']);
+        $timezone = $clinic?->timezone ?: config('app.timezone', 'UTC');
+        $buffer = max((int) ($provider?->scheduling_buffer_minutes ?? 0), 0);
+        $requestedStart = Carbon::parse($data['appointment_date'].' '.$data['start_time'], $timezone);
+        $requestedEnd = Carbon::parse($data['appointment_date'].' '.$data['end_time'], $timezone);
+
         $query = Appointment::query()
             ->where('organization_id', $data['organization_id'])
             ->where('clinic_id', $data['clinic_id'])
@@ -157,7 +168,22 @@ class AppointmentSchedulingService
             $query->whereKeyNot($appointment->getKey());
         }
 
-        if ((clone $query)->where('provider_id', $data['provider_id'])->exists()) {
+        $providerConflict = Appointment::query()
+            ->where('organization_id', $data['organization_id'])
+            ->where('clinic_id', $data['clinic_id'])
+            ->where('provider_id', $data['provider_id'])
+            ->whereDate('appointment_date', $data['appointment_date'])
+            ->whereNotIn('status', ['cancelled', 'no_show'])
+            ->when($appointment, fn ($providerQuery) => $providerQuery->whereKeyNot($appointment->getKey()))
+            ->get(['start_time', 'end_time'])
+            ->contains(function (Appointment $existing) use ($requestedStart, $requestedEnd, $data, $timezone, $buffer): bool {
+                $existingStart = Carbon::parse($data['appointment_date'].' '.$existing->start_time, $timezone)->subMinutes($buffer);
+                $existingEnd = Carbon::parse($data['appointment_date'].' '.$existing->end_time, $timezone)->addMinutes($buffer);
+
+                return $requestedStart->lt($existingEnd) && $requestedEnd->gt($existingStart);
+            });
+
+        if ($providerConflict) {
             throw ValidationException::withMessages([
                 'start_time' => 'This provider already has an appointment during the selected time.',
             ]);
@@ -167,6 +193,39 @@ class AppointmentSchedulingService
             && (clone $query)->where('clinic_operatory_id', $data['clinic_operatory_id'])->exists()) {
             throw ValidationException::withMessages([
                 'clinic_operatory_id' => 'This operatory is already booked during the selected time.',
+            ]);
+        }
+    }
+
+    protected function validateAvailability(array $data): void
+    {
+        $clinic = Clinic::query()->find($data['clinic_id']);
+        $location = Location::query()->find($data['location_id']);
+        $provider = Provider::query()->find($data['provider_id']);
+        $timezone = $clinic?->timezone ?: config('app.timezone', 'UTC');
+        $operatory = filled($data['clinic_operatory_id'] ?? null)
+            ? ClinicOperatory::query()->find($data['clinic_operatory_id'])
+            : null;
+        $context = $this->availability->context($clinic, $location, $provider, $operatory);
+        $window = $this->availability->operatingWindow($data['appointment_date'], $timezone, $context);
+        $start = Carbon::parse($data['appointment_date'].' '.$data['start_time'], $timezone);
+        $end = Carbon::parse($data['appointment_date'].' '.$data['end_time'], $timezone);
+
+        if (! $window || $start->lt($window[0]) || $end->gt($window[1])) {
+            throw ValidationException::withMessages([
+                'start_time' => 'Select a time within this provider and location schedule.',
+            ]);
+        }
+
+        if ($this->availability->overlapsException($start, $end, $context)) {
+            throw ValidationException::withMessages([
+                'start_time' => 'This time is unavailable because of a closure or provider leave.',
+            ]);
+        }
+
+        if ($this->availability->overlapsBreak($start, $end, $context)) {
+            throw ValidationException::withMessages([
+                'start_time' => 'This time overlaps a configured break.',
             ]);
         }
     }
