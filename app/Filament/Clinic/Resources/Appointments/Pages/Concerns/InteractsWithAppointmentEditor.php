@@ -420,7 +420,7 @@ trait InteractsWithAppointmentEditor
     {
         $resource = static::getResource();
 
-        return $this->previousUrl ?: $resource::getUrl();
+        return $resource::getUrl();
     }
 
     public function getBackUrl(): string

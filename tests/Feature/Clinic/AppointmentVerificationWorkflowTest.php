@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
@@ -448,8 +449,22 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Appointment Preview')
         ->assertSee('Pending patient selection')
         ->assertSee('Complete required details')
-        ->assertSee('Complete before saving: doctor, patient, available time slot, verification route.')
+        ->assertSee('Complete before saving: doctor, patient, available time slot.')
+        ->assertSee('href="'.AppointmentResource::getUrl().'"', false)
+        ->assertDontSee('/saas/client-service-enrollments/create')
         ->assertDontSee('Booking Snapshot');
+});
+
+it('defaults an enrolled clinic appointment to managed verification', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(CreateAppointment::class)
+        ->assertFormSet([
+            'location_id' => $this->location->id,
+            'verification_processing_mode' => BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE,
+        ]);
 });
 
 it('renders appointment details with insurance member information', function () {
@@ -567,7 +582,6 @@ it('runs the save appointment action and reports incomplete required fields', fu
             'patient_id' => 'required',
             'start_time' => 'required',
             'end_time' => 'required',
-            'verification_processing_mode' => 'required',
         ])
         ->assertDispatched('appointment-validation-error');
 });

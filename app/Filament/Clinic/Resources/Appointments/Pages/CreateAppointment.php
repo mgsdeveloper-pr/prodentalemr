@@ -11,7 +11,6 @@ use App\Support\AppointmentWorkspaceScope;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CreateAppointment extends CreateRecord
@@ -57,35 +56,27 @@ class CreateAppointment extends CreateRecord
             return;
         }
 
-        $appointmentId = $this->record->getKey();
-        $processingMode = $this->record->verification_processing_mode;
+        try {
+            app(AppointmentVerificationSender::class)->send(
+                $this->record,
+                $this->record->verification_processing_mode,
+            );
 
-        DB::afterCommit(function () use ($appointmentId, $processingMode): void {
-            $appointment = Appointment::query()->find($appointmentId);
+            Notification::make()
+                ->title('Appointment and verification request created')
+                ->body('The appointment is scheduled and its verification workflow is ready.')
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            report($exception);
 
-            if (! $appointment) {
-                return;
-            }
-
-            try {
-                app(AppointmentVerificationSender::class)->send($appointment, $processingMode);
-
-                Notification::make()
-                    ->title('Appointment and verification request created')
-                    ->body('The appointment is scheduled and its verification workflow is ready.')
-                    ->success()
-                    ->send();
-            } catch (\Throwable $exception) {
-                report($exception);
-
-                Notification::make()
-                    ->title('Appointment saved; verification needs attention')
-                    ->body($exception->getMessage())
-                    ->warning()
-                    ->persistent()
-                    ->send();
-            }
-        });
+            Notification::make()
+                ->title('Appointment saved; verification needs attention')
+                ->body('The appointment was saved, but its verification request could not be prepared. Review it from the appointment page.')
+                ->warning()
+                ->persistent()
+                ->send();
+        }
     }
 
     protected function onValidationError(ValidationException $exception): void

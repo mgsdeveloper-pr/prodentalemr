@@ -568,7 +568,7 @@ class AppointmentForm
     {
         $options = static::verificationProcessingModeOptions($organizationId, $clinicId, $locationId);
 
-        return count($options) === 1 ? array_key_first($options) : null;
+        return array_key_first($options);
     }
 
     protected static function timeToMinutes(string $time): int
