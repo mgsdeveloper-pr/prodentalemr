@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Appointments\Pages;
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\Concerns\InteractsWithAppointmentEditor;
+use App\Models\Appointment;
 use App\Services\Appointments\AppointmentSchedulingService;
 use App\Support\AppointmentVerificationSender;
 use App\Support\AppointmentWorkspaceScope;
@@ -35,6 +36,21 @@ class EditAppointment extends EditRecord
     protected function afterSave(): void
     {
         if (! $this->record->verification_required || filled($this->record->verification_work_item_id)) {
+            return;
+        }
+
+        if (blank($this->record->patient_insurance_policy_id)) {
+            $this->record->update([
+                'verification_status' => Appointment::VERIFICATION_STATUS_NEEDS_INSURANCE,
+            ]);
+
+            Notification::make()
+                ->title('Appointment saved')
+                ->body('Insurance information is missing. Add an active policy before starting verification.')
+                ->warning()
+                ->persistent()
+                ->send();
+
             return;
         }
 

@@ -502,3 +502,39 @@ it('creates an appointment through the save appointment action', function () {
         'end_time' => '10:30:00',
     ]);
 });
+
+it('saves the appointment when insurance is missing and marks verification for attention', function () {
+    $this->policy->delete();
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    $date = today()->next('Monday')->toDateString();
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm([
+            'organization_id' => $this->organization->id,
+            'clinic_id' => $this->clinic->id,
+            'location_id' => $this->location->id,
+            'provider_id' => $this->provider->id,
+            'patient_id' => $this->patient->id,
+            'patient_insurance_policy_id' => null,
+            'appointment_date' => $date,
+            'duration_minutes' => 30,
+            'status' => 'scheduled',
+            'verification_required' => true,
+            'verification_processing_mode' => BillingWorkItem::PROCESSING_MODE_SELF_MANAGED,
+        ])
+        ->call('selectAppointmentSlot', '10:00:00', '10:30:00')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $appointment = Appointment::query()
+        ->where('patient_id', $this->patient->id)
+        ->whereDate('appointment_date', $date)
+        ->where('start_time', '10:00:00')
+        ->first();
+
+    expect($appointment)->not->toBeNull()
+        ->and($appointment->verification_status)->toBe(Appointment::VERIFICATION_STATUS_NEEDS_INSURANCE)
+        ->and($appointment->verification_work_item_id)->toBeNull();
+});
