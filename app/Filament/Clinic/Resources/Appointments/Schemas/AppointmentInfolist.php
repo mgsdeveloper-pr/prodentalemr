@@ -21,11 +21,11 @@ class AppointmentInfolist
                     ->schema([
                         Grid::make(4)
                             ->schema([
-                                TextEntry::make('patient.full_name')
+                                TextEntry::make('patient_name')
                                     ->label('Patient')
                                     ->state(fn ($record): string => $record->patient?->full_name ?? 'Unknown patient')
                                     ->columnSpan(2),
-                                TextEntry::make('provider.display_name')
+                                TextEntry::make('provider_name')
                                     ->label('Provider')
                                     ->state(fn ($record): string => $record->provider?->display_name ?? 'Unknown provider'),
                                 TextEntry::make('status')
@@ -45,27 +45,36 @@ class AppointmentInfolist
                                 TextEntry::make('end_time')
                                     ->label('End time')
                                     ->placeholder('-'),
-                                TextEntry::make('location.location_name')
+                                TextEntry::make('location_name')
                                     ->label('Location')
+                                    ->state(fn ($record): ?string => $record->location?->location_name)
                                     ->placeholder('-'),
-                                TextEntry::make('operatory.name')
+                                TextEntry::make('operatory_name')
                                     ->label('Operatory')
+                                    ->state(fn ($record): ?string => $record->operatory?->name)
                                     ->placeholder('-'),
                                 TextEntry::make('appointment_type')
                                     ->label('Visit type')
                                     ->placeholder('-')
                                     ->columnSpan(2),
-                                TextEntry::make('clinicService.service_code')
+                                TextEntry::make('service_code')
                                     ->label('Service code')
+                                    ->state(fn ($record): ?string => $record->clinicService?->service_code)
                                     ->placeholder('-'),
-                                TextEntry::make('insurancePolicy.insurance_company')
+                                TextEntry::make('insurance_policy')
                                     ->label('Insurance policy')
-                                    ->description(fn ($record): ?string => $record->insurancePolicy?->member_id
-                                        ? 'Member '.$record->insurancePolicy->member_id
+                                    ->state(fn ($record): ?string => $record->insurancePolicy
+                                        ? collect([
+                                            $record->insurancePolicy->insurance_company,
+                                            filled($record->insurancePolicy->member_id)
+                                                ? 'Member '.$record->insurancePolicy->member_id
+                                                : null,
+                                        ])->filter()->implode(' | ')
                                         : null)
                                     ->placeholder('Not selected'),
-                                TextEntry::make('parentAppointment.appointment_date')
+                                TextEntry::make('parent_appointment_date')
                                     ->label('Follow-up to')
+                                    ->state(fn ($record) => $record->parentAppointment?->appointment_date)
                                     ->date('M d, Y')
                                     ->placeholder('Not a follow-up'),
                                 TextEntry::make('duration_minutes')
@@ -117,8 +126,9 @@ class AppointmentInfolist
                                         Appointment::VERIFICATION_STATUS_NEEDS_INSURANCE => 'danger',
                                         default => 'gray',
                                     }),
-                                TextEntry::make('verificationWorkItem.reference_number')
+                                TextEntry::make('verification_request')
                                     ->label('Request')
+                                    ->state(fn ($record): ?string => $record->verificationWorkItem?->reference_number)
                                     ->placeholder('Not created')
                                     ->url(function ($record): ?string {
                                         $request = $record->verificationWorkItem;
@@ -132,12 +142,14 @@ class AppointmentInfolist
                                             ['record' => $request],
                                         );
                                     }),
-                                TextEntry::make('verificationWorkItem.processing_mode')
+                                TextEntry::make('verification_processing_mode')
                                     ->label('Completed by')
+                                    ->state(fn ($record): ?string => $record->verificationWorkItem?->processing_mode)
                                     ->formatStateUsing(fn (?string $state): string => BillingWorkItem::PROCESSING_MODE_OPTIONS[$state] ?? 'Not selected')
                                     ->placeholder('-'),
-                                TextEntry::make('verificationWorkItem.outcome_status')
+                                TextEntry::make('verification_outcome')
                                     ->label('Result')
+                                    ->state(fn ($record): ?string => $record->verificationWorkItem?->outcome_status)
                                     ->badge()
                                     ->formatStateUsing(fn (?string $state): string => filled($state) ? str($state)->replace('_', ' ')->title()->toString() : 'Pending')
                                     ->color(fn (?string $state): string => in_array($state, ['verified', 'completed', 'approved'], true) ? 'success' : 'gray'),

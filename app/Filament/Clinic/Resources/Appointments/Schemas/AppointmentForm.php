@@ -7,6 +7,7 @@ use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\ClinicOperatory;
 use App\Models\ClinicService;
+use App\Models\InsuranceCarrier;
 use App\Models\Location;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
@@ -24,6 +25,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\DB;
 
 class AppointmentForm
 {
@@ -191,7 +193,8 @@ class AppointmentForm
                                         DatePicker::make('dob')
                                             ->label('Date of birth')
                                             ->native(false)
-                                            ->maxDate(now()),
+                                            ->maxDate(now())
+                                            ->required(fn (Get $get): bool => (bool) $get('add_insurance')),
                                         TextInput::make('email')
                                             ->label('Email')
                                             ->email()
@@ -204,21 +207,39 @@ class AppointmentForm
                                                 'prefer_not_to_say' => 'Prefer not to say',
                                             ])
                                             ->native(false),
+                                        Toggle::make('add_insurance')
+                                            ->label('Add insurance now')
+                                            ->helperText('Optional. Add the primary policy now so verification can begin from this appointment.')
+                                            ->default(true)
+                                            ->live()
+                                            ->columnSpanFull(),
+                                        ...static::insurancePolicyFields(
+                                            visibleWhen: fn (Get $get): bool => (bool) $get('add_insurance'),
+                                        ),
                                     ]),
                             ])
                             ->createOptionUsing(function (array $data, Get $get): int {
-                                $patient = Patient::query()->create([
-                                    'organization_id' => AppointmentWorkspaceScope::selectedOrganizationId(),
-                                    'clinic_id' => AppointmentWorkspaceScope::selectedClinicId(),
-                                    'location_id' => $get('location_id'),
-                                    'first_name' => $data['first_name'],
-                                    'last_name' => $data['last_name'],
-                                    'phone' => $data['phone'] ?? null,
-                                    'dob' => $data['dob'] ?? null,
-                                    'email' => $data['email'] ?? null,
-                                    'gender' => $data['gender'] ?? null,
-                                    'status' => true,
-                                ]);
+                                $patient = DB::transaction(function () use ($data, $get): Patient {
+                                    $patient = Patient::query()->create([
+                                        'organization_id' => AppointmentWorkspaceScope::selectedOrganizationId(),
+                                        'clinic_id' => AppointmentWorkspaceScope::selectedClinicId(),
+                                        'location_id' => $get('location_id'),
+                                        'created_by' => auth()->id(),
+                                        'first_name' => $data['first_name'],
+                                        'last_name' => $data['last_name'],
+                                        'phone' => $data['phone'] ?? null,
+                                        'dob' => $data['dob'] ?? null,
+                                        'email' => $data['email'] ?? null,
+                                        'gender' => $data['gender'] ?? null,
+                                        'status' => true,
+                                    ]);
+
+                                    if ($data['add_insurance'] ?? false) {
+                                        static::createInsurancePolicy($patient, $data, $get('location_id'));
+                                    }
+
+                                    return $patient;
+                                });
 
                                 return $patient->getKey();
                             })
@@ -231,7 +252,36 @@ class AppointmentForm
                             ->noSearchResultsMessage('Patient not found. Use + Add Patient.')
                             ->required()
                             ->columnSpan(6),
-                        Hidden::make('patient_insurance_policy_id'),
+                        Select::make('patient_insurance_policy_id')
+                            ->label('Insurance Policy')
+                            ->options(fn (Get $get): array => static::patientInsurancePolicyOptions(
+                                filled($get('patient_id')) ? (int) $get('patient_id') : null,
+                            ))
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->visible(fn (Get $get): bool => filled($get('patient_id')))
+                            ->placeholder('No policy selected')
+                            ->helperText('Optional. Select existing coverage or add insurance for this patient.')
+                            ->createOptionForm([
+                                Grid::make(2)
+                                    ->schema(static::insurancePolicyFields()),
+                            ])
+                            ->createOptionUsing(function (array $data, Get $get): int {
+                                $patient = Patient::query()
+                                    ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+                                    ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
+                                    ->findOrFail($get('patient_id'));
+
+                                return static::createInsurancePolicy($patient, $data, $get('location_id'))->getKey();
+                            })
+                            ->createOptionAction(fn (Action $action) => $action
+                                ->label('+ Add Insurance')
+                                ->modalHeading('Add Patient Insurance')
+                                ->modalSubmitActionLabel('Add Insurance')
+                                ->visible((auth()->user()?->canCreateClinicPatients() ?? false)
+                                    || (auth()->user()?->canCreateClinicAppointments() ?? false)))
+                            ->columnSpan(6),
                         Toggle::make('is_follow_up')
                             ->label('Is this a follow-up appointment?')
                             ->dehydrated(false)
@@ -392,6 +442,125 @@ class AppointmentForm
             ->map(fn (string $label, string $mode): string => $mode === BillingWorkItem::PROCESSING_MODE_SELF_MANAGED
                 ? 'Clinic Team'
                 : $label)
+            ->all();
+    }
+
+    protected static function insurancePolicyFields(?callable $visibleWhen = null): array
+    {
+        $visibleWhen ??= fn (): bool => true;
+
+        return [
+            Select::make('insurance_carrier_id')
+                ->label('Insurance carrier')
+                ->options(fn (): array => InsuranceCarrier::query()
+                    ->where('is_active', true)
+                    ->orderBy('insurance_name')
+                    ->pluck('insurance_name', 'id')
+                    ->all())
+                ->searchable()
+                ->preload()
+                ->required()
+                ->visible($visibleWhen),
+            Select::make('coverage_priority')
+                ->label('Coverage priority')
+                ->options(PatientInsurancePolicy::PRIORITY_OPTIONS)
+                ->default('primary')
+                ->native(false)
+                ->required()
+                ->visible($visibleWhen),
+            TextInput::make('member_id')
+                ->label('Member ID')
+                ->required()
+                ->maxLength(255)
+                ->visible($visibleWhen),
+            TextInput::make('group_number')
+                ->label('Group number')
+                ->maxLength(255)
+                ->visible($visibleWhen),
+            TextInput::make('plan_name')
+                ->label('Plan name')
+                ->maxLength(255)
+                ->visible($visibleWhen),
+            Select::make('subscriber_relationship')
+                ->label('Patient relationship to subscriber')
+                ->options(PatientInsurancePolicy::RELATIONSHIP_OPTIONS)
+                ->default('self')
+                ->native(false)
+                ->live()
+                ->required()
+                ->visible($visibleWhen),
+            TextInput::make('subscriber_name')
+                ->label('Subscriber name')
+                ->maxLength(255)
+                ->required(fn (Get $get): bool => $get('subscriber_relationship') !== 'self')
+                ->visible(fn (Get $get): bool => $visibleWhen($get) && $get('subscriber_relationship') !== 'self'),
+            DatePicker::make('subscriber_dob')
+                ->label('Subscriber date of birth')
+                ->native(false)
+                ->maxDate(now())
+                ->visible(fn (Get $get): bool => $visibleWhen($get) && $get('subscriber_relationship') !== 'self'),
+            DatePicker::make('effective_date')
+                ->label('Effective date')
+                ->native(false)
+                ->visible($visibleWhen),
+            DatePicker::make('termination_date')
+                ->label('Termination date')
+                ->native(false)
+                ->afterOrEqual('effective_date')
+                ->visible($visibleWhen),
+        ];
+    }
+
+    protected static function createInsurancePolicy(Patient $patient, array $data, mixed $locationId): PatientInsurancePolicy
+    {
+        $carrier = InsuranceCarrier::query()
+            ->where('is_active', true)
+            ->findOrFail($data['insurance_carrier_id']);
+        $relationship = $data['subscriber_relationship'] ?? 'self';
+
+        return PatientInsurancePolicy::query()->create([
+            'organization_id' => AppointmentWorkspaceScope::selectedOrganizationId(),
+            'clinic_id' => AppointmentWorkspaceScope::selectedClinicId(),
+            'location_id' => filled($locationId) ? (int) $locationId : null,
+            'patient_id' => $patient->getKey(),
+            'created_by' => auth()->id(),
+            'coverage_priority' => $data['coverage_priority'] ?? 'primary',
+            'insurance_company' => $carrier->insurance_name,
+            'plan_name' => $data['plan_name'] ?? null,
+            'member_id' => $data['member_id'],
+            'group_number' => $data['group_number'] ?? null,
+            'subscriber_name' => $relationship === 'self' ? $patient->full_name : $data['subscriber_name'],
+            'subscriber_relationship' => $relationship,
+            'subscriber_dob' => $relationship === 'self' ? $patient->dob : ($data['subscriber_dob'] ?? null),
+            'payer_phone' => $carrier->payer_phone,
+            'claims_address' => $carrier->claims_address,
+            'effective_date' => $data['effective_date'] ?? null,
+            'termination_date' => $data['termination_date'] ?? null,
+            'status' => true,
+        ]);
+    }
+
+    protected static function patientInsurancePolicyOptions(?int $patientId): array
+    {
+        if (! $patientId) {
+            return [];
+        }
+
+        return PatientInsurancePolicy::query()
+            ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
+            ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
+            ->where('patient_id', $patientId)
+            ->where('status', true)
+            ->orderByRaw("case when coverage_priority = 'primary' then 0 else 1 end")
+            ->orderBy('insurance_company')
+            ->get()
+            ->mapWithKeys(fn (PatientInsurancePolicy $policy): array => [
+                $policy->getKey() => collect([
+                    $policy->insurance_company,
+                    $policy->member_id,
+                    PatientInsurancePolicy::PRIORITY_OPTIONS[$policy->coverage_priority] ?? null,
+                ])->filter()->implode(' | '),
+            ])
             ->all();
     }
 

@@ -1,13 +1,14 @@
 <?php
 
-use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
+use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\ClientServiceEnrollment;
 use App\Models\Clinic;
 use App\Models\ClinicOperatory;
 use App\Models\ClinicService;
+use App\Models\InsuranceCarrier;
 use App\Models\Location;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
@@ -21,9 +22,9 @@ use App\Support\AppointmentVerificationSender;
 use App\Support\AppointmentWorkspaceScope;
 use App\Support\ClinicWorkspace;
 use Database\Seeders\RoleSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Filament\Facades\Filament;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -442,7 +443,6 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('+ Add Patient')
         ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
-        ->assertDontSee('Add Patient Insurance')
         ->assertSee('Save Appointment')
         ->assertSee('Appointment Details')
         ->assertSee('Appointment Preview')
@@ -450,6 +450,109 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Complete required details')
         ->assertSee('Complete before saving: doctor, patient, available time slot, verification route.')
         ->assertDontSee('Booking Snapshot');
+});
+
+it('renders appointment details with insurance member information', function () {
+    $this->actingAs($this->clinicUser)
+        ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])
+        ->get('/clinic/appointments/'.$this->appointment->id)
+        ->assertOk()
+        ->assertSee('Insurance policy')
+        ->assertSee('Aetna Dental | Member MEM-100');
+});
+
+it('creates a patient and insurance policy together from the appointment form', function () {
+    $carrier = InsuranceCarrier::query()->create([
+        'insurance_name' => 'Appointment Dental Plan',
+        'payer_id' => 'PAYER-100',
+        'payer_phone' => '800-555-0100',
+        'claims_address' => '100 Claims Way',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm(['location_id' => $this->location->id])
+        ->callFormComponentAction('patient_id', 'createOption', [
+            'first_name' => 'New',
+            'last_name' => 'Patient',
+            'dob' => '1990-05-15',
+            'email' => 'new.patient@example.test',
+            'add_insurance' => true,
+            'insurance_carrier_id' => $carrier->id,
+            'coverage_priority' => 'primary',
+            'member_id' => 'MEMBER-100',
+            'group_number' => 'GROUP-100',
+            'subscriber_relationship' => 'self',
+        ])
+        ->assertHasNoFormComponentActionErrors();
+
+    $patient = Patient::query()->where('email', 'new.patient@example.test')->firstOrFail();
+    $policy = PatientInsurancePolicy::query()->where('patient_id', $patient->id)->firstOrFail();
+
+    expect($patient->location_id)->toBe($this->location->id)
+        ->and($policy->insurance_company)->toBe('Appointment Dental Plan')
+        ->and($policy->member_id)->toBe('MEMBER-100')
+        ->and($policy->subscriber_name)->toBe('New Patient')
+        ->and($policy->subscriber_dob?->toDateString())->toBe('1990-05-15')
+        ->and($policy->payer_phone)->toBe('800-555-0100');
+});
+
+it('allows appointment patient creation without insurance', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm(['location_id' => $this->location->id])
+        ->callFormComponentAction('patient_id', 'createOption', [
+            'first_name' => 'Cash',
+            'last_name' => 'Patient',
+            'email' => 'cash.patient@example.test',
+            'add_insurance' => false,
+        ])
+        ->assertHasNoFormComponentActionErrors();
+
+    $patient = Patient::query()->where('email', 'cash.patient@example.test')->firstOrFail();
+
+    expect($patient->insurancePolicies()->count())->toBe(0);
+});
+
+it('adds and selects insurance for an existing appointment patient', function () {
+    $carrier = InsuranceCarrier::query()->create([
+        'insurance_name' => 'Existing Patient Dental',
+        'payer_id' => 'PAYER-200',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    $component = Livewire::test(CreateAppointment::class)
+        ->fillForm([
+            'location_id' => $this->location->id,
+            'patient_id' => $this->patient->id,
+        ])
+        ->callFormComponentAction('patient_insurance_policy_id', 'createOption', [
+            'insurance_carrier_id' => $carrier->id,
+            'coverage_priority' => 'primary',
+            'member_id' => 'MEMBER-200',
+            'subscriber_relationship' => 'self',
+        ])
+        ->assertHasNoFormComponentActionErrors();
+
+    $policy = PatientInsurancePolicy::query()
+        ->where('patient_id', $this->patient->id)
+        ->where('member_id', 'MEMBER-200')
+        ->firstOrFail();
+
+    $component->assertFormSet([
+        'patient_insurance_policy_id' => $policy->id,
+    ]);
 });
 
 it('runs the save appointment action and reports incomplete required fields', function () {

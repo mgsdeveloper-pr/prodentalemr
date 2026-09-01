@@ -10,37 +10,65 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('locations', function (Blueprint $table): void {
-            $table->json('business_hours')->nullable()->after('phone');
-            $table->json('schedule_exceptions')->nullable()->after('business_hours');
-        });
+        $locationBusinessHoursMissing = ! Schema::hasColumn('locations', 'business_hours');
+        $locationExceptionsMissing = ! Schema::hasColumn('locations', 'schedule_exceptions');
 
-        Schema::table('clinics', function (Blueprint $table): void {
-            $table->foreignId('default_location_id')
-                ->nullable()
-                ->after('business_hours')
-                ->constrained('locations')
-                ->nullOnDelete();
-        });
+        if ($locationBusinessHoursMissing || $locationExceptionsMissing) {
+            Schema::table('locations', function (Blueprint $table) use ($locationBusinessHoursMissing, $locationExceptionsMissing): void {
+                if ($locationBusinessHoursMissing) {
+                    $table->json('business_hours')->nullable()->after('phone');
+                }
 
-        Schema::table('providers', function (Blueprint $table): void {
-            $table->string('license_state', 2)->nullable()->after('license_number');
-            $table->date('license_expires_at')->nullable()->after('license_state');
-            $table->string('taxonomy_code', 20)->nullable()->after('npi_number');
-            $table->text('dea_number')->nullable()->after('taxonomy_code');
-            $table->string('credentialing_status', 30)->default('not_started')->after('tax_id');
-            $table->date('credentialing_effective_at')->nullable()->after('credentialing_status');
-            $table->date('credentialing_expires_at')->nullable()->after('credentialing_effective_at');
-            $table->json('additional_licenses')->nullable()->after('credentialing_expires_at');
-            $table->json('business_hours')->nullable()->after('additional_licenses');
-            $table->json('schedule_exceptions')->nullable()->after('business_hours');
-            $table->unsignedSmallInteger('scheduling_buffer_minutes')->default(0)->after('schedule_exceptions');
-        });
+                if ($locationExceptionsMissing) {
+                    $table->json('schedule_exceptions')->nullable()->after('business_hours');
+                }
+            });
+        }
 
-        Schema::table('clinic_operatories', function (Blueprint $table): void {
-            $table->json('business_hours')->nullable()->after('notes');
-            $table->json('schedule_exceptions')->nullable()->after('business_hours');
-        });
+        if (! Schema::hasColumn('clinics', 'default_location_id')) {
+            Schema::table('clinics', function (Blueprint $table): void {
+                $table->foreignId('default_location_id')
+                    ->nullable()
+                    ->after('business_hours')
+                    ->constrained('locations')
+                    ->nullOnDelete();
+            });
+        }
+
+        $providerColumns = [
+            'license_state' => fn (Blueprint $table) => $table->string('license_state', 2)->nullable()->after('license_number'),
+            'license_expires_at' => fn (Blueprint $table) => $table->date('license_expires_at')->nullable()->after('license_state'),
+            'taxonomy_code' => fn (Blueprint $table) => $table->string('taxonomy_code', 20)->nullable()->after('npi_number'),
+            'dea_number' => fn (Blueprint $table) => $table->text('dea_number')->nullable()->after('taxonomy_code'),
+            'credentialing_status' => fn (Blueprint $table) => $table->string('credentialing_status', 30)->default('not_started')->after('tax_id'),
+            'credentialing_effective_at' => fn (Blueprint $table) => $table->date('credentialing_effective_at')->nullable()->after('credentialing_status'),
+            'credentialing_expires_at' => fn (Blueprint $table) => $table->date('credentialing_expires_at')->nullable()->after('credentialing_effective_at'),
+            'additional_licenses' => fn (Blueprint $table) => $table->json('additional_licenses')->nullable()->after('credentialing_expires_at'),
+            'business_hours' => fn (Blueprint $table) => $table->json('business_hours')->nullable()->after('additional_licenses'),
+            'schedule_exceptions' => fn (Blueprint $table) => $table->json('schedule_exceptions')->nullable()->after('business_hours'),
+            'scheduling_buffer_minutes' => fn (Blueprint $table) => $table->unsignedSmallInteger('scheduling_buffer_minutes')->default(0)->after('schedule_exceptions'),
+        ];
+
+        foreach ($providerColumns as $column => $definition) {
+            if (! Schema::hasColumn('providers', $column)) {
+                Schema::table('providers', $definition);
+            }
+        }
+
+        $operatoryBusinessHoursMissing = ! Schema::hasColumn('clinic_operatories', 'business_hours');
+        $operatoryExceptionsMissing = ! Schema::hasColumn('clinic_operatories', 'schedule_exceptions');
+
+        if ($operatoryBusinessHoursMissing || $operatoryExceptionsMissing) {
+            Schema::table('clinic_operatories', function (Blueprint $table) use ($operatoryBusinessHoursMissing, $operatoryExceptionsMissing): void {
+                if ($operatoryBusinessHoursMissing) {
+                    $table->json('business_hours')->nullable()->after('notes');
+                }
+
+                if ($operatoryExceptionsMissing) {
+                    $table->json('schedule_exceptions')->nullable()->after('business_hours');
+                }
+            });
+        }
 
         DB::table('providers')
             ->whereNotNull('tax_id')
