@@ -104,13 +104,49 @@ trait InteractsWithAppointmentEditor
             return 'Verification not required';
         }
 
+        if (! filled($this->data['patient_id'] ?? null)) {
+            return 'Pending patient selection';
+        }
+
+        if (! filled($this->data['patient_insurance_policy_id'] ?? null)) {
+            return 'Insurance information required';
+        }
+
         $mode = $this->data['verification_processing_mode'] ?? null;
 
-        return BillingWorkItem::PROCESSING_MODE_OPTIONS[$mode] ?? 'Select who will complete verification';
+        return match ($mode) {
+            BillingWorkItem::PROCESSING_MODE_SELF_MANAGED => 'Clinic Team',
+            BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE => 'Managed Service',
+            default => 'Select who will complete verification',
+        };
+    }
+
+    public function verificationReviewIsReady(): bool
+    {
+        if (! filled($this->data['location_id'] ?? null)) {
+            return false;
+        }
+
+        if (! ($this->data['verification_required'] ?? true)) {
+            return true;
+        }
+
+        return filled($this->data['patient_id'] ?? null)
+            && filled($this->data['patient_insurance_policy_id'] ?? null)
+            && filled($this->data['verification_processing_mode'] ?? null);
     }
 
     public function getCurrentStatusLabel(): string
     {
+        if (! filled($this->data['location_id'] ?? null)
+            || ! filled($this->data['provider_id'] ?? null)
+            || ! filled($this->data['patient_id'] ?? null)
+            || ! filled($this->data['appointment_date'] ?? null)
+            || ! filled($this->data['start_time'] ?? null)
+            || ! filled($this->data['end_time'] ?? null)) {
+            return 'Complete required details';
+        }
+
         $status = $this->data['status'] ?? 'scheduled';
 
         return str($status)->replace('_', ' ')->title()->toString();

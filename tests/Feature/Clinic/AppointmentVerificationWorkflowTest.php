@@ -441,5 +441,9 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Insurance verification required')
         ->assertDontSee('Add Patient Insurance')
         ->assertSee('Save Appointment')
-        ->assertSee('Appointment Details');
+        ->assertSee('Appointment Details')
+        ->assertSee('Appointment Preview')
+        ->assertSee('Pending patient selection')
+        ->assertSee('Complete required details')
+        ->assertDontSee('Booking Snapshot');
 });

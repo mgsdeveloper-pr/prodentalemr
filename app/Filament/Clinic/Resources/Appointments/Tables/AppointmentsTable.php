@@ -192,7 +192,7 @@ class AppointmentsTable
                         ->visible(fn (Appointment $record): bool => static::canStartVerification($record, BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE))
                         ->action(fn (Appointment $record) => static::startVerification($record, BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE)),
                     Action::make('startClinicVerification')
-                        ->label('Start Self-Managed')
+                        ->label('Start Clinic Verification')
                         ->icon('heroicon-o-pencil-square')
                         ->visible(fn (Appointment $record): bool => static::canStartVerification($record, BillingWorkItem::PROCESSING_MODE_SELF_MANAGED))
                         ->action(fn (Appointment $record) => static::startVerification($record, BillingWorkItem::PROCESSING_MODE_SELF_MANAGED)),

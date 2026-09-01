@@ -54,7 +54,7 @@
             <aside style="display: flex; flex-direction: column; gap: 18px;">
                 <section style="border: 1px solid #dbe4ee; border-radius: 8px; background: #ffffff; overflow: hidden;">
                     <div style="padding: 14px 18px; border-bottom: 1px solid #eef2f7;">
-                        <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Booking Snapshot</div>
+                        <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Appointment Preview</div>
                     </div>
                     <div style="padding: 18px; display: grid; gap: 12px;">
                         <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid #edf2f7; background: #fafbfd;">
@@ -73,9 +73,9 @@
                             <div style="margin-top: 6px; font-size: 14px; font-weight: 800; color: #0f172a;">{{ $this->getCurrentInsuranceLabel() }}</div>
                         </div>
 
-                        <div style="padding: 14px 16px; border-radius: 8px; border: 1px solid #a7f3d0; background: #ecfdf5;">
-                            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0f766e;">Verification</div>
-                            <div style="margin-top: 6px; font-size: 14px; font-weight: 800; color: #134e4a;">{{ $this->getVerificationRouteLabel() }}</div>
+                        <div style="padding: 14px 16px; border-radius: 8px; border: 1px solid {{ $this->verificationReviewIsReady() ? '#a7f3d0' : '#fde68a' }}; background: {{ $this->verificationReviewIsReady() ? '#ecfdf5' : '#fffbeb' }};">
+                            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: {{ $this->verificationReviewIsReady() ? '#0f766e' : '#92400e' }};">Verification</div>
+                            <div style="margin-top: 6px; font-size: 14px; font-weight: 800; color: {{ $this->verificationReviewIsReady() ? '#134e4a' : '#78350f' }};">{{ $this->getVerificationRouteLabel() }}</div>
                         </div>
 
                         <div style="padding: 14px 16px; border-radius: 12px; border: 1px solid #edf2f7; background: #fafbfd;">

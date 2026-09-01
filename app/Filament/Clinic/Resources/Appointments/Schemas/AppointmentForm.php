@@ -4,6 +4,7 @@ namespace App\Filament\Clinic\Resources\Appointments\Schemas;
 
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
+use App\Models\BillingWorkItem;
 use App\Models\ClinicOperatory;
 use App\Models\ClinicService;
 use App\Models\Location;
@@ -53,7 +54,7 @@ class AppointmentForm
                                 $set('clinic_service_id', null);
                                 $set('clinic_operatory_id', null);
                                 $set('appointment_type', null);
-                                $set('verification_processing_mode', VerificationRequestForm::defaultProcessingMode(
+                                $set('verification_processing_mode', static::defaultVerificationProcessingMode(
                                     AppointmentWorkspaceScope::selectedOrganizationId(),
                                     AppointmentWorkspaceScope::selectedClinicId(),
                                     filled($state) ? (int) $state : null,
@@ -348,12 +349,12 @@ class AppointmentForm
                             ->columnSpan(4),
                         Select::make('verification_processing_mode')
                             ->label('Verification handled by')
-                            ->options(fn (Get $get): array => VerificationRequestForm::processingModeOptions(
+                            ->options(fn (Get $get): array => static::verificationProcessingModeOptions(
                                 AppointmentWorkspaceScope::selectedOrganizationId(),
                                 AppointmentWorkspaceScope::selectedClinicId(),
                                 filled($get('location_id')) ? (int) $get('location_id') : null,
                             ))
-                            ->default(fn (): string => VerificationRequestForm::defaultProcessingMode(
+                            ->default(fn (): ?string => static::defaultVerificationProcessingMode(
                                 AppointmentWorkspaceScope::selectedOrganizationId(),
                                 AppointmentWorkspaceScope::selectedClinicId(),
                                 AppointmentWorkspaceScope::mappedLocationId(),
@@ -383,6 +384,22 @@ class AppointmentForm
                     ]),
             ])
             ->columns(1);
+    }
+
+    protected static function verificationProcessingModeOptions(?int $organizationId, ?int $clinicId, ?int $locationId): array
+    {
+        return collect(VerificationRequestForm::processingModeOptions($organizationId, $clinicId, $locationId))
+            ->map(fn (string $label, string $mode): string => $mode === BillingWorkItem::PROCESSING_MODE_SELF_MANAGED
+                ? 'Clinic Team'
+                : $label)
+            ->all();
+    }
+
+    protected static function defaultVerificationProcessingMode(?int $organizationId, ?int $clinicId, ?int $locationId): ?string
+    {
+        $options = static::verificationProcessingModeOptions($organizationId, $clinicId, $locationId);
+
+        return count($options) === 1 ? array_key_first($options) : null;
     }
 
     protected static function timeToMinutes(string $time): int

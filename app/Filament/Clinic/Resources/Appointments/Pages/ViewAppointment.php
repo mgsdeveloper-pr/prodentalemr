@@ -64,7 +64,7 @@ class ViewAppointment extends ViewRecord
         Notification::make()
             ->title($mode === BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE
                 ? 'Verification sent to Managed Service'
-                : 'Self-Managed verification started')
+                : 'Clinic verification started')
             ->success()
             ->send();
 
