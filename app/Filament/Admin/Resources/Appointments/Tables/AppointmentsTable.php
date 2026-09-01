@@ -103,6 +103,9 @@ class AppointmentsTable
                 TrashedFilter::make(),
             ])
             ->defaultSort('appointment_date', 'asc')
+            ->emptyStateHeading('No appointments in this date range')
+            ->emptyStateDescription('Choose another date range, clear any table filters, or add an appointment for the selected clinic.')
+            ->emptyStateIcon('heroicon-o-calendar-days')
             ->recordActions([
                 Action::make('sendForVerification')
                     ->label('Send for Verification')

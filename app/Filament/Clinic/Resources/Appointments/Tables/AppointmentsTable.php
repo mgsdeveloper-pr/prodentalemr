@@ -121,7 +121,7 @@ class AppointmentsTable
                     })
                     ->sortable(),
                 TextColumn::make('journey')
-                    ->label('Journey')
+                    ->label('Patient Journey')
                     ->html()
                     ->state(function (Appointment $record): HtmlString {
                         $items = array_filter([
@@ -167,6 +167,9 @@ class AppointmentsTable
                 TrashedFilter::make(),
             ])
             ->defaultSort('appointment_date', 'asc')
+            ->emptyStateHeading('No appointments in this date range')
+            ->emptyStateDescription('Choose another date range, clear any table filters, import appointments, or add an appointment.')
+            ->emptyStateIcon('heroicon-o-calendar-days')
             ->recordActions([
                 ViewAction::make()
                     ->iconButton(),

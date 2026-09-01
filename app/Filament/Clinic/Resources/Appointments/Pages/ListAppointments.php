@@ -6,7 +6,6 @@ use App\Filament\Clinic\Pages\AppointmentCalendar;
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Support\ClinicPanelScope;
 use App\Support\SaasEntitlements;
-use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -26,12 +25,12 @@ class ListAppointments extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('calendar')
-                ->label('Open Calendar')
-                ->url(AppointmentCalendar::getUrl())
-                ->color('gray'),
-        ];
+        return [];
+    }
+
+    public function getCalendarUrl(): string
+    {
+        return AppointmentCalendar::getUrl();
     }
 
     public function getCreateUrl(): string
@@ -68,6 +67,16 @@ class ListAppointments extends ListRecords
     public function getControlsDescription(): string
     {
         return '';
+    }
+
+    public function getAppointmentPageTitle(): string
+    {
+        return 'Schedule overview';
+    }
+
+    public function getAppointmentPageDescription(): string
+    {
+        return 'Review appointments, patient details, provider assignments, and verification progress for the selected period.';
     }
 
     public function getAppointmentStats(): array

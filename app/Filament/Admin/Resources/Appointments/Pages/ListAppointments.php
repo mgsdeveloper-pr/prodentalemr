@@ -66,7 +66,7 @@ class ListAppointments extends ListRecords
 
     public function getAppointmentPageTitle(): string
     {
-        return 'Appointments for Verification';
+        return 'Verification appointment queue';
     }
 
     public function getAppointmentPageDescription(): string
