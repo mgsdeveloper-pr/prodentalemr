@@ -1,7 +1,6 @@
 <x-filament-panels::page>
     @php
         $submitMethod = $this->getSubmitMethodName();
-        $hasService = filled($this->data['clinic_service_id'] ?? null);
     @endphp
 
     <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -9,7 +8,11 @@
             <div style="display: flex; flex-direction: column; gap: 4px;">
                 <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">Appointment Details</h2>
                 <div style="font-size: 13px; line-height: 1.6; color: #64748b;">
-                    Showing times in <strong>{{ $this->getDisplayTimezone() }}</strong> for <strong>{{ $this->getSelectedClinicName() }}</strong>.
+                    Showing times in <strong>{{ $this->getDisplayTimezone() }}</strong> for <strong>{{ $this->getSelectedClinicName() }}</strong>
+                    @if (filled($this->data['location_id'] ?? null))
+                        at <strong>{{ $this->getCurrentLocationLabel() }}</strong>
+                    @endif
+                    .
                 </div>
             </div>
 
@@ -49,17 +52,6 @@
             </form>
 
             <aside style="display: flex; flex-direction: column; gap: 18px;">
-                <section style="border: 1px solid #dbe4ee; border-radius: 8px; background: #ffffff; overflow: hidden; min-height: 92px;">
-                    <div style="padding: 18px 20px; min-height: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
-                        @if ($hasService)
-                            <div style="font-size: 13px; font-weight: 700; color: #64748b;">Selected Service</div>
-                            <div style="margin-top: 8px; font-size: 18px; font-weight: 800; line-height: 1.45; color: #0f172a;">{{ $this->getCurrentVisitTypeLabel() }}</div>
-                        @else
-                            <div style="font-size: 14px; color: #64748b;">No Service Is Selected</div>
-                        @endif
-                    </div>
-                </section>
-
                 <section style="border: 1px solid #dbe4ee; border-radius: 8px; background: #ffffff; overflow: hidden;">
                     <div style="padding: 14px 18px; border-bottom: 1px solid #eef2f7;">
                         <div style="font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Booking Snapshot</div>

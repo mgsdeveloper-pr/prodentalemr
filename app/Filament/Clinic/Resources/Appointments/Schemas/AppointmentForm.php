@@ -38,6 +38,7 @@ class AppointmentForm
                     ->schema([
                         Select::make('location_id')
                             ->label('Select Clinic Location')
+                            ->default(fn (): ?int => AppointmentWorkspaceScope::mappedLocationId())
                             ->options(fn (): array => Location::query()
                                 ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
                                 ->orderBy('location_name')
@@ -46,6 +47,7 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->hidden(fn ($record): bool => blank($record) && AppointmentWorkspaceScope::hasLockedLocation())
                             ->afterStateUpdated(function ($state, Set $set): void {
                                 $set('provider_id', null);
                                 $set('clinic_service_id', null);
@@ -78,6 +80,7 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->disabled(fn (Get $get): bool => blank($get('location_id')))
                             ->required()
                             ->columnSpan(6),
                         Select::make('clinic_service_id')
@@ -102,6 +105,7 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->disabled(fn (Get $get): bool => blank($get('location_id')))
                             ->required()
                             ->afterStateUpdated(function ($state, Set $set): void {
                                 $service = ClinicService::query()->find($state);
@@ -153,6 +157,7 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->disabled(fn (Get $get): bool => blank($get('location_id')) || blank($get('provider_id')) || blank($get('clinic_service_id')))
                             ->afterStateUpdated(function ($state, Set $set): void {
                                 $policyId = PatientInsurancePolicy::query()
                                     ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
@@ -272,6 +277,7 @@ class AppointmentForm
                         'selectedDate' => $get('appointment_date'),
                         'availableSlots' => $livewire->getAvailableSlots(),
                         'selectedSlotLabel' => $livewire->getSelectedSlotLabel(),
+                        'availabilityMessage' => $livewire->getAvailabilityMessage(),
                         'displayTimezone' => $livewire->getDisplayTimezone(),
                         'selectedDuration' => (int) ($get('duration_minutes') ?: 30),
                     ])
@@ -349,7 +355,7 @@ class AppointmentForm
                             ->default(fn (): string => VerificationRequestForm::defaultProcessingMode(
                                 AppointmentWorkspaceScope::selectedOrganizationId(),
                                 AppointmentWorkspaceScope::selectedClinicId(),
-                                null,
+                                AppointmentWorkspaceScope::mappedLocationId(),
                             ))
                             ->required(fn (Get $get): bool => (bool) $get('verification_required'))
                             ->visible(fn (Get $get): bool => (bool) $get('verification_required'))

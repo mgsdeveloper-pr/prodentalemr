@@ -17,6 +17,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Appointments\AppointmentSchedulingService;
 use App\Support\AppointmentVerificationSender;
+use App\Support\AppointmentWorkspaceScope;
 use App\Support\ClinicWorkspace;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Validation\ValidationException;
@@ -239,12 +240,59 @@ it('blocks provider and operatory scheduling conflicts on save', function () {
         ->toThrow(ValidationException::class, 'This provider already has an appointment during the selected time.');
 });
 
+it('maps an assigned active location into the appointment workspace', function () {
+    $this->actingAs($this->clinicUser);
+
+    expect(AppointmentWorkspaceScope::mappedLocationId())->toBe($this->location->id);
+});
+
+it('rejects a location outside the active clinic', function () {
+    $otherOrganization = Organization::create([
+        'name' => 'Other Dental Group',
+        'owner_name' => 'Other Owner',
+        'email' => 'other-owner@schedule.test',
+        'status' => true,
+    ]);
+    $otherClinic = Clinic::create([
+        'organization_id' => $otherOrganization->id,
+        'clinic_name' => 'Other Clinic',
+        'clinic_code' => 'CLN-OTHER-SCHEDULE',
+        'timezone' => 'America/New_York',
+        'status' => true,
+    ]);
+    $otherLocation = Location::create([
+        'clinic_id' => $otherClinic->id,
+        'location_name' => 'Other Office',
+        'status' => true,
+    ]);
+
+    $data = [
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $otherLocation->id,
+        'clinic_service_id' => $this->clinicService->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'appointment_date' => today()->addDays(2)->toDateString(),
+        'start_time' => '10:00:00',
+        'end_time' => '10:45:00',
+        'duration_minutes' => 45,
+        'status' => 'scheduled',
+    ];
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize($data))
+        ->toThrow(ValidationException::class, 'Select an active location from this clinic.');
+});
+
 it('renders the connected appointment editor and modal actions', function () {
     $this->actingAs($this->clinicUser)
         ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])
         ->get('/clinic/appointments/create')
         ->assertOk()
         ->assertSee('Select Service')
+        ->assertSee('at <strong>Main Office</strong>', false)
+        ->assertSee('Service not selected')
+        ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
         ->assertDontSee('Add Patient Insurance')
         ->assertSee('Save Appointment')

@@ -70,11 +70,15 @@ trait InteractsWithAppointmentEditor
     {
         return filled($this->data['appointment_type'] ?? null)
             ? (string) $this->data['appointment_type']
-            : 'General Appointment';
+            : 'Service not selected';
     }
 
     public function getCurrentInsuranceLabel(): string
     {
+        if (! filled($this->data['patient_id'] ?? null)) {
+            return 'Select a patient to check insurance';
+        }
+
         $policyId = $this->data['patient_insurance_policy_id'] ?? null;
 
         if (! filled($policyId)) {
@@ -90,6 +94,10 @@ trait InteractsWithAppointmentEditor
 
     public function getVerificationRouteLabel(): string
     {
+        if (! filled($this->data['location_id'] ?? null)) {
+            return 'Determined after location selection';
+        }
+
         if (! ($this->data['verification_required'] ?? true)) {
             return 'Verification not required';
         }
@@ -177,6 +185,10 @@ trait InteractsWithAppointmentEditor
 
     public function getAvailableSlots(): array
     {
+        if (! $this->bookingPrerequisitesAreSelected()) {
+            return [];
+        }
+
         $providerId = $this->data['provider_id'] ?? null;
         $date = $this->data['appointment_date'] ?? null;
 
@@ -225,7 +237,7 @@ trait InteractsWithAppointmentEditor
         $start = $month->copy()->startOfMonth()->startOfWeek(Carbon::MONDAY);
         $end = $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
         $selectedDate = $this->data['appointment_date'] ?? null;
-        $today = now()->toDateString();
+        $today = now($this->getDisplayTimezone())->toDateString();
         $providerId = $this->data['provider_id'] ?? null;
         $duration = max((int) ($this->data['duration_minutes'] ?? 30), 15);
         $appointmentsByDate = $this->getProviderAppointmentsByDateForRange($providerId, $month->copy()->startOfMonth(), $month->copy()->endOfMonth());
@@ -250,6 +262,9 @@ trait InteractsWithAppointmentEditor
                 'is_selected' => $date->toDateString() === $selectedDate,
                 'availability_tone' => $availability['tone'],
                 'availability_label' => $availability['label'],
+                'is_disabled' => ! $this->bookingPrerequisitesAreSelected()
+                    || $date->toDateString() < $today
+                    || $availability['tone'] === 'blocked',
             ];
 
             if (count($week) === 7) {
@@ -273,6 +288,27 @@ trait InteractsWithAppointmentEditor
         }
 
         return Carbon::parse($start)->format('g:i A').' - '.Carbon::parse($end)->format('g:i A');
+    }
+
+    public function getAvailabilityMessage(): string
+    {
+        if (! filled($this->data['location_id'] ?? null)) {
+            return 'Select a clinic location to begin scheduling.';
+        }
+
+        if (! filled($this->data['provider_id'] ?? null)) {
+            return 'Select a doctor to view appointment availability.';
+        }
+
+        if (! filled($this->data['clinic_service_id'] ?? null)) {
+            return 'Select a service to calculate the correct appointment duration.';
+        }
+
+        if (! filled($this->data['appointment_date'] ?? null)) {
+            return 'Select an appointment date to view available slots.';
+        }
+
+        return 'No available slots for this doctor and date. Choose another date or doctor.';
     }
 
     public function previousCalendarMonth(): void
@@ -418,8 +454,10 @@ trait InteractsWithAppointmentEditor
 
     protected function buildAvailableSlotsForDate(string $date, int $duration, Collection $existingAppointments): array
     {
-        $dayStart = Carbon::parse($date.' 09:00:00');
-        $dayEnd = Carbon::parse($date.' 17:00:00');
+        $timezone = $this->getDisplayTimezone();
+        $dayStart = Carbon::parse($date.' 09:00:00', $timezone);
+        $dayEnd = Carbon::parse($date.' 17:00:00', $timezone);
+        $now = now($timezone);
         $slots = [];
         $cursor = $dayStart->copy();
         $selectedStart = $this->data['start_time'] ?? null;
@@ -428,6 +466,12 @@ trait InteractsWithAppointmentEditor
         while ($cursor->copy()->addMinutes($duration)->lte($dayEnd)) {
             $slotStart = $cursor->copy();
             $slotEnd = $cursor->copy()->addMinutes($duration);
+
+            if ($slotStart->lte($now)) {
+                $cursor->addMinutes(15);
+
+                continue;
+            }
 
             $overlaps = $existingAppointments->contains(function (Appointment $appointment) use ($slotStart, $slotEnd, $date): bool {
                 if (! filled($appointment->start_time) || ! filled($appointment->end_time)) {
@@ -456,5 +500,12 @@ trait InteractsWithAppointmentEditor
         }
 
         return $slots;
+    }
+
+    protected function bookingPrerequisitesAreSelected(): bool
+    {
+        return filled($this->data['location_id'] ?? null)
+            && filled($this->data['provider_id'] ?? null)
+            && filled($this->data['clinic_service_id'] ?? null);
     }
 }

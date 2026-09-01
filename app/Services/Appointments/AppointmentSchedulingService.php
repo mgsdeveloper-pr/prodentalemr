@@ -5,6 +5,7 @@ namespace App\Services\Appointments;
 use App\Models\Appointment;
 use App\Models\ClinicOperatory;
 use App\Models\ClinicService;
+use App\Models\Location;
 use App\Models\Patient;
 use App\Models\PatientInsurancePolicy;
 use App\Models\Provider;
@@ -29,6 +30,14 @@ class AppointmentSchedulingService
         $clinicId = (int) ($data['clinic_id'] ?? 0);
         $locationId = (int) ($data['location_id'] ?? 0);
         $messages = [];
+
+        if (! Location::query()
+            ->whereKey($locationId)
+            ->where('clinic_id', $clinicId)
+            ->where('status', true)
+            ->exists()) {
+            $messages['location_id'] = 'Select an active location from this clinic.';
+        }
 
         if (! Provider::query()
             ->whereKey($data['provider_id'] ?? null)

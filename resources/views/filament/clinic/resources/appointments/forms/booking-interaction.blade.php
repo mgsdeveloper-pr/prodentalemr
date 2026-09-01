@@ -73,6 +73,8 @@
                                 <button
                                     type="button"
                                     wire:click="selectCalendarDate('{{ $day['date'] }}')"
+                                    @disabled($day['is_disabled'])
+                                    aria-disabled="{{ $day['is_disabled'] ? 'true' : 'false' }}"
                                     style="
                                         min-height: 74px;
                                         border-radius: 8px;
@@ -81,7 +83,8 @@
                                         color: {{ $styles['color'] }};
                                         font-size: 14px;
                                         font-weight: {{ $day['is_selected'] ? '800' : '700' }};
-                                        cursor: pointer;
+                                        cursor: {{ $day['is_disabled'] ? 'not-allowed' : 'pointer' }};
+                                        opacity: {{ $day['is_disabled'] ? '0.68' : '1' }};
                                         box-shadow: {{ $day['is_selected'] ? 'inset 0 0 0 1px #0f766e' : 'none' }};
                                         display: flex;
                                         flex-direction: column;
@@ -138,7 +141,7 @@
                 </div>
             @else
                 <div style="min-height: 320px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 18px; font-size: 14px; line-height: 1.7; color: #64748b;">
-                    No available slots for the selected date and doctor.
+                    {{ $availabilityMessage }}
                 </div>
             @endif
         </div>

@@ -25,6 +25,9 @@ class CreateAppointment extends CreateRecord
     {
         $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
         $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
+        if (AppointmentWorkspaceScope::hasLockedLocation()) {
+            $data['location_id'] = AppointmentWorkspaceScope::mappedLocationId();
+        }
         $data = $this->syncStatusTimestamps($data);
 
         return app(AppointmentSchedulingService::class)->validateAndNormalize($data);
