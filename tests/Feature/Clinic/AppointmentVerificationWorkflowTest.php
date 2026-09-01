@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
+use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
 use App\Models\ClientServiceEnrollment;
@@ -22,6 +23,8 @@ use App\Support\ClinicWorkspace;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Filament\Facades\Filament;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -445,5 +448,57 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Appointment Preview')
         ->assertSee('Pending patient selection')
         ->assertSee('Complete required details')
+        ->assertSee('Complete before saving: doctor, patient, available time slot, verification route.')
         ->assertDontSee('Booking Snapshot');
+});
+
+it('runs the save appointment action and reports incomplete required fields', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(CreateAppointment::class)
+        ->call('create')
+        ->assertHasFormErrors([
+            'provider_id' => 'required',
+            'patient_id' => 'required',
+            'start_time' => 'required',
+            'end_time' => 'required',
+            'verification_processing_mode' => 'required',
+        ])
+        ->assertDispatched('appointment-validation-error');
+});
+
+it('creates an appointment through the save appointment action', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    $date = today()->next('Monday')->toDateString();
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm([
+            'organization_id' => $this->organization->id,
+            'clinic_id' => $this->clinic->id,
+            'location_id' => $this->location->id,
+            'provider_id' => $this->provider->id,
+            'patient_id' => $this->patient->id,
+            'patient_insurance_policy_id' => $this->policy->id,
+            'appointment_date' => $date,
+            'duration_minutes' => 30,
+            'status' => 'scheduled',
+            'verification_required' => false,
+        ])
+        ->call('selectAppointmentSlot', '10:00:00', '10:30:00')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $this->assertDatabaseHas('appointments', [
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'provider_id' => $this->provider->id,
+        'patient_id' => $this->patient->id,
+        'appointment_date' => $date.' 00:00:00',
+        'start_time' => '10:00:00',
+        'end_time' => '10:30:00',
+    ]);
 });

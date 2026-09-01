@@ -3,7 +3,10 @@
         $submitMethod = $this->getSubmitMethodName();
     @endphp
 
-    <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div
+        x-on:appointment-validation-error.window="window.scrollTo({ top: 0, behavior: 'smooth' })"
+        style="display: flex; flex-direction: column; gap: 16px;"
+    >
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
             <div style="display: flex; flex-direction: column; gap: 4px;">
                 <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: #0f172a;">Appointment Details</h2>
@@ -25,12 +28,18 @@
         </div>
 
         <div class="appointment-editor-grid" style="display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(300px, 1fr); gap: 18px; align-items: start;">
-            <form wire:submit="{{ $submitMethod }}" style="display: flex; flex-direction: column; gap: 18px;">
+            <form wire:submit="{{ $submitMethod }}" novalidate style="display: flex; flex-direction: column; gap: 18px;">
                 <section style="border: 1px solid #dbe4ee; border-radius: 8px; background: #ffffff; overflow: hidden;">
                     <div style="padding: 18px;">
                         {{ $this->form }}
                     </div>
                 </section>
+
+                @if ($this->getMissingAppointmentRequirements() !== [])
+                    <div style="padding: 11px 14px; border: 1px solid #fde68a; border-radius: 6px; background: #fffbeb; color: #78350f; font-size: 13px; font-weight: 700; line-height: 1.5;">
+                        {{ $this->getMissingAppointmentRequirementsLabel() }}
+                    </div>
+                @endif
 
                 <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap;">
                     <a

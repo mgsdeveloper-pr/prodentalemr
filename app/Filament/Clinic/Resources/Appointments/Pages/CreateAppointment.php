@@ -10,6 +10,7 @@ use App\Support\AppointmentWorkspaceScope;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
+use Illuminate\Validation\ValidationException;
 
 class CreateAppointment extends CreateRecord
 {
@@ -60,6 +61,20 @@ class CreateAppointment extends CreateRecord
                 ->persistent()
                 ->send();
         }
+    }
+
+    protected function onValidationError(ValidationException $exception): void
+    {
+        parent::onValidationError($exception);
+
+        Notification::make()
+            ->danger()
+            ->title('Appointment is incomplete')
+            ->body('Complete the required fields highlighted in the form, then save the appointment again.')
+            ->persistent()
+            ->send();
+
+        $this->dispatch('appointment-validation-error');
     }
 
     protected function syncStatusTimestamps(array $data): array

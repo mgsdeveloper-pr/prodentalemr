@@ -382,6 +382,40 @@ trait InteractsWithAppointmentEditor
         return method_exists($this, 'create') ? 'Save Appointment' : 'Save Changes';
     }
 
+    public function getMissingAppointmentRequirements(): array
+    {
+        $requirements = [
+            'location_id' => 'clinic location',
+            'provider_id' => 'doctor',
+            'patient_id' => 'patient',
+            'appointment_date' => 'appointment date',
+            'start_time' => 'available time slot',
+            'end_time' => 'available time slot',
+        ];
+
+        $missing = [];
+
+        foreach ($requirements as $field => $label) {
+            if (! filled($this->data[$field] ?? null)) {
+                $missing[$label] = $label;
+            }
+        }
+
+        if (($this->data['verification_required'] ?? true)
+            && ! filled($this->data['verification_processing_mode'] ?? null)) {
+            $missing['verification route'] = 'verification route';
+        }
+
+        return array_values($missing);
+    }
+
+    public function getMissingAppointmentRequirementsLabel(): string
+    {
+        $missing = $this->getMissingAppointmentRequirements();
+
+        return $missing === [] ? '' : 'Complete before saving: '.implode(', ', $missing).'.';
+    }
+
     public function getCancelUrl(): string
     {
         $resource = static::getResource();
