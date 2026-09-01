@@ -31,7 +31,7 @@ trait InteractsWithClientServiceEnrollmentEditor
 
     public function getEditorDescription(): string
     {
-        return 'Use this workspace to connect a managed service to the right organization, clinic, or location. Keep the coverage clear, define the response targets, and make it obvious whether clinics can collaborate on shared verification work.';
+        return 'Connect a managed service to the correct client clinic, optionally narrow coverage to one location, and define the response targets and clinic collaboration rules.';
     }
 
     public function getCancelUrl(): string

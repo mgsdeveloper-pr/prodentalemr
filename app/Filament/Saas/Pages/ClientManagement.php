@@ -3,6 +3,7 @@
 namespace App\Filament\Saas\Pages;
 
 use App\Filament\Saas\Resources\Organizations\OrganizationResource;
+use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\OnboardingDraft;
 use App\Services\ClientOnboardingService;
@@ -154,6 +155,8 @@ class ClientManagement extends Page
             ->with([
                 'dso:id,name',
                 'clinics:id,organization_id,verification_services_enabled,managed_services_status',
+                'clinics.serviceEnrollments:id,clinic_id,managed_billing_service_id,status',
+                'clinics.serviceEnrollments.managedBillingService:id,category',
                 'subscriptions' => fn ($query) => $query
                     ->with('subscriptionPlan:id,name')
                     ->latest('start_date'),
@@ -172,13 +175,19 @@ class ClientManagement extends Page
             ->when($this->typeFilter === 'multi_location', fn (Builder $query) => $query->whereNull('dso_id')->has('clinics', '>', 1))
             ->when($this->typeFilter === 'solo', fn (Builder $query) => $query->whereNull('dso_id')->has('clinics', '<=', 1))
             ->when($this->serviceFilter === 'managed', fn (Builder $query) => $query
-                ->whereHas('clinics', fn (Builder $query) => $query->whereIn('managed_services_status', ['active', 'trial'])))
+                ->whereHas('serviceEnrollments', fn (Builder $query) => $query
+                    ->where('status', 'active')
+                    ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))))
             ->when($this->serviceFilter === 'hybrid', fn (Builder $query) => $query
-                ->whereHas('clinics', fn (Builder $query) => $query->where('managed_services_status', 'requested')))
+                ->whereHas('serviceEnrollments', fn (Builder $query) => $query
+                    ->where('status', 'requested')
+                    ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))))
             ->when($this->serviceFilter === 'self', fn (Builder $query) => $query
                 ->whereHas('clinics', fn (Builder $query) => $query
-                    ->where('verification_services_enabled', true)
-                    ->whereNotIn('managed_services_status', ['active', 'trial', 'requested'])))
+                    ->where('verification_services_enabled', true))
+                ->whereDoesntHave('serviceEnrollments', fn (Builder $query) => $query
+                    ->whereIn('status', ['active', 'requested'])
+                    ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))))
             ->when($this->statusFilter === 'active', fn (Builder $query) => $query->where('status', true))
             ->when($this->statusFilter === 'inactive', fn (Builder $query) => $query->where('status', false))
             ->when($this->statusFilter === 'onboarding', fn (Builder $query) => $query->where('onboarding_status', '!=', 'complete'))
@@ -191,9 +200,12 @@ class ClientManagement extends Page
         $subscription = $organization->subscriptions
             ->first(fn ($subscription) => in_array($subscription->status, ['active', 'trial'], true))
             ?? $organization->subscriptions->first();
-        $managedStatuses = $organization->clinics->pluck('managed_services_status');
+        $managedStatuses = $organization->clinics
+            ->flatMap(fn (Clinic $clinic) => $clinic->serviceEnrollments
+                ->filter(fn ($enrollment): bool => $enrollment->managedBillingService?->category === 'verification')
+                ->pluck('status'));
         $serviceModel = match (true) {
-            $managedStatuses->contains(fn ($status) => in_array($status, ['active', 'trial'], true)) => 'Managed Service',
+            $managedStatuses->contains('active') => 'Managed Service',
             $managedStatuses->contains('requested') => 'Hybrid',
             default => 'Self-Managed',
         };

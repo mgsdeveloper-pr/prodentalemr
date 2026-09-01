@@ -29,7 +29,7 @@ class ClientServiceEnrollmentForm
                 Hidden::make('created_by')
                     ->default(fn () => auth()->id()),
                 Section::make('Enrollment Scope')
-                    ->description('Turn on a managed SaaS billing service for a specific client, clinic, or location.')
+                    ->description('Turn on a managed SaaS billing service for a client clinic, with optional location-specific coverage.')
                     ->schema([
                         Grid::make([
                             'default' => 1,
@@ -42,6 +42,7 @@ class ClientServiceEnrollmentForm
                                     ->searchable()
                                     ->preload()
                                     ->live()
+                                    ->default(fn (): ?int => request()->integer('organization') ?: null)
                                     ->helperText('Choose the parent organization first to narrow the clinic and location list.')
                                     ->afterStateUpdated(function (Set $set): void {
                                         $set('clinic_id', null);
@@ -58,7 +59,11 @@ class ClientServiceEnrollmentForm
                                     ->searchable()
                                     ->preload()
                                     ->live()
-                                    ->afterStateUpdated(fn (Set $set) => $set('location_id', null)),
+                                    ->default(fn (): ?int => request()->integer('clinic') ?: null)
+                                    ->disabled(fn (Get $get): bool => blank($get('organization_id')))
+                                    ->helperText('A clinic is required because Verification access and assignments are clinic-specific.')
+                                    ->afterStateUpdated(fn (Set $set) => $set('location_id', null))
+                                    ->required(),
                                 Select::make('location_id')
                                     ->label('Location')
                                     ->options(fn (Get $get): array => Location::query()
@@ -67,7 +72,9 @@ class ClientServiceEnrollmentForm
                                         ->pluck('location_name', 'id')
                                         ->all())
                                     ->searchable()
-                                    ->preload(),
+                                    ->preload()
+                                    ->disabled(fn (Get $get): bool => blank($get('clinic_id')))
+                                    ->helperText('Optional. Select a location only when service coverage differs by location.'),
                             ]),
                         Grid::make([
                             'default' => 1,
@@ -84,18 +91,31 @@ class ClientServiceEnrollmentForm
                                         ->all())
                                     ->searchable()
                                     ->preload()
+                                    ->default(fn (): ?int => request()->integer('service') ?: null)
+                                    ->live()
+                                    ->afterStateUpdated(function (mixed $state, Set $set): void {
+                                        $service = ManagedBillingService::query()->find($state);
+
+                                        if (! $service) {
+                                            return;
+                                        }
+
+                                        $set('urgent_sla_hours', max(1, (int) $service->service_level_agreement_hours));
+                                    })
                                     ->required(),
                                 Select::make('status')
                                     ->options(ClientServiceEnrollment::STATUS_OPTIONS)
                                     ->default('active')
                                     ->native(false)
+                                    ->helperText('Only Active enrollments make a clinic available to the managed service team.')
                                     ->required(),
                                 DatePicker::make('start_date')
                                     ->native(false)
                                     ->displayFormat('M d, Y'),
                                 DatePicker::make('end_date')
                                     ->native(false)
-                                    ->displayFormat('M d, Y'),
+                                    ->displayFormat('M d, Y')
+                                    ->afterOrEqual('start_date'),
                             ]),
                         Textarea::make('notes')
                             ->rows(4)
@@ -125,7 +145,9 @@ class ClientServiceEnrollmentForm
                                     ->label('Urgent SLA (hours)')
                                     ->numeric()
                                     ->minValue(1)
-                                    ->default(24)
+                                    ->default(fn (): int => max(1, (int) (ManagedBillingService::query()
+                                        ->whereKey(request()->integer('service'))
+                                        ->value('service_level_agreement_hours') ?: 24)))
                                     ->required()
                                     ->columnSpan(6),
                             ]),

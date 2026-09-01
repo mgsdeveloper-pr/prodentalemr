@@ -44,7 +44,7 @@ it('renders the focused client directory for an authorized SaaS user', function 
         ->assertSee('Clients')
         ->assertSee('New Client')
         ->assertSee('Focused Dental Group')
-        ->assertSee('Managed Service')
+        ->assertSee('Self-Managed')
         ->assertSee('Manage Client')
         ->assertDontSee('Shared vs Local Ownership')
         ->assertDontSee('Quick Registration Paths')

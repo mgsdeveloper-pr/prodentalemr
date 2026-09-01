@@ -3,6 +3,7 @@
 namespace App\Filament\Saas\Pages;
 
 use App\Filament\Saas\Resources\Clinics\ClinicResource;
+use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\Organizations\OrganizationResource;
 use App\Filament\Saas\Resources\SaasEntitlementAuditLogs\SaasEntitlementAuditLogResource;
 use App\Filament\Saas\Resources\Subscriptions\SubscriptionResource;
@@ -124,6 +125,17 @@ class OrganizationWorkspace extends Page
                 ->icon('heroicon-o-arrow-left')
                 ->color('gray')
                 ->url(OrganizationResource::getUrl()),
+            Action::make('enrollClient')
+                ->label('Enroll Client')
+                ->icon('heroicon-o-user-plus')
+                ->color('primary')
+                ->url(fn (): string => ClientServiceEnrollmentResource::getUrl('create', [
+                    'organization' => $this->organization->getKey(),
+                    'clinic' => $this->organization->clinics()->count() === 1
+                        ? $this->organization->clinics()->value('id')
+                        : null,
+                ]))
+                ->visible(fn (): bool => auth()->user()?->canPerformSaasModuleAction('client_enrollments', 'add') ?? false),
             Action::make('editOrganization')
                 ->label('Edit Organization')
                 ->icon('heroicon-o-pencil-square')
@@ -388,17 +400,15 @@ class OrganizationWorkspace extends Page
 
     protected function verificationModelLabel(): string
     {
-        $statuses = $this->organization->clinics()
-            ->pluck('managed_services_status')
-            ->filter()
-            ->unique()
-            ->values();
+        $statuses = $this->organization->serviceEnrollments()
+            ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))
+            ->pluck('status');
 
         if ($statuses->contains('requested')) {
             return 'Hybrid';
         }
 
-        if ($statuses->intersect(['active', 'trial'])->isNotEmpty()) {
+        if ($statuses->contains('active')) {
             return 'Managed Service';
         }
 
@@ -407,9 +417,13 @@ class OrganizationWorkspace extends Page
 
     protected function clinicVerificationModelLabel(Clinic $clinic): string
     {
-        return match ($clinic->managed_services_status) {
-            'active', 'trial' => 'Managed Service',
-            'requested' => 'Hybrid',
+        $statuses = $clinic->serviceEnrollments()
+            ->whereHas('managedBillingService', fn (Builder $query) => $query->where('category', 'verification'))
+            ->pluck('status');
+
+        return match (true) {
+            $statuses->contains('active') => 'Managed Service',
+            $statuses->contains('requested') => 'Hybrid',
             default => 'Self-Service',
         };
     }

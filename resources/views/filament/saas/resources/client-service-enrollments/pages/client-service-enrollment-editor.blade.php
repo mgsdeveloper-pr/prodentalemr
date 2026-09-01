@@ -104,7 +104,7 @@
                         </div>
                         <div style="padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 1.75; color: #64748b;">
                             <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #e2e8f0; background: #ffffff;">
-                                Use <span style="font-weight: 700; color: #0f172a;">Organization</span> to define the client umbrella, then narrow to a clinic or location only when the service coverage really differs.
+                                Choose the <span style="font-weight: 700; color: #0f172a;">Organization and Clinic</span> that receive the service. Narrow to a location only when coverage differs between locations.
                             </div>
                             <div style="padding: 14px 16px; border-radius: 18px; border: 1px solid #e2e8f0; background: #ffffff;">
                                 Turn on <span style="font-weight: 700; color: #0f172a;">Clinic Workspace Enabled</span> only when clinic teams should collaborate directly with the verification service team.

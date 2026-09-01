@@ -4,6 +4,7 @@ namespace App\Filament\Saas\Resources\ClientServiceEnrollments\Pages;
 
 use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\ClientServiceEnrollments\Pages\Concerns\InteractsWithClientServiceEnrollmentEditor;
+use App\Services\ClientServiceEnrollmentWorkflow;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 
@@ -16,4 +17,14 @@ class EditClientServiceEnrollment extends EditRecord
     protected string $view = 'filament.saas.resources.client-service-enrollments.pages.client-service-enrollment-editor';
 
     protected Width | string | null $maxContentWidth = Width::Full;
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return app(ClientServiceEnrollmentWorkflow::class)->prepare($data, $this->record);
+    }
+
+    protected function afterSave(): void
+    {
+        app(ClientServiceEnrollmentWorkflow::class)->synchronizeClinic($this->record);
+    }
 }

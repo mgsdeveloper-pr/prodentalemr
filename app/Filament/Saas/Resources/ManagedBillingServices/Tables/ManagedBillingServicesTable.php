@@ -2,6 +2,9 @@
 
 namespace App\Filament\Saas\Resources\ManagedBillingServices\Tables;
 
+use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
+use App\Models\ManagedBillingService;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -58,6 +61,13 @@ class ManagedBillingServicesTable
             ])
             ->defaultSort('name')
             ->recordActions([
+                Action::make('enrollClient')
+                    ->label('Enroll Client')
+                    ->icon('heroicon-o-user-plus')
+                    ->url(fn (ManagedBillingService $record): string => ClientServiceEnrollmentResource::getUrl('create', [
+                        'service' => $record->getKey(),
+                    ]))
+                    ->visible(fn (ManagedBillingService $record): bool => (bool) $record->status && ClientServiceEnrollmentResource::canCreate()),
                 ViewAction::make(),
                 EditAction::make(),
                 RestoreAction::make(),
