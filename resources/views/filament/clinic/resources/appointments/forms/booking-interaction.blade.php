@@ -148,5 +148,10 @@
         <div style="margin-top: 10px; font-size: 12px; line-height: 1.6; color: #64748b;">
             Selected slot: <strong>{{ $selectedSlotLabel }}</strong>
         </div>
+        @error('data.start_time')
+            <div role="alert" style="margin-top: 8px; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #b91c1c; font-size: 12px; font-weight: 700; line-height: 1.5;">
+                {{ $message }} Please choose an available slot and save again.
+            </div>
+        @enderror
     </div>
 </div>
