@@ -70,7 +70,7 @@ trait InteractsWithAppointmentEditor
     {
         return filled($this->data['appointment_type'] ?? null)
             ? (string) $this->data['appointment_type']
-            : 'Service not selected';
+            : 'General Appointment';
     }
 
     public function getCurrentInsuranceLabel(): string
@@ -300,10 +300,6 @@ trait InteractsWithAppointmentEditor
             return 'Select a doctor to view appointment availability.';
         }
 
-        if (! filled($this->data['clinic_service_id'] ?? null)) {
-            return 'Select a service to calculate the correct appointment duration.';
-        }
-
         if (! filled($this->data['appointment_date'] ?? null)) {
             return 'Select an appointment date to view available slots.';
         }
@@ -505,7 +501,6 @@ trait InteractsWithAppointmentEditor
     protected function bookingPrerequisitesAreSelected(): bool
     {
         return filled($this->data['location_id'] ?? null)
-            && filled($this->data['provider_id'] ?? null)
-            && filled($this->data['clinic_service_id'] ?? null);
+            && filled($this->data['provider_id'] ?? null);
     }
 }

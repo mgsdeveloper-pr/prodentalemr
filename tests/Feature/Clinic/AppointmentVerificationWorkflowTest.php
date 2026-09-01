@@ -220,6 +220,24 @@ it('normalizes the selected clinic service into appointment data', function () {
         ->and($data['duration_minutes'])->toBe(45);
 });
 
+it('allows an appointment without an optional service', function () {
+    $data = app(AppointmentSchedulingService::class)->validateAndNormalize([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'appointment_date' => today()->addDays(3)->toDateString(),
+        'start_time' => '10:00:00',
+        'end_time' => '10:30:00',
+        'duration_minutes' => 30,
+        'status' => 'scheduled',
+    ]);
+
+    expect($data)->not->toHaveKey('clinic_service_id')
+        ->and($data['duration_minutes'])->toBe(30);
+});
+
 it('blocks provider and operatory scheduling conflicts on save', function () {
     $data = [
         'organization_id' => $this->organization->id,
@@ -289,9 +307,11 @@ it('renders the connected appointment editor and modal actions', function () {
         ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])
         ->get('/clinic/appointments/create')
         ->assertOk()
-        ->assertSee('Select Service')
+        ->assertSee('Service (Optional)')
         ->assertSee('at <strong>Main Office</strong>', false)
-        ->assertSee('Service not selected')
+        ->assertSee('General Appointment')
+        ->assertSee('Search or select a patient')
+        ->assertSee('+ Add Patient')
         ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
         ->assertDontSee('Add Patient Insurance')

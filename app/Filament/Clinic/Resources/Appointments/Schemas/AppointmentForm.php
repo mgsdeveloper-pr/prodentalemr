@@ -84,7 +84,7 @@ class AppointmentForm
                             ->required()
                             ->columnSpan(6),
                         Select::make('clinic_service_id')
-                            ->label('Select Service')
+                            ->label('Service (Optional)')
                             ->options(fn (Get $get): array => ClinicService::query()
                                 ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
                                 ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
@@ -105,8 +105,8 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
+                            ->placeholder('Optional - select a service')
                             ->disabled(fn (Get $get): bool => blank($get('location_id')))
-                            ->required()
                             ->afterStateUpdated(function ($state, Set $set): void {
                                 $service = ClinicService::query()->find($state);
                                 $set('appointment_type', $service?->name);
@@ -157,7 +157,8 @@ class AppointmentForm
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->disabled(fn (Get $get): bool => blank($get('location_id')) || blank($get('provider_id')) || blank($get('clinic_service_id')))
+                            ->placeholder('Search or select a patient')
+                            ->disabled(fn (Get $get): bool => blank($get('location_id')))
                             ->afterStateUpdated(function ($state, Set $set): void {
                                 $policyId = PatientInsurancePolicy::query()
                                     ->where('organization_id', AppointmentWorkspaceScope::selectedOrganizationId())
