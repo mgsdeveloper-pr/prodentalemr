@@ -2536,10 +2536,9 @@ class EditVerificationRequest extends EditRecord
     protected function syncVerificationCoverageCodes(): void
     {
         $rows = collect($this->verificationCoverageCodeData);
-        $existingIds = $this->record->verificationCoverageCodes()
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->flip();
+        $existingRows = $this->record->verificationCoverageCodes()
+            ->get(['id', 'public_id'])
+            ->keyBy(fn (VerificationCoverageCode $row): int => (int) $row->getKey());
         $keptIds = [];
         $existingPayloads = [];
         $newPayloads = [];
@@ -2568,9 +2567,11 @@ class EditVerificationRequest extends EditRecord
 
             $rowId = filled($row['id'] ?? null) ? (int) $row['id'] : null;
 
-            if ($rowId && $existingIds->has($rowId)) {
+            if ($rowId && $existingRows->has($rowId)) {
+                $existingRow = $existingRows->get($rowId);
                 $existingPayloads[] = [
                     'id' => $rowId,
+                    'public_id' => filled($existingRow->public_id) ? $existingRow->public_id : (string) Str::ulid(),
                     'billing_work_item_id' => $this->record->getKey(),
                     ...$payload,
                     'updated_at' => $now,
@@ -2594,6 +2595,7 @@ class EditVerificationRequest extends EditRecord
                 $existingPayloads,
                 ['id'],
                 [
+                    'public_id',
                     'code_system',
                     'category',
                     'code',

@@ -915,11 +915,22 @@ it('saves a full template draft in bulk without creating an audit submission', f
     $queryCount = count(DB::getQueryLog());
     DB::disableQueryLog();
 
+    DB::flushQueryLog();
+    DB::enableQueryLog();
     $page->persistDraftForTest();
+    $repeatSaveQueries = collect(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    $coverageUpsert = $repeatSaveQueries->first(fn (array $query): bool => str_contains(
+        strtolower($query['query']),
+        'verification_coverage_codes'
+    ) && str_contains(strtolower($query['query']), 'update'));
 
     expect($request->verificationFormAnswers()->count())->toBe(45)
         ->and($request->verificationCoverageCodes()->count())->toBe(40)
         ->and($request->formSubmissions()->count())->toBe(0)
         ->and($request->activities()->where('activity_type', 'form_submitted')->count())->toBe(0)
-        ->and($queryCount)->toBeLessThan(30);
+        ->and($queryCount)->toBeLessThan(30)
+        ->and($coverageUpsert)->not->toBeNull()
+        ->and(strtolower($coverageUpsert['query']))->toContain('public_id');
 });
