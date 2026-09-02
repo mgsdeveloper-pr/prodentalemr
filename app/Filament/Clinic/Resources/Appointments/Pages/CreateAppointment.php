@@ -33,7 +33,32 @@ class CreateAppointment extends CreateRecord
         try {
             parent::create($another);
         } catch (ValidationException $exception) {
-            throw $exception;
+            $this->isCreating = false;
+
+            if (collect(array_keys($exception->errors()))
+                ->contains(fn (string $field): bool => str_starts_with($field, 'data.'))) {
+                throw $exception;
+            }
+
+            foreach ($exception->errors() as $field => $messages) {
+                $statePath = str_starts_with($field, 'data.') ? $field : 'data.'.$field;
+
+                foreach ($messages as $message) {
+                    $this->addError($statePath, $message);
+                }
+            }
+
+            $message = collect($exception->errors())->flatten()->filter()->first()
+                ?: 'Review the appointment details and select an available time slot.';
+
+            Notification::make()
+                ->danger()
+                ->title('Appointment was not saved')
+                ->body((string) $message)
+                ->persistent()
+                ->send();
+
+            $this->dispatch('appointment-validation-error');
         } catch (Throwable $exception) {
             $this->isCreating = false;
             $reference = Str::upper(Str::random(8));

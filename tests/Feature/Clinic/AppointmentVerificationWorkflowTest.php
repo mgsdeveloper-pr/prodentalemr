@@ -447,7 +447,9 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
         ->assertSee('Save Appointment')
-        ->assertSee('wire:click="create"', false)
+        ->assertSee('wire:submit="create"', false)
+        ->assertSee('type="submit"', false)
+        ->assertDontSee('wire:click="create"', false)
         ->assertSee('Appointment Details')
         ->assertSee('Appointment Preview')
         ->assertSee('Pending patient selection')
@@ -621,6 +623,43 @@ it('creates an appointment through the save appointment action', function () {
         'start_time' => '10:00:00',
         'end_time' => '10:30:00',
     ]);
+});
+
+it('surfaces scheduling validation errors from the completed save action', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    $date = today()->next('Monday')->toDateString();
+    $this->provider->update([
+        'business_hours' => [
+            'monday' => ['open' => true, 'opens_at' => '10:00', 'closes_at' => '12:00'],
+        ],
+    ]);
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm([
+            'organization_id' => $this->organization->id,
+            'clinic_id' => $this->clinic->id,
+            'location_id' => $this->location->id,
+            'provider_id' => $this->provider->id,
+            'patient_id' => $this->patient->id,
+            'appointment_date' => $date,
+            'duration_minutes' => 30,
+            'status' => 'scheduled',
+            'verification_required' => false,
+        ])
+        ->call('selectAppointmentSlot', '09:00:00', '09:30:00')
+        ->call('create')
+        ->assertHasErrors([
+            'data.start_time' => 'Select a time within this provider and location schedule.',
+        ])
+        ->assertDispatched('appointment-validation-error');
+
+    expect(Appointment::query()
+        ->where('provider_id', $this->provider->id)
+        ->whereDate('appointment_date', $date)
+        ->where('start_time', '09:00:00')
+        ->exists())->toBeFalse();
 });
 
 it('creates an appointment and managed verification request through the save action', function () {
