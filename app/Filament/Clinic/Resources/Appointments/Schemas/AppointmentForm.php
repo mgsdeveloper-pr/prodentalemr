@@ -411,6 +411,7 @@ class AppointmentForm
                             ))
                             ->required(fn (Get $get): bool => (bool) $get('verification_required'))
                             ->visible(fn (Get $get): bool => (bool) $get('verification_required'))
+                            ->live()
                             ->native(false)
                             ->columnSpan(4),
                         Hidden::make('source')->default('manual'),

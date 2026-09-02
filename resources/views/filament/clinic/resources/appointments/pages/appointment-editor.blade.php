@@ -49,7 +49,8 @@
                         Cancel
                     </a>
                     <button
-                        type="submit"
+                        type="button"
+                        wire:click="{{ $submitMethod }}"
                         wire:loading.attr="disabled"
                         wire:target="{{ $submitMethod }}"
                         style="display: inline-flex; align-items: center; justify-content: center; min-width: 140px; padding: 10px 14px; border: 1px solid #0f766e; border-radius: 6px; background: #0f766e; color: #ffffff; font-size: 13px; font-weight: 700; cursor: pointer;"

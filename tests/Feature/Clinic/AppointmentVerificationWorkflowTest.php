@@ -227,13 +227,15 @@ it('normalizes the selected clinic service into appointment data', function () {
 });
 
 it('allows an appointment without an optional service', function () {
+    $date = today()->next('Monday')->toDateString();
+
     $data = app(AppointmentSchedulingService::class)->validateAndNormalize([
         'organization_id' => $this->organization->id,
         'clinic_id' => $this->clinic->id,
         'location_id' => $this->location->id,
         'patient_id' => $this->patient->id,
         'provider_id' => $this->provider->id,
-        'appointment_date' => today()->addDays(3)->toDateString(),
+        'appointment_date' => $date,
         'start_time' => '10:00:00',
         'end_time' => '10:30:00',
         'duration_minutes' => 30,
@@ -445,6 +447,7 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
         ->assertSee('Save Appointment')
+        ->assertSee('wire:click="create"', false)
         ->assertSee('Appointment Details')
         ->assertSee('Appointment Preview')
         ->assertSee('Pending patient selection')
