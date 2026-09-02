@@ -11,7 +11,12 @@ use App\Support\AppointmentWorkspaceScope;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Width;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class CreateAppointment extends CreateRecord
 {
@@ -23,8 +28,39 @@ class CreateAppointment extends CreateRecord
 
     protected Width|string|null $maxContentWidth = Width::Full;
 
+    public function create(bool $another = false): void
+    {
+        try {
+            parent::create($another);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->isCreating = false;
+            $reference = Str::upper(Str::random(8));
+
+            Log::error('Appointment creation failed.', [
+                'reference' => $reference,
+                'user_id' => auth()->id(),
+                'organization_id' => AppointmentWorkspaceScope::selectedOrganizationId(),
+                'clinic_id' => AppointmentWorkspaceScope::selectedClinicId(),
+                'exception' => $exception,
+            ]);
+
+            Notification::make()
+                ->danger()
+                ->title('Appointment was not saved')
+                ->body($exception instanceof QueryException
+                    ? "The database rejected the appointment. Confirm that all pending System Updates have been applied. Reference: {$reference}."
+                    : "A server error interrupted appointment creation. Reference: {$reference}.")
+                ->persistent()
+                ->send();
+        }
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $this->ensureAppointmentSchemaIsReady();
+
         $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
         $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
         if (AppointmentWorkspaceScope::hasLockedLocation()) {
@@ -33,6 +69,34 @@ class CreateAppointment extends CreateRecord
         $data = $this->syncStatusTimestamps($data);
 
         return app(AppointmentSchedulingService::class)->validateAndNormalize($data);
+    }
+
+    protected function ensureAppointmentSchemaIsReady(): void
+    {
+        $requiredColumns = [
+            'public_id',
+            'clinic_operatory_id',
+            'clinic_service_id',
+            'patient_insurance_policy_id',
+            'parent_appointment_id',
+            'duration_minutes',
+            'verification_status',
+            'verification_work_item_id',
+            'verification_required',
+            'verification_processing_mode',
+            'source',
+            'reason_for_visit',
+            'arrival_notes',
+        ];
+        $missingColumns = array_values(array_diff($requiredColumns, Schema::getColumnListing('appointments')));
+
+        if ($missingColumns === []) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'appointment_date' => 'The production database is missing required appointment updates: '.implode(', ', $missingColumns).'. Run all pending System Updates before saving appointments.',
+        ]);
     }
 
     protected function afterCreate(): void
@@ -67,7 +131,7 @@ class CreateAppointment extends CreateRecord
                 ->body('The appointment is scheduled and its verification workflow is ready.')
                 ->success()
                 ->send();
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             report($exception);
 
             Notification::make()
