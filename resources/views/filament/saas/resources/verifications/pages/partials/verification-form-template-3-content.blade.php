@@ -1384,7 +1384,10 @@
                                         $rowIndex = $benefitRow['index'];
                                         $row = $benefitRow['row'];
                                         $responseMode = data_get($this->codeCoverageData, $rowIndex . '.frequency_response_mode') ?: data_get($row, 'frequency_response_mode', 'current');
-                                        $configuredFields = data_get($this->codeCoverageData, $rowIndex . '.frequency_response_fields') ?: data_get($row, 'frequency_response_fields');
+                                        $configuredFields = data_get($this->codeCoverageData, $rowIndex . '.frequency_response_fields');
+                                        $configuredFields = is_array($configuredFields)
+                                            ? $configuredFields
+                                            : data_get($row, 'frequency_response_fields');
                                         $configuredFields = is_array($configuredFields)
                                             ? $configuredFields
                                             : \App\Models\VerificationFormQuestion::defaultFrequencyResponseFields($responseMode);

@@ -465,6 +465,63 @@ it('never mixes frequency rows from draft current or historical template version
         ->and(VerificationResultPdf::output($request->fresh(), 'standard', submission: $snapshot))->toStartWith('%PDF-');
 });
 
+it('keeps the exact optional response fields configured for each frequency row', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+
+    foreach ([
+        ['D9911', 'Selected optional fields', ['pre_auth_required', 'notes']],
+        ['D9912', 'No optional fields', []],
+    ] as [$code, $prompt, $fields]) {
+        VerificationFormQuestion::create([
+            'template_version_id' => $version->id,
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => 'template_3_frequency_diagnostic_preventative',
+            'code' => $code,
+            'prompt' => $prompt,
+            'form_type' => 'both',
+            'input_type' => 'frequency_row',
+            'frequency_response_mode' => 'current',
+            'frequency_response_fields' => $fields,
+            'sort_order' => 900,
+            'is_active' => true,
+        ]);
+    }
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Optional frequency response fields',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function useRequest(BillingWorkItem $request): void
+        {
+            $this->record = $request;
+            $this->data = ['vf_form_type' => 'full_form'];
+            $this->formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+        }
+
+        public function frequencyRows(): array
+        {
+            return $this->templateThreeFrequencyQuestionRows();
+        }
+    };
+    $page->useRequest($request->fresh());
+
+    $rows = collect($page->frequencyRows())->keyBy('code');
+
+    expect($rows->get('D9911')['frequency_response_fields'])->toBe(['pre_auth_required', 'notes'])
+        ->and($rows->get('D9912')['frequency_response_fields'])->toBe([]);
+});
+
 it('limits the audit checklist to active required questions applicable to the selected form type', function () {
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 

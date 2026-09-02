@@ -3,9 +3,8 @@
 namespace App\Models;
 
 use App\Traits\HasPublicId;
-
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -822,6 +821,21 @@ class VerificationFormQuestion extends Model
         return $mode === 'advanced'
             ? ['coverage_status', 'service_history', 'pre_auth_required', 'downgrade_applies', 'age_limit', 'waiting_period', 'pre_auth_details', 'downgrade_to', 'payment_guideline', 'notes']
             : ['pre_auth_required', 'notes'];
+    }
+
+    public static function normalizeFrequencyResponseFields(mixed $fields, ?string $mode): array
+    {
+        if (! is_array($fields)) {
+            return self::defaultFrequencyResponseFields($mode);
+        }
+
+        $allowedFields = array_keys(self::frequencyResponseFieldOptions($mode));
+
+        return collect($fields)
+            ->filter(fn ($field): bool => is_string($field) && in_array($field, $allowedFields, true))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public static function parentQuestionOptionsFor(

@@ -2232,7 +2232,10 @@ class EditVerificationRequest extends EditRecord
                 'code' => $question->code ?: '',
                 'description' => $question->prompt,
                 'frequency_response_mode' => $question->frequency_response_mode ?: 'current',
-                'frequency_response_fields' => $question->frequency_response_fields ?: VerificationFormQuestion::defaultFrequencyResponseFields($question->frequency_response_mode ?: 'current'),
+                'frequency_response_fields' => VerificationFormQuestion::normalizeFrequencyResponseFields(
+                    $question->frequency_response_fields,
+                    $question->frequency_response_mode ?: 'current',
+                ),
             ])
             ->all();
     }

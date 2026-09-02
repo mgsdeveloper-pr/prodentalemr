@@ -17,7 +17,7 @@ class EditVerificationFormQuestion extends EditRecord
 
     protected string $view = 'filament.saas.resources.verification-form-questions.pages.verification-form-question-editor';
 
-    protected Width | string | null $maxContentWidth = Width::Full;
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     protected ?string $originalSectionKey = null;
 
@@ -112,7 +112,10 @@ class EditVerificationFormQuestion extends EditRecord
         if (VerificationFormQuestion::isFrequencyPercentageSection($this->record?->section_key)) {
             $this->data['frequency_row_mode'] = filled($this->record?->code) ? 'code' : 'question';
             $this->data['frequency_response_mode'] = $this->record?->frequency_response_mode ?: 'current';
-            $this->data['frequency_response_fields'] = $this->record?->frequency_response_fields ?: VerificationFormQuestion::defaultFrequencyResponseFields($this->data['frequency_response_mode']);
+            $this->data['frequency_response_fields'] = VerificationFormQuestion::normalizeFrequencyResponseFields(
+                $this->record?->frequency_response_fields,
+                $this->data['frequency_response_mode'],
+            );
         }
     }
 
@@ -140,7 +143,10 @@ class EditVerificationFormQuestion extends EditRecord
             $data['trigger_answer'] = null;
             $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
             $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
-            $data['frequency_response_fields'] = $data['frequency_response_fields'] ?: VerificationFormQuestion::defaultFrequencyResponseFields($data['frequency_response_mode']);
+            $data['frequency_response_fields'] = VerificationFormQuestion::normalizeFrequencyResponseFields(
+                $data['frequency_response_fields'] ?? null,
+                $data['frequency_response_mode'],
+            );
         } else {
             $data['question_kind'] = $data['question_kind'] ?? VerificationFormQuestion::QUESTION_KIND_NORMAL;
 

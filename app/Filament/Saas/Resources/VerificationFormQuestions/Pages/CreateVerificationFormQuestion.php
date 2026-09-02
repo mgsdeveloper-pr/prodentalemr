@@ -152,7 +152,10 @@ class CreateVerificationFormQuestion extends CreateRecord
             $data['trigger_answer'] = null;
             $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
             $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
-            $data['frequency_response_fields'] = $data['frequency_response_fields'] ?: VerificationFormQuestion::defaultFrequencyResponseFields($data['frequency_response_mode']);
+            $data['frequency_response_fields'] = VerificationFormQuestion::normalizeFrequencyResponseFields(
+                $data['frequency_response_fields'] ?? null,
+                $data['frequency_response_mode'],
+            );
         } else {
             $data['question_kind'] = $data['question_kind'] ?? VerificationFormQuestion::QUESTION_KIND_NORMAL;
 
