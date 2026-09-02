@@ -3,19 +3,20 @@
 namespace App\Actions\Verification;
 
 use App\Models\BillingWorkItem;
+use App\Models\User;
 use App\Models\VerificationFormAnswer;
 use App\Models\VerificationFormQuestion;
-use App\Models\User;
 use App\Support\VerificationTemplateVersionService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SaveVerificationAnswerAction
 {
     public function __construct(
         protected VerificationTemplateVersionService $templates,
-    ) {
-    }
+    ) {}
 
     public function execute(BillingWorkItem $workItem, int $questionId, mixed $answerValue = null, mixed $noteValue = null, ?User $actor = null): ?VerificationFormAnswer
     {
@@ -49,6 +50,123 @@ class SaveVerificationAnswerAction
                 'note_value' => $noteValue,
             ],
         );
+    }
+
+    /**
+     * Persist a complete form payload without repeating template and question
+     * lookups for every answer in a large verification form.
+     *
+     * @param  array<int|string, mixed>  $answerValues
+     * @param  array<int|string, mixed>  $noteValues
+     */
+    public function executeMany(
+        BillingWorkItem $workItem,
+        array $answerValues,
+        array $noteValues = [],
+        ?User $actor = null,
+    ): void {
+        $actor ??= auth()->user();
+
+        if ($workItem->normalized_status === BillingWorkItem::STATUS_DONE) {
+            throw new AuthorizationException('Completed verification answers are locked for audit history.');
+        }
+
+        if ($actor && ! $workItem->verificationUserCanEditVerification($actor) && ! $workItem->clinicUserCanEditVerification($actor)) {
+            throw new AuthorizationException('You are not authorized to edit this verification request.');
+        }
+
+        $workItem = $this->templates->attachSnapshotToWorkItem($workItem);
+        $questionIds = collect(array_keys($answerValues))
+            ->merge(array_keys($noteValues))
+            ->map(fn ($questionId): int => (int) $questionId)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($questionIds->isEmpty()) {
+            return;
+        }
+
+        $questions = VerificationFormQuestion::query()
+            ->whereIn('id', $questionIds)
+            ->where('template_version_id', $workItem->verification_template_version_id)
+            ->where('is_active', true)
+            ->get()
+            ->keyBy(fn (VerificationFormQuestion $question): int => (int) $question->getKey());
+
+        $missingQuestionIds = $questionIds->diff($questions->keys());
+
+        if ($missingQuestionIds->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'verification_template' => 'One or more answers do not belong to the verification request template.',
+            ]);
+        }
+
+        [$rows, $blankQuestionIds] = $this->prepareBulkRows(
+            $workItem,
+            $questions,
+            $questionIds,
+            $answerValues,
+            $noteValues,
+        );
+
+        if ($blankQuestionIds !== []) {
+            $workItem->verificationFormAnswers()
+                ->whereIn('verification_form_question_id', $blankQuestionIds)
+                ->delete();
+        }
+
+        if ($rows !== []) {
+            VerificationFormAnswer::query()->upsert(
+                $rows,
+                ['billing_work_item_id', 'verification_form_question_id'],
+                ['answer_value', 'note_value', 'updated_at'],
+            );
+        }
+    }
+
+    /**
+     * @param  Collection<int, VerificationFormQuestion>  $questions
+     * @param  Collection<int, int>  $questionIds
+     * @param  array<int|string, mixed>  $answerValues
+     * @param  array<int|string, mixed>  $noteValues
+     * @return array{0: list<array<string, mixed>>, 1: list<int>}
+     */
+    protected function prepareBulkRows(
+        BillingWorkItem $workItem,
+        Collection $questions,
+        Collection $questionIds,
+        array $answerValues,
+        array $noteValues,
+    ): array {
+        $now = now();
+        $rows = [];
+        $blankQuestionIds = [];
+
+        foreach ($questionIds as $questionId) {
+            $question = $questions->get($questionId);
+            $answerValue = $this->normalizeAnswerValue($question, $answerValues[$questionId] ?? null);
+            $noteValue = $noteValues[$questionId] ?? null;
+            $noteValue = is_scalar($noteValue) ? trim((string) $noteValue) : null;
+
+            if ($this->isBlank($answerValue) && $this->isBlank($noteValue)) {
+                $blankQuestionIds[] = $questionId;
+
+                continue;
+            }
+
+            $rows[] = [
+                'public_id' => (string) Str::ulid(),
+                'billing_work_item_id' => $workItem->getKey(),
+                'verification_form_question_id' => $questionId,
+                'answer_value' => $answerValue,
+                'note_value' => $noteValue,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        return [$rows, $blankQuestionIds];
     }
 
     protected function resolveQuestionForRequest(BillingWorkItem $workItem, int $questionId): VerificationFormQuestion

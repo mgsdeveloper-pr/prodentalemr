@@ -17,6 +17,7 @@ use App\Services\Verification\VerificationAuditService;
 use App\Support\VerificationResultPdf;
 use App\Support\VerificationTemplateVersionService;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
@@ -675,3 +676,112 @@ it('validates select answers against the attached request template options', fun
 
     app(SaveVerificationAnswerAction::class)->execute($request, $question->id, 'Email');
 })->throws(ValidationException::class);
+
+it('saves a full template draft in bulk without creating an audit submission', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+
+    $questions = collect(range(1, 45))->map(fn (int $number): VerificationFormQuestion => VerificationFormQuestion::create([
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_verification_information',
+        'prompt' => 'Full form question '.$number,
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 1000 + $number,
+        'is_active' => true,
+    ]));
+
+    collect(range(1, 40))->each(fn (int $number): VerificationFormQuestion => VerificationFormQuestion::create([
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => $number <= 20 ? 'template_3_frequency_basic' : 'template_3_frequency_major',
+        'code' => 'D'.str_pad((string) $number, 4, '0', STR_PAD_LEFT),
+        'prompt' => 'Procedure '.$number,
+        'form_type' => 'both',
+        'input_type' => 'frequency_row',
+        'sort_order' => $number,
+        'is_active' => true,
+    ]));
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Large full form draft save',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $formData = ['vf_form_type' => 'full_form'];
+
+    foreach ($questions as $question) {
+        $formData['custom_question_'.$question->id] = 'Answer '.$question->id;
+        $formData['custom_question_note_'.$question->id] = 'Note '.$question->id;
+    }
+
+    $coverageRows = collect(range(1, 40))->map(fn (int $number): array => [
+        'id' => null,
+        'code_system' => 'ada',
+        'category' => $number <= 20 ? 'Basic' : 'Major',
+        'code' => 'D'.str_pad((string) $number, 4, '0', STR_PAD_LEFT),
+        'description' => 'Procedure '.$number,
+        'coverage_status' => 'Covered',
+        'coverage_percent' => $number % 2 === 0 ? 80 : 50,
+        'frequency' => '1 per year',
+        'age_limit' => null,
+        'waiting_period' => null,
+        'service_history' => null,
+        'pre_auth_required' => $number % 3 === 0 ? 'Yes' : 'No',
+        'pre_auth_details' => $number % 3 === 0 ? 'Required before treatment' : null,
+        'downgrade_applies' => 'No',
+        'downgrade_to' => null,
+        'payment_guideline' => null,
+        'notes' => 'Coverage note '.$number,
+        'sort_order' => $number,
+    ])->all();
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function configureDraft(BillingWorkItem $request, array $formData, array $coverageRows): void
+        {
+            $this->record = $request;
+            $this->data = $formData;
+            $this->codeCoverageData = $coverageRows;
+            $this->formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+            $this->waitingPeriodAnswer = 'no';
+        }
+
+        public function persistDraftForTest(): void
+        {
+            $this->shouldSkipWorkflowSyncOnSave = true;
+            $this->shouldCaptureSubmissionOnSave = false;
+
+            try {
+                $this->persistTemplateThreeWithoutResourceValidation(['outcome_status' => 'pending']);
+            } finally {
+                $this->shouldSkipWorkflowSyncOnSave = false;
+                $this->shouldCaptureSubmissionOnSave = true;
+            }
+        }
+    };
+
+    $page->configureDraft($request, $formData, $coverageRows);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $page->persistDraftForTest();
+    $queryCount = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    $page->persistDraftForTest();
+
+    expect($request->verificationFormAnswers()->count())->toBe(45)
+        ->and($request->verificationCoverageCodes()->count())->toBe(40)
+        ->and($request->formSubmissions()->count())->toBe(0)
+        ->and($request->activities()->where('activity_type', 'form_submitted')->count())->toBe(0)
+        ->and($queryCount)->toBeLessThan(30);
+});

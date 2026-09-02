@@ -83,6 +83,8 @@ class EditVerificationRequest extends EditRecord
 
     protected bool $shouldSkipWorkflowSyncOnSave = false;
 
+    protected bool $shouldCaptureSubmissionOnSave = true;
+
     public function mount(int|string $record): void
     {
         $this->record = $this->resolveRecord($record);
@@ -722,7 +724,14 @@ class EditVerificationRequest extends EditRecord
         }
 
         $this->shouldSkipWorkflowSyncOnSave = false;
-        $this->persistTemplateThreeWithoutResourceValidation();
+        $this->shouldCaptureSubmissionOnSave = false;
+
+        try {
+            $this->persistTemplateThreeWithoutResourceValidation();
+        } finally {
+            $this->shouldCaptureSubmissionOnSave = true;
+        }
+
         $this->refreshVerificationFormStateFromRecord();
         $this->auditReady = false;
 
@@ -738,12 +747,18 @@ class EditVerificationRequest extends EditRecord
         abort_unless($this->canSubmitForm(), 403);
 
         $this->shouldSkipWorkflowSyncOnSave = true;
-        if ($this->formTemplate === 'template_3') {
-            $this->persistTemplateThreeWithoutResourceValidation();
-        } else {
-            $this->save(false, false);
+        $this->shouldCaptureSubmissionOnSave = false;
+
+        try {
+            if ($this->formTemplate === 'template_3') {
+                $this->persistTemplateThreeWithoutResourceValidation();
+            } else {
+                $this->save(false, false);
+            }
+        } finally {
+            $this->shouldSkipWorkflowSyncOnSave = false;
+            $this->shouldCaptureSubmissionOnSave = true;
         }
-        $this->shouldSkipWorkflowSyncOnSave = false;
 
         Notification::make()
             ->title('Draft saved')
@@ -764,12 +779,18 @@ class EditVerificationRequest extends EditRecord
         $this->record->outcome_status = 'pending';
 
         $this->shouldSkipWorkflowSyncOnSave = true;
-        if ($this->formTemplate === 'template_3') {
-            $this->persistTemplateThreeWithoutResourceValidation(['outcome_status' => 'pending']);
-        } else {
-            $this->save(false, false);
+        $this->shouldCaptureSubmissionOnSave = false;
+
+        try {
+            if ($this->formTemplate === 'template_3') {
+                $this->persistTemplateThreeWithoutResourceValidation(['outcome_status' => 'pending']);
+            } else {
+                $this->save(false, false);
+            }
+        } finally {
+            $this->shouldSkipWorkflowSyncOnSave = false;
+            $this->shouldCaptureSubmissionOnSave = true;
         }
-        $this->shouldSkipWorkflowSyncOnSave = false;
 
         $this->refreshVerificationFormStateFromRecord();
         $missingFields = $this->missingRequiredVerificationFields();
@@ -1705,6 +1726,10 @@ class EditVerificationRequest extends EditRecord
         if (! $this->shouldSkipWorkflowSyncOnSave) {
             $this->syncWorkflowStatusFromForm();
         }
+        if (! $this->shouldCaptureSubmissionOnSave) {
+            return;
+        }
+
         $submission = $this->captureFormSubmissionSnapshot();
 
         if ($submission) {
@@ -2121,18 +2146,12 @@ class EditVerificationRequest extends EditRecord
 
     protected function syncVerificationFormAnswers(): void
     {
-        $saveAnswer = app(SaveVerificationAnswerAction::class);
-        $questionIds = collect(array_keys($this->verificationFormAnswerData))
-            ->merge(array_keys($this->verificationFormAnswerNoteData))
-            ->map(fn ($questionId): int => (int) $questionId)
-            ->unique();
-
-        foreach ($questionIds as $questionId) {
-            $answerValue = $this->verificationFormAnswerData[$questionId] ?? null;
-            $noteValue = $this->verificationFormAnswerNoteData[$questionId] ?? null;
-
-            $saveAnswer->execute($this->record, $questionId, $answerValue, $noteValue, auth()->user());
-        }
+        app(SaveVerificationAnswerAction::class)->executeMany(
+            $this->record,
+            $this->verificationFormAnswerData,
+            $this->verificationFormAnswerNoteData,
+            auth()->user(),
+        );
     }
 
     public function getCodeCoverageSection(): array
@@ -2513,7 +2532,14 @@ class EditVerificationRequest extends EditRecord
     protected function syncVerificationCoverageCodes(): void
     {
         $rows = collect($this->verificationCoverageCodeData);
+        $existingIds = $this->record->verificationCoverageCodes()
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->flip();
         $keptIds = [];
+        $existingPayloads = [];
+        $newPayloads = [];
+        $now = now();
 
         foreach ($rows as $index => $row) {
             $payload = [
@@ -2536,24 +2562,63 @@ class EditVerificationRequest extends EditRecord
                 'sort_order' => $index + 1,
             ];
 
-            if (filled($row['id'] ?? null)) {
-                $coverageCode = $this->record->verificationCoverageCodes()->find($row['id']);
+            $rowId = filled($row['id'] ?? null) ? (int) $row['id'] : null;
 
-                if ($coverageCode) {
-                    $coverageCode->update($payload);
-                    $keptIds[] = $coverageCode->getKey();
-                }
+            if ($rowId && $existingIds->has($rowId)) {
+                $existingPayloads[] = [
+                    'id' => $rowId,
+                    'billing_work_item_id' => $this->record->getKey(),
+                    ...$payload,
+                    'updated_at' => $now,
+                ];
+                $keptIds[] = $rowId;
 
                 continue;
             }
 
-            $coverageCode = $this->record->verificationCoverageCodes()->create($payload);
-            $keptIds[] = $coverageCode->getKey();
+            $newPayloads[] = [
+                'public_id' => (string) Str::ulid(),
+                'billing_work_item_id' => $this->record->getKey(),
+                ...$payload,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if ($existingPayloads !== []) {
+            VerificationCoverageCode::query()->upsert(
+                $existingPayloads,
+                ['id'],
+                [
+                    'code_system',
+                    'category',
+                    'code',
+                    'description',
+                    'coverage_status',
+                    'coverage_percent',
+                    'frequency',
+                    'age_limit',
+                    'waiting_period',
+                    'service_history',
+                    'pre_auth_required',
+                    'pre_auth_details',
+                    'downgrade_applies',
+                    'downgrade_to',
+                    'payment_guideline',
+                    'notes',
+                    'sort_order',
+                    'updated_at',
+                ],
+            );
         }
 
         $this->record->verificationCoverageCodes()
             ->when($keptIds !== [], fn ($query) => $query->whereNotIn('id', $keptIds))
             ->delete();
+
+        if ($newPayloads !== []) {
+            VerificationCoverageCode::query()->insert($newPayloads);
+        }
 
         $this->codeCoverageData = $this->mergeConfiguredCodeCoverageRows($this->record->verificationCoverageCodes()
             ->orderBy('sort_order')
