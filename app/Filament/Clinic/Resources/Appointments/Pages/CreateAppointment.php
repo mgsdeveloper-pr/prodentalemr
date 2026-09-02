@@ -86,8 +86,8 @@ class CreateAppointment extends CreateRecord
     {
         $this->ensureAppointmentSchemaIsReady();
 
-        $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
-        $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
+        $data['organization_id'] = AppointmentWorkspaceScope::selectedOrganizationId();
+        $data['clinic_id'] = AppointmentWorkspaceScope::selectedClinicId();
         if (AppointmentWorkspaceScope::hasLockedLocation()) {
             $data['location_id'] = AppointmentWorkspaceScope::mappedLocationId();
         }

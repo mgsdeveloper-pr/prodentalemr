@@ -625,6 +625,40 @@ it('creates an appointment through the save appointment action', function () {
     ]);
 });
 
+it('uses the selected clinic workspace instead of stale hidden scope values', function () {
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    $date = today()->next('Monday')->toDateString();
+
+    Livewire::test(CreateAppointment::class)
+        ->fillForm([
+            'organization_id' => 999999,
+            'clinic_id' => 999999,
+            'location_id' => $this->location->id,
+            'provider_id' => $this->provider->id,
+            'patient_id' => $this->patient->id,
+            'appointment_date' => $date,
+            'duration_minutes' => 30,
+            'status' => 'scheduled',
+            'verification_required' => false,
+        ])
+        ->call('selectAppointmentSlot', '11:00:00', '11:30:00')
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $this->assertDatabaseHas('appointments', [
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'provider_id' => $this->provider->id,
+        'patient_id' => $this->patient->id,
+        'appointment_date' => $date.' 00:00:00',
+        'start_time' => '11:00:00',
+        'end_time' => '11:30:00',
+    ]);
+});
+
 it('surfaces scheduling validation errors from the completed save action', function () {
     $this->actingAs($this->clinicUser);
     $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
