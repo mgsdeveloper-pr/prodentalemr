@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class VerificationFormQuestion extends Model
 {
@@ -836,6 +837,125 @@ class VerificationFormQuestion extends Model
             ->unique()
             ->values()
             ->all();
+    }
+
+    public function frequencyResponseConfiguration(): array
+    {
+        $detailFields = self::normalizeFrequencyResponseFields(
+            $this->frequency_response_fields,
+            $this->frequency_response_mode ?: 'current',
+        );
+        $prompt = Str::lower(trim((string) $this->prompt));
+        $configuration = [
+            'primary_fields' => ['coverage_percent', 'frequency'],
+            'detail_fields' => $detailFields,
+            'field_labels' => [],
+            'field_placeholders' => [],
+            'yes_no_fields' => [],
+            'single_line_fields' => [],
+            'required_any' => ['coverage_status', 'coverage_percent'],
+            'required_when' => [],
+        ];
+
+        if (str_contains($prompt, 'downgrade')) {
+            return array_replace($configuration, [
+                'primary_fields' => [],
+                'detail_fields' => ['downgrade_applies', 'downgrade_to'],
+                'field_labels' => [
+                    'downgrade_applies' => 'Downgrade',
+                    'downgrade_to' => 'Downgrade code',
+                ],
+                'field_placeholders' => [
+                    'downgrade_to' => 'Enter ADA/CDT downgrade code',
+                ],
+                'single_line_fields' => ['downgrade_to'],
+                'required_any' => ['downgrade_applies'],
+                'required_when' => [
+                    'field' => 'downgrade_to',
+                    'when_field' => 'downgrade_applies',
+                    'when_value' => 'Yes',
+                ],
+            ]);
+        }
+
+        if ($this->section_key !== 'template_3_frequency_orthodontics') {
+            return $configuration;
+        }
+
+        if (str_contains($prompt, 'lifetime') && str_contains($prompt, 'maximum')) {
+            return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Lifetime maximum', 'Enter lifetime maximum');
+        }
+
+        if (str_contains($prompt, 'remaining') && str_contains($prompt, 'maximum')) {
+            return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Remaining maximum', 'Enter remaining maximum');
+        }
+
+        if (str_contains($prompt, 'deductible')) {
+            return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Orthodontic deductible', 'Enter deductible');
+        }
+
+        if (str_contains($prompt, 'age') && str_contains($prompt, 'limit')) {
+            return $this->singleResponseConfiguration($configuration, 'age_limit', 'Age limit', 'Enter age limit');
+        }
+
+        if (str_contains($prompt, 'initial') && str_contains($prompt, 'payment')) {
+            return array_replace($configuration, [
+                'primary_fields' => ['coverage_percent'],
+                'detail_fields' => [],
+                'field_labels' => ['coverage_percent' => 'Initial payment %'],
+                'required_any' => ['coverage_percent'],
+            ]);
+        }
+
+        if (str_contains($prompt, 'how') && str_contains($prompt, 'paid')) {
+            return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Payment method', 'Enter how orthodontics is paid');
+        }
+
+        if (str_contains($prompt, 'work in progress')) {
+            return array_replace($configuration, [
+                'primary_fields' => [],
+                'detail_fields' => ['coverage_status'],
+                'field_labels' => ['coverage_status' => 'Work in progress covered'],
+                'yes_no_fields' => ['coverage_status'],
+                'required_any' => ['coverage_status'],
+            ]);
+        }
+
+        return $configuration;
+    }
+
+    public function missingFrequencyResponseFields(mixed $row): array
+    {
+        $configuration = $this->frequencyResponseConfiguration();
+        $requiredAny = $configuration['required_any'];
+
+        if (collect($requiredAny)->every(fn (string $field): bool => blank(data_get($row, $field)) && data_get($row, $field) !== 0 && data_get($row, $field) !== '0')) {
+            return [$requiredAny[0] => $configuration['field_labels'][$requiredAny[0]] ?? $this->prompt];
+        }
+
+        $conditional = $configuration['required_when'];
+
+        if ($conditional !== []
+            && data_get($row, $conditional['when_field']) === $conditional['when_value']
+            && blank(data_get($row, $conditional['field']))) {
+            $field = $conditional['field'];
+
+            return [$field => $configuration['field_labels'][$field] ?? $this->prompt];
+        }
+
+        return [];
+    }
+
+    protected function singleResponseConfiguration(array $configuration, string $field, string $label, string $placeholder): array
+    {
+        return array_replace($configuration, [
+            'primary_fields' => [],
+            'detail_fields' => [$field],
+            'field_labels' => [$field => $label],
+            'field_placeholders' => [$field => $placeholder],
+            'single_line_fields' => [$field],
+            'required_any' => [$field],
+        ]);
     }
 
     public static function parentQuestionOptionsFor(

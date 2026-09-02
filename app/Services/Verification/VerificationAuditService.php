@@ -53,7 +53,7 @@ class VerificationAuditService
                 return strcasecmp(trim((string) $row->description), trim((string) $question->prompt)) === 0;
             });
 
-            if (! $coverage || ($this->isBlank($coverage->coverage_status) && $this->isBlank($coverage->coverage_percent))) {
+            if (! $coverage || $question->missingFrequencyResponseFields($coverage) !== []) {
                 $missing['frequency:'.$question->getKey()] = $question->prompt;
             }
         }

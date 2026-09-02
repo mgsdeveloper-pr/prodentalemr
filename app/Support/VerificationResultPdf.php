@@ -264,8 +264,7 @@ class VerificationResultPdf
         array $state,
         bool $showBlankRows = true,
         ?VerificationFormSubmission $submission = null,
-    ): array
-    {
+    ): array {
         $formType = $state['vf_form_type'] ?? $workItem->verificationProfile?->form_type ?? 'full_form';
         $clinicId = $workItem->clinic_id;
 
@@ -340,8 +339,7 @@ class VerificationResultPdf
         BillingWorkItem $workItem,
         string $sectionKey,
         ?VerificationFormSubmission $submission = null,
-    ): Collection
-    {
+    ): Collection {
         $category = match ($sectionKey) {
             'template_3_frequency_diagnostic_preventative' => 'Diagnostic & Preventative',
             'template_3_frequency_basic' => 'Basic',
@@ -364,7 +362,7 @@ class VerificationResultPdf
             )
             ->where('section_key', $sectionKey)
             ->mapWithKeys(fn (VerificationFormQuestion $question): array => [
-                static::coverageRowSignature($question->code, $question->prompt) => true,
+                static::coverageRowSignature($question->code, $question->prompt) => $question->frequencyResponseConfiguration(),
             ]);
 
         $submissionPayload = $submission?->payload ?? [];
@@ -382,17 +380,40 @@ class VerificationResultPdf
                 ['sort_order', 'asc'],
                 ['id', 'asc'],
             ])
-            ->map(function ($row): array {
+            ->map(function ($row) use ($allowedSignatures): array {
+                $configuration = $allowedSignatures->get(
+                    static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')),
+                    [],
+                );
+                $labels = array_replace([
+                    'coverage_status' => 'Status',
+                    'age_limit' => 'Age',
+                    'waiting_period' => 'Waiting period',
+                    'service_history' => 'History',
+                    'pre_auth_required' => 'Pre-auth',
+                    'pre_auth_details' => 'Pre-auth detail',
+                    'downgrade_applies' => 'Downgrade',
+                    'downgrade_to' => 'Downgrade code',
+                    'payment_guideline' => 'Payment guideline',
+                    'notes' => 'Notes',
+                ], data_get($configuration, 'field_labels', []));
                 $parts = collect([
                     filled(data_get($row, 'coverage_percent')) ? number_format((float) data_get($row, 'coverage_percent'), 0).'%' : null,
                     filled(data_get($row, 'frequency')) ? 'Freq: '.data_get($row, 'frequency') : null,
-                    filled(data_get($row, 'coverage_status')) ? data_get($row, 'coverage_status') : null,
-                    filled(data_get($row, 'age_limit')) ? 'Age: '.data_get($row, 'age_limit') : null,
-                    filled(data_get($row, 'waiting_period')) ? 'WP: '.data_get($row, 'waiting_period') : null,
-                    filled(data_get($row, 'service_history')) ? 'History: '.data_get($row, 'service_history') : null,
-                    filled(data_get($row, 'pre_auth_required')) ? 'Pre-auth: '.data_get($row, 'pre_auth_required') : null,
-                    filled(data_get($row, 'downgrade_applies')) ? 'Downgrade: '.data_get($row, 'downgrade_applies') : null,
-                    filled(data_get($row, 'notes')) ? 'Notes: '.data_get($row, 'notes') : null,
+                    ...collect([
+                        'coverage_status',
+                        'age_limit',
+                        'waiting_period',
+                        'service_history',
+                        'pre_auth_required',
+                        'pre_auth_details',
+                        'downgrade_applies',
+                        'downgrade_to',
+                        'payment_guideline',
+                        'notes',
+                    ])->map(fn (string $field): ?string => filled(data_get($row, $field))
+                        ? $labels[$field].': '.data_get($row, $field)
+                        : null)->all(),
                 ])->filter()->implode(' | ');
 
                 return [

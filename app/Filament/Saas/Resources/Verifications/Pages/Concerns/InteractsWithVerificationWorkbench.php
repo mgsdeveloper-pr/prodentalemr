@@ -6,6 +6,8 @@ use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemActivity;
 use App\Models\BillingWorkItemAttachment;
 use App\Models\VerificationFormSubmission;
+use App\Models\VerificationPlanSnapshot;
+use App\Models\VerificationProfile;
 use App\Services\Verification\WorkflowService;
 use Illuminate\Support\Collection;
 
@@ -44,7 +46,7 @@ trait InteractsWithVerificationWorkbench
                     ['label' => 'Patient name', 'value' => $profile?->patient_full_name ?: ($record->patient?->full_name ?: '-')],
                     ['label' => 'Date of birth', 'value' => optional($profile?->patient_dob)->format('m-d-Y') ?: (optional($record->patient?->dob)->format('m-d-Y') ?: '-')],
                     ['label' => 'Member ID', 'value' => $profile?->patient_identifier ?: ($record->insurancePolicy?->member_id ?: '-')],
-                    ['label' => 'Form type', 'value' => \App\Models\VerificationProfile::FORM_TYPE_OPTIONS[$profile?->form_type ?? 'full_form'] ?? 'Full Form'],
+                    ['label' => 'Form type', 'value' => VerificationProfile::FORM_TYPE_OPTIONS[$profile?->form_type ?? 'full_form'] ?? 'Full Form'],
                     ['label' => 'Requested by', 'value' => $profile?->requested_by_name ?: '-'],
                     ['label' => 'Requested from', 'value' => filled($profile?->requested_from_panel) ? str($profile->requested_from_panel)->headline()->toString() : '-'],
                 ],
@@ -463,7 +465,7 @@ trait InteractsWithVerificationWorkbench
             ->sortBy(fn ($plan) => array_search($plan->plan_priority, ['primary', 'secondary', 'tertiary'], true))
             ->values()
             ->map(fn ($plan): array => [
-                'priority' => \App\Models\VerificationPlanSnapshot::PRIORITY_OPTIONS[$plan->plan_priority] ?? str($plan->plan_priority)->title()->toString(),
+                'priority' => VerificationPlanSnapshot::PRIORITY_OPTIONS[$plan->plan_priority] ?? str($plan->plan_priority)->title()->toString(),
                 'payer_name' => $plan->payer_name ?: '-',
                 'member_id' => $plan->member_id ?: '-',
                 'group_number' => $plan->group_number ?: '-',
@@ -498,7 +500,7 @@ trait InteractsWithVerificationWorkbench
                 'subtitle' => collect([
                     $attachment->original_file_name,
                     $attachment->mime_type,
-                    filled($attachment->file_size) ? number_format(((int) $attachment->file_size) / 1024, 1) . ' KB' : null,
+                    filled($attachment->file_size) ? number_format(((int) $attachment->file_size) / 1024, 1).' KB' : null,
                 ])->filter()->implode(' · '),
                 'download_url' => $this->getAttachmentDownloadUrl($attachment),
                 'uploaded_at' => optional($attachment->created_at)->format('M d, Y h:i A') ?: '-',
@@ -525,12 +527,12 @@ trait InteractsWithVerificationWorkbench
                     'info_requested_from_clinic' => data_get($activity->meta, 'info_request_reason'),
                     'clinic_response_received' => data_get($activity->meta, 'clinic_response_note'),
                     'clinic_correction_requested' => collect([
-                        filled(data_get($activity->meta, 'reason')) ? 'Reason: ' . data_get($activity->meta, 'reason') : null,
+                        filled(data_get($activity->meta, 'reason')) ? 'Reason: '.data_get($activity->meta, 'reason') : null,
                         collect(data_get($activity->meta, 'requested_fields', []))->isNotEmpty()
-                            ? "Requested items:\n- " . collect(data_get($activity->meta, 'requested_fields', []))->values()->implode("\n- ")
+                            ? "Requested items:\n- ".collect(data_get($activity->meta, 'requested_fields', []))->values()->implode("\n- ")
                             : null,
                         filled(data_get($activity->meta, 'baseline_submission_version'))
-                            ? 'Original completed result: v' . data_get($activity->meta, 'baseline_submission_version')
+                            ? 'Original completed result: v'.data_get($activity->meta, 'baseline_submission_version')
                             : null,
                     ])->filter()->implode("\n"),
                     'returned_for_rework' => data_get($activity->meta, 'return_reason'),
@@ -543,7 +545,7 @@ trait InteractsWithVerificationWorkbench
                     'verification_pdf_downloaded', 'verification_pdf_previewed' => $this->buildPdfAccessDetails($activity),
                     'form_submitted' => $this->buildSubmissionDetails($activity),
                     'verification_qa_approved' => filled(data_get($activity->meta, 'submission_version'))
-                        ? 'Completed result: v' . data_get($activity->meta, 'submission_version') . "\nReviewed by: " . (data_get($activity->meta, 'reviewed_by') ?: 'Audit reviewer')
+                        ? 'Completed result: v'.data_get($activity->meta, 'submission_version')."\nReviewed by: ".(data_get($activity->meta, 'reviewed_by') ?: 'Audit reviewer')
                         : null,
                     default => null,
                 };
@@ -642,9 +644,9 @@ trait InteractsWithVerificationWorkbench
     {
         return collect([
             filled(data_get($activity->meta, 'channel'))
-                ? 'Channel: ' . str((string) data_get($activity->meta, 'channel'))->replace('_', ' ')->headline()->toString()
+                ? 'Channel: '.str((string) data_get($activity->meta, 'channel'))->replace('_', ' ')->headline()->toString()
                 : null,
-            filled(data_get($activity->meta, 'user_name')) ? 'Recorded by: ' . data_get($activity->meta, 'user_name') : null,
+            filled(data_get($activity->meta, 'user_name')) ? 'Recorded by: '.data_get($activity->meta, 'user_name') : null,
         ])->filter()->implode("\n") ?: null;
     }
 
@@ -652,12 +654,12 @@ trait InteractsWithVerificationWorkbench
     {
         return collect([
             filled(data_get($activity->meta, 'panel'))
-                ? 'Panel: ' . str((string) data_get($activity->meta, 'panel'))->headline()->toString()
+                ? 'Panel: '.str((string) data_get($activity->meta, 'panel'))->headline()->toString()
                 : null,
             filled(data_get($activity->meta, 'output_mode'))
-                ? 'Output mode: ' . str((string) data_get($activity->meta, 'output_mode'))->replace('_', ' ')->headline()->toString()
+                ? 'Output mode: '.str((string) data_get($activity->meta, 'output_mode'))->replace('_', ' ')->headline()->toString()
                 : null,
-            filled(data_get($activity->meta, 'user_name')) ? 'User: ' . data_get($activity->meta, 'user_name') : null,
+            filled(data_get($activity->meta, 'user_name')) ? 'User: '.data_get($activity->meta, 'user_name') : null,
         ])->filter()->implode("\n") ?: null;
     }
 
@@ -677,7 +679,7 @@ trait InteractsWithVerificationWorkbench
 
         return collect([
             filled(data_get($activity->meta, 'submission_version'))
-                ? 'Submission Version: v' . data_get($activity->meta, 'submission_version')
+                ? 'Submission Version: v'.data_get($activity->meta, 'submission_version')
                 : null,
             "Source: {$panel}",
             filled(data_get($activity->meta, 'status')) ? "Status: {$status}" : null,
@@ -700,7 +702,7 @@ trait InteractsWithVerificationWorkbench
     protected function buildAttachmentDownloadDetails(BillingWorkItemActivity $activity): ?string
     {
         return collect([
-            filled(data_get($activity->meta, 'panel')) ? 'Panel: ' . str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
+            filled(data_get($activity->meta, 'panel')) ? 'Panel: '.str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
             data_get($activity->meta, 'original_file_name'),
             data_get($activity->meta, 'mime_type'),
         ])->filter()->implode("\n") ?: null;
@@ -709,17 +711,17 @@ trait InteractsWithVerificationWorkbench
     protected function buildSnapshotViewDetails(BillingWorkItemActivity $activity): ?string
     {
         return collect([
-            filled(data_get($activity->meta, 'panel')) ? 'Panel: ' . str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
-            filled(data_get($activity->meta, 'submission_version')) ? 'Submission Version: v' . data_get($activity->meta, 'submission_version') : null,
+            filled(data_get($activity->meta, 'panel')) ? 'Panel: '.str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
+            filled(data_get($activity->meta, 'submission_version')) ? 'Submission Version: v'.data_get($activity->meta, 'submission_version') : null,
         ])->filter()->implode("\n") ?: null;
     }
 
     protected function buildAccessDetails(BillingWorkItemActivity $activity): ?string
     {
         return collect([
-            filled(data_get($activity->meta, 'panel')) ? 'Panel: ' . str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
+            filled(data_get($activity->meta, 'panel')) ? 'Panel: '.str((string) data_get($activity->meta, 'panel'))->headline()->toString() : null,
             filled(data_get($activity->meta, 'status'))
-                ? 'Status: ' . (BillingWorkItem::STATUS_OPTIONS[data_get($activity->meta, 'status')] ?? str((string) data_get($activity->meta, 'status'))->headline()->toString())
+                ? 'Status: '.(BillingWorkItem::STATUS_OPTIONS[data_get($activity->meta, 'status')] ?? str((string) data_get($activity->meta, 'status'))->headline()->toString())
                 : null,
         ])->filter()->implode("\n") ?: null;
     }
@@ -766,7 +768,7 @@ trait InteractsWithVerificationWorkbench
                         'prompt' => data_get($answer, 'prompt') ?: 'Question',
                         'value' => collect([
                             $answerValue !== '-' ? $answerValue : null,
-                            $noteValue !== '-' ? 'Note: ' . $noteValue : null,
+                            $noteValue !== '-' ? 'Note: '.$noteValue : null,
                         ])->filter()->implode("\n") ?: '-',
                     ];
                 })
@@ -777,9 +779,18 @@ trait InteractsWithVerificationWorkbench
                     'code' => data_get($row, 'code') ?: '-',
                     'description' => data_get($row, 'description') ?: 'Coverage item',
                     'value' => collect([
-                        filled(data_get($row, 'coverage_status')) ? 'Status: ' . str((string) data_get($row, 'coverage_status'))->headline() : null,
-                        filled(data_get($row, 'coverage_percent')) ? 'Coverage: ' . data_get($row, 'coverage_percent') . '%' : null,
-                        filled(data_get($row, 'frequency')) ? 'Frequency: ' . data_get($row, 'frequency') : null,
+                        filled(data_get($row, 'coverage_status')) ? 'Status: '.str((string) data_get($row, 'coverage_status'))->headline() : null,
+                        filled(data_get($row, 'coverage_percent')) ? 'Coverage: '.data_get($row, 'coverage_percent').'%' : null,
+                        filled(data_get($row, 'frequency')) ? 'Frequency: '.data_get($row, 'frequency') : null,
+                        filled(data_get($row, 'age_limit')) ? 'Age limit: '.data_get($row, 'age_limit') : null,
+                        filled(data_get($row, 'waiting_period')) ? 'Waiting period: '.data_get($row, 'waiting_period') : null,
+                        filled(data_get($row, 'service_history')) ? 'History: '.data_get($row, 'service_history') : null,
+                        filled(data_get($row, 'pre_auth_required')) ? 'Pre-auth: '.data_get($row, 'pre_auth_required') : null,
+                        filled(data_get($row, 'pre_auth_details')) ? 'Pre-auth detail: '.data_get($row, 'pre_auth_details') : null,
+                        filled(data_get($row, 'downgrade_applies')) ? 'Downgrade: '.data_get($row, 'downgrade_applies') : null,
+                        filled(data_get($row, 'downgrade_to')) ? 'Downgrade code: '.data_get($row, 'downgrade_to') : null,
+                        filled(data_get($row, 'payment_guideline')) ? 'Payment guideline: '.data_get($row, 'payment_guideline') : null,
+                        filled(data_get($row, 'notes')) ? 'Notes: '.data_get($row, 'notes') : null,
                     ])->filter()->implode(' | ') ?: '-',
                 ])
                 ->values()
@@ -854,39 +865,46 @@ trait InteractsWithVerificationWorkbench
         $entries = [];
 
         foreach (data_get($payload, 'summary', []) as $key => $value) {
-            $entryKey = 'summary.' . $key;
+            $entryKey = 'summary.'.$key;
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, $value);
         }
 
         foreach (data_get($payload, 'work_item', []) as $key => $value) {
-            $entryKey = 'work_item.' . $key;
+            $entryKey = 'work_item.'.$key;
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, $value);
         }
 
         foreach (data_get($payload, 'verification_profile', []) as $key => $value) {
-            $entryKey = 'verification_profile.' . $key;
+            $entryKey = 'verification_profile.'.$key;
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, $value);
         }
 
         foreach (data_get($payload, 'answers', []) as $answer) {
-            $identifier = data_get($answer, 'code') ?: ('question_' . data_get($answer, 'question_id'));
-            $entryKey = 'answers.' . $identifier;
+            $identifier = data_get($answer, 'code') ?: ('question_'.data_get($answer, 'question_id'));
+            $entryKey = 'answers.'.$identifier;
             $answerValue = $this->normalizeSnapshotValue(data_get($answer, 'answer_value'));
             $noteValue = $this->normalizeSnapshotValue(data_get($answer, 'note_value'));
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, collect([
                 $answerValue !== '-' ? $answerValue : null,
-                $noteValue !== '-' ? 'Note: ' . $noteValue : null,
+                $noteValue !== '-' ? 'Note: '.$noteValue : null,
             ])->filter()->implode("\n") ?: null, $answer);
         }
 
         foreach (data_get($payload, 'coverage_codes', []) as $row) {
             $identifier = data_get($row, 'code') ?: str((string) data_get($row, 'description', 'coverage_code'))->slug('_')->toString();
-            $entryKey = 'coverage_codes.' . $identifier;
+            $entryKey = 'coverage_codes.'.$identifier;
             $entries[$entryKey] = $this->describeSubmissionEntry($entryKey, collect([
                 data_get($row, 'coverage_status'),
-                filled(data_get($row, 'coverage_percent')) ? data_get($row, 'coverage_percent') . '%' : null,
+                filled(data_get($row, 'coverage_percent')) ? data_get($row, 'coverage_percent').'%' : null,
                 data_get($row, 'frequency'),
+                data_get($row, 'age_limit'),
+                data_get($row, 'waiting_period'),
                 data_get($row, 'service_history'),
+                data_get($row, 'pre_auth_required'),
+                data_get($row, 'pre_auth_details'),
+                data_get($row, 'downgrade_applies'),
+                data_get($row, 'downgrade_to'),
+                data_get($row, 'payment_guideline'),
                 data_get($row, 'notes'),
             ])->filter()->implode(' | '), $row);
         }
@@ -934,7 +952,7 @@ trait InteractsWithVerificationWorkbench
             str_starts_with($key, 'answers.') => [
                 'group' => 'Custom Answers',
                 'label' => data_get($answer, 'prompt')
-                    ? trim((string) data_get($answer, 'prompt')) . (filled(data_get($answer, 'code')) ? ' (' . data_get($answer, 'code') . ')' : '')
+                    ? trim((string) data_get($answer, 'prompt')).(filled(data_get($answer, 'code')) ? ' ('.data_get($answer, 'code').')' : '')
                     : str(str_replace('answers.', '', $key))->replace('_', ' ')->headline()->toString(),
                 'value' => $value,
             ],
@@ -1040,9 +1058,9 @@ trait InteractsWithVerificationWorkbench
                 'description' => 'This request has been waiting on clinic response longer than the normal follow-up window.',
                 'details' => collect([
                     'Current status: Awaiting Clinic Response',
-                    'Last workflow update: ' . $lastTouchedAt->format('M d, Y h:i A'),
-                    'Time waiting: ' . $this->humanizeHours($hoursSinceUpdate),
-                    $record->due_at ? 'Original due target: ' . $record->due_at->format('M d, Y h:i A') : null,
+                    'Last workflow update: '.$lastTouchedAt->format('M d, Y h:i A'),
+                    'Time waiting: '.$this->humanizeHours($hoursSinceUpdate),
+                    $record->due_at ? 'Original due target: '.$record->due_at->format('M d, Y h:i A') : null,
                 ])->filter()->implode("\n"),
                 'author' => 'System Monitor',
                 'created_at' => now()->format('M d, Y h:i A'),
@@ -1059,10 +1077,10 @@ trait InteractsWithVerificationWorkbench
                 'type' => 'No Recent Update',
                 'description' => 'This verification has been sitting without a new submission or workflow action for an extended period.',
                 'details' => collect([
-                    'Current status: ' . (BillingWorkItem::STATUS_OPTIONS[$record->normalized_status] ?? str($record->normalized_status)->headline()->toString()),
-                    'Last workflow update: ' . $lastTouchedAt->format('M d, Y h:i A'),
-                    'Time idle: ' . $this->humanizeHours($hoursSinceUpdate),
-                    $record->due_at ? 'Due at: ' . $record->due_at->format('M d, Y h:i A') : null,
+                    'Current status: '.(BillingWorkItem::STATUS_OPTIONS[$record->normalized_status] ?? str($record->normalized_status)->headline()->toString()),
+                    'Last workflow update: '.$lastTouchedAt->format('M d, Y h:i A'),
+                    'Time idle: '.$this->humanizeHours($hoursSinceUpdate),
+                    $record->due_at ? 'Due at: '.$record->due_at->format('M d, Y h:i A') : null,
                 ])->filter()->implode("\n"),
                 'author' => 'System Monitor',
                 'created_at' => now()->format('M d, Y h:i A'),
@@ -1082,17 +1100,17 @@ trait InteractsWithVerificationWorkbench
     protected function humanizeHours(int $hours): string
     {
         if ($hours < 24) {
-            return $hours . ' hour' . ($hours === 1 ? '' : 's');
+            return $hours.' hour'.($hours === 1 ? '' : 's');
         }
 
         $days = (int) floor($hours / 24);
         $remainingHours = $hours % 24;
 
         if ($remainingHours === 0) {
-            return $days . ' day' . ($days === 1 ? '' : 's');
+            return $days.' day'.($days === 1 ? '' : 's');
         }
 
-        return $days . ' day' . ($days === 1 ? '' : 's') . ' ' . $remainingHours . ' hour' . ($remainingHours === 1 ? '' : 's');
+        return $days.' day'.($days === 1 ? '' : 's').' '.$remainingHours.' hour'.($remainingHours === 1 ? '' : 's');
     }
 
     protected function formatSnapshotRows(array $rows): array
@@ -1152,7 +1170,7 @@ trait InteractsWithVerificationWorkbench
             return '-';
         }
 
-        return '$' . number_format((float) $value, 2);
+        return '$'.number_format((float) $value, 2);
     }
 
     protected function percent($value): string
@@ -1161,7 +1179,7 @@ trait InteractsWithVerificationWorkbench
             return '-';
         }
 
-        return number_format((float) $value, 0) . '%';
+        return number_format((float) $value, 0).'%';
     }
 
     protected function countCompleted(array $values): int

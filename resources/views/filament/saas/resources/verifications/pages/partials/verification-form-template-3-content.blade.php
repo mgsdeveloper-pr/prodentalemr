@@ -1391,6 +1391,9 @@
                                         $configuredFields = is_array($configuredFields)
                                             ? $configuredFields
                                             : \App\Models\VerificationFormQuestion::defaultFrequencyResponseFields($responseMode);
+                                        $responseConfiguration = data_get($row, 'response_configuration');
+                                        $responseConfiguration = is_array($responseConfiguration) ? $responseConfiguration : [];
+                                        $primaryFields = data_get($responseConfiguration, 'primary_fields', ['coverage_percent', 'frequency']);
                                         $fieldOrder = [
                                             'coverage_status',
                                             'service_history',
@@ -1403,13 +1406,17 @@
                                             'payment_guideline',
                                             'notes',
                                         ];
-                                        $detailFields = collect($configuredFields)
+                                        $detailFields = collect(data_get($responseConfiguration, 'detail_fields', $configuredFields))
                                             ->reject(fn (string $field): bool => in_array($field, ['coverage_percent', 'frequency'], true))
                                             ->sortBy(fn (string $field): int => array_search($field, $fieldOrder, true) === false ? 999 : array_search($field, $fieldOrder, true))
                                             ->values()
                                             ->all();
                                         $preAuthRequiredForRow = data_get($this->codeCoverageData, $rowIndex . '.pre_auth_required') === 'Yes';
                                         $downgradeAppliesForRow = data_get($this->codeCoverageData, $rowIndex . '.downgrade_applies') === 'Yes';
+                                        $fieldLabels = array_replace($templateThreeFrequencyFieldLabels, data_get($responseConfiguration, 'field_labels', []));
+                                        $fieldPlaceholders = array_replace($templateThreeFrequencyPlaceholders, data_get($responseConfiguration, 'field_placeholders', []));
+                                        $yesNoFields = data_get($responseConfiguration, 'yes_no_fields', []);
+                                        $singleLineFields = data_get($responseConfiguration, 'single_line_fields', []);
 
                                         if (in_array('pre_auth_required', $detailFields, true) && ! in_array('pre_auth_details', $detailFields, true)) {
                                             $detailFields[] = 'pre_auth_details';
@@ -1427,13 +1434,23 @@
                                         <tr>
                                             <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
                                             <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
-                                            <td data-label="%"><input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%"></td>
-                                            <td data-label="Frequency"><input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency"></td>
+                                            <td data-label="%">
+                                                @if (in_array('coverage_percent', $primaryFields, true))
+                                                    <input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%">
+                                                @else
+                                                    <span style="color:#94a3b8;">-</span>
+                                                @endif
+                                            </td>
+                                            <td data-label="Frequency">
+                                                @if (in_array('frequency', $primaryFields, true))
+                                                    <input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency">
+                                                @else
+                                                    <span style="color:#94a3b8;">-</span>
+                                                @endif
+                                            </td>
                                             <td data-label="Response Details">
                                                 @if (empty($detailFields))
-                                                    <div style="border:1px dashed #dce8e3;border-radius:12px;background:#f8fafc;color:#64748b;padding:10px 12px;font-size:13px;font-weight:700;">
-                                                        No extra response fields selected.
-                                                    </div>
+                                                    <span style="color:#94a3b8;">-</span>
                                                 @else
                                                     <div
                                                         x-data="{ preAuth: @js(data_get($this->codeCoverageData, $rowIndex . '.pre_auth_required')), downgrade: @js(data_get($this->codeCoverageData, $rowIndex . '.downgrade_applies')) }"
@@ -1441,8 +1458,11 @@
                                                     >
                                                         @foreach ($detailFields as $field)
                                                             @php
-                                                                $label = $templateThreeFrequencyFieldLabels[$field] ?? str($field)->headline()->toString();
-                                                                $placeholder = $templateThreeFrequencyPlaceholders[$field] ?? $label;
+                                                                $label = $fieldLabels[$field] ?? str($field)->headline()->toString();
+                                                                $placeholder = $fieldPlaceholders[$field] ?? $label;
+                                                                $selectOptions = in_array($field, $yesNoFields, true)
+                                                                    ? ['' => 'Select an option', 'Yes' => 'Yes', 'No' => 'No']
+                                                                    : ($templateThreeFrequencySelectFields[$field] ?? null);
                                                             @endphp
                                                             <div
                                                                 @if ($field === 'pre_auth_details')
@@ -1454,7 +1474,7 @@
                                                                 @endif
                                                             >
                                                                 <label style="display:block;margin:0 0 5px;color:#50655d;font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;">{{ $label }}</label>
-                                                                @if (isset($templateThreeFrequencySelectFields[$field]))
+                                                                @if (is_array($selectOptions))
                                                                     <select
                                                                         @if ($field === 'pre_auth_required')
                                                                             x-model="preAuth"
@@ -1466,11 +1486,11 @@
                                                                             wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}"
                                                                         @endif
                                                                     >
-                                                                        @foreach ($templateThreeFrequencySelectFields[$field] as $optionValue => $optionLabel)
+                                                                        @foreach ($selectOptions as $optionValue => $optionLabel)
                                                                             <option value="{{ $optionValue }}">{{ $optionLabel }}</option>
                                                                         @endforeach
                                                                     </select>
-                                                                @elseif (in_array($field, $templateThreeFrequencyTextareaFields, true))
+                                                                @elseif (in_array($field, $templateThreeFrequencyTextareaFields, true) && ! in_array($field, $singleLineFields, true))
                                                                     <textarea wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}" placeholder="{{ $placeholder }}" rows="2"></textarea>
                                                                 @else
                                                                     <input wire:model.blur="codeCoverageData.{{ $rowIndex }}.{{ $field }}" placeholder="{{ $placeholder }}">

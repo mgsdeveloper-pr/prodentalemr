@@ -893,6 +893,7 @@ class EditVerificationRequest extends EditRecord
                 'description' => $row['description'],
                 'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
                 'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
+                'response_configuration' => $row['response_configuration'] ?? null,
                 'coverage_status' => null,
                 'coverage_percent' => null,
                 'frequency' => null,
@@ -1897,13 +1898,13 @@ class EditVerificationRequest extends EditRecord
 
             $match = $savedRowsBySignature->get($signature);
             $row = $match['row'] ?? [];
-            $fieldKey = 'codeCoverageData.'.($match['index'] ?? 'required_'.$question->getKey()).'.coverage_status';
             $label = filled($question->code)
                 ? "{$question->code} - {$question->prompt}"
                 : $question->prompt;
 
-            if (! filled($row['coverage_status'] ?? null) && ! filled($row['coverage_percent'] ?? null)) {
-                $missingFields[$fieldKey] = 'Coverage status or percent is required for '.$label;
+            foreach ($question->missingFrequencyResponseFields($row) as $missingField => $missingLabel) {
+                $missingFields['codeCoverageData.'.($match['index'] ?? 'required_'.$question->getKey()).'.'.$missingField]
+                    = $missingLabel.' is required for '.$label;
             }
         }
 
@@ -2255,6 +2256,7 @@ class EditVerificationRequest extends EditRecord
                     $question->frequency_response_fields,
                     $question->frequency_response_mode ?: 'current',
                 ),
+                'response_configuration' => $question->frequencyResponseConfiguration(),
             ])
             ->all();
     }
@@ -2412,6 +2414,7 @@ class EditVerificationRequest extends EditRecord
 
                 $row['frequency_response_mode'] = $defaultRow['frequency_response_mode'] ?? 'current';
                 $row['frequency_response_fields'] = $defaultRow['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode']);
+                $row['response_configuration'] = $defaultRow['response_configuration'] ?? null;
 
                 return $row;
             })
@@ -2445,6 +2448,7 @@ class EditVerificationRequest extends EditRecord
             'description' => $row['description'],
             'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
             'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
+            'response_configuration' => $row['response_configuration'] ?? null,
             'coverage_status' => null,
             'coverage_percent' => null,
             'frequency' => null,

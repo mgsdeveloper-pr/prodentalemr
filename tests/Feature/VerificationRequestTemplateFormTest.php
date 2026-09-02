@@ -523,6 +523,144 @@ it('keeps the exact optional response fields configured for each frequency row',
         ->and($rows->get('D9912')['frequency_response_fields'])->toBe([]);
 });
 
+it('uses and persists the correct responses for downgrade and orthodontic business questions', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $definitions = [
+        ['template_3_frequency_major', 'Crowns (D2740) Downgrade (Yes/No)? If YES need Code.'],
+        ['template_3_frequency_orthodontics', 'Ortho Lifetime Maximum?'],
+        ['template_3_frequency_orthodontics', 'Remaining Ortho maximum?'],
+        ['template_3_frequency_orthodontics', 'Ortho Deductibles?'],
+        ['template_3_frequency_orthodontics', 'Ortho Age limit?'],
+        ['template_3_frequency_orthodontics', 'Initial Payment %'],
+        ['template_3_frequency_orthodontics', 'How is Ortho Paid?'],
+        ['template_3_frequency_orthodontics', 'Work In Progress Covered (Yes/No)?'],
+    ];
+
+    $questions = collect($definitions)->map(function (array $definition, int $index) use ($version): VerificationFormQuestion {
+        return VerificationFormQuestion::create([
+            'template_version_id' => $version->id,
+            'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+            'section_key' => $definition[0],
+            'prompt' => $definition[1],
+            'form_type' => 'both',
+            'input_type' => 'frequency_row',
+            'frequency_response_mode' => 'advanced',
+            'frequency_response_fields' => [],
+            'sort_order' => 5000 + $index,
+            'is_required_for_audit' => true,
+            'is_active' => true,
+        ]);
+    });
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Major and orthodontic response request',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $coverageRows = [
+        ['category' => 'Major', 'description' => $definitions[0][1], 'downgrade_applies' => 'Yes', 'downgrade_to' => 'D2751'],
+        ['category' => 'Orthodontics', 'description' => $definitions[1][1], 'payment_guideline' => '$2,000'],
+        ['category' => 'Orthodontics', 'description' => $definitions[2][1], 'payment_guideline' => '$1,200'],
+        ['category' => 'Orthodontics', 'description' => $definitions[3][1], 'payment_guideline' => '$50'],
+        ['category' => 'Orthodontics', 'description' => $definitions[4][1], 'age_limit' => '19'],
+        ['category' => 'Orthodontics', 'description' => $definitions[5][1], 'coverage_percent' => 25],
+        ['category' => 'Orthodontics', 'description' => $definitions[6][1], 'payment_guideline' => 'Monthly installments'],
+        ['category' => 'Orthodontics', 'description' => $definitions[7][1], 'coverage_status' => 'Yes'],
+    ];
+    $coverageRows = collect($coverageRows)->map(fn (array $row, int $index): array => [
+        'id' => null,
+        'code_system' => 'ada',
+        'code' => '',
+        'coverage_status' => null,
+        'coverage_percent' => null,
+        'frequency' => null,
+        'age_limit' => null,
+        'waiting_period' => null,
+        'service_history' => null,
+        'pre_auth_required' => null,
+        'pre_auth_details' => null,
+        'downgrade_applies' => null,
+        'downgrade_to' => null,
+        'payment_guideline' => null,
+        'notes' => null,
+        'sort_order' => $index + 1,
+        ...$row,
+    ])->all();
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function configure(BillingWorkItem $request, array $coverageRows): void
+        {
+            $this->record = $request;
+            $this->data = ['vf_form_type' => 'full_form'];
+            $this->codeCoverageData = $coverageRows;
+            $this->formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
+            $this->waitingPeriodAnswer = 'no';
+        }
+
+        public function persist(): void
+        {
+            $this->shouldSkipWorkflowSyncOnSave = true;
+            $this->shouldCaptureSubmissionOnSave = false;
+
+            try {
+                $this->persistTemplateThreeWithoutResourceValidation(['outcome_status' => 'pending']);
+            } finally {
+                $this->shouldSkipWorkflowSyncOnSave = false;
+                $this->shouldCaptureSubmissionOnSave = true;
+            }
+        }
+
+        public function frequencyRows(): array
+        {
+            return $this->templateThreeFrequencyQuestionRows();
+        }
+    };
+    $page->configure($request, $coverageRows);
+
+    $configurations = collect($page->frequencyRows())
+        ->whereIn('description', collect($definitions)->pluck(1))
+        ->mapWithKeys(fn (array $row): array => [$row['description'] => $row['response_configuration']]);
+
+    expect($configurations[$definitions[0][1]]['primary_fields'])->toBe([])
+        ->and($configurations[$definitions[0][1]]['detail_fields'])->toBe(['downgrade_applies', 'downgrade_to'])
+        ->and($configurations[$definitions[1][1]]['detail_fields'])->toBe(['payment_guideline'])
+        ->and($configurations[$definitions[4][1]]['detail_fields'])->toBe(['age_limit'])
+        ->and($configurations[$definitions[5][1]]['primary_fields'])->toBe(['coverage_percent'])
+        ->and($configurations[$definitions[7][1]]['yes_no_fields'])->toBe(['coverage_status'])
+        ->and($questions->first()->missingFrequencyResponseFields(['downgrade_applies' => 'Yes']))->toHaveKey('downgrade_to');
+
+    $page->persist();
+
+    $savedRows = $request->verificationCoverageCodes()->get()->keyBy('description');
+
+    expect($savedRows[$definitions[0][1]]->downgrade_to)->toBe('D2751')
+        ->and($savedRows[$definitions[1][1]]->payment_guideline)->toBe('$2,000')
+        ->and($savedRows[$definitions[4][1]]->age_limit)->toBe('19')
+        ->and($savedRows[$definitions[5][1]]->coverage_percent)->toBe('25.00')
+        ->and($savedRows[$definitions[7][1]]->coverage_status)->toBe('Yes');
+
+    foreach ($questions as $question) {
+        expect($question->missingFrequencyResponseFields($savedRows[$question->prompt]))->toBe([]);
+    }
+
+    $pdfRows = (new ReflectionMethod(VerificationResultPdf::class, 'mapCoverageCodeRowsForSection'))
+        ->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_major');
+
+    expect($pdfRows->firstWhere('label', $definitions[0][1])['value'])
+        ->toContain('Downgrade: Yes', 'Downgrade code: D2751')
+        ->and(file_get_contents(resource_path('views/filament/saas/resources/verifications/pages/partials/verification-form-template-3-content.blade.php')))
+        ->not->toContain('No extra response fields selected.');
+});
+
 it('limits the audit checklist to active required questions applicable to the selected form type', function () {
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
