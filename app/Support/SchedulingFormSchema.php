@@ -31,15 +31,30 @@ class SchedulingFormSchema
                     Toggle::make("{$statePath}.{$day}.open")
                         ->label($label)
                         ->default(! in_array($day, ['saturday', 'sunday'], true))
+                        ->afterStateHydrated(function (Toggle $component, mixed $state, mixed $record) use ($day, $statePath): void {
+                            if ($state === null || blank(data_get($record, $statePath))) {
+                                $component->state(! in_array($day, ['saturday', 'sunday'], true));
+                            }
+                        })
                         ->live(),
                     TimePicker::make("{$statePath}.{$day}.opens_at")
                         ->label('Opens')
                         ->seconds(false)
-                        ->default('09:00'),
+                        ->default('09:00')
+                        ->afterStateHydrated(function (TimePicker $component, mixed $state): void {
+                            if (blank($state)) {
+                                $component->state('09:00');
+                            }
+                        }),
                     TimePicker::make("{$statePath}.{$day}.closes_at")
                         ->label('Closes')
                         ->seconds(false)
-                        ->default('17:00'),
+                        ->default('17:00')
+                        ->afterStateHydrated(function (TimePicker $component, mixed $state): void {
+                            if (blank($state)) {
+                                $component->state('17:00');
+                            }
+                        }),
                     TimePicker::make("{$statePath}.{$day}.break_starts_at")
                         ->label('Break starts')
                         ->seconds(false),

@@ -2,6 +2,7 @@
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
+use App\Filament\Clinic\Resources\Locations\Pages\EditLocation;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
@@ -468,6 +469,41 @@ it('does not offer inactive locations in the appointment editor', function () {
         ->assertOk()
         ->assertSee('Main Office')
         ->assertDontSee('Inactive Office');
+});
+
+it('preserves default weekday hours when editing a legacy location without a schedule', function () {
+    $this->location->update([
+        'city' => 'New York City',
+        'state' => 'New York',
+        'zip_code' => '10001',
+        'country' => 'USA',
+        'business_hours' => null,
+    ]);
+
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(EditLocation::class, ['record' => $this->location->getRouteKey()])
+        ->assertFormSet([
+            'business_hours.monday.open' => true,
+            'business_hours.monday.opens_at' => '09:00',
+            'business_hours.monday.closes_at' => '17:00',
+            'business_hours.friday.open' => true,
+            'business_hours.saturday.open' => false,
+            'business_hours.sunday.open' => false,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $hours = $this->location->fresh()->business_hours;
+
+    expect(data_get($hours, 'monday.open'))->toBeTrue()
+        ->and(data_get($hours, 'monday.opens_at'))->toBe('09:00')
+        ->and(data_get($hours, 'monday.closes_at'))->toBe('17:00')
+        ->and(data_get($hours, 'friday.open'))->toBeTrue()
+        ->and(data_get($hours, 'saturday.open'))->toBeFalse()
+        ->and(data_get($hours, 'sunday.open'))->toBeFalse();
 });
 
 it('renders the connected appointment editor and modal actions', function () {
