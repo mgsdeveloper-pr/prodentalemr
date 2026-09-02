@@ -19,6 +19,7 @@ use App\Models\Provider;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Appointments\AppointmentSchedulingService;
+use App\Support\AdminClinicScope;
 use App\Support\AppointmentVerificationSender;
 use App\Support\AppointmentWorkspaceScope;
 use App\Support\ClinicWorkspace;
@@ -627,7 +628,10 @@ it('creates an appointment through the save appointment action', function () {
 
 it('uses the selected clinic workspace instead of stale hidden scope values', function () {
     $this->actingAs($this->clinicUser);
-    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    $this->withSession([
+        ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION,
+        AdminClinicScope::SESSION_KEY => 999999,
+    ]);
     Filament::setCurrentPanel(Filament::getPanel('clinic'));
     $date = today()->next('Monday')->toDateString();
 

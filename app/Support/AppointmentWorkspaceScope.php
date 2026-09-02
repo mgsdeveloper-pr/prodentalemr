@@ -9,14 +9,14 @@ class AppointmentWorkspaceScope
 {
     public static function selectedClinicId(): ?int
     {
-        return AdminClinicScope::selectedClinicId()
-            ?: ClinicPanelScope::selectedClinicId();
+        return ClinicPanelScope::selectedClinicId()
+            ?: AdminClinicScope::selectedClinic()?->getKey();
     }
 
     public static function selectedClinic(): ?Clinic
     {
-        return AdminClinicScope::selectedClinic()
-            ?: ClinicPanelScope::selectedClinic();
+        return ClinicPanelScope::selectedClinic()
+            ?: AdminClinicScope::selectedClinic();
     }
 
     public static function selectedOrganizationId(): ?int
