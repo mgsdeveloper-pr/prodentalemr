@@ -26,8 +26,8 @@ class EditAppointment extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['organization_id'] ??= AppointmentWorkspaceScope::selectedOrganizationId();
-        $data['clinic_id'] ??= AppointmentWorkspaceScope::selectedClinicId();
+        $data['organization_id'] = AppointmentWorkspaceScope::selectedOrganizationId();
+        $data['clinic_id'] = AppointmentWorkspaceScope::selectedClinicId();
         $data = $this->syncStatusTimestamps($data);
 
         return app(AppointmentSchedulingService::class)->validateAndNormalize($data, $this->record);

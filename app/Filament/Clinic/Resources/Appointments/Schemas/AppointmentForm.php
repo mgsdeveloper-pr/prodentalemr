@@ -44,6 +44,7 @@ class AppointmentForm
                             ->default(fn (): ?int => AppointmentWorkspaceScope::mappedLocationId())
                             ->options(fn (): array => Location::query()
                                 ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
+                                ->where('status', true)
                                 ->orderBy('location_name')
                                 ->pluck('location_name', 'id')
                                 ->all())

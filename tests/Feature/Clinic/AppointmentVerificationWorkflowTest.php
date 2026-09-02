@@ -435,6 +435,41 @@ it('rejects a location outside the active clinic', function () {
         ->toThrow(ValidationException::class, 'Select an active location from this clinic.');
 });
 
+it('rejects an inactive location from the selected clinic', function () {
+    $this->location->update(['status' => false]);
+
+    $data = [
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'patient_id' => $this->patient->id,
+        'provider_id' => $this->provider->id,
+        'appointment_date' => today()->addDays(2)->toDateString(),
+        'start_time' => '10:00:00',
+        'end_time' => '10:30:00',
+        'duration_minutes' => 30,
+        'status' => 'scheduled',
+    ];
+
+    expect(fn () => app(AppointmentSchedulingService::class)->validateAndNormalize($data))
+        ->toThrow(ValidationException::class, 'Select an active location from this clinic.');
+});
+
+it('does not offer inactive locations in the appointment editor', function () {
+    Location::create([
+        'clinic_id' => $this->clinic->id,
+        'location_name' => 'Inactive Office',
+        'status' => false,
+    ]);
+
+    $this->actingAs($this->clinicUser)
+        ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])
+        ->get('/clinic/appointments/create')
+        ->assertOk()
+        ->assertSee('Main Office')
+        ->assertDontSee('Inactive Office');
+});
+
 it('renders the connected appointment editor and modal actions', function () {
     $this->actingAs($this->clinicUser)
         ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])

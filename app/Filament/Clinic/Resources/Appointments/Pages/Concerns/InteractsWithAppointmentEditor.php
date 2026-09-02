@@ -65,7 +65,11 @@ trait InteractsWithAppointmentEditor
             return 'Location not selected';
         }
 
-        return Location::query()->whereKey($locationId)->value('location_name') ?: 'Location not selected';
+        return Location::query()
+            ->whereKey($locationId)
+            ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
+            ->where('status', true)
+            ->value('location_name') ?: 'Location not selected';
     }
 
     public function getCurrentVisitTypeLabel(): string
@@ -600,7 +604,11 @@ trait InteractsWithAppointmentEditor
         $providerId = $this->data['provider_id'] ?? null;
 
         $location = filled($locationId)
-            ? Location::query()->where('clinic_id', $clinicId)->whereKey($locationId)->first()
+            ? Location::query()
+                ->where('clinic_id', $clinicId)
+                ->whereKey($locationId)
+                ->where('status', true)
+                ->first()
             : null;
         $provider = filled($providerId)
             ? Provider::query()->where('clinic_id', $clinicId)->whereKey($providerId)->first()
