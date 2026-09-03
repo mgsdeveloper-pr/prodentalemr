@@ -3,6 +3,33 @@
         $record = $this->getRecord();
         $summaryCards = $this->getWorkbenchSummary();
         $quickReference = $this->getQuickReferenceCard();
+        $templateThreeContextRows = $this->getContextRows();
+        $templateThreePracticeContext = collect($templateThreeContextRows['practice'] ?? [])
+            ->mapWithKeys(fn (array $row): array => [(string) ($row['label'] ?? '') => $row['value'] ?? '-']);
+        $templateThreeQuickReferenceRows = [
+            'Patient & Policy' => [
+                ['Patient Name', $quickReference['patient'] ?? '-'],
+                ['DOB', $quickReference['dob'] ?? '-'],
+                ['Relationship', $quickReference['relationship'] ?? '-'],
+                ['Member ID', $quickReference['member_id'] ?? '-'],
+                ['Group ID', $quickReference['group_number'] ?? '-'],
+                ['Insurance Name', $quickReference['insurance_name'] ?? '-'],
+            ],
+            'Verification Context' => [
+                ['Insurance Phone', $quickReference['phone'] ?? '-'],
+                ['Subscriber', $quickReference['subscriber_name'] ?? '-'],
+                ['Subscriber DOB', $quickReference['subscriber_dob'] ?? '-'],
+                ['Subscriber ID', $quickReference['subscriber_id'] ?? '-'],
+                ['Location', $templateThreePracticeContext->get('Location', '-')],
+                ['Appointment Date', $quickReference['appointment_date'] ?? '-'],
+            ],
+            'Provider Information' => [
+                ['Provider Name', $quickReference['provider_name'] ?? '-'],
+                ['NPI', $quickReference['provider_npi'] ?? '-'],
+                ['Tax ID / EIN', $quickReference['provider_tax_id'] ?? '-'],
+                ['Clinic Name', $quickReference['clinic_name'] ?? '-'],
+            ],
+        ];
         $coreDetails = $this->getCoreDetailRows();
         $coverageMatrix = $this->getCoverageMatrix();
         $planProvisionRows = $this->getPlanProvisionRows();
@@ -271,12 +298,11 @@
         }
 
         .vt3-compact-workbar {
-            z-index: 25;
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
-            gap: 12px 24px;
+            gap: 8px 24px;
             align-items: center;
-            padding: 17px 24px 14px;
+            padding: 14px 24px 12px;
             border: 0;
             border-bottom: 1px solid #dbe4ee;
             border-radius: 0;
@@ -286,18 +312,20 @@
 
         .vt3-compact-workbar__identity {
             min-width: 0;
+            display: grid;
+            gap: 7px;
         }
 
         .vt3-compact-workbar__title-row {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
-            gap: 10px 12px;
+            gap: 8px 14px;
         }
 
         .vt3-compact-workbar__title-row h1 {
             margin: 0;
-            font-size: 26px;
+            font-size: 24px;
             line-height: 1.15;
             font-weight: 900;
             color: #0f172a;
@@ -308,7 +336,7 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 6px 10px;
-            margin-top: 6px;
+            margin-top: 0;
         }
 
         .vt3-compact-workbar__context-divider {
@@ -337,7 +365,7 @@
         }
 
         .vt3-compact-workbar__breadcrumbs {
-            margin-top: 8px;
+            margin-top: 0;
             display: inline-flex;
             flex-wrap: wrap;
             align-items: center;
@@ -388,6 +416,235 @@
 
         .vt3-form-stage {
             gap: 16px !important;
+        }
+
+        .vt3-integrated-header {
+            position: sticky;
+            top: calc(var(--pwdl-shell-topbar, 72px) - 8px);
+            z-index: 25;
+            overflow: visible;
+            border: 0;
+            border-bottom: 1px solid #dbe4ee;
+            border-radius: 0;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+        }
+
+        .vt3-integrated-header .vt3-compact-workbar {
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            min-height: 56px;
+            padding: 8px 16px;
+            border-bottom: 0;
+        }
+
+        .vt3-integrated-header .vt3-compact-workbar__title-row {
+            flex-wrap: nowrap;
+            gap: 0;
+            min-width: 0;
+            align-items: center;
+        }
+
+        .vt3-integrated-header .vt3-compact-workbar__title-row h1 {
+            flex: 0 0 auto;
+            padding-right: 14px;
+            font-size: 15px;
+            line-height: 1.2;
+        }
+
+        .vt3-integrated-header .vt3-compact-workbar__context {
+            flex-wrap: nowrap;
+            gap: 0;
+            min-width: 0;
+            margin: 0;
+        }
+
+        .vt3-header-context-item {
+            display: inline-flex;
+            align-items: center;
+            min-width: 0;
+            padding: 0 12px;
+            border-left: 1px solid #dbe4ee;
+            color: #475569;
+            font-size: 12px;
+            line-height: 1.35;
+            white-space: nowrap;
+        }
+
+        .vt3-header-context-item strong {
+            margin-left: 4px;
+            color: #0f172a;
+            font-weight: 850;
+        }
+
+        .vt3-header-context-item:last-child {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .vt3-integrated-header .vt3-compact-workbar__actions,
+        .vt3-integrated-header .vt3-compact-workbar__actions .vt3-top-actions {
+            justify-content: flex-end;
+        }
+
+        .vt3-reference-drawer {
+            position: fixed;
+            top: calc(var(--pwdl-shell-topbar, 72px) + 49px);
+            right: 0;
+            bottom: 0;
+            z-index: 45;
+            display: flex;
+            width: min(390px, calc(100vw - 48px));
+            flex-direction: column;
+            border-left: 1px solid #dbe4ee;
+            background: #ffffff;
+            box-shadow: -12px 0 28px rgba(15, 23, 42, 0.14);
+            transform: translateX(100%);
+            transition: transform 180ms ease;
+        }
+
+        .vt3-reference-drawer.is-open {
+            transform: translateX(0);
+        }
+
+        .vt3-reference-drawer__tab {
+            position: absolute;
+            top: 34%;
+            left: -42px;
+            display: flex;
+            width: 42px;
+            min-height: 184px;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 7px;
+            border: 0;
+            border-radius: 6px 0 0 6px;
+            background: #0f766e;
+            color: #ffffff;
+            cursor: pointer;
+            box-shadow: -4px 4px 12px rgba(15, 23, 42, 0.14);
+        }
+
+        .vt3-reference-drawer__tab svg {
+            position: absolute;
+            top: 10px;
+            width: 16px;
+            height: 16px;
+        }
+
+        .vt3-reference-drawer__tab span {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-size: 11px;
+            font-weight: 850;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .vt3-reference-drawer__header {
+            display: flex;
+            min-height: 64px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            border-bottom: 1px solid #dbe4ee;
+        }
+
+        .vt3-reference-drawer__header h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .vt3-reference-drawer__close {
+            display: inline-grid;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            place-items: center;
+            border: 0;
+            border-radius: 5px;
+            background: transparent;
+            color: #475569;
+            cursor: pointer;
+        }
+
+        .vt3-reference-drawer__close:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .vt3-reference-drawer__close svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .vt3-reference-drawer__body {
+            min-height: 0;
+            flex: 1;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 8px 20px 24px;
+            scrollbar-width: thin;
+        }
+
+        .vt3-reference-drawer__group {
+            padding: 18px 0;
+            border-bottom: 1px solid #dbe4ee;
+        }
+
+        .vt3-reference-drawer__group:last-child {
+            border-bottom: 0;
+        }
+
+        .vt3-reference-drawer__group h3 {
+            margin: 0 0 14px;
+            color: #0f766e;
+            font-size: 14px;
+            font-weight: 900;
+        }
+
+        .vt3-reference-drawer__group dl {
+            display: grid;
+            gap: 0;
+            margin: 0;
+        }
+
+        .vt3-reference-drawer__row {
+            display: grid;
+            grid-template-columns: minmax(112px, .8fr) minmax(0, 1.2fr);
+            gap: 14px;
+            padding: 9px 0;
+        }
+
+        .vt3-reference-drawer__row dt,
+        .vt3-reference-drawer__row dd {
+            margin: 0;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        .vt3-reference-drawer__row dt {
+            color: #64748b;
+            font-weight: 650;
+        }
+
+        .vt3-reference-drawer__row dd {
+            color: #0f172a;
+            font-weight: 800;
+            overflow-wrap: anywhere;
+        }
+
+        .vt3-reference-drawer__row a {
+            color: #0f766e;
+            text-decoration: none;
+        }
+
+        .vt3-reference-drawer__row a:hover {
+            text-decoration: underline;
         }
 
         .vt3-status-rail {
@@ -521,9 +778,28 @@
                 padding-inline: 18px;
             }
 
+            .vt3-integrated-header {
+                position: static;
+                box-shadow: none;
+            }
+
+            .vt3-integrated-header .vt3-compact-workbar__title-row,
+            .vt3-integrated-header .vt3-compact-workbar__context {
+                flex-wrap: wrap;
+            }
+
+            .vt3-header-context-item {
+                margin-top: 5px;
+            }
+
             .vt3-compact-workbar__actions {
                 justify-content: flex-start;
                 max-width: none;
+            }
+
+            .vt3-integrated-header .vt3-compact-workbar__actions,
+            .vt3-integrated-header .vt3-compact-workbar__actions .vt3-top-actions {
+                justify-content: flex-start;
             }
 
             .verification-workbench-layout {
@@ -540,9 +816,35 @@
             }
 
         }
+
+        @media (max-width: 640px) {
+            .vt3-integrated-header .vt3-compact-workbar__title-row h1 {
+                width: 100%;
+                padding: 0 0 4px;
+            }
+
+            .vt3-header-context-item {
+                padding: 0 8px;
+                border-left: 0;
+            }
+
+            .vt3-header-context-item:first-child {
+                padding-left: 0;
+            }
+
+            .vt3-reference-drawer {
+                top: calc(var(--pwdl-shell-topbar, 72px) - 8px);
+                width: calc(100vw - 42px);
+            }
+
+            .vt3-reference-drawer__tab {
+                left: -38px;
+                width: 38px;
+            }
+        }
     </style>
 
-    <div class="verification-reference-workspace verification-reference-workspace--edit {{ $this->focusMode ? 'verification-focus-mode' : '' }}" style="display: flex; flex-direction: column; gap: 22px;">
+    <div class="verification-reference-workspace verification-reference-workspace--edit {{ $this->focusMode ? 'verification-focus-mode' : '' }}" style="display: flex; flex-direction: column; gap: {{ $isTemplateThreeVerificationForm && ! $this->focusMode ? '12px' : '22px' }};">
         @if ($this->focusMode)
             <x-pds.focus-mode-topbar
                 :title="$this->getTitle()"
@@ -556,32 +858,29 @@
                 </x-pds.button>
             </x-pds.focus-mode-topbar>
         @elseif ($isTemplateThreeVerificationForm)
-            <section class="vt3-compact-workbar">
-                <div class="vt3-compact-workbar__identity">
-                    <div class="vt3-compact-workbar__title-row">
-                        <h1>{{ $this->getTitle() }}</h1>
+            <section
+                class="vt3-integrated-header"
+                x-data="{ quickReferenceDrawerOpen: true }"
+                x-on:keydown.escape.window="quickReferenceDrawerOpen = false"
+            >
+                <div class="vt3-compact-workbar">
+                    <div class="vt3-compact-workbar__identity">
+                        <div class="vt3-compact-workbar__title-row">
+                            <h1>{{ $this->getTitle() }}</h1>
+                            <div class="vt3-compact-workbar__context">
+                                <span class="vt3-header-context-item">Patient: <strong>{{ $quickReference['patient'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">DOB: <strong>{{ $quickReference['dob'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Member ID: <strong>{{ $quickReference['member_id'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Insurance: <strong>{{ $quickReference['insurance_name'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber: <strong>{{ $quickReference['subscriber_name'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber DOB: <strong>{{ $quickReference['subscriber_dob'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber ID: <strong>{{ $quickReference['subscriber_id'] ?? '-' }}</strong></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="vt3-compact-workbar__context">
-                        <span class="vt3-compact-workbar__patient">Patient: {{ $record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? 'Verification Request') }}</span>
-                        <span class="vt3-compact-workbar__context-divider" aria-hidden="true">&bull;</span>
-                        <span class="vt3-compact-workbar__token">{{ $record->reference_number }}</span>
-                    </div>
-                    <div class="vt3-compact-workbar__breadcrumbs">
-                        <span>Verification Requests</span>
-                        <span>&rsaquo;</span>
-                        <span>{{ $record->reference_number }}</span>
-                        <span>&rsaquo;</span>
-                        <span>Edit</span>
-                    </div>
+                    <div class="vt3-compact-workbar__actions">{!! $verificationFormHeroActions !!}</div>
                 </div>
-                <div class="vt3-compact-workbar__actions">{!! $verificationFormHeroActions !!}</div>
-                <section class="vt3-status-rail" aria-label="Verification request summary">
-                    <span class="vt3-status-chip vt3-status-chip--primary">Status <strong>{{ $requestStatusLabel }}</strong></span>
-                    <span class="vt3-status-chip">Next <strong>{{ $requestNextAction }}</strong></span>
-                    <span class="vt3-status-chip" title="{{ $templateName ?: 'Template snapshot' }}">Template <strong>{{ $templateChipLabel ?: 'Attached' }}</strong></span>
-                    <span class="vt3-status-chip">SLA <strong>{{ $slaSnapshot['label'] ?? 'Not Set' }}</strong></span>
-                    <span class="vt3-status-chip">Activity <strong>{{ $activityTimeline->count() }}</strong></span>
-                </section>
+                @include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-drawer')
             </section>
         @else
             @include('filament.shared.partials.page-hero', [

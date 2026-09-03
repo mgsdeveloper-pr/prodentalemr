@@ -889,11 +889,14 @@
     }
 
     .verification-focus-mode .vt3-shell .uel2-sidebar {
+        position: sticky;
         top: 8.25rem;
+        max-height: calc(100vh - 9rem);
     }
 
     .verification-focus-mode .vt3-shell .uel2-sidebar-rail {
-        max-height: calc(100vh - 9rem);
+        max-height: inherit;
+        overflow-x: hidden;
         overflow-y: auto;
     }
 

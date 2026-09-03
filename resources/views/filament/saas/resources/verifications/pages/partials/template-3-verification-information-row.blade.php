@@ -25,7 +25,14 @@
                 @break
 
             @case('yes_no')
-                <select wire:model.blur="data.{{ $question['field'] }}" style="{{ $templateThreeInput }}">
+                <select
+                    @if ($question['reactive'] ?? false)
+                        wire:model.live="data.{{ $question['field'] }}"
+                    @else
+                        wire:model.blur="data.{{ $question['field'] }}"
+                    @endif
+                    style="{{ $templateThreeInput }}"
+                >
                     <option value="">Select</option>
                     <option value="Yes">Yes</option>
                     <option value="No">No</option>
@@ -33,7 +40,14 @@
                 @break
 
             @case('select')
-                <select wire:model.blur="data.{{ $question['field'] }}" style="{{ $templateThreeInput }}">
+                <select
+                    @if ($question['reactive'] ?? false)
+                        wire:model.live="data.{{ $question['field'] }}"
+                    @else
+                        wire:model.blur="data.{{ $question['field'] }}"
+                    @endif
+                    style="{{ $templateThreeInput }}"
+                >
                     <option value="">Select</option>
                     @foreach ($question['options'] as $option)
                         <option value="{{ $option }}">{{ $option }}</option>

@@ -29,6 +29,13 @@
 
     $templateThreeVisibleBenefitGroups = $templateThreeBenefitGroups
         ->filter(fn (array $benefitRows): bool => count($benefitRows) > 0);
+    $templateThreeBenefitGroupCounts = $templateThreeVisibleBenefitGroups
+        ->map(fn (array $benefitRows): array => [
+            'completed' => collect($benefitRows)
+                ->filter(fn (array $entry): bool => $this->codeCoverageRowIsComplete($entry['row'] ?? []))
+                ->count(),
+            'total' => count($benefitRows),
+        ]);
 
     $templateThreePatientQuestions = $this->getTemplateThreeQuestionsForSection('template_3_patient_subscriber');
     $templateThreeInsuranceQuestions = $this->getTemplateThreeQuestionsForSection('template_3_insurance');
@@ -36,20 +43,8 @@
     $templateThreePlanProvisionQuestions = $this->getTemplateThreeQuestionsForSection('template_3_plan_provisions');
     $templateThreeServiceHistoryQuestions = $this->getTemplateThreeQuestionsForSection('template_3_service_history');
     $templateThreeVerificationSection = $this->getTemplateThreeVerificationInformationSection();
-    $templateThreeSectionProgress = collect($this->getVerificationSectionProgress());
-    $templateThreeContextRows = $this->getContextRows();
-    $templateThreeSidebarBlocks = [
-        'Practice' => $templateThreeContextRows['practice'] ?? [],
-        'Provider' => [
-            ['label' => 'Doctor', 'value' => $quickReference['provider_name'] ?? '-'],
-            ['label' => 'Provider NPI', 'value' => $quickReference['provider_npi'] ?? '-'],
-            ['label' => 'Insurance Phone', 'value' => $quickReference['phone'] ?? '-'],
-        ],
-        'Patient' => $templateThreeContextRows['patient'] ?? [],
-    ];
-
-    $templateThreeInput = 'width:100%;min-height:42px;border:1px solid #dce8e3;border-radius:12px;background:#fff;padding:10px 12px;font-size:14px;outline:none;color:#142e25;';
-    $templateThreeReadonly = 'width:100%;min-height:42px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:10px 12px;font-size:14px;font-weight:700;color:#334155;';
+    $templateThreeInput = 'width:100%;min-height:38px;border:1px solid #dce8e3;border-radius:6px;background:#fff;padding:8px 10px;font-size:13px;outline:none;color:#142e25;';
+    $templateThreeReadonly = 'width:100%;min-height:38px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:8px 10px;font-size:13px;font-weight:700;color:#334155;';
     $templateThreeFrequencyFieldLabels = array_merge(
         \App\Models\VerificationFormQuestion::FREQUENCY_BASE_RESPONSE_FIELDS,
         \App\Models\VerificationFormQuestion::FREQUENCY_CURRENT_OPTIONAL_FIELDS,
@@ -253,7 +248,6 @@
                 ? collect($this->waitingPeriodDetails ?? [])->contains(
                     fn ($detail): bool => filled(data_get($detail, 'period'))
                         || filled(data_get($detail, 'notes'))
-                        || filled(data_get($detail, 'unit'))
                 )
                 : filled($this->waitingPeriodAnswer ?? null))
             : null,
@@ -325,23 +319,22 @@
 
     .uel2-shell {
         border: 1px solid #d6e6df;
-        border-radius: 30px;
-        background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 252, 249, 0.98) 100%);
-        box-shadow: 0 18px 40px rgba(13, 58, 41, 0.08);
+        border-radius: 8px;
+        background: #f7faf9;
         overflow: hidden;
     }
 
     .uel2-shell__inner {
-        padding: 20px;
-        background:
-            linear-gradient(180deg, rgba(238, 247, 243, 0.92) 0%, rgba(248, 252, 250, 0.96) 100%);
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+        background: #f7faf9;
     }
 
     .uel2-layout {
         display: grid;
-        grid-template-columns: 300px minmax(0, 1fr);
-        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
         align-items: start;
     }
 
@@ -355,15 +348,14 @@
     .uel2-content {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
         min-width: 0;
     }
 
     .uel2-sidebar-rail {
         border: 1px solid var(--uel2-line);
-        border-radius: 24px;
-        background: linear-gradient(180deg, #ffffff, #f9fcfb);
-        box-shadow: 0 10px 24px rgba(13, 58, 41, 0.05);
+        border-radius: 7px;
+        background: #ffffff;
         max-height: calc(100vh - 32px);
         overflow-y: auto;
         padding-right: 6px;
@@ -432,9 +424,8 @@
     .uel2-section {
         overflow: hidden;
         border: 1px solid var(--uel2-line);
-        border-radius: 22px;
+        border-radius: 7px;
         background: #ffffff;
-        box-shadow: 0 10px 24px rgba(13, 58, 41, 0.05);
     }
 
     .uel2-header {
@@ -442,9 +433,9 @@
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        padding: 18px 22px;
+        padding: 12px 14px;
         border-bottom: 1px solid var(--uel2-line);
-        background: linear-gradient(180deg, #ffffff, #f8fbfa);
+        background: #e4f5ef;
     }
 
     .uel2-header h2, .uel2-subsection h3 {
@@ -453,20 +444,208 @@
         font-weight: 900;
     }
 
-    .uel2-header h2 { font-size: 19px; }
-    .uel2-header p { margin: 4px 0 0; color: var(--uel2-muted); font-size: 13px; }
+    .uel2-header h2 { font-size: 15px; }
+    .uel2-header p { margin: 3px 0 0; color: var(--uel2-muted); font-size: 11px; }
 
-    .uel2-pill {
-        padding: 7px 11px;
-        border-radius: 999px;
-        background: var(--uel2-soft);
-        color: var(--uel2-brand);
-        font-size: 12px;
+    .uel2-quick-strip,
+    .uel2-progress-disclosure {
+        overflow: hidden;
+        border: 1px solid var(--uel2-line);
+        border-radius: 7px;
+        background: #ffffff;
+    }
+
+    .uel2-quick-strip__header,
+    .uel2-progress-disclosure > summary {
+        display: flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 12px;
+        color: var(--uel2-dark);
+    }
+
+    .uel2-quick-strip__header h3 {
+        margin: 0;
+        font-size: 13px;
         font-weight: 900;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .uel2-quick-strip__toggle {
+        display: inline-grid;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        place-items: center;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--uel2-brand);
+        cursor: pointer;
+    }
+
+    .uel2-quick-strip__toggle:hover {
+        background: #eef8f4;
+    }
+
+    .uel2-quick-strip__toggle svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .uel2-sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .uel2-quick-strip__body {
+        border-top: 1px solid var(--uel2-line);
+    }
+
+    .uel2-quick-strip__row {
+        display: grid;
+        grid-template-columns: 126px minmax(0, 1fr);
+        gap: 10px;
+        align-items: stretch;
+        padding: 8px 12px;
+    }
+
+    .uel2-quick-strip__row + .uel2-quick-strip__row {
+        border-top: 1px solid var(--uel2-line);
+    }
+
+    .uel2-quick-strip__row-title {
+        display: flex;
+        align-items: center;
+        color: #64776f;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .uel2-quick-strip__row-title span {
         white-space: nowrap;
     }
 
-    .uel2-body { padding: 20px; }
+    .uel2-quick-strip__fields {
+        display: grid;
+        min-width: 0;
+        gap: 0;
+    }
+
+    .uel2-quick-strip__fields--patient {
+        grid-template-columns: 1.25fr .72fr .82fr 1.4fr 1fr 1.1fr;
+    }
+
+    .uel2-quick-strip__fields--context {
+        grid-template-columns: .95fr 1fr .92fr 1.35fr 1.18fr 1.12fr .92fr;
+    }
+
+    .uel2-quick-strip__field {
+        min-width: 0;
+        padding: 0 10px;
+        border-left: 1px solid #e8efec;
+    }
+
+    .uel2-quick-strip__field:first-child {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .uel2-quick-strip__label {
+        color: #738377;
+        font-size: 9px;
+        font-weight: 900;
+        letter-spacing: .05em;
+        line-height: 1.25;
+        text-transform: uppercase;
+    }
+
+    .uel2-quick-strip__value {
+        margin-top: 2px;
+        color: var(--uel2-dark);
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .uel2-quick-strip__value a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .uel2-quick-strip__value a:hover {
+        color: var(--uel2-brand);
+        text-decoration: underline;
+    }
+
+    .uel2-progress-disclosure > summary {
+        border-bottom: 0;
+        font-size: 12px;
+        font-weight: 800;
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .vt3-shell .uel2-progress-disclosure {
+        border: 0;
+        border-bottom: 1px solid var(--uel2-line);
+        border-radius: 0;
+        background: transparent;
+    }
+
+    .vt3-shell .uel2-progress-disclosure > summary {
+        min-height: 32px;
+        padding: 4px 6px;
+    }
+
+    .uel2-progress-disclosure > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .uel2-progress-disclosure[open] > summary {
+        border-bottom: 1px solid var(--uel2-line);
+    }
+
+    .uel2-progress-disclosure__summary,
+    .uel2-progress-disclosure__status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .uel2-progress-disclosure__body {
+        padding: 12px 14px 14px;
+    }
+
+    .uel2-progress-disclosure .uel2-progress-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .uel2-pill {
+        padding: 4px 8px;
+        border: 1px solid #acd9ca;
+        border-radius: 999px;
+        background: #ffffff;
+        color: var(--uel2-brand);
+        font-size: 11px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .uel2-body { padding: 14px; }
 
     .uel2-quick-reference {
         display: grid;
@@ -474,10 +653,10 @@
     }
 
     .uel2-progress-card {
-        padding: 16px;
+        padding: 12px;
         border: 1px solid var(--uel2-line);
-        border-radius: 18px;
-        background: linear-gradient(180deg, #ffffff, #f7fbf9);
+        border-radius: 6px;
+        background: #f8fbfa;
     }
 
     .uel2-progress-bar {
@@ -491,7 +670,7 @@
         display: block;
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #2bb673, #0b6b4f);
+        background: var(--uel2-brand);
     }
 
     .uel2-progress-total {
@@ -516,7 +695,7 @@
         justify-content: space-between;
         gap: 10px;
         padding: 10px 12px;
-        border-radius: 14px;
+        border-radius: 6px;
         background: #f8fbfa;
         border: 1px solid #e4eeea;
     }
@@ -641,7 +820,11 @@
     .uel2-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 15px;
+        gap: 12px;
+    }
+
+    .uel2-grid--money {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .uel2-field label {
@@ -668,23 +851,140 @@
     }
 
     .uel2-insurance-group {
-        padding: 16px;
+        padding: 14px 0 0;
+        border-top: 1px solid var(--uel2-line);
+        background: #ffffff;
+    }
+
+    .uel2-insurance-group:first-child {
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    .uel2-insurance-group__title {
+        grid-column: 1 / -1;
+        margin: 0 0 2px;
+        color: #42564f;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .uel2-question-list { display: grid; }
+
+    .uel2-question-row {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) minmax(260px, .8fr);
+        gap: 18px;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--uel2-line);
+    }
+
+    .uel2-question-row:last-child { border-bottom: 0; }
+
+    .uel2-question-row__label {
+        color: var(--uel2-dark);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.4;
+    }
+
+    .uel2-question-row__help {
+        margin-top: 3px;
+        color: var(--uel2-muted);
+        font-size: 11px;
+        line-height: 1.45;
+    }
+
+    .uel2-question-row__response > input,
+    .uel2-question-row__response > select,
+    .uel2-question-row__response > textarea {
+        width: 100%;
+        min-height: 38px;
+        padding: 8px 10px;
         border: 1px solid var(--uel2-line);
-        border-radius: 18px;
-        background: #fbfdfc;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #142e25;
+        font-size: 13px;
+    }
+
+    .uel2-coverage-list,
+    .uel2-history-list {
+        display: grid;
+    }
+
+    .uel2-coverage-row {
+        display: grid;
+        grid-template-columns: minmax(190px, 1fr) minmax(150px, .72fr) minmax(150px, .72fr);
+        gap: 14px;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--uel2-line);
+    }
+
+    .uel2-coverage-row:first-child,
+    .uel2-history-row:first-child {
+        padding-top: 0;
+    }
+
+    .uel2-coverage-row:last-child,
+    .uel2-history-row:last-child {
+        border-bottom: 0;
+    }
+
+    .uel2-response-label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--uel2-muted);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+
+    .uel2-history-row {
+        display: grid;
+        grid-template-columns: minmax(190px, .7fr) minmax(260px, 1.3fr);
+        gap: 16px;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--uel2-line);
+    }
+
+    .uel2-history-row input {
+        width: 100%;
+        min-height: 38px;
+        padding: 8px 10px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 6px;
+        background: #ffffff;
+        color: #142e25;
+        font-size: 13px;
+    }
+
+    .uel2-detail-panel {
+        margin: 0 14px 14px;
+        padding: 12px;
+        border-left: 3px solid #80c8b2;
+        background: #f5faf8;
     }
 
     .uel2-subsection {
-        margin-top: 16px;
-        padding: 16px;
+        margin-top: 12px;
+        padding: 0;
         border: 1px solid var(--uel2-line);
-        border-radius: 18px;
-        background: #fbfdfc;
+        border-radius: 7px;
+        background: #ffffff;
+        overflow: hidden;
     }
 
     .uel2-subsection h3 {
-        margin-bottom: 14px;
-        font-size: 15px;
+        margin: 0;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--uel2-line);
+        background: #f8fbfa;
+        font-size: 13px;
         letter-spacing: .04em;
         text-transform: uppercase;
     }
@@ -694,11 +994,49 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 14px;
+        margin-bottom: 0;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--uel2-line);
+        background: #f8fbfa;
     }
 
     .uel2-subsection__header h3 {
-        margin-bottom: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
+
+    .uel2-subsection > .uel2-grid {
+        padding: 14px;
+    }
+
+    .uel2-subsection > .uel2-field {
+        margin: 14px !important;
+    }
+
+    .uel2-subsection > .uel2-table {
+        border: 0;
+        border-radius: 0;
+    }
+
+    .uel2-subsection--flat {
+        margin-top: 16px;
+        border: 0;
+        border-top: 1px solid var(--uel2-line);
+        border-radius: 0;
+        overflow: visible;
+    }
+
+    .uel2-subsection--flat h3 {
+        padding: 12px 0 10px;
+        border: 0;
+        background: transparent;
+        color: #42564f;
+        font-size: 11px;
+    }
+
+    .uel2-subsection--flat > .uel2-grid {
+        padding: 0;
     }
 
     .uel2-table {
@@ -707,7 +1045,7 @@
         border-spacing: 0;
         border-collapse: separate;
         table-layout: fixed;
-        border-radius: 16px;
+        border-radius: 6px;
         overflow: hidden;
     }
 
@@ -738,35 +1076,350 @@
         min-height: 38px;
         padding: 8px 10px;
         border: 1px solid var(--uel2-line);
-        border-radius: 10px;
+        border-radius: 6px;
         background: #ffffff;
         color: #142e25;
         font-size: 13px;
     }
 
-    .uel2-managed-questions {
+    .uel2-page input:focus,
+    .uel2-page select:focus,
+    .uel2-page textarea:focus {
+        border-color: #16856a !important;
+        box-shadow: 0 0 0 3px rgba(22, 133, 106, .12);
+        outline: none;
+    }
+
+    .uel2-page input[readonly],
+    .uel2-page textarea[readonly],
+    .uel2-readonly {
+        border-color: #dfe7e3 !important;
+        background: #f3f6f5 !important;
+        color: #53645e !important;
+        cursor: default;
+    }
+
+    .uel2-inline-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .uel2-icon-button {
+        display: inline-flex;
+        flex: 0 0 38px;
+        width: 38px;
+        height: 38px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #b8d4c9;
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--uel2-brand);
+        font-size: 18px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .uel2-icon-button:disabled {
+        border-color: #dbe4ee;
+        background: #f3f6f5;
+        color: #94a3b8;
+        cursor: not-allowed;
+    }
+
+    .uel2-input-addon {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-        margin-top: 16px;
-        padding-top: 16px;
-        border-top: 1px dashed var(--uel2-line);
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--uel2-line);
+        border-radius: 6px;
+        background: #ffffff;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .uel2-input-addon:focus-within {
+        border-color: #16856a;
+        box-shadow: 0 0 0 3px rgba(22, 133, 106, .12);
+    }
+
+    .uel2-input-addon--prefix {
+        grid-template-columns: 36px minmax(0, 1fr);
+    }
+
+    .uel2-input-addon--suffix {
+        grid-template-columns: minmax(0, 1fr) 38px;
+    }
+
+    .uel2-input-addon > span {
+        display: grid;
+        place-items: center;
+        min-height: 38px;
+        border: 0;
+        background: #f3f7f5;
+        color: #62736d;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .uel2-input-addon--prefix > span {
+        border-right: 1px solid var(--uel2-line);
+    }
+
+    .uel2-input-addon--suffix > span {
+        border-left: 1px solid var(--uel2-line);
+    }
+
+    .uel2-input-addon > input {
+        width: 100%;
+        min-width: 0;
+        min-height: 38px;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 0;
+        background: #ffffff;
+        color: #142e25;
+        font-size: 13px;
+    }
+
+    .uel2-page .uel2-input-addon > input:focus {
+        border: 0 !important;
+        box-shadow: none;
+    }
+
+    .uel2-segmented {
+        display: inline-grid;
+        grid-template-columns: repeat(2, minmax(72px, 1fr));
+        min-height: 38px;
+        overflow: hidden;
+        border: 1px solid var(--uel2-line);
+        border-radius: 6px;
+        background: #ffffff;
+    }
+
+    .uel2-segmented label {
+        display: block;
+        margin: 0;
+        cursor: pointer;
+    }
+
+    .uel2-segmented label + label {
+        border-left: 1px solid var(--uel2-line);
+    }
+
+    .uel2-segmented input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .uel2-segmented span {
+        display: grid;
+        place-items: center;
+        min-height: 38px;
+        padding: 7px 14px;
+        color: #29443a;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .uel2-segmented input:checked + span {
+        background: var(--uel2-brand);
+        color: #ffffff;
+    }
+
+    .uel2-segmented input:focus-visible + span {
+        box-shadow: inset 0 0 0 2px #8ed4bf;
+    }
+
+    .uel2-choice-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 8px;
+    }
+
+    .uel2-choice-option {
+        display: flex !important;
+        align-items: center;
+        gap: 8px;
+        min-height: 38px;
+        margin: 0 !important;
+        padding: 8px 10px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 6px;
+        background: #ffffff;
+        color: #142e25 !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+    }
+
+    .uel2-benefit-group > h3,
+    .uel2-benefit-group > .uel2-subsection__header {
+        padding: 12px 14px;
+        background: #eaf7f2;
+        color: #075f49;
+    }
+
+    .uel2-benefit-table {
+        border: 0;
+        border-radius: 0;
+    }
+
+    .uel2-benefit-table thead {
+        display: none;
+    }
+
+    .uel2-benefit-table tbody {
+        display: block;
+    }
+
+    .uel2-benefit-table tr {
+        display: grid;
+        grid-template-columns: 68px minmax(170px, 1fr) minmax(124px, .58fr) minmax(150px, .72fr);
+        gap: 8px;
+        align-items: center;
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--uel2-line);
+    }
+
+    .uel2-benefit-table tr:last-child {
+        border-bottom: 0;
+    }
+
+    .uel2-benefit-table td {
+        min-width: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .uel2-benefit-table td:last-child {
+        grid-column: 3 / -1;
+    }
+
+    .uel2-benefit-row--no-coverage > td:nth-child(3),
+    .uel2-benefit-row--no-frequency > td:nth-child(4) {
+        display: none;
+    }
+
+    .uel2-benefit-row--no-coverage:not(.uel2-benefit-row--no-frequency) > td:nth-child(4) {
+        grid-column: 3;
+    }
+
+    .uel2-benefit-row--no-coverage:not(.uel2-benefit-row--no-frequency) > td:last-child {
+        grid-column: 4 / -1;
+    }
+
+    .uel2-benefit-row--no-frequency:not(.uel2-benefit-row--no-coverage) > td:last-child {
+        grid-column: 4 / -1;
+    }
+
+    .uel2-benefit-row--no-coverage.uel2-benefit-row--no-frequency > td:last-child {
+        grid-column: 3 / -1;
+    }
+
+    .uel2-benefit-code {
+        color: var(--uel2-brand);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: .02em;
+        text-transform: uppercase;
+    }
+
+    .uel2-benefit-description {
+        color: var(--uel2-dark);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.4;
+    }
+
+    .uel2-benefit-kind {
+        display: block;
+        margin-top: 3px;
+        color: var(--uel2-muted);
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .uel2-benefit-empty {
+        display: block;
+        min-height: 1px;
+    }
+
+    .uel2-benefit-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+        gap: 8px;
+        align-items: start;
+    }
+
+    .uel2-benefit-table input,
+    .uel2-benefit-table select,
+    .uel2-benefit-table textarea {
+        min-width: 0;
+    }
+
+    .uel2-managed-questions {
+        display: block;
+        margin-top: 12px;
+        border: 1px solid var(--uel2-line);
+        border-radius: 7px;
+        background: #ffffff;
+        overflow: hidden;
     }
 
     .uel2-managed-question {
         display: grid;
-        gap: 12px;
-        padding: 15px;
-        border: 1px solid var(--uel2-line);
-        border-radius: 16px;
-        background: #fbfdfc;
+        grid-template-columns: minmax(220px, .9fr) minmax(280px, 1.25fr);
+        gap: 16px;
+        align-items: center;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--uel2-line);
+        background: #ffffff;
+    }
+
+    .uel2-managed-question:last-child {
+        border-bottom: 0;
+    }
+
+    .uel2-managed-question--with-note {
+        grid-template-columns: minmax(220px, .8fr) minmax(240px, 1fr) minmax(240px, 1fr);
+    }
+
+    .uel2-managed-question--child {
+        padding-left: 28px;
+        border-left: 3px solid #80b9a5;
+        background: #f9fcfb;
+    }
+
+    .uel2-question-copy {
+        min-width: 0;
+    }
+
+    .uel2-question-label {
+        color: var(--uel2-dark);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.4;
+    }
+
+    .uel2-question-response {
+        min-width: 0;
+    }
+
+    .uel2-response-textarea,
+    .uel2-question-note textarea {
+        min-height: 64px !important;
     }
 
     .uel2-question-help {
-        margin: -2px 0 8px;
+        margin: 3px 0 0;
         color: var(--uel2-muted);
-        font-size: 12px;
-        line-height: 1.55;
+        font-size: 11px;
+        line-height: 1.45;
     }
 
     @media (max-width: 1050px) {
@@ -777,15 +1430,38 @@
         .uel2-sidebar {
             position: static;
         }
-        .uel2-sidebar-rail { max-height: none; padding-right: 0; }
+        .uel2-sidebar-rail { max-height: 320px; padding-right: 6px; }
         .uel2-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .uel2-benefit-table tr {
+            grid-template-columns: 68px minmax(160px, 1fr) minmax(118px, .58fr) minmax(140px, .72fr);
+        }
+        .uel2-benefit-table td:last-child { grid-column: 3 / -1; }
+        .uel2-quick-strip__row { grid-template-columns: 1fr; gap: 8px; }
+        .uel2-quick-strip__fields--patient { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .uel2-quick-strip__fields--context { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .uel2-quick-strip__field {
+            padding: 8px 10px;
+            border-left: 0;
+            border-top: 1px solid #eef3f0;
+        }
+        .uel2-quick-strip__field:first-child { padding-left: 10px; }
+        .uel2-progress-disclosure .uel2-progress-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 720px) {
         .uel2-grid { grid-template-columns: 1fr; }
-        .uel2-managed-questions { grid-template-columns: 1fr; }
+        .uel2-grid--money { grid-template-columns: 1fr; }
+        .uel2-managed-question,
+        .uel2-managed-question--with-note { grid-template-columns: 1fr; gap: 10px; }
         .uel2-half, .uel2-wide { grid-column: 1; }
-        .uel2-header { align-items: flex-start; }
+        .uel2-question-row { grid-template-columns: 1fr; gap: 8px; }
+        .uel2-coverage-row,
+        .uel2-history-row { grid-template-columns: 1fr; gap: 10px; }
+        .uel2-header {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 8px;
+        }
         .uel2-pill { align-self: flex-start; }
         .uel2-subsection__header {
             align-items: flex-start;
@@ -827,53 +1503,52 @@
             letter-spacing: .07em;
             text-transform: uppercase;
         }
+        .uel2-benefit-table tr {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 14px 12px;
+        }
+        .uel2-benefit-table td,
+        .uel2-benefit-table td:last-child,
+        .uel2-benefit-row--no-coverage:not(.uel2-benefit-row--no-frequency) > td:nth-child(4),
+        .uel2-benefit-row--no-coverage:not(.uel2-benefit-row--no-frequency) > td:last-child,
+        .uel2-benefit-row--no-frequency:not(.uel2-benefit-row--no-coverage) > td:last-child,
+        .uel2-benefit-row--no-coverage.uel2-benefit-row--no-frequency > td:last-child {
+            display: block;
+            grid-column: 1;
+            padding: 0;
+        }
+        .uel2-benefit-table td::before { display: none; }
+        .uel2-benefit-table td:first-child { margin-bottom: -6px; }
+        .uel2-benefit-details { grid-template-columns: 1fr; }
+        .uel2-quick-strip__fields--patient,
+        .uel2-quick-strip__fields--context { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 460px) {
+        .uel2-quick-strip__fields--patient,
+        .uel2-quick-strip__fields--context,
+        .uel2-progress-disclosure .uel2-progress-list { grid-template-columns: minmax(0, 1fr); }
     }
 </style>
 
 <div class="uel2-page">
     <section class="uel2-shell">
         <div class="uel2-shell__inner">
-            <div class="uel2-layout">
-                <aside class="uel2-sidebar">
-                    <div class="uel2-sidebar-rail">
-                <section class="uel2-sidebar-rail__section">
-                    <div class="uel2-sidebar-rail__title">
-                        <h3>Quick Reference</h3>
-                    </div>
-                    <div class="uel2-quick-reference">
-                        <div class="uel2-quick-reference__grid">
-                            @foreach ([
-                                ['Patient Name', $quickReference['patient'] ?? '-'],
-                                ['Patient DOB', $quickReference['dob'] ?? '-'],
-                                ['Member ID', $quickReference['member_id'] ?? '-'],
-                                ['Relationship', $quickReference['relationship'] ?? '-'],
-                                ['Subscriber Name', $quickReference['subscriber_name'] ?? '-'],
-                                ['Subscriber DOB', $quickReference['subscriber_dob'] ?? '-'],
-                                ['Coverage Role', $quickReference['coverage_role'] ?? '-'],
-                                ['Insurance / TPA', $quickReference['insurance_name'] ?? '-'],
-                                ['Insurance / TPA Phone', $quickReference['phone'] ?? '-'],
-                                ['Group Number', $quickReference['group_number'] ?? '-'],
-                                ['Appointment Date', $quickReference['appointment_date'] ?? '-'],
-                                ['Doctor Name', $quickReference['provider_name'] ?? '-'],
-                                ['Provider NPI', $quickReference['provider_npi'] ?? '-'],
-                            ] as [$quickReferenceLabel, $quickReferenceValue])
-                                <div class="uel2-quick-reference__item">
-                                    <div class="uel2-quick-reference__label">{{ $quickReferenceLabel }}</div>
-                                    <div class="uel2-quick-reference__value">{{ filled($quickReferenceValue) ? $quickReferenceValue : '-' }}</div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </section>
+            @if ($this->focusMode)
+                @include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-strip')
+            @endif
 
-                <section class="uel2-sidebar-rail__section">
-                    <div class="uel2-sidebar-rail__title">
-                        <div>
-                            <h2>Verification Progress</h2>
-                            <div class="uel2-sidebar-rail__copy">Track completion across the workup</div>
-                        </div>
+            <details class="uel2-progress-disclosure">
+                <summary>
+                    <span class="uel2-progress-disclosure__summary">Verification Progress</span>
+                    <span class="uel2-progress-disclosure__status">
+                        <span>{{ $templateThreeProgressPercent }}% complete</span>
                         <span class="uel2-pill">{{ $templateThreeProgressCompleted }}/{{ $templateThreeProgressSections->sum('total') }}</span>
-                    </div>
+                    </span>
+                </summary>
+                <div class="uel2-progress-disclosure__body">
                     <div class="uel2-progress-card">
                         <div class="uel2-progress-bar">
                             <span style="width: {{ min(100, max(0, $templateThreeProgressPercent)) }}%;"></span>
@@ -883,7 +1558,6 @@
                             <span>{{ $templateThreeProgressCompleted }} / {{ $templateThreeProgressSections->sum('total') }} fields</span>
                         </div>
                     </div>
-
                     <div class="uel2-progress-list">
                         @foreach ($templateThreeProgressSections as $templateThreeProgressItem)
                             @php
@@ -899,30 +1573,11 @@
                             </div>
                         @endforeach
                     </div>
-                </section>
+                </div>
+            </details>
 
-                <section class="uel2-sidebar-rail__section">
-                    <div class="uel2-sidebar-blocks">
-                        @foreach ($templateThreeSidebarBlocks as $templateThreeBlockTitle => $templateThreeBlockRows)
-                            <div class="uel2-sidebar-block">
-                                <div class="uel2-sidebar-block__title">{{ $templateThreeBlockTitle }}</div>
-                                <div class="uel2-sidebar-block__rows">
-                                    @foreach ($templateThreeBlockRows as $templateThreeBlockRow)
-                                        <div class="uel2-sidebar-block__row">
-                                            <div class="uel2-sidebar-block__label">{{ $templateThreeBlockRow['label'] ?? '' }}</div>
-                                            <div class="uel2-sidebar-block__value">{{ filled($templateThreeBlockRow['value'] ?? null) ? $templateThreeBlockRow['value'] : '-' }}</div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-                    </div>
-                </aside>
-
+            <div class="uel2-layout">
                 <div class="uel2-content">
-
     <section class="uel2-section">
         <div class="uel2-header">
             <div><h2>Patient & Subscriber Information</h2><p>Core eligibility identifiers</p></div>
@@ -953,9 +1608,10 @@
                     $options = $patientField[3] ?? [];
                 @endphp
                 <div class="uel2-field">
-                    <label>{{ $label }}</label>
+                    <label for="template3-{{ $field }}">{{ $label }}</label>
                     @if ($type === 'select')
                         <select
+                            id="template3-{{ $field }}"
                             @if ($field === 'vf_insured_relation')
                                 wire:model.live="data.{{ $field }}"
                             @else
@@ -974,6 +1630,7 @@
                             $templateThreeResolvedDateValue = $templateThreeDateValue($field);
                         @endphp
                         <input
+                            id="template3-{{ $field }}"
                             type="date"
                             wire:key="template3-patient-date-{{ $field }}-{{ $templateThreeResolvedDateValue ?: 'blank' }}"
                             @if ($field === 'vf_patient_dob')
@@ -989,6 +1646,7 @@
                         >
                     @else
                         <input
+                            id="template3-{{ $field }}"
                             type="{{ $type }}"
                             @if (in_array($field, ['vf_patient_full_name', 'vf_subscriber_name'], true))
                                 wire:model.live="data.{{ $field }}"
@@ -1007,7 +1665,7 @@
         @endphp
         @if (in_array($templateThreeRelationship, ['spouse', 'dependent'], true))
             <div class="uel2-body" style="padding-top:0;">
-                <div style="border:1px solid #dbe8e2;border-radius:14px;background:#f8fbfa;padding:12px 14px;color:#5f7469;font-size:13px;line-height:1.55;">
+                <div style="border:1px solid #dbe8e2;border-radius:6px;background:#f8fbfa;padding:12px 14px;color:#5f7469;font-size:13px;line-height:1.55;">
                     Enter subscriber details separately because the policy holder is different from the patient.
                 </div>
             </div>
@@ -1027,18 +1685,20 @@
             <span class="uel2-pill">{{ $templateThreeSectionCounts['insurance']['completed'] }}/{{ $templateThreeSectionCounts['insurance']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-insurance-groups">
-            @foreach ($templateThreeInsuranceGroups as $insuranceGroup)
+            @foreach ($templateThreeInsuranceGroups as $insuranceGroupIndex => $insuranceGroup)
                 <div class="uel2-insurance-group uel2-grid">
+                <h3 class="uel2-insurance-group__title">{{ $insuranceGroupIndex === 0 ? 'Plan and eligibility' : 'Claims and payer details' }}</h3>
                 @foreach ($insuranceGroup as $insuranceField)
                 @php
                     [$label, $field, $type] = $insuranceField;
                     $options = $insuranceField[3] ?? [];
                 @endphp
                 <div class="uel2-field {{ $field === 'vf_insurance_claim_mailing_address' ? 'uel2-half' : '' }}">
-                    <label>{{ $label }}</label>
+                    <label for="template3-{{ $field }}">{{ $label }}</label>
                     @if ($field === 'vf_insurance_provider_name')
-                        <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="uel2-inline-control">
                             <select
+                                id="template3-{{ $field }}"
                                 wire:model.live="data.{{ $field }}"
                                 style="{{ $templateThreeInput }};min-width:0;flex:1 1 auto;appearance:auto;"
                             >
@@ -1056,7 +1716,7 @@
                                     wire:click="openAddInsuranceModal"
                                     title="Add insurance not listed"
                                     aria-label="Add insurance"
-                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #b8d4c9;border-radius:12px;background:#eaf6f1;color:#0b6b4f;font-size:22px;font-weight:800;cursor:pointer;"
+                                    class="uel2-icon-button"
                                 >
                                     +
                                 </button>
@@ -1064,6 +1724,7 @@
                         </div>
                     @elseif ($type === 'select')
                         <select
+                            id="template3-{{ $field }}"
                             wire:model.blur="data.{{ $field }}"
                             style="{{ $templateThreeInput }}"
                         >
@@ -1076,8 +1737,9 @@
                             @endforeach
                         </select>
                     @elseif ($field === 'vf_fee_schedule')
-                        <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="uel2-inline-control">
                             <input
+                                id="template3-{{ $field }}"
                                 type="text"
                                 wire:model.blur="data.{{ $field }}"
                                 style="{{ $templateThreeInput }};min-width:0;flex:1 1 auto;"
@@ -1096,7 +1758,7 @@
                                     onclick='openReferenceViewerModal({!! $templateThreeFeeSchedulePayload !!})'
                                     title="{{ $feeScheduleReference['name'] }}"
                                     aria-label="View fee schedule reference"
-                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #b8d4c9;border-radius:12px;background:#ffffff;color:#0b6b4f;font-size:18px;font-weight:900;cursor:pointer;"
+                                    class="uel2-icon-button"
                                 >
                                     &#9432;
                                 </button>
@@ -1106,7 +1768,7 @@
                                     title="No fee schedule reference added"
                                     aria-label="No fee schedule reference added"
                                     disabled
-                                    style="display:inline-flex;flex:0 0 42px;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #dbe4ee;border-radius:12px;background:#f8fafc;color:#94a3b8;font-size:18px;font-weight:900;cursor:not-allowed;opacity:.9;"
+                                    class="uel2-icon-button"
                                 >
                                     &#9432;
                                 </button>
@@ -1118,6 +1780,7 @@
                                 $templateThreeInsuranceDateValue = $templateThreeDateValue($field);
                             @endphp
                             <input
+                                id="template3-{{ $field }}"
                                 type="date"
                                 wire:key="template3-insurance-date-{{ $field }}-{{ $templateThreeInsuranceDateValue ?: 'blank' }}"
                                 wire:change="$set('data.{{ $field }}', $event.target.value)"
@@ -1126,6 +1789,7 @@
                             >
                         @else
                             <input
+                                id="template3-{{ $field }}"
                                 type="{{ $type }}"
                                 wire:model.blur="data.{{ $field }}"
                                 @if ($field === 'vf_plan_renewal_month') placeholder="MM/YYYY" inputmode="numeric" @endif
@@ -1153,94 +1817,115 @@
             <span class="uel2-pill">{{ $templateThreeSectionCounts['maximums']['completed'] }}/{{ $templateThreeSectionCounts['maximums']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
-            <div class="uel2-grid">
-                <div class="uel2-field"><label>Annual Maximum on the Plan?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum" style="{{ $templateThreeInput }}"></div>
+            <div class="uel2-grid uel2-grid--money">
+                <div class="uel2-field"><label for="template3-vf_annual_maximum">Annual Maximum on the Plan?</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_annual_maximum" type="number" min="0" step="0.01" wire:model.blur="data.vf_annual_maximum" placeholder="0.00"></div></div>
                 @if ($this->templateThreeFieldIsVisible('vf_annual_maximum_used_display', false))
-                    <div class="uel2-field"><label>Annual Maximum Used?</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $annualMaximum - $annualRemaining), 2) }}</div></div>
+                    <div class="uel2-field"><label>Annual Maximum Used?</label><div class="uel2-readonly" style="{{ $templateThreeReadonly }}">{{ filled(data_get($this->data, 'vf_annual_maximum')) && filled(data_get($this->data, 'vf_annual_maximum_remaining')) ? '$'.number_format(max(0, $annualMaximum - $annualRemaining), 2) : 'Not calculated' }}</div></div>
                 @endif
-                <div class="uel2-field"><label>Annual Maximum Remaining?</label><input type="number" step="0.01" wire:model.blur="data.vf_annual_maximum_remaining" style="{{ $templateThreeInput }}"></div>
+                <div class="uel2-field"><label for="template3-vf_annual_maximum_remaining">Annual Maximum Remaining?</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_annual_maximum_remaining" type="number" min="0" step="0.01" wire:model.blur="data.vf_annual_maximum_remaining" placeholder="0.00"></div></div>
             </div>
 
-            <div class="uel2-subsection">
+            <div class="uel2-subsection uel2-subsection--flat">
                 <h3>Individual Deductible</h3>
-                <div class="uel2-grid">
-                    <div class="uel2-field"><label>Annual Deductible - Individual</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible" style="{{ $templateThreeInput }}"></div>
+                <div class="uel2-grid uel2-grid--money">
+                    <div class="uel2-field"><label for="template3-vf_individual_deductible">Annual Deductible - Individual</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_individual_deductible" type="number" min="0" step="0.01" wire:model.blur="data.vf_individual_deductible" placeholder="0.00"></div></div>
                     @if ($this->templateThreeFieldIsVisible('vf_individual_deductible_met_display', false))
-                        <div class="uel2-field"><label>Deductible Met - Individual</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $individualDeductible - $individualRemaining), 2) }}</div></div>
+                        <div class="uel2-field"><label>Deductible Met - Individual</label><div class="uel2-readonly" style="{{ $templateThreeReadonly }}">{{ filled(data_get($this->data, 'vf_individual_deductible')) && filled(data_get($this->data, 'vf_individual_deductible_remaining')) ? '$'.number_format(max(0, $individualDeductible - $individualRemaining), 2) : 'Not calculated' }}</div></div>
                     @endif
-                    <div class="uel2-field"><label>Individual Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_individual_deductible_remaining" style="{{ $templateThreeInput }}"></div>
+                    <div class="uel2-field"><label for="template3-vf_individual_deductible_remaining">Individual Deductible Remaining</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_individual_deductible_remaining" type="number" min="0" step="0.01" wire:model.blur="data.vf_individual_deductible_remaining" placeholder="0.00"></div></div>
                 </div>
             </div>
 
-            <div class="uel2-subsection">
+            <div class="uel2-subsection uel2-subsection--flat">
                 <h3>Family Deductible</h3>
-                <div class="uel2-grid">
-                    <div class="uel2-field"><label>Annual Deductible - Family</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible" style="{{ $templateThreeInput }}"></div>
+                <div class="uel2-grid uel2-grid--money">
+                    <div class="uel2-field"><label for="template3-vf_family_deductible">Annual Deductible - Family</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_family_deductible" type="number" min="0" step="0.01" wire:model.blur="data.vf_family_deductible" placeholder="0.00"></div></div>
                     @if ($this->templateThreeFieldIsVisible('vf_family_deductible_met_display', false))
-                        <div class="uel2-field"><label>Deductible Met - Family</label><div style="{{ $templateThreeReadonly }}">${{ number_format(max(0, $familyDeductible - $familyRemaining), 2) }}</div></div>
+                        <div class="uel2-field"><label>Deductible Met - Family</label><div class="uel2-readonly" style="{{ $templateThreeReadonly }}">{{ filled(data_get($this->data, 'vf_family_deductible')) && filled(data_get($this->data, 'vf_family_deductible_remaining')) ? '$'.number_format(max(0, $familyDeductible - $familyRemaining), 2) : 'Not calculated' }}</div></div>
                     @endif
-                    <div class="uel2-field"><label>Family Deductible Remaining</label><input type="number" step="0.01" wire:model.blur="data.vf_family_deductible_remaining" style="{{ $templateThreeInput }}"></div>
+                    <div class="uel2-field"><label for="template3-vf_family_deductible_remaining">Family Deductible Remaining</label><div class="uel2-input-addon uel2-input-addon--prefix"><span>$</span><input id="template3-vf_family_deductible_remaining" type="number" min="0" step="0.01" wire:model.blur="data.vf_family_deductible_remaining" placeholder="0.00"></div></div>
                 </div>
             </div>
 
             @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
                 'questions' => $templateThreeMaximumQuestions,
             ])
+        </div>
+    </section>
 
-            <div class="uel2-subsection">
-                <div class="uel2-subsection__header">
-                    <h3>Deductible & Coverage Category</h3>
-                    <span class="uel2-pill">{{ $templateThreeCoverageCategoryCompleted }}/{{ $templateThreeCoverageCategoryTotal }} Completed</span>
-                </div>
-                <table class="uel2-table">
-                    <thead><tr><th>Category</th><th>DED Applied?</th><th>Category %</th></tr></thead>
-                    <tbody>
-                        @foreach ($templateThreeCoverageCategoryRows as [$label, $deductibleField, $coverageField])
-                            <tr>
-                                <td data-label="Category"><b>{{ $label }}</b></td>
-                                <td data-label="DED Applied?"><select wire:model.blur="data.{{ $deductibleField }}"><option value="">Select</option><option>Yes</option><option>No</option></select></td>
-                                <td data-label="Category %"><input wire:model.blur="data.{{ $coverageField }}" placeholder="Coverage"></td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-                <div class="uel2-field" style="margin-top:14px;">
-                    <label>Coverage Notes</label>
-                    <textarea wire:model.blur="data.vf_deductible_applies_notes" placeholder="Add note" style="{{ $templateThreeInput }}"></textarea>
-                </div>
+    <section class="uel2-section">
+        <div class="uel2-header">
+            <div><h2>Deductible & Coverage Category</h2><p>Category deductible rules and coverage percentages</p></div>
+            <span class="uel2-pill">{{ $templateThreeCoverageCategoryCompleted }}/{{ $templateThreeCoverageCategoryTotal }} Completed</span>
+        </div>
+        <div class="uel2-body">
+            <div class="uel2-coverage-list">
+                @foreach ($templateThreeCoverageCategoryRows as [$label, $deductibleField, $coverageField])
+                    <div class="uel2-coverage-row">
+                        <div>
+                            <div class="uel2-question-row__label">{{ $label }}</div>
+                            <div class="uel2-question-row__help">Category benefit</div>
+                        </div>
+                        <div>
+                            <span class="uel2-response-label">Deductible applied?</span>
+                            <div class="uel2-segmented" role="radiogroup" aria-label="Deductible applies for {{ $label }}">
+                                @foreach (['Yes', 'No'] as $answerOption)
+                                    <label>
+                                        <input type="radio" name="template3-{{ $deductibleField }}" wire:model.live="data.{{ $deductibleField }}" value="{{ $answerOption }}">
+                                        <span>{{ $answerOption }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <label class="uel2-response-label" for="template3-{{ $coverageField }}">Coverage</label>
+                            <div class="uel2-input-addon uel2-input-addon--suffix">
+                                <input id="template3-{{ $coverageField }}" type="number" min="0" max="100" step="0.01" wire:model.blur="data.{{ $coverageField }}" placeholder="Coverage" aria-label="Coverage percentage for {{ $label }}">
+                                <span>%</span>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
-
-            <div class="uel2-subsection">
-                <div class="uel2-subsection__header">
-                    <h3>Plan Provisions</h3>
-                    <span class="uel2-pill">{{ $templateThreePlanProvisionCompleted }}/{{ $templateThreePlanProvisionTotal }} Completed</span>
+            <div class="uel2-field" style="margin-top:14px;">
+                <label for="template3-vf_deductible_applies_notes">Coverage Notes</label>
+                <textarea id="template3-vf_deductible_applies_notes" wire:model.blur="data.vf_deductible_applies_notes" placeholder="Add note" style="{{ $templateThreeInput }}"></textarea>
                 </div>
-                <table class="uel2-table">
-                    <thead><tr><th style="width:68%;">Question</th><th style="width:32%;" aria-label="Response"></th></tr></thead>
-                    <tbody>
+        </div>
+    </section>
+
+    <section class="uel2-section">
+        <div class="uel2-header">
+            <div><h2>Plan Provisions</h2><p>Waiting periods, clauses, and benefit rules</p></div>
+            <span class="uel2-pill">{{ $templateThreePlanProvisionCompleted }}/{{ $templateThreePlanProvisionTotal }} Completed</span>
+        </div>
+        <div class="uel2-body" style="padding-top:0;">
+                <div class="uel2-question-list">
                         @if ($templateThreePlanProvisionVisibility['vf_waiting_periods'])
-                            <tr>
-                                <td data-label="Question">
-                                    <b>Is there any Waiting Period on this plan?</b>
-                                    <div style="margin-top:4px;color:#6d7d77;font-size:12px;">If Yes, waiting period details will appear below.</div>
-                                </td>
-                                <td data-label="Response">
-                                    <select wire:model.live="waitingPeriodAnswer">
-                                        <option value="no">No</option>
-                                        <option value="yes">Yes</option>
-                                    </select>
-                                </td>
-                            </tr>
+                            <div class="uel2-question-row">
+                                <div>
+                                    <div class="uel2-question-row__label">Is there any Waiting Period on this plan?</div>
+                                    <div class="uel2-question-row__help">Choose Yes to enter category-specific waiting periods.</div>
+                                </div>
+                                <div class="uel2-question-row__response">
+                                    <div class="uel2-segmented" role="radiogroup" aria-label="Waiting period on this plan">
+                                        @foreach (['yes' => 'Yes', 'no' => 'No'] as $answerValue => $answerLabel)
+                                            <label>
+                                                <input type="radio" name="template3-waiting-period" wire:model.live="waitingPeriodAnswer" value="{{ $answerValue }}">
+                                                <span>{{ $answerLabel }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         @endif
                         @if ($templateThreePlanProvisionVisibility['vf_waiting_periods'] && $this->waitingPeriodAnswer === 'yes')
-                            <tr>
-                                <td colspan="2" style="padding:14px;">
-                                    <div style="padding:16px;border:1px solid #bfe3d5;border-radius:16px;background:#f7fcfa;">
-                                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
-                                            <strong style="color:#063f30;font-size:15px;">Waiting Period Details</strong>
-                                            <span class="uel2-pill">Shown only when answer is Yes</span>
-                                        </div>
-                                        <table class="uel2-table">
+                            <div class="uel2-detail-panel">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">
+                                    <strong style="color:#063f30;font-size:14px;">Waiting Period Details</strong>
+                                    <span class="uel2-pill">Required when applicable</span>
+                                </div>
+                                <table class="uel2-table">
                                             <thead>
                                                 <tr>
                                                     <th>Service Category</th>
@@ -1269,49 +1954,50 @@
                                                     </tr>
                                                 @endforeach
                                             </tbody>
-                                        </table>
-                                    </div>
-                                </td>
-                            </tr>
+                                </table>
+                            </div>
                         @endif
                         @if ($templateThreePlanProvisionVisibility['vf_missing_tooth_clause'])
-                            <tr>
-                                <td data-label="Question"><b>Missing Tooth Clause</b></td>
-                                <td data-label="Response">
-                                    <select wire:model.blur="data.vf_missing_tooth_clause">
-                                        <option value="">Select</option>
-                                        <option value="No">No</option>
-                                        <option value="Yes">Yes</option>
-                                    </select>
-                                </td>
-                            </tr>
+                            <div class="uel2-question-row">
+                                <div class="uel2-question-row__label">Missing Tooth Clause</div>
+                                <div class="uel2-question-row__response">
+                                    <div class="uel2-segmented" role="radiogroup" aria-label="Missing tooth clause">
+                                        @foreach (['Yes', 'No'] as $answerOption)
+                                            <label>
+                                                <input type="radio" name="template3-missing-tooth" wire:model.live="data.vf_missing_tooth_clause" value="{{ $answerOption }}">
+                                                <span>{{ $answerOption }}</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         @endif
                         @if ($templateThreePlanProvisionVisibility['vf_crowns_paid_on'])
-                            <tr>
-                                <td data-label="Question"><b>Crowns are paid on Prep Date or Seat Date?</b></td>
-                                <td data-label="Response">
-                                    <select wire:model.blur="data.vf_crowns_paid_on">
+                            <div class="uel2-question-row">
+                                <label class="uel2-question-row__label" for="template3-vf_crowns_paid_on">Crowns are paid on Prep Date or Seat Date?</label>
+                                <div class="uel2-question-row__response">
+                                    <select id="template3-vf_crowns_paid_on" wire:model.blur="data.vf_crowns_paid_on">
                                         <option value="">Select</option>
                                         <option value="Prep">Prep</option>
                                         <option value="Seat">Seat</option>
                                         <option value="Either-Or">Either-Or</option>
                                     </select>
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
                         @endif
                         @if ($templateThreePlanProvisionVisibility['vf_prosthetic_replacement_period'])
-                            <tr>
-                                <td data-label="Question"><b>Prosthetic Replacement Year / Month</b></td>
-                                <td data-label="Response">
-                                    <input wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period">
-                                </td>
-                            </tr>
+                            <div class="uel2-question-row">
+                                <label class="uel2-question-row__label" for="template3-vf_prosthetic_replacement_period">Prosthetic Replacement Year / Month</label>
+                                <div class="uel2-question-row__response">
+                                    <input id="template3-vf_prosthetic_replacement_period" wire:model.blur="data.vf_prosthetic_replacement_period" placeholder="MM/YYYY or replacement period">
+                                </div>
+                            </div>
                         @endif
                         @if ($templateThreePlanProvisionVisibility['vf_coordination_of_benefits'])
-                            <tr>
-                                <td data-label="Question"><b>Coordination of Benefits</b></td>
-                                <td data-label="Response">
-                                    <select wire:model.blur="data.vf_coordination_of_benefits">
+                            <div class="uel2-question-row">
+                                <label class="uel2-question-row__label" for="template3-vf_coordination_of_benefits">Coordination of Benefits</label>
+                                <div class="uel2-question-row__response">
+                                    <select id="template3-vf_coordination_of_benefits" wire:model.blur="data.vf_coordination_of_benefits">
                                         <option value="">Select</option>
                                         <option value="Standard">Standard</option>
                                         <option value="Non-Dup">Non-Dup</option>
@@ -1319,11 +2005,10 @@
                                         <option value="No COB">No COB</option>
                                         <option value="Other">Other</option>
                                     </select>
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
                         @endif
-                    </tbody>
-                </table>
+                </div>
                 @if ($templateThreePlanProvisionVisibility['vf_plan_provisions'])
                     <div class="uel2-field" style="margin-top:14px;">
                         <label>Plan Provision Notes</label>
@@ -1333,7 +2018,6 @@
                 @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
                     'questions' => $templateThreePlanProvisionQuestions,
                 ])
-            </div>
         </div>
     </section>
 
@@ -1343,22 +2027,22 @@
             <span class="uel2-pill">{{ $templateThreeSectionCounts['service_history']['completed'] }}/{{ $templateThreeSectionCounts['service_history']['total'] }} Completed</span>
         </div>
         <div class="uel2-body">
-            <table class="uel2-table">
-                <thead><tr><th>Service</th><th>Specific Code / Service History / Date</th></tr></thead>
-                <tbody>
-                    @foreach ([
-                        ['Exams', 'vf_history_exams', 'e.g., D0120 - 01/15/2026'],
-                        ['Prophylaxis', 'vf_history_prophylaxis', 'e.g., D1110 - 01/15/2026'],
-                        ['Bitewings', 'vf_history_bitewings', 'e.g., D0274 - 01/15/2026'],
-                        ['Full Mouth X-Ray / Panoramic X-Ray', 'vf_history_full_mouth_xray', 'e.g., D0210 or D0330 - 01/15/2026'],
-                    ] as [$label, $field, $placeholder])
-                        <tr><td data-label="Service"><b>{{ $label }}</b></td><td data-label="History"><input wire:model.blur="data.{{ $field }}" placeholder="{{ $placeholder }}"></td></tr>
-                    @endforeach
-                </tbody>
-            </table>
+            <div class="uel2-history-list">
+                @foreach ([
+                    ['Exams', 'vf_history_exams', 'e.g., D0120 - 01/15/2026'],
+                    ['Prophylaxis', 'vf_history_prophylaxis', 'e.g., D1110 - 01/15/2026'],
+                    ['Bitewings', 'vf_history_bitewings', 'e.g., D0274 - 01/15/2026'],
+                    ['Full Mouth X-Ray / Panoramic X-Ray', 'vf_history_full_mouth_xray', 'e.g., D0210 or D0330 - 01/15/2026'],
+                ] as [$label, $field, $placeholder])
+                    <div class="uel2-history-row">
+                        <label class="uel2-question-row__label" for="template3-{{ $field }}">{{ $label }}</label>
+                        <input id="template3-{{ $field }}" wire:model.blur="data.{{ $field }}" placeholder="{{ $placeholder }}">
+                    </div>
+                @endforeach
+            </div>
             <div class="uel2-field" style="margin-top:16px;">
-                <label>Other Major History Affecting Eligibility</label>
-                <textarea wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateThreeInput }}"></textarea>
+                <label for="template3-vf_history_basic_or_major">Other Major History Affecting Eligibility</label>
+                <textarea id="template3-vf_history_basic_or_major" wire:model.blur="data.vf_history_basic_or_major" placeholder="Add any major history that may affect eligibility, frequency, downgrade, replacement, or waiting-period decisions." style="{{ $templateThreeInput }}"></textarea>
             </div>
             @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
                 'questions' => $templateThreeServiceHistoryQuestions,
@@ -1369,14 +2053,23 @@
     @if ($templateThreeVisibleBenefitGroups->isNotEmpty())
         <section class="uel2-section">
             <div class="uel2-header">
-                <div><h2>Frequency and Percentage</h2><p>Code-level coverage configured through the clinic template builder</p></div>
+                <div><h2>Frequency and Percentage</h2><p>Procedure benefits and plan questions organized by coverage category</p></div>
                 <span class="uel2-pill">{{ $codeCoverageSection['completed'] }}/{{ $codeCoverageSection['total'] }} Completed</span>
             </div>
             <div class="uel2-body">
                 @foreach ($templateThreeVisibleBenefitGroups as $benefitGroupName => $benefitRows)
-                    <div class="uel2-subsection" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
-                        <h3>{{ $benefitGroupName }}</h3>
-                        <table class="uel2-table">
+                    @php
+                        $benefitGroupCount = $templateThreeBenefitGroupCounts->get($benefitGroupName, [
+                            'completed' => 0,
+                            'total' => count($benefitRows),
+                        ]);
+                    @endphp
+                    <div class="uel2-subsection uel2-benefit-group" style="{{ $loop->first ? 'margin-top:0;' : '' }}">
+                        <div class="uel2-subsection__header">
+                            <h3>{{ $benefitGroupName }}</h3>
+                            <span class="uel2-pill">{{ $benefitGroupCount['completed'] }}/{{ $benefitGroupCount['total'] }} Completed</span>
+                        </div>
+                        <table class="uel2-table uel2-benefit-table">
                             <thead><tr><th style="width: 140px;">Code</th><th>Description</th><th style="width: 140px;">%</th><th style="width: 220px;">Frequency</th><th style="width: 48%;">Response Details</th></tr></thead>
                             <tbody>
                                 @foreach ($benefitRows as $benefitRow)
@@ -1430,31 +2123,44 @@
                                             ->sortBy(fn (string $field): int => array_search($field, $fieldOrder, true) === false ? 999 : array_search($field, $fieldOrder, true))
                                             ->values()
                                             ->all();
+                                        $benefitCode = trim((string) data_get($this->codeCoverageData, $rowIndex . '.code'));
+                                        $hasCoverageResponse = in_array('coverage_percent', $primaryFields, true);
+                                        $hasFrequencyResponse = in_array('frequency', $primaryFields, true);
+                                        $isRequiredResponse = (bool) data_get($row, 'required', false);
                                     @endphp
-                                        <tr>
-                                            <td data-label="Code"><b>{{ data_get($this->codeCoverageData, $rowIndex . '.code') }}</b></td>
-                                            <td data-label="Description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</td>
+                                        <tr
+                                            class="{{ $hasCoverageResponse ? '' : 'uel2-benefit-row--no-coverage' }} {{ $hasFrequencyResponse ? '' : 'uel2-benefit-row--no-frequency' }}"
+                                            data-required="{{ $isRequiredResponse ? 'true' : 'false' }}"
+                                        >
+                                            <td data-label="Code"><span class="uel2-benefit-code">{{ filled($benefitCode) ? $benefitCode : 'Question' }}</span></td>
+                                            <td data-label="Description">
+                                                <div class="uel2-benefit-description">{{ data_get($this->codeCoverageData, $rowIndex . '.description') }}</div>
+                                                <span class="uel2-benefit-kind">{{ filled($benefitCode) ? 'Procedure benefit' : 'Plan question' }}</span>
+                                            </td>
                                             <td data-label="%">
-                                                @if (in_array('coverage_percent', $primaryFields, true))
-                                                    <input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="%">
+                                                @if ($hasCoverageResponse)
+                                                    <div class="uel2-input-addon uel2-input-addon--suffix">
+                                                        <input type="number" min="0" max="100" wire:model.blur="codeCoverageData.{{ $rowIndex }}.coverage_percent" placeholder="Coverage" aria-label="Coverage percentage for {{ data_get($this->codeCoverageData, $rowIndex . '.description') }}">
+                                                        <span>%</span>
+                                                    </div>
                                                 @else
-                                                    <span style="color:#94a3b8;">-</span>
+                                                    <span class="uel2-benefit-empty" aria-hidden="true"></span>
                                                 @endif
                                             </td>
                                             <td data-label="Frequency">
-                                                @if (in_array('frequency', $primaryFields, true))
+                                                @if ($hasFrequencyResponse)
                                                     <input wire:model.blur="codeCoverageData.{{ $rowIndex }}.frequency" placeholder="Frequency">
                                                 @else
-                                                    <span style="color:#94a3b8;">-</span>
+                                                    <span class="uel2-benefit-empty" aria-hidden="true"></span>
                                                 @endif
                                             </td>
                                             <td data-label="Response Details">
                                                 @if (empty($detailFields))
-                                                    <span style="color:#94a3b8;">-</span>
+                                                    <span class="uel2-benefit-empty" aria-hidden="true"></span>
                                                 @else
                                                     <div
+                                                        class="uel2-benefit-details"
                                                         x-data="{ preAuth: @js(data_get($this->codeCoverageData, $rowIndex . '.pre_auth_required')), downgrade: @js(data_get($this->codeCoverageData, $rowIndex . '.downgrade_applies')) }"
-                                                        style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;"
                                                     >
                                                         @foreach ($detailFields as $field)
                                                             @php
@@ -1474,7 +2180,21 @@
                                                                 @endif
                                                             >
                                                                 <label style="display:block;margin:0 0 5px;color:#50655d;font-size:10px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;">{{ $label }}</label>
-                                                                @if (is_array($selectOptions))
+                                                                @if (in_array($field, $yesNoFields, true))
+                                                                    <div class="uel2-segmented" role="radiogroup" aria-label="{{ $label }}">
+                                                                        @foreach (['Yes', 'No'] as $answerOption)
+                                                                            <label>
+                                                                                <input
+                                                                                    type="radio"
+                                                                                    name="coverage-{{ $rowIndex }}-{{ $field }}"
+                                                                                    wire:model.live="codeCoverageData.{{ $rowIndex }}.{{ $field }}"
+                                                                                    value="{{ $answerOption }}"
+                                                                                >
+                                                                                <span>{{ $answerOption }}</span>
+                                                                            </label>
+                                                                        @endforeach
+                                                                    </div>
+                                                                @elseif (is_array($selectOptions))
                                                                     <select
                                                                         @if ($field === 'pre_auth_required')
                                                                             x-model="preAuth"
@@ -1512,7 +2232,7 @@
 
     <section class="uel2-section">
         <div class="uel2-header">
-            <div><h2>Verification Information</h2><p>Representative, reference number, and final notes</p></div>
+            <div><h2>Verification Information</h2><p>Verification method, payer reference, and final notes</p></div>
             <span class="uel2-pill">{{ $templateThreeSectionCounts['verification']['completed'] }}/{{ $templateThreeSectionCounts['verification']['total'] }} Completed</span>
         </div>
         <div class="uel2-body uel2-grid">
@@ -1538,7 +2258,7 @@
         aria-modal="true"
         aria-labelledby="add-insurance-title"
     >
-        <div style="width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #dce8e3;border-radius:24px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.28);">
+        <div style="width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #dce8e3;border-radius:8px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.24);">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid #e8efec;">
                 <div>
                     <div style="margin-bottom:6px;color:#0b6b4f;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Insurance Directory</div>
@@ -1581,7 +2301,7 @@
                 <button
                     type="button"
                     wire:click="closeAddInsuranceModal"
-                    style="padding:11px 18px;border:1px solid #dbe4ee;border-radius:12px;background:#fff;color:#475569;font-weight:800;cursor:pointer;"
+                    style="padding:11px 18px;border:1px solid #dbe4ee;border-radius:6px;background:#fff;color:#475569;font-weight:800;cursor:pointer;"
                 >
                     Cancel
                 </button>
@@ -1590,7 +2310,7 @@
                     wire:click="addInsuranceCarrier"
                     wire:loading.attr="disabled"
                     wire:target="addInsuranceCarrier"
-                    style="padding:11px 18px;border:0;border-radius:12px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;"
+                    style="padding:11px 18px;border:0;border-radius:6px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;"
                 >
                     <span wire:loading.remove wire:target="addInsuranceCarrier">Add & Select</span>
                     <span wire:loading wire:target="addInsuranceCarrier">Adding...</span>

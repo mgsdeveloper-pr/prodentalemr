@@ -21,7 +21,7 @@
 
     .vt3-shell .uel2-shell {
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 8px;
         background: #ffffff;
         box-shadow: none;
         overflow: visible;
@@ -34,9 +34,16 @@
 
     .vt3-shell .uel2-layout {
         display: grid;
-        grid-template-columns: 284px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: 14px;
         align-items: start;
+    }
+
+    .vt3-shell .uel2-quick-strip {
+        position: sticky;
+        top: var(--vt3-context-offset);
+        z-index: 20;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
     }
 
     .vt3-shell .uel2-sidebar {
@@ -55,11 +62,11 @@
         gap: 0;
         padding: 0;
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 8px;
         background: #ffffff;
         box-shadow: none;
-        overflow-y: auto;
         overflow-x: hidden;
+        overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-gutter: stable;
         scrollbar-width: thin;
@@ -140,8 +147,8 @@
 
     .vt3-shell .uel2-quick-reference__grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px 12px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
     }
 
     .vt3-shell .uel2-quick-reference__label,
@@ -156,7 +163,7 @@
 
     .vt3-shell .uel2-progress-item {
         padding: 9px 10px;
-        border-radius: 14px;
+        border-radius: 6px;
         border-color: #dbe7e2;
         background: #fbfdfc;
     }
@@ -164,9 +171,9 @@
     .vt3-shell .uel2-progress-card {
         padding: 12px 14px;
         border: 1px solid #dce8e2;
-        border-radius: 18px;
-        background: linear-gradient(180deg, #ffffff 0%, #f9fcfa 100%);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        border-radius: 6px;
+        background: #f9fcfa;
+        box-shadow: none;
     }
 
     .vt3-shell .uel2-progress-total {
@@ -199,7 +206,7 @@
 
     .vt3-shell .uel2-section {
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 8px;
         background: #ffffff;
         box-shadow: none;
         overflow: hidden;
@@ -240,7 +247,7 @@
     }
 
     .vt3-shell .uel2-table {
-        border-radius: 12px;
+        border-radius: 6px;
         overflow: hidden;
     }
 
@@ -260,7 +267,7 @@
     .vt3-shell .uel2-grid select,
     .vt3-shell .uel2-grid textarea {
         min-height: 40px;
-        border-radius: 12px;
+        border-radius: 6px;
     }
 
     .vt3-shell .uel2-actions {
@@ -292,7 +299,7 @@
     }
 
     .vt3-shell .uel2-managed-question {
-        border-radius: 12px;
+        border-radius: 6px;
         border-color: #e2e8f0;
         background: #ffffff;
     }
@@ -307,7 +314,7 @@
     }
 
     .vt3-shell .uel2-subsection {
-        border-radius: 12px;
+        border-radius: 7px;
         border-color: #e2e8f0;
         background: #ffffff;
         box-shadow: none;
@@ -403,7 +410,12 @@
         margin-bottom: 10px;
     }
 
-    @media (max-width: 1180px) {
+    @media (max-width: 900px) {
+        .vt3-shell .uel2-quick-strip {
+            position: static;
+            box-shadow: none;
+        }
+
         .vt3-shell .uel2-layout {
             grid-template-columns: minmax(0, 1fr);
         }
@@ -422,11 +434,17 @@
         }
 
         .vt3-shell .uel2-content {
-            padding: 12px;
+            order: 1;
+            padding: 0;
+        }
+
+        .vt3-shell .uel2-sidebar {
+            order: 2;
         }
 
         .vt3-shell .uel2-quick-reference__grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0 16px;
         }
     }
 

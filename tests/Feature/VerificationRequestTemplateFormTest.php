@@ -166,15 +166,38 @@ it('renders verification information from the request template order and counts 
     expect(collect($section['rows'])->pluck('label')->all())
         ->toBe([
             'Mode of Verification',
-            'Reference Number',
+            'Portal Reference #',
+            'Verified By',
+            'Verification Date',
+            'Additional Information',
+        ])
+        ->and($section['total'])->toBe(5)
+        ->and($section['completed'])->toBe(3)
+        ->and(data_get($section, 'rows.0.field'))->toBe('custom_question_'.$modeQuestion->id)
+        ->and(data_get($section, 'rows.0.reactive'))->toBeTrue()
+        ->and(data_get($section, 'rows.1.field'))->not->toBeNull()
+        ->and(data_get($section, 'rows.1.readonly'))->toBeFalse()
+        ->and(data_get($section, 'rows.1.value'))->toBeNull()
+        ->and(data_get($section, 'rows.1.placeholder'))->toContain('portal confirmation');
+
+    $page->useData([
+        'vf_form_type' => 'full_form',
+        'custom_question_'.$modeQuestion->id => 'On Call',
+    ]);
+
+    $phoneSection = $page->getTemplateThreeVerificationInformationSection();
+
+    expect(collect($phoneSection['rows'])->pluck('label')->all())
+        ->toBe([
+            'Mode of Verification',
+            'Insurance Reference #',
             'Insurance Representative',
             'Verified By',
             'Verification Date',
             'Additional Information',
         ])
-        ->and($section['total'])->toBe(6)
-        ->and($section['completed'])->toBe(4)
-        ->and(data_get($section, 'rows.0.field'))->toBe('custom_question_'.$modeQuestion->id);
+        ->and($phoneSection['total'])->toBe(6)
+        ->and(data_get($phoneSection, 'rows.1.placeholder'))->toContain('provided by insurance');
 });
 
 it('builds form links for active requests and read-only links for completed requests', function () {
@@ -470,9 +493,9 @@ it('keeps the exact optional response fields configured for each frequency row',
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
     foreach ([
-        ['D9911', 'Selected optional fields', ['pre_auth_required', 'notes']],
-        ['D9912', 'No optional fields', []],
-    ] as [$code, $prompt, $fields]) {
+        ['D9911', 'Selected optional fields', ['pre_auth_required', 'notes'], true],
+        ['D9912', 'No optional fields', [], false],
+    ] as [$code, $prompt, $fields, $required]) {
         VerificationFormQuestion::create([
             'template_version_id' => $version->id,
             'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
@@ -484,6 +507,7 @@ it('keeps the exact optional response fields configured for each frequency row',
             'frequency_response_mode' => 'current',
             'frequency_response_fields' => $fields,
             'sort_order' => 900,
+            'is_required_for_audit' => $required,
             'is_active' => true,
         ]);
     }
@@ -514,13 +538,22 @@ it('keeps the exact optional response fields configured for each frequency row',
         {
             return $this->templateThreeFrequencyQuestionRows();
         }
+
+        public function resolvedCoverageRows(): array
+        {
+            return $this->resolveCodeCoverageRows();
+        }
     };
     $page->useRequest($request->fresh());
 
     $rows = collect($page->frequencyRows())->keyBy('code');
 
+    $resolvedRows = collect($page->resolvedCoverageRows())->keyBy('code');
+
     expect($rows->get('D9911')['frequency_response_fields'])->toBe(['pre_auth_required', 'notes'])
-        ->and($rows->get('D9912')['frequency_response_fields'])->toBe([]);
+        ->and($rows->get('D9912')['frequency_response_fields'])->toBe([])
+        ->and($resolvedRows->get('D9911')['required'])->toBeTrue()
+        ->and($resolvedRows->get('D9912')['required'])->toBeFalse();
 });
 
 it('uses and persists the correct responses for downgrade and orthodontic business questions', function () {
@@ -658,7 +691,60 @@ it('uses and persists the correct responses for downgrade and orthodontic busine
     expect($pdfRows->firstWhere('label', $definitions[0][1])['value'])
         ->toContain('Downgrade: Yes', 'Downgrade code: D2751')
         ->and(file_get_contents(resource_path('views/filament/saas/resources/verifications/pages/partials/verification-form-template-3-content.blade.php')))
-        ->not->toContain('No extra response fields selected.');
+        ->toContain('uel2-question-list', 'uel2-input-addon--prefix')
+        ->not->toContain('Audit-required only', 'No extra response fields selected.', "benefitGroupName === 'General' ? 'Diagnostic & Preventive'");
+});
+
+it('counts configured frequency responses and conditional details accurately', function () {
+    $page = new class extends EditVerificationRequest {};
+    $page->codeCoverageData = [
+        [
+            'category' => 'Major',
+            'description' => 'Crown downgrade',
+            'downgrade_applies' => 'Yes',
+            'downgrade_to' => null,
+            'response_configuration' => [
+                'required_any' => ['downgrade_applies'],
+                'required_when' => [
+                    'field' => 'downgrade_to',
+                    'when_field' => 'downgrade_applies',
+                    'when_value' => 'Yes',
+                ],
+            ],
+        ],
+        [
+            'category' => 'Orthodontics',
+            'description' => 'Lifetime maximum',
+            'payment_guideline' => '$2,000',
+            'response_configuration' => [
+                'required_any' => ['payment_guideline'],
+                'required_when' => [],
+            ],
+        ],
+        [
+            'category' => 'General',
+            'description' => 'Zero percent benefit',
+            'coverage_percent' => 0,
+            'response_configuration' => [
+                'required_any' => ['coverage_status', 'coverage_percent'],
+                'required_when' => [],
+            ],
+        ],
+    ];
+
+    expect($page->getCodeCoverageSection()['completed'])->toBe(2)
+        ->and($page->codeCoverageRowIsComplete($page->codeCoverageData[0]))->toBeFalse();
+
+    $page->codeCoverageData[0]['downgrade_to'] = 'D2751';
+
+    expect($page->getCodeCoverageSection()['completed'])->toBe(3)
+        ->and($page->codeCoverageRowIsComplete($page->codeCoverageData[0]))->toBeTrue();
+});
+
+it('does not pre-answer the waiting period question', function () {
+    $page = new class extends EditVerificationRequest {};
+
+    expect($page->waitingPeriodAnswer)->toBe('');
 });
 
 it('limits the audit checklist to active required questions applicable to the selected form type', function () {
@@ -928,6 +1014,7 @@ it('saves a full template draft in bulk without creating an audit submission', f
 
     expect($request->verificationFormAnswers()->count())->toBe(45)
         ->and($request->verificationCoverageCodes()->count())->toBe(40)
+        ->and($request->fresh()->verificationProfile?->waiting_periods)->toBe('No')
         ->and($request->formSubmissions()->count())->toBe(0)
         ->and($request->activities()->where('activity_type', 'form_submitted')->count())->toBe(0)
         ->and($queryCount)->toBeLessThan(30)

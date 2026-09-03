@@ -243,7 +243,7 @@ class VerificationTemplateThreeDefaults
     protected static function verificationInformationQuestions(): array
     {
         return self::section('template_3_verification_information', [
-            ['Reference Number', null, 'text', 10],
+            ['Insurance Reference #', null, 'text', 10],
             ['Insurance Representative', 'vf_insurance_representative_name', 'text', 20],
             ['Verified By', 'vf_verified_by', 'text', 30],
             ['Verification Date', 'vf_verification_date', 'date', 40],

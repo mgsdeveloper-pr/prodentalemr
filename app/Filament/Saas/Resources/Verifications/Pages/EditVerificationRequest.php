@@ -77,7 +77,7 @@ class EditVerificationRequest extends EditRecord
 
     public string $formTemplate = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
 
-    public string $waitingPeriodAnswer = 'no';
+    public string $waitingPeriodAnswer = '';
 
     public array $waitingPeriodDetails = [];
 
@@ -885,32 +885,10 @@ class EditVerificationRequest extends EditRecord
         $this->data['outcome_status'] = 'pending';
         $this->codeCoverageData = collect($this->configuredCodeCoverageTemplate())
             ->values()
-            ->map(fn (array $row, int $index): array => [
-                'id' => null,
-                'code_system' => 'ada',
-                'category' => $row['category'],
-                'code' => $row['code'],
-                'description' => $row['description'],
-                'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
-                'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
-                'response_configuration' => $row['response_configuration'] ?? null,
-                'coverage_status' => null,
-                'coverage_percent' => null,
-                'frequency' => null,
-                'age_limit' => null,
-                'waiting_period' => null,
-                'service_history' => null,
-                'pre_auth_required' => null,
-                'pre_auth_details' => null,
-                'downgrade_applies' => null,
-                'downgrade_to' => null,
-                'payment_guideline' => null,
-                'notes' => null,
-                'sort_order' => $index + 1,
-            ])
+            ->map(fn (array $row, int $index): array => $this->makeDefaultCodeCoverageRow($row, $index + 1))
             ->all();
         $this->clinicResponseAttachments = [];
-        $this->waitingPeriodAnswer = 'no';
+        $this->waitingPeriodAnswer = '';
         $this->waitingPeriodDetails = $this->defaultWaitingPeriodDetails();
         $this->data = $this->applyAutofillDefaults($this->data ?? []);
         $this->auditReady = false;
@@ -1130,7 +1108,7 @@ class EditVerificationRequest extends EditRecord
         $formType = data_get($this->data, 'vf_form_type', 'full_form');
         $templateVersionId = app(VerificationAuditService::class)->templateVersionId($this->record);
 
-        $questions = VerificationFormQuestion::query()
+        $configuredQuestions = VerificationFormQuestion::query()
             ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
             ->where('section_key', 'template_3_verification_information')
             ->where('is_active', true)
@@ -1144,38 +1122,76 @@ class EditVerificationRequest extends EditRecord
             ->where('template_version_id', $templateVersionId)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get()
-            ->map(function (VerificationFormQuestion $question): array {
+            ->get();
+
+        $verificationModeQuestion = $configuredQuestions->first(function (VerificationFormQuestion $question): bool {
+            return in_array(Str::lower(trim($question->prompt)), [
+                'mode of verification',
+                'verification mode',
+                'method of verification',
+            ], true);
+        });
+        $verificationModeField = $verificationModeQuestion
+            ? (filled($verificationModeQuestion->field_key)
+                ? $verificationModeQuestion->field_key
+                : $this->customQuestionFieldName($verificationModeQuestion->getKey()))
+            : null;
+        $verificationMode = filled($verificationModeField)
+            ? Str::lower(trim((string) data_get($this->data, $verificationModeField)))
+            : '';
+        $isWebVerification = str_contains($verificationMode, 'web') || str_contains($verificationMode, 'portal');
+
+        $questions = $configuredQuestions
+            ->reject(function (VerificationFormQuestion $question) use ($isWebVerification): bool {
                 $promptKey = Str::lower(trim($question->prompt));
-                $isReference = $promptKey === 'reference number';
-                $isReadonly = $isReference || in_array($question->field_key, [
+                $isInsuranceRepresentative = $question->field_key === 'vf_insurance_representative_name'
+                    || str_contains($promptKey, 'insurance representative');
+
+                return $isWebVerification && $isInsuranceRepresentative;
+            })
+            ->map(function (VerificationFormQuestion $question) use ($isWebVerification, $verificationModeField): array {
+                $promptKey = Str::lower(trim($question->prompt));
+                $isReference = in_array($promptKey, [
+                    'reference number',
+                    'insurance reference #',
+                    'insurance reference number',
+                    'portal reference #',
+                    'portal reference number',
+                ], true);
+                $isReadonly = in_array($question->field_key, [
                     'vf_verified_by',
                     'vf_verification_date',
                 ], true);
                 $field = filled($question->field_key)
                     ? $question->field_key
-                    : ($isReference ? null : $this->customQuestionFieldName($question->getKey()));
+                    : $this->customQuestionFieldName($question->getKey());
                 $value = match (true) {
-                    $isReference => $this->record->reference_number,
                     $question->field_key === 'vf_verified_by' => data_get($this->data, 'vf_verified_by') ?: auth()->user()?->name ?: '-',
                     $question->field_key === 'vf_verification_date' => data_get($this->data, 'vf_verification_date') ?: now()->format('Y-m-d'),
                     filled($field) => data_get($this->data, $field),
                     default => null,
                 };
+                $label = $isReference
+                    ? ($isWebVerification ? 'Portal Reference #' : 'Insurance Reference #')
+                    : $question->prompt;
+                $placeholder = $isReference
+                    ? ($isWebVerification ? 'Enter portal confirmation or transaction number' : 'Enter reference provided by insurance')
+                    : $question->placeholder;
 
                 return [
                     'id' => $question->getKey(),
-                    'label' => $question->prompt,
+                    'label' => $label,
                     'field' => $field,
                     'note_field' => $this->customQuestionNoteFieldName($question->getKey()),
                     'type' => $question->input_type,
                     'help_text' => $question->help_text,
-                    'placeholder' => $question->placeholder,
+                    'placeholder' => $placeholder,
                     'options' => $question->getSelectOptionValues(),
                     'has_note' => $question->has_note,
                     'note_label' => $question->note_label ?: 'Note',
                     'note_placeholder' => $question->note_placeholder ?: 'Add note',
                     'readonly' => $isReadonly,
+                    'reactive' => filled($verificationModeField) && $field === $verificationModeField,
                     'value' => $value,
                     'completed' => filled($value),
                 ];
@@ -1282,6 +1298,7 @@ class EditVerificationRequest extends EditRecord
             'has_note' => $question->has_note,
             'note_label' => $question->note_label ?: 'Note',
             'note_placeholder' => $question->note_placeholder ?: 'Add note',
+            'required' => (bool) $question->is_required_for_audit,
             'is_child' => $isChild,
             'children' => [],
         ];
@@ -1501,9 +1518,11 @@ class EditVerificationRequest extends EditRecord
         $formData = $this->normalizeVerificationDateFieldsForStorage($formData);
         $workItemData = $this->normalizeVerificationDateFieldsForStorage($workItemData);
 
-        $waitingPeriodSummary = $this->waitingPeriodAnswer === 'yes'
-            ? $this->formatWaitingPeriodDetails()
-            : null;
+        $waitingPeriodSummary = match ($this->waitingPeriodAnswer) {
+            'yes' => $this->formatWaitingPeriodDetails(),
+            'no' => 'No',
+            default => null,
+        };
 
         $formData['vf_waiting_periods'] = $waitingPeriodSummary;
         $workItemData['vf_waiting_periods'] = $waitingPeriodSummary;
@@ -1658,6 +1677,12 @@ class EditVerificationRequest extends EditRecord
         $savedValue = trim((string) data_get($this->data, 'vf_waiting_periods'));
 
         if ($savedValue === '') {
+            $this->waitingPeriodAnswer = '';
+
+            return;
+        }
+
+        if (strcasecmp($savedValue, 'No') === 0) {
             $this->waitingPeriodAnswer = 'no';
 
             return;
@@ -2157,20 +2182,22 @@ class EditVerificationRequest extends EditRecord
 
     public function getCodeCoverageSection(): array
     {
-        $rows = $this->normalizeCodeCoverageRows($this->codeCoverageData);
+        $rows = collect($this->codeCoverageData)
+            ->filter(fn (array $row): bool => filled($row['category'] ?? null) || filled($row['code'] ?? null) || filled($row['description'] ?? null))
+            ->values();
 
         return [
             'title' => 'Codes',
-            'completed' => collect($rows)
-                ->filter(fn (array $row): bool => filled($row['coverage_status'] ?? null) || filled($row['coverage_percent'] ?? null))
+            'completed' => $rows
+                ->filter(fn (array $row): bool => $this->codeCoverageRowIsComplete($row))
                 ->count(),
-            'total' => count($rows),
-            'groups' => collect($rows)
+            'total' => $rows->count(),
+            'groups' => $rows
                 ->groupBy(fn (array $row): string => $row['category'] ?: 'Uncategorized')
                 ->map(fn (Collection $categoryRows, string $category): array => [
                     'category' => $category,
                     'completed' => $categoryRows
-                        ->filter(fn (array $row): bool => filled($row['coverage_status'] ?? null) || filled($row['coverage_percent'] ?? null))
+                        ->filter(fn (array $row): bool => $this->codeCoverageRowIsComplete($row))
                         ->count(),
                     'total' => $categoryRows->count(),
                     'rows' => $categoryRows->values()->all(),
@@ -2178,6 +2205,40 @@ class EditVerificationRequest extends EditRecord
                 ->values()
                 ->all(),
         ];
+    }
+
+    public function codeCoverageRowIsComplete(array $row): bool
+    {
+        $configuration = is_array($row['response_configuration'] ?? null)
+            ? $row['response_configuration']
+            : [];
+        $requiredAny = collect($configuration['required_any'] ?? ['coverage_status', 'coverage_percent'])
+            ->filter(fn (mixed $field): bool => is_string($field) && $field !== '')
+            ->values();
+
+        $hasPrimaryResponse = $requiredAny->isEmpty()
+            || $requiredAny->contains(fn (string $field): bool => $this->hasCodeCoverageResponseValue(data_get($row, $field)));
+
+        if (! $hasPrimaryResponse) {
+            return false;
+        }
+
+        $conditional = is_array($configuration['required_when'] ?? null)
+            ? $configuration['required_when']
+            : [];
+
+        if ($conditional !== []
+            && data_get($row, $conditional['when_field'] ?? '') === ($conditional['when_value'] ?? null)
+            && ! $this->hasCodeCoverageResponseValue(data_get($row, $conditional['field'] ?? ''))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function hasCodeCoverageResponseValue(mixed $value): bool
+    {
+        return ! blank($value) || $value === 0 || $value === '0';
     }
 
     protected function resolveCodeCoverageRows(): array
@@ -2257,6 +2318,7 @@ class EditVerificationRequest extends EditRecord
                     $question->frequency_response_mode ?: 'current',
                 ),
                 'response_configuration' => $question->frequencyResponseConfiguration(),
+                'required' => (bool) $question->is_required_for_audit,
             ])
             ->all();
     }
@@ -2377,6 +2439,7 @@ class EditVerificationRequest extends EditRecord
         return match ($sectionKey) {
             'template_3_verification_information' => [
                 'Reference Number',
+                'Insurance Reference #',
             ],
             default => [],
         };
@@ -2415,6 +2478,7 @@ class EditVerificationRequest extends EditRecord
                 $row['frequency_response_mode'] = $defaultRow['frequency_response_mode'] ?? 'current';
                 $row['frequency_response_fields'] = $defaultRow['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode']);
                 $row['response_configuration'] = $defaultRow['response_configuration'] ?? null;
+                $row['required'] = (bool) ($defaultRow['required'] ?? false);
 
                 return $row;
             })
@@ -2449,6 +2513,7 @@ class EditVerificationRequest extends EditRecord
             'frequency_response_mode' => $row['frequency_response_mode'] ?? 'current',
             'frequency_response_fields' => $row['frequency_response_fields'] ?? VerificationFormQuestion::defaultFrequencyResponseFields($row['frequency_response_mode'] ?? 'current'),
             'response_configuration' => $row['response_configuration'] ?? null,
+            'required' => (bool) ($row['required'] ?? false),
             'coverage_status' => null,
             'coverage_percent' => null,
             'frequency' => null,

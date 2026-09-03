@@ -1,11 +1,12 @@
 <?php
 
+use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
 use App\Models\BillingWorkItem;
+use App\Models\Clinic;
 use App\Models\Provider;
 use App\Models\User;
 use App\Models\VerificationPlanSnapshot;
 use App\Models\VerificationProfile;
-use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
 use App\Support\PanelPermissionMatrix;
 use App\Support\WorkContext\Providers\VerificationContextProvider;
 use Database\Seeders\RoleSeeder;
@@ -217,9 +218,12 @@ it('builds quick reference from live worksheet data before saved fallbacks', fun
     ]));
     $record->setRelation('provider', new Provider([
         'npi_number' => '1790914729',
+        'tax_id' => '12-3456789',
     ]));
+    $record->setRelation('clinic', new Clinic(['clinic_name' => 'Demo Solo Dental Clinic']));
 
-    $page = new class($record) {
+    $page = new class($record)
+    {
         use InteractsWithVerificationWorkbench;
 
         public array $data = [
@@ -244,37 +248,115 @@ it('builds quick reference from live worksheet data before saved fallbacks', fun
             'patient' => 'Liam Bennett',
             'dob' => '08-14-1992',
             'member_id' => 'U63292952',
+            'subscriber_id' => 'U63292952',
             'insurance_name' => 'Delta Dental of Kentucky',
             'group_number' => 'GRP-42',
             'provider_npi' => '1790914729',
+            'provider_tax_id' => '12-3456789',
+            'clinic_name' => 'Demo Solo Dental Clinic',
             'phone' => '800-555-0199',
         ])
         ->not->toHaveKey('practice_npi');
 });
 
-it('keeps the template three quick reference available while the worksheet scrolls', function (): void {
+it('renders template three quick reference as a fixed collapsible drawer', function (): void {
+    $page = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/edit-verification-request.blade.php'
+    ));
+    $quickReference = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/template-3-quick-reference-drawer.blade.php'
+    ));
+
+    expect($page)
+        ->toContain('class="vt3-integrated-header"')
+        ->toContain('quickReferenceDrawerOpen: true')
+        ->toContain("@include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-drawer')")
+        ->toContain("['Insurance Phone', \$quickReference['phone'] ?? '-']")
+        ->toContain("['Location', \$templateThreePracticeContext->get('Location', '-')]")
+        ->toContain("'Provider Information' => [")
+        ->toContain("['Provider Name', \$quickReference['provider_name'] ?? '-']")
+        ->toContain("['NPI', \$quickReference['provider_npi'] ?? '-']")
+        ->toContain("['Tax ID / EIN', \$quickReference['provider_tax_id'] ?? '-']")
+        ->toContain("['Clinic Name', \$quickReference['clinic_name'] ?? '-']")
+        ->toContain('.vt3-reference-drawer {')
+        ->toContain('position: fixed;')
+        ->toContain('transform: translateX(100%);')
+        ->toContain('.vt3-reference-drawer.is-open {')
+        ->toContain('overflow-y: auto;');
+
+    expect($quickReference)
+        ->toContain('class="vt3-reference-drawer__tab"')
+        ->toContain('class="vt3-reference-drawer__body"')
+        ->toContain('Quick Reference')
+        ->toContain('href="tel:');
+});
+
+it('allows template three monetary fields to fill equal responsive columns', function (): void {
     $template = file_get_contents(resource_path(
-        'views/filament/saas/resources/verifications/pages/partials/verification-form-template-3.blade.php'
+        'views/filament/saas/resources/verifications/pages/partials/verification-form-template-3-content.blade.php'
     ));
 
     expect($template)
-        ->toContain('--vt3-context-offset: calc(var(--pwdl-shell-topbar, 72px) + 12px)')
-        ->toContain('top: var(--vt3-context-offset)')
-        ->toContain('max-height: calc(100dvh - var(--vt3-context-offset) - 12px)')
-        ->toContain('overscroll-behavior: contain')
-        ->toContain('overflow-x: visible;')
-        ->toContain('overflow-y: visible;');
+        ->toContain('.uel2-grid--money {')
+        ->toContain('grid-template-columns: repeat(2, minmax(0, 1fr));')
+        ->toContain('.uel2-input-addon > input {')
+        ->toContain('width: 100%;')
+        ->toContain('.uel2-input-addon:focus-within {')
+        ->toContain('overflow: hidden;')
+        ->toContain('border: 1px solid var(--uel2-line);')
+        ->toContain('.uel2-input-addon--prefix > span {')
+        ->toContain('border-right: 1px solid var(--uel2-line);')
+        ->toContain('.uel2-input-addon--suffix > span {')
+        ->toContain('border-left: 1px solid var(--uel2-line);')
+        ->toContain('@media (max-width: 720px)')
+        ->toContain('.uel2-grid--money { grid-template-columns: 1fr; }')
+        ->not->toContain('repeat(auto-fit, minmax(220px, 320px))');
 });
 
-it('renders the template three identity actions and status as one integrated header', function (): void {
+it('uses a slim identity summary with no embedded quick reference panel', function (): void {
+    $template = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/verification-form-template-3-content.blade.php'
+    ));
+    $page = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/edit-verification-request.blade.php'
+    ));
+    $managedQuestion = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/template-3-managed-question-row.blade.php'
+    ));
+
+    expect($template)
+        ->toContain('<div class="uel2-shell__inner">')
+        ->toContain('min-height: 36px;')
+        ->toContain('padding: 6px 12px;')
+        ->toContain('<div class="uel2-layout">')
+        ->not->toContain('requiredOnly', 'Audit-required only', 'uel2-form-header', 'Question-driven Response Form');
+
+    expect($page)
+        ->toContain('class="vt3-integrated-header"')
+        ->toContain('class="vt3-header-context-item">Patient:')
+        ->toContain('class="vt3-header-context-item">DOB:')
+        ->toContain('class="vt3-header-context-item">Member ID:')
+        ->toContain('class="vt3-header-context-item">Insurance:')
+        ->toContain('class="vt3-header-context-item">Subscriber:')
+        ->toContain('class="vt3-header-context-item">Subscriber DOB:')
+        ->toContain('class="vt3-header-context-item">Subscriber ID:')
+        ->not->toContain('class="vt3-header-context-item">Reference:')
+        ->not->toContain("@include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-strip')\n            </section>")
+        ->not->toContain('<section class="vt3-status-rail" aria-label="Verification request summary">\n                    <span class="vt3-status-chip');
+
+    expect($managedQuestion)->not->toContain('requiredOnly');
+});
+
+it('renders template three identity actions and quick reference drawer together', function (): void {
     $template = file_get_contents(resource_path(
         'views/filament/saas/resources/verifications/pages/edit-verification-request.blade.php'
     ));
 
     expect($template)
+        ->toContain('class="vt3-integrated-header"')
         ->toContain('class="vt3-compact-workbar__identity"')
         ->toContain('class="vt3-compact-workbar__context"')
-        ->toContain('.vt3-compact-workbar > .vt3-status-rail')
+        ->toContain("@include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-drawer')")
         ->toContain('! $this->focusMode && ! $isTemplateThreeVerificationForm');
 });
 

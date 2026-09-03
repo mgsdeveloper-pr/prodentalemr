@@ -332,6 +332,13 @@ trait InteractsWithVerificationWorkbench
             $record->insurancePolicy?->subscriber_dob,
             $primaryPlan?->subscriber_dob
         );
+        $subscriberId = $this->firstFilled(
+            data_get($data, 'vf_subscriber_id'),
+            $profile?->subscriber_id,
+            $primaryPlan?->member_id,
+            $record->insurancePolicy?->member_id,
+            $record->patient?->insurance_number
+        );
         $insuredRelation = $this->firstFilled(
             data_get($data, 'vf_insured_relation'),
             $profile?->insured_relation,
@@ -380,12 +387,15 @@ trait InteractsWithVerificationWorkbench
             'relationship' => filled($insuredRelation) ? str((string) $insuredRelation)->headline()->toString() : '-',
             'subscriber_name' => $subscriberName ?: '-',
             'subscriber_dob' => $this->formatQuickReferenceDate($subscriberDob),
+            'subscriber_id' => $subscriberId ?: '-',
             'insurance_name' => $insuranceName ?: '-',
             'coverage_role' => $this->resolveCoverageRole($patientName, $subscriberName, $insuredRelation),
             'group_number' => $groupNumber ?: '-',
             'appointment_date' => $this->formatQuickReferenceDate($appointmentDate),
             'provider_name' => $providerName ?: '-',
             'provider_npi' => $record->provider?->npi_number ?: '-',
+            'provider_tax_id' => $record->provider?->tax_id ?: ($record->clinic?->tax_id ?: '-'),
+            'clinic_name' => $record->clinic?->clinic_name ?: '-',
             'phone' => $insurancePhone ?: '-',
         ];
     }
