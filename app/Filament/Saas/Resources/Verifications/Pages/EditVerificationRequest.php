@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationFormSubmission;
+use App\Models\VerificationTemplateSection;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\WorkflowService;
@@ -1101,6 +1102,60 @@ class EditVerificationRequest extends EditRecord
     public function getTemplateThreeQuestionsForSection(string $sectionKey): array
     {
         return $this->getManagedTemplateQuestionsForSection($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY);
+    }
+
+    public function getTemplateThreeCustomSections(): array
+    {
+        $formType = data_get($this->data, 'vf_form_type', 'full_form');
+        $templateVersionId = app(VerificationAuditService::class)->templateVersionId($this->record);
+
+        $sectionKeys = VerificationFormQuestion::query()
+            ->where('template_version_id', $templateVersionId)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('is_builtin', false)
+            ->where('is_active', true)
+            ->where('input_type', '!=', 'frequency_row')
+            ->whereIn('form_type', ['both', $formType])
+            ->whereNotIn('section_key', VerificationFormQuestion::TEMPLATE_3_LIVE_SECTION_KEYS)
+            ->pluck('section_key')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($sectionKeys->isEmpty()) {
+            return [];
+        }
+
+        $sectionDefinitions = VerificationTemplateSection::query()
+            ->where('template_version_id', $templateVersionId)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('is_active', true)
+            ->whereIn('section_key', $sectionKeys)
+            ->get()
+            ->keyBy('section_key');
+
+        return $sectionKeys
+            ->map(function (string $sectionKey) use ($sectionDefinitions): array {
+                $definition = $sectionDefinitions->get($sectionKey);
+                $questions = $this->getTemplateThreeQuestionsForSection($sectionKey);
+                $visibleRows = collect($questions)
+                    ->flatMap(fn (array $question): array => [$question, ...($question['children'] ?? [])]);
+
+                return [
+                    'key' => $sectionKey,
+                    'label' => $definition?->label ?: str($sectionKey)->headline()->toString(),
+                    'sort_order' => $definition?->sort_order ?? PHP_INT_MAX,
+                    'questions' => $questions,
+                    'completed' => $visibleRows
+                        ->filter(fn (array $question): bool => filled(data_get($this->data, $question['field'])))
+                        ->count(),
+                    'total' => $visibleRows->count(),
+                ];
+            })
+            ->filter(fn (array $section): bool => $section['total'] > 0)
+            ->sortBy(fn (array $section): array => [$section['sort_order'], $section['label']])
+            ->values()
+            ->all();
     }
 
     public function getTemplateThreeVerificationInformationSection(): array

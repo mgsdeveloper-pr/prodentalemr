@@ -12,6 +12,7 @@ use App\Models\ManagedBillingService;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\VerificationFormQuestion;
+use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
 use App\Services\Verification\VerificationAuditService;
 use App\Support\VerificationResultPdf;
@@ -91,6 +92,76 @@ it('attaches the active clinic template snapshot when a verification request is 
         ->and($request->verification_template_snapshot)->toBeArray()
         ->and(data_get($request->verification_template_snapshot, 'version.id'))->toBe($version->id)
         ->and($request->verification_template_snapshot_at)->not->toBeNull();
+});
+
+it('renders and counts custom sections from the request template version', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+
+    VerificationTemplateSection::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'custom_testing',
+        'label' => 'Testing',
+        'sort_order' => 900,
+        'is_builtin' => false,
+        'is_active' => true,
+    ]);
+
+    $question = VerificationFormQuestion::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'template_version_id' => $version->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'custom_testing',
+        'prompt' => 'Custom required answer',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'sort_order' => 10,
+        'is_builtin' => false,
+        'is_active' => true,
+        'is_required_for_audit' => true,
+    ]);
+
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Custom section request',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    $page = new class extends EditVerificationRequest
+    {
+        public function configure(BillingWorkItem $request, array $data): void
+        {
+            $this->record = $request;
+            $this->data = $data;
+        }
+    };
+    $page->configure($request, ['vf_form_type' => 'full_form']);
+
+    $sections = $page->getTemplateThreeCustomSections();
+
+    expect($sections)->toHaveCount(1)
+        ->and(data_get($sections, '0.key'))->toBe('custom_testing')
+        ->and(data_get($sections, '0.label'))->toBe('Testing')
+        ->and(data_get($sections, '0.completed'))->toBe(0)
+        ->and(data_get($sections, '0.total'))->toBe(1)
+        ->and(data_get($sections, '0.questions.0.label'))->toBe('Custom required answer');
+
+    $page->configure($request, [
+        'vf_form_type' => 'full_form',
+        'custom_question_'.$question->id => 'Answered',
+    ]);
+
+    expect(data_get($page->getTemplateThreeCustomSections(), '0.completed'))->toBe(1);
 });
 
 it('renders verification information from the request template order and counts every configured question', function () {

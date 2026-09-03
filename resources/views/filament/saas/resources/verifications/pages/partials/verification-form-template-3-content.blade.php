@@ -42,6 +42,7 @@
     $templateThreeMaximumQuestions = $this->getTemplateThreeQuestionsForSection('template_3_maximums_deductibles');
     $templateThreePlanProvisionQuestions = $this->getTemplateThreeQuestionsForSection('template_3_plan_provisions');
     $templateThreeServiceHistoryQuestions = $this->getTemplateThreeQuestionsForSection('template_3_service_history');
+    $templateThreeCustomSections = $this->getTemplateThreeCustomSections();
     $templateThreeVerificationSection = $this->getTemplateThreeVerificationInformationSection();
     $templateThreeInput = 'width:100%;min-height:38px;border:1px solid #dce8e3;border-radius:6px;background:#fff;padding:8px 10px;font-size:13px;outline:none;color:#142e25;';
     $templateThreeReadonly = 'width:100%;min-height:38px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:8px 10px;font-size:13px;font-weight:700;color:#334155;';
@@ -293,6 +294,13 @@
             'total' => (int) ($codeCoverageSection['total'] ?? 0),
             'visible' => $templateThreeVisibleBenefitGroups->isNotEmpty(),
         ],
+        ...collect($templateThreeCustomSections)
+            ->map(fn (array $section): array => [
+                'label' => $section['label'],
+                'completed' => $section['completed'],
+                'total' => $section['total'],
+            ])
+            ->all(),
         [
             'label' => 'Verification Information',
             'completed' => $templateThreeSectionCounts['verification']['completed'],
@@ -2229,6 +2237,23 @@
             </div>
         </section>
     @endif
+
+    @foreach ($templateThreeCustomSections as $customSection)
+        <section class="uel2-section" data-section-key="{{ $customSection['key'] }}">
+            <div class="uel2-header">
+                <div>
+                    <h2>{{ $customSection['label'] }}</h2>
+                    <p>Additional questions configured for this verification</p>
+                </div>
+                <span class="uel2-pill">{{ $customSection['completed'] }}/{{ $customSection['total'] }} Completed</span>
+            </div>
+            <div class="uel2-body">
+                @include('filament.saas.resources.verifications.pages.partials.template-3-managed-questions', [
+                    'questions' => $customSection['questions'],
+                ])
+            </div>
+        </section>
+    @endforeach
 
     <section class="uel2-section">
         <div class="uel2-header">
