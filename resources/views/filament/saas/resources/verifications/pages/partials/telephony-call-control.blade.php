@@ -8,6 +8,8 @@
         'insuranceName' => $insuranceName,
         'recordingEnabled' => (bool) ($callingWorkspace['recording_enabled'] ?? false),
         'aiSummaryEnabled' => (bool) ($callingWorkspace['ai_summary_enabled'] ?? false),
+        'available' => (bool) ($callingWorkspace['available'] ?? false),
+        'unavailableReason' => $callingWorkspace['reason'] ?? '',
     ];
 @endphp
 
@@ -22,10 +24,10 @@
         x-on:click="open = ! open"
         aria-label="Call insurance"
         title="Call insurance"
-        style="display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border:0;border-radius:10px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;"
+        style="display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border:1px solid {{ ($callingWorkspace['available'] ?? false) ? '#0f766e' : '#cbd5e1' }};border-radius:10px;background:{{ ($callingWorkspace['available'] ?? false) ? '#0f766e' : '#f8fafc' }};color:{{ ($callingWorkspace['available'] ?? false) ? '#ffffff' : '#475569' }};font-size:12px;font-weight:850;cursor:pointer;"
     >
         <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"/></svg>
-        Call Insurance
+        {{ ($callingWorkspace['available'] ?? false) ? 'Call Insurance' : 'Calling unavailable' }}
     </button>
 
     <div
@@ -51,6 +53,8 @@
 
         <div x-show="error" x-text="error" style="margin-top:12px;padding:9px 10px;border:1px solid #fecaca;border-radius:6px;background:#fef2f2;color:#b91c1c;font-size:12px;"></div>
 
+        <div x-show="! config.available" x-text="config.unavailableReason" style="margin-top:12px;padding:10px 11px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.45;"></div>
+
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px;padding:11px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;">
             <span style="font-size:12px;font-weight:750;color:#475569;" x-text="statusLabel"></span>
             <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#0f172a;" x-text="formattedDuration"></span>
@@ -59,7 +63,7 @@
         <div id="mightycall-webphone-container" style="margin-top:10px;"></div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
-            <button type="button" x-show="! active" x-bind:disabled="loading" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
+            <button type="button" x-show="config.available && ! active" x-bind:disabled="loading" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
                 <span x-text="loading ? 'Connecting...' : 'Start call'"></span>
             </button>
             <button type="button" x-show="active" x-on:click="toggleMute()" style="height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;" x-text="muted ? 'Unmute' : 'Mute'"></button>

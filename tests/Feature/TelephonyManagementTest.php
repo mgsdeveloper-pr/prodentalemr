@@ -93,9 +93,13 @@ it('keeps provider credentials encrypted and requires an active assigned user', 
         'is_active' => true,
     ]);
 
+    $unavailableWorkspace = TelephonyAccess::workspace($this->user, $this->workItem);
+
     expect(DB::table('telephony_accounts')->where('id', $account->id)->value('api_key'))
         ->not->toBe('mighty-api-key')
-        ->and(TelephonyAccess::canCall($this->user, $this->workItem))->toBeFalse();
+        ->and(TelephonyAccess::canCall($this->user, $this->workItem))->toBeFalse()
+        ->and($unavailableWorkspace['visible'])->toBeTrue()
+        ->and($unavailableWorkspace['reason'])->toBe('Your portal user is not assigned under User Calling Access.');
 
     TelephonyUserAssignment::create([
         'telephony_account_id' => $account->id,

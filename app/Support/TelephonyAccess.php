@@ -40,42 +40,27 @@ class TelephonyAccess
 
     public static function canCall(?User $user, BillingWorkItem $workItem): bool
     {
-        $account = self::accountFor($workItem->organization);
-        $assignment = self::assignmentFor($user, $account);
-        $callingUserLimit = SaasEntitlements::limitFor($workItem->clinic, 'calling_users');
-        $withinUserLimit = true;
-
-        if ($account && $callingUserLimit !== null) {
-            $allowedUserIds = $account->userAssignments()
-                ->where('is_active', true)
-                ->where('can_call', true)
-                ->orderBy('id')
-                ->limit(max(0, (int) $callingUserLimit))
-                ->pluck('user_id')
-                ->all();
-            $withinUserLimit = in_array($user?->getKey(), $allowedUserIds, true);
-        }
-
-        return $workItem->organization
-            && SaasEntitlements::userFeatureAllowed($user, 'calling', $workItem->clinic)
-            && self::hasRolePermission($user, 'add')
-            && $assignment?->can_call === true
-            && $withinUserLimit
-            && filled($account?->api_key)
-            && filled($assignment?->user_key);
+        return self::evaluate($user, $workItem)['available'];
     }
 
     public static function workspace(?User $user, BillingWorkItem $workItem): array
     {
-        $account = self::accountFor($workItem->organization);
-        $assignment = self::assignmentFor($user, $account);
+        $status = self::evaluate($user, $workItem);
 
-        if (! self::canCall($user, $workItem) || ! $account || ! $assignment) {
-            return ['available' => false];
+        if (! $status['available']) {
+            return [
+                'available' => false,
+                'visible' => $status['visible'],
+                'reason' => $status['reason'],
+            ];
         }
+
+        $account = $status['account'];
+        $assignment = $status['assignment'];
 
         return [
             'available' => true,
+            'visible' => true,
             'provider' => $account->provider,
             'provider_label' => 'MightyCall',
             'api_key' => $account->api_key,
@@ -87,6 +72,91 @@ class TelephonyAccess
             'ai_summary_enabled' => $account->ai_summary_enabled
                 && $assignment->can_use_ai_summary
                 && SaasEntitlements::userFeatureAllowed($user, 'call_ai_summary', $workItem->clinic),
+        ];
+    }
+
+    private static function evaluate(?User $user, BillingWorkItem $workItem): array
+    {
+        $visible = (bool) ($user?->isSaasAdmin()
+            || self::hasRolePermission($user, 'view')
+            || self::hasRolePermission($user, 'add'));
+
+        $unavailable = fn (string $reason): array => [
+            'available' => false,
+            'visible' => $visible,
+            'reason' => $reason,
+            'account' => null,
+            'assignment' => null,
+        ];
+
+        if (! $user?->status) {
+            return $unavailable('Your portal user account is inactive.');
+        }
+
+        if (! $workItem->organization) {
+            return $unavailable('This verification request is not connected to a client organization.');
+        }
+
+        if (! SaasEntitlements::userFeatureAllowed($user, 'calling', $workItem->clinic)) {
+            return $unavailable('Portal Calling is not enabled in this client\'s subscription plan.');
+        }
+
+        if (! self::hasRolePermission($user, 'add')) {
+            return $unavailable('Your role does not have permission to place calls.');
+        }
+
+        $account = self::accountFor($workItem->organization);
+
+        if (! $account) {
+            return $unavailable('No active Calling Account is assigned to this client.');
+        }
+
+        $assignment = $account->userAssignments()
+            ->where('user_id', $user->getKey())
+            ->first();
+
+        if (! $assignment) {
+            return $unavailable('Your portal user is not assigned under User Calling Access.');
+        }
+
+        if (! $assignment->is_active) {
+            return $unavailable('Your User Calling Access assignment is inactive.');
+        }
+
+        if (! $assignment->can_call) {
+            return $unavailable('Calling is disabled for your user assignment.');
+        }
+
+        $callingUserLimit = SaasEntitlements::limitFor($workItem->clinic, 'calling_users');
+
+        if ($callingUserLimit !== null) {
+            $allowedUserIds = $account->userAssignments()
+                ->where('is_active', true)
+                ->where('can_call', true)
+                ->orderBy('id')
+                ->limit(max(0, (int) $callingUserLimit))
+                ->pluck('user_id')
+                ->all();
+
+            if (! in_array($user->getKey(), $allowedUserIds, true)) {
+                return $unavailable('The client has reached its Calling users plan limit.');
+            }
+        }
+
+        if (blank($account->api_key)) {
+            return $unavailable('The Calling Account is missing its MightyCall API key.');
+        }
+
+        if (blank($assignment->user_key)) {
+            return $unavailable('Your User Calling Access assignment is missing its MightyCall User Key.');
+        }
+
+        return [
+            'available' => true,
+            'visible' => true,
+            'reason' => null,
+            'account' => $account,
+            'assignment' => $assignment,
         ];
     }
 

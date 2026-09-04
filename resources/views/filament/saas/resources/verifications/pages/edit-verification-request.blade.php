@@ -203,7 +203,7 @@
         ob_start();
     @endphp
         <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;">
-            @if (($callingWorkspace['available'] ?? false) && filled($quickReference['phone'] ?? null))
+            @if (($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
                 @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
                     'callingWorkspace' => $callingWorkspace,
                     'destinationNumber' => $quickReference['phone'],
