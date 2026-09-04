@@ -646,12 +646,14 @@
             overflow-wrap: anywhere;
         }
 
-        .vt3-reference-drawer__row a {
+        .vt3-reference-drawer__row a,
+        .vt3-reference-drawer__row button {
             color: #0f766e;
             text-decoration: none;
         }
 
-        .vt3-reference-drawer__row a:hover {
+        .vt3-reference-drawer__row a:hover,
+        .vt3-reference-drawer__row button:hover {
             text-decoration: underline;
         }
 

@@ -288,7 +288,8 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain('class="vt3-reference-drawer__tab"')
         ->toContain('class="vt3-reference-drawer__body"')
         ->toContain('Quick Reference')
-        ->toContain('href="tel:');
+        ->toContain("\$dispatch('verification-open-telephony'")
+        ->not->toContain('href="tel:');
 });
 
 it('allows template three monetary fields to fill equal responsive columns', function (): void {

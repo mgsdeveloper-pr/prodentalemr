@@ -39,8 +39,14 @@
                         <div class="vt3-reference-drawer__row">
                             <dt>{{ $templateThreeQuickReferenceLabel }}</dt>
                             <dd>
-                                @if ($templateThreeQuickReferenceLabel === 'Insurance Phone' && filled($templateThreeQuickReferenceValue) && $templateThreeQuickReferenceValue !== '-')
-                                    <a href="tel:{{ preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue) }}">{{ $templateThreeQuickReferenceValue }}</a>
+                                @if ($templateThreeQuickReferenceLabel === 'Insurance Phone' && filled($templateThreeQuickReferenceValue) && $templateThreeQuickReferenceValue !== '-' && ($callingWorkspace['available'] ?? false))
+                                    <button
+                                        type="button"
+                                        x-on:click="$dispatch('verification-open-telephony', { destination: @js(preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue)) })"
+                                        aria-label="Call insurance at {{ $templateThreeQuickReferenceValue }}"
+                                        title="Open portal dialer"
+                                        style="appearance:none;padding:0;border:0;background:transparent;color:#0f766e;font:inherit;cursor:pointer;"
+                                    >{{ $templateThreeQuickReferenceValue }}</button>
                                 @else
                                     {{ filled($templateThreeQuickReferenceValue) ? $templateThreeQuickReferenceValue : '-' }}
                                 @endif

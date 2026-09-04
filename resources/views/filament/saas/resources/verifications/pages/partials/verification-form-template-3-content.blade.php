@@ -589,12 +589,14 @@
         overflow-wrap: anywhere;
     }
 
-    .uel2-quick-strip__value a {
+    .uel2-quick-strip__value a,
+    .uel2-quick-strip__value button {
         color: inherit;
         text-decoration: none;
     }
 
-    .uel2-quick-strip__value a:hover {
+    .uel2-quick-strip__value a:hover,
+    .uel2-quick-strip__value button:hover {
         color: var(--uel2-brand);
         text-decoration: underline;
     }

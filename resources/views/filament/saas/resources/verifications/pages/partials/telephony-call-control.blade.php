@@ -14,6 +14,7 @@
 <div
     x-data="verificationTelephonyControl(@js($telephonyConfig))"
     x-on:keydown.escape.window="open = false"
+    x-on:verification-open-telephony.window="config.destination = $event.detail.destination || config.destination; open = true"
     style="position:relative;"
 >
     <button
