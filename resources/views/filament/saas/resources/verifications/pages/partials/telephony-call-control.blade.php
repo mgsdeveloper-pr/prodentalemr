@@ -14,6 +14,7 @@
 @endphp
 
 <div
+    wire:ignore
     x-data="verificationTelephonyControl(@js($telephonyConfig))"
     x-on:keydown.escape.window="open = false"
     x-on:verification-open-telephony.window="config.destination = $event.detail.destination || config.destination; open = true"
@@ -53,6 +54,8 @@
 
         <div x-show="error" x-text="error" style="margin-top:12px;padding:9px 10px;border:1px solid #fecaca;border-radius:6px;background:#fef2f2;color:#b91c1c;font-size:12px;"></div>
 
+        <div x-show="trackingWarning" x-text="trackingWarning" style="margin-top:12px;padding:9px 10px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:11px;line-height:1.45;"></div>
+
         <div x-show="! config.available" x-text="config.unavailableReason" style="margin-top:12px;padding:10px 11px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.45;"></div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:11px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;">
@@ -85,6 +88,7 @@
             active: false,
             muted: false,
             error: '',
+            trackingWarning: '',
             statusLabel: 'Ready to call',
             callId: null,
             startedAt: null,
@@ -95,6 +99,8 @@
             terminalReported: false,
             requestedEndStatus: null,
             requestedEndLabel: '',
+            reporting: false,
+            pendingReports: [],
 
             get formattedDuration() {
                 const minutes = Math.floor(this.duration / 60).toString().padStart(2, '0');
@@ -225,13 +231,39 @@
             async report(status, callInfo = null, providerEvent = null) {
                 if (! this.callId) return;
                 const providerCallId = callInfo?.Id || callInfo?.id || null;
-                await this.$wire.updateTelephonyCall(
-                    this.callId,
+                this.pendingReports.push({
+                    callId: this.callId,
                     status,
-                    this.duration,
+                    duration: this.duration,
                     providerCallId,
                     providerEvent,
-                );
+                });
+
+                if (this.reporting) return;
+
+                this.reporting = true;
+
+                try {
+                    while (this.pendingReports.length > 0) {
+                        const report = this.pendingReports.shift();
+
+                        try {
+                            await this.$wire.updateTelephonyCall(
+                                report.callId,
+                                report.status,
+                                report.duration,
+                                report.providerCallId,
+                                report.providerEvent,
+                            );
+                            this.trackingWarning = '';
+                        } catch (error) {
+                            console.error('Call activity sync failed.', error);
+                            this.trackingWarning = 'The call is continuing, but its activity status could not be synchronized. Call Usage may update through the MightyCall webhook.';
+                        }
+                    }
+                } finally {
+                    this.reporting = false;
+                }
             },
 
             async finishCall(status, label, callInfo = null, providerEvent = null) {
@@ -248,6 +280,7 @@
             async startCall() {
                 this.loading = true;
                 this.error = '';
+                this.trackingWarning = '';
                 this.statusLabel = 'Connecting to MightyCall';
                 this.wasConnected = false;
                 this.duration = 0;

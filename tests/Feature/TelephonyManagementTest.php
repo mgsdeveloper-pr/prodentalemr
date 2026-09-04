@@ -221,6 +221,7 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
     ));
 
     expect($control)
+        ->toContain('wire:ignore')
         ->toContain('async waitForPhoneReady()')
         ->toContain("const readyStatuses = ['ready', 'registered'];")
         ->toContain('await this.waitForPhoneReady();')
@@ -230,6 +231,8 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('this.subscribe(phone.OnOffline')
         ->toContain('this.subscribe(phone.OnError')
         ->toContain('Phone.Focus?.();')
+        ->toContain('pendingReports: []')
+        ->toContain('while (this.pendingReports.length > 0)')
         ->toContain("this.finishCall(status, label, null, 'hangup')")
         ->and(strpos($control, 'await this.waitForPhoneReady();'))
         ->toBeLessThan(strpos($control, 'Phone.Call(config.destination)'));
