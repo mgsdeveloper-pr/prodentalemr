@@ -228,10 +228,20 @@ class EditVerificationRequest extends EditRecord
         return ['public_id' => $call->public_id];
     }
 
-    public function updateTelephonyCall(string $publicId, string $status, int $durationSeconds = 0): void
-    {
+    public function updateTelephonyCall(
+        string $publicId,
+        string $status,
+        int $durationSeconds = 0,
+        ?string $providerCallId = null,
+        ?string $providerEvent = null,
+    ): void {
         $allowedStatuses = ['initiated', 'ringing', 'connected', 'completed', 'failed'];
+        $allowedProviderEvents = ['outgoing', 'started', 'completed', 'hangup', 'offline', 'error', 'cancelled'];
         abort_unless(in_array($status, $allowedStatuses, true), 422);
+
+        $providerCallId = filled($providerCallId) ? trim($providerCallId) : null;
+        $providerEvent = in_array($providerEvent, $allowedProviderEvents, true) ? $providerEvent : null;
+        abort_if($providerCallId && mb_strlen($providerCallId) > 255, 422);
 
         $call = TelephonyCall::query()->where('public_id', $publicId)->firstOrFail();
         abort_unless($call->user_id === auth()->id() || auth()->user()?->isSaasAdmin(), 403);
@@ -241,6 +251,24 @@ class EditVerificationRequest extends EditRecord
             'status' => $status,
             'duration_seconds' => max($call->duration_seconds, min($durationSeconds, 86400)),
         ];
+
+        if ($providerCallId && ! $call->provider_call_id) {
+            $updates['provider_call_id'] = $providerCallId;
+        }
+
+        if ($providerEvent) {
+            $providerPayload = $call->provider_payload ?? [];
+            $browserEvents = collect($providerPayload['browser_events'] ?? [])
+                ->push([
+                    'event' => $providerEvent,
+                    'status' => $status,
+                    'at' => now()->toIso8601String(),
+                ])
+                ->take(-20)
+                ->values()
+                ->all();
+            $updates['provider_payload'] = array_merge($providerPayload, ['browser_events' => $browserEvents]);
+        }
 
         if ($status === 'connected' && ! $call->answered_at) {
             $updates['answered_at'] = now();

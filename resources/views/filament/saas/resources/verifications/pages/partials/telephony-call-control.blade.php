@@ -143,27 +143,50 @@
                 const phone = window.MightyCallWebPhone.Phone;
                 this.eventsBound = true;
 
-                this.subscribe(phone.OnCallOutgoing, () => {
+                this.subscribe(phone.OnCallOutgoing, (callInfo) => {
                     this.statusLabel = 'Ringing insurer';
-                    this.report('ringing');
+                    this.report('ringing', callInfo, 'outgoing');
                 });
-                this.subscribe(phone.OnCallStarted, () => {
+                this.subscribe(phone.OnCallStarted, (callInfo) => {
                     this.active = true;
                     this.wasConnected = true;
                     this.loading = false;
                     this.startedAt = Date.now();
                     this.statusLabel = 'Connected';
-                    this.report('connected');
+                    this.report('connected', callInfo, 'started');
                     window.clearInterval(this.timer);
                     this.timer = window.setInterval(() => {
                         this.duration = Math.floor((Date.now() - this.startedAt) / 1000);
                     }, 1000);
                 });
+                this.subscribe(phone.OnCallCompleted, (callInfo) => {
+                    const completed = this.wasConnected;
+
+                    this.finishCall(
+                        completed ? 'completed' : 'failed',
+                        completed ? 'Call completed' : 'Call ended without connection',
+                        callInfo,
+                        'completed',
+                    );
+                });
                 this.subscribe(phone.OnHangUp, () => {
                     const status = this.requestedEndStatus || (this.wasConnected ? 'completed' : 'failed');
                     const label = this.requestedEndLabel || (this.wasConnected ? 'Call completed' : 'Call ended without connection');
 
-                    this.finishCall(status, label);
+                    window.setTimeout(() => this.finishCall(status, label, null, 'hangup'), 750);
+                });
+                this.subscribe(phone.OnOffline, () => {
+                    if (! this.loading && ! this.active) return;
+
+                    this.error = 'MightyCall went offline. Check the browser microphone and network connection.';
+                    this.finishCall('failed', 'Connection lost', null, 'offline');
+                });
+                this.subscribe(phone.OnError, (error) => {
+                    if (! this.loading && ! this.active) return;
+
+                    const message = typeof error === 'string' ? error : (error?.message || 'MightyCall reported an unknown error.');
+                    this.error = `MightyCall: ${message}`;
+                    this.finishCall('failed', 'Call failed', null, 'error');
                 });
             },
 
@@ -199,12 +222,19 @@
                 });
             },
 
-            async report(status) {
+            async report(status, callInfo = null, providerEvent = null) {
                 if (! this.callId) return;
-                await this.$wire.updateTelephonyCall(this.callId, status, this.duration);
+                const providerCallId = callInfo?.Id || callInfo?.id || null;
+                await this.$wire.updateTelephonyCall(
+                    this.callId,
+                    status,
+                    this.duration,
+                    providerCallId,
+                    providerEvent,
+                );
             },
 
-            async finishCall(status, label) {
+            async finishCall(status, label, callInfo = null, providerEvent = null) {
                 if (this.terminalReported) return;
 
                 this.terminalReported = true;
@@ -212,7 +242,7 @@
                 this.active = false;
                 this.loading = false;
                 this.statusLabel = label;
-                await this.report(status);
+                await this.report(status, callInfo, providerEvent);
             },
 
             async startCall() {
@@ -236,6 +266,7 @@
                     await this.waitForPhoneReady();
                     this.statusLabel = 'Starting call';
                     window.MightyCallWebPhone.Phone.Call(config.destination);
+                    window.MightyCallWebPhone.Phone.Focus?.();
                 } catch (error) {
                     this.error = error?.message || 'The call could not be started.';
                     await this.finishCall('failed', 'Call failed');
@@ -247,7 +278,7 @@
                 this.requestedEndLabel = 'Call cancelled';
                 this.statusLabel = 'Cancelling call';
                 window.MightyCallWebPhone?.Phone?.HangUp();
-                window.setTimeout(() => this.finishCall('failed', 'Call cancelled'), 1000);
+                window.setTimeout(() => this.finishCall('failed', 'Call cancelled', null, 'cancelled'), 1000);
             },
 
             toggleMute() {
