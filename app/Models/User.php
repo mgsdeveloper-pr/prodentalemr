@@ -148,6 +148,11 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         return $this->hasOne(UserMailbox::class);
     }
 
+    public function telephonyAssignments(): HasMany
+    {
+        return $this->hasMany(TelephonyUserAssignment::class);
+    }
+
     public function allowedWorkspaces(): array
     {
         $workspaces = $this->allowed_workspaces;

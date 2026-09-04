@@ -28,6 +28,8 @@ use App\Filament\Saas\Resources\Payments\PaymentResource;
 use App\Filament\Saas\Resources\SaasEntitlementAuditLogs\SaasEntitlementAuditLogResource;
 use App\Filament\Saas\Resources\SubscriptionPlans\SubscriptionPlanResource;
 use App\Filament\Saas\Resources\Subscriptions\SubscriptionResource;
+use App\Filament\Saas\Resources\TelephonyAccounts\TelephonyAccountResource;
+use App\Filament\Saas\Resources\TelephonyCalls\TelephonyCallResource;
 use App\Filament\Saas\Resources\Users\UserResource;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Filament\Saas\Widgets\BillingHealthOverview;
@@ -98,6 +100,7 @@ class SaasPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Billing'),
                 NavigationGroup::make()->label('Master Data'),
                 NavigationGroup::make()->label('Administration'),
+                NavigationGroup::make()->label('Calling'),
                 NavigationGroup::make()->label('Notifications'),
                 NavigationGroup::make()->label('Settings'),
             ])
@@ -120,6 +123,8 @@ class SaasPanelProvider extends PanelProvider
                 SubscriptionPlanResource::class,
                 SubscriptionResource::class,
                 SaasEntitlementAuditLogResource::class,
+                TelephonyAccountResource::class,
+                TelephonyCallResource::class,
             ])
             ->pages([
                 Dashboard::class,

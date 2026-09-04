@@ -109,6 +109,21 @@ class SubscriptionPlanForm
                             ->numeric()
                             ->default(SubscriptionPlan::defaultPlanLimits()['attachment_mb'])
                             ->minValue(0),
+                        TextInput::make('plan_limits.monthly_call_minutes')
+                            ->label('Monthly call minutes')
+                            ->numeric()
+                            ->default(SubscriptionPlan::defaultPlanLimits()['monthly_call_minutes'])
+                            ->minValue(0),
+                        TextInput::make('plan_limits.calling_users')
+                            ->label('Calling users')
+                            ->numeric()
+                            ->default(SubscriptionPlan::defaultPlanLimits()['calling_users'])
+                            ->minValue(0),
+                        TextInput::make('plan_limits.recording_retention_days')
+                            ->label('Recording retention (days)')
+                            ->numeric()
+                            ->default(SubscriptionPlan::defaultPlanLimits()['recording_retention_days'])
+                            ->minValue(1),
                     ])
                     ->columns(3)
                     ->columnSpanFull(),

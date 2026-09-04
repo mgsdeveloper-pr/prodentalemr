@@ -54,6 +54,7 @@
         $attachments = $this->getAttachmentCards();
         $feeScheduleReference = $this->getFeeScheduleReference();
         $canSubmitForm = method_exists($this, 'canSubmitForm') ? $this->canSubmitForm() : true;
+        $callingWorkspace = $this->getCallingWorkspace();
         $clinicResponseUrl = $this->getClinicResponseUrl();
         $canRequestClinicInfo = $this->canRequestClinicInfo();
         $canRefreshVerificationTemplate = $this->canRefreshVerificationTemplate();
@@ -202,6 +203,13 @@
         ob_start();
     @endphp
         <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;">
+            @if (($callingWorkspace['available'] ?? false) && filled($quickReference['phone'] ?? null))
+                @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
+                    'callingWorkspace' => $callingWorkspace,
+                    'destinationNumber' => $quickReference['phone'],
+                    'insuranceName' => $quickReference['insurance_name'] ?? 'Insurance',
+                ])
+            @endif
             @if ($clinicResponseUrl)
                 <a href="{{ $clinicResponseUrl }}" style="display:inline-flex;align-items:center;justify-content:center;min-width:188px;padding:10px 15px;border-radius:12px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:900;text-decoration:none;">
                     Respond in Request &amp; Response

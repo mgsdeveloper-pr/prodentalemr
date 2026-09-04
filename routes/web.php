@@ -27,6 +27,7 @@ use App\Http\Controllers\Verification\VerificationInboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationNotificationActionController;
 use App\Http\Controllers\Verification\VerificationRequestResponseExportController;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
+use App\Http\Controllers\Webhooks\MightyCallWebhookController;
 use App\Support\AuthenticatedUserHome;
 use App\Support\ClinicWorkspace;
 use Illuminate\Http\Request;
@@ -150,6 +151,9 @@ Route::get('/admin/{path?}', function (Request $request, ?string $path = null) {
 
 Route::post('/stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 Route::post('/paypal/webhook', [PayPalCheckoutController::class, 'webhook'])->name('paypal.webhook');
+Route::post('/webhooks/telephony/mightycall/{account}/{token}', MightyCallWebhookController::class)
+    ->middleware('throttle:300,1')
+    ->name('webhooks.telephony.mightycall');
 Route::get('/billing/invoices/{invoice}/pay', [InvoicePaymentPageController::class, 'show'])
     ->middleware('signed')
     ->name('billing.invoices.payment.page');

@@ -10,6 +10,7 @@ use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\BillingWorkItem;
 use App\Models\InsuranceCarrier;
 use App\Models\InsuranceCarrierNetworkProfile;
+use App\Models\TelephonyCall;
 use App\Models\User;
 use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormQuestion;
@@ -18,6 +19,8 @@ use App\Models\VerificationTemplateSection;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\WorkflowService;
+use App\Support\SaasEntitlements;
+use App\Support\TelephonyAccess;
 use App\Support\VerificationAutoAssigner;
 use App\Support\VerificationTemplateVersionService;
 use App\Support\WorkContext\Providers\VerificationContextProvider;
@@ -158,6 +161,104 @@ class EditVerificationRequest extends EditRecord
     public function getIndexUrl(): string
     {
         return $this->returnToQueue ?? $this->getDefaultIndexUrl();
+    }
+
+    public function getCallingWorkspace(): array
+    {
+        return TelephonyAccess::workspace(auth()->user(), $this->record);
+    }
+
+    public function startTelephonyCall(string $destination): array
+    {
+        abort_unless(TelephonyAccess::canCall(auth()->user(), $this->record), 403);
+
+        $destination = preg_replace('/[^0-9+]/', '', trim($destination)) ?: '';
+
+        if (! preg_match('/^\+?[0-9]{7,15}$/', $destination)) {
+            throw ValidationException::withMessages([
+                'telephony' => 'Enter a valid insurance phone number before starting the call.',
+            ]);
+        }
+
+        $account = TelephonyAccess::accountFor($this->record->organization);
+        abort_unless($account, 403);
+
+        $planLimit = SaasEntitlements::limitFor(
+            $this->record->clinic,
+            'monthly_call_minutes',
+            null
+        );
+        $accountLimit = $account->monthly_minute_limit;
+        $limits = array_map('intval', array_values(array_filter(
+            [$planLimit, $accountLimit],
+            fn (mixed $limit): bool => $limit !== null
+        )));
+        $effectiveLimit = $limits === [] ? null : min($limits);
+        $usedSeconds = (int) TelephonyCall::query()
+            ->where('organization_id', $this->record->organization_id)
+            ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+            ->sum('duration_seconds');
+
+        if ($effectiveLimit !== null && $usedSeconds >= ($effectiveLimit * 60)) {
+            throw ValidationException::withMessages([
+                'telephony' => 'This client has reached its monthly calling allowance.',
+            ]);
+        }
+
+        $call = TelephonyCall::create([
+            'telephony_account_id' => $account->getKey(),
+            'organization_id' => $this->record->organization_id,
+            'clinic_id' => $this->record->clinic_id,
+            'billing_work_item_id' => $this->record->getKey(),
+            'user_id' => auth()->id(),
+            'provider' => $account->provider,
+            'from_number' => $account->business_number,
+            'to_number' => $destination,
+            'status' => 'initiated',
+            'started_at' => now(),
+        ]);
+
+        $this->record->recordActivity('insurance_call_started', 'Insurance call started from the verification form.', [
+            'call_public_id' => $call->public_id,
+            'provider' => $account->provider,
+            'to_number' => $destination,
+            'user_name' => auth()->user()?->name,
+        ]);
+
+        return ['public_id' => $call->public_id];
+    }
+
+    public function updateTelephonyCall(string $publicId, string $status, int $durationSeconds = 0): void
+    {
+        $allowedStatuses = ['initiated', 'ringing', 'connected', 'completed', 'failed'];
+        abort_unless(in_array($status, $allowedStatuses, true), 422);
+
+        $call = TelephonyCall::query()->where('public_id', $publicId)->firstOrFail();
+        abort_unless($call->user_id === auth()->id() || auth()->user()?->isSaasAdmin(), 403);
+        $wasTerminal = in_array($call->status, ['completed', 'failed'], true);
+
+        $updates = [
+            'status' => $status,
+            'duration_seconds' => max($call->duration_seconds, min($durationSeconds, 86400)),
+        ];
+
+        if ($status === 'connected' && ! $call->answered_at) {
+            $updates['answered_at'] = now();
+        }
+
+        if (! $wasTerminal && in_array($status, ['completed', 'failed'], true)) {
+            $updates['ended_at'] = now();
+        }
+
+        $call->update($updates);
+
+        if (! $wasTerminal && in_array($status, ['completed', 'failed'], true)) {
+            $this->record->recordActivity('insurance_call_'.$status, 'Insurance call '.$status.'.', [
+                'call_public_id' => $call->public_id,
+                'duration_seconds' => $updates['duration_seconds'],
+                'user_name' => auth()->user()?->name,
+            ]);
+        }
     }
 
     public function getClinicResponseUrl(): ?string

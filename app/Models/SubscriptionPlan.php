@@ -102,6 +102,10 @@ class SubscriptionPlan extends Model
             'advanced_reports' => 'Advanced Reports',
             'request_response' => 'Request & Response',
             'portal_credentials' => 'Portal Credentials',
+            'calling' => 'Portal Calling',
+            'call_recording' => 'Call Recording',
+            'call_transcription' => 'Call Transcription',
+            'call_ai_summary' => 'AI Call Summary',
         ];
     }
 
@@ -118,6 +122,9 @@ class SubscriptionPlan extends Model
             'mailbox_storage_mb' => 1024,
             'import_rows' => 5000,
             'attachment_mb' => 25,
+            'monthly_call_minutes' => 500,
+            'calling_users' => 3,
+            'recording_retention_days' => 365,
         ];
     }
 
@@ -190,6 +197,7 @@ class SubscriptionPlan extends Model
                 'modules' => [
                     'patient_insurance_policies',
                     'verification_requests',
+                    'calling',
                     'patient_insurance_claims',
                     'patient_ledger_entries',
                     'patient_statements',

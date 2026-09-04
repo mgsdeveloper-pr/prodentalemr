@@ -38,7 +38,7 @@
                 @foreach ($cards as $card)
                     <a class="saas-user-card" href="{{ $card['url'] }}">
                         <div class="saas-user-icon">
-                            {{ $card['icon'] === 'shield' ? 'S' : 'U' }}
+                            {{ $card['icon'] === 'shield' ? 'S' : ($card['icon'] === 'phone' ? 'C' : 'U') }}
                         </div>
                         <div>
                             <h2 class="saas-user-card-title">{{ $card['title'] }}</h2>

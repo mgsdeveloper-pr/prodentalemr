@@ -153,6 +153,7 @@ class ClinicWorkspace
             'template_management',
             'appointments',
             'portal_credentials',
+            'calling',
         ];
     }
 

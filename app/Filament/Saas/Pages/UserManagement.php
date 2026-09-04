@@ -2,6 +2,7 @@
 
 namespace App\Filament\Saas\Pages;
 
+use App\Filament\Saas\Resources\TelephonyAccounts\TelephonyAccountResource;
 use App\Filament\Saas\Resources\Users\UserResource;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -48,6 +49,13 @@ class UserManagement extends Page
                 'url' => RolesAndPermissions::getUrl(),
                 'icon' => 'shield',
                 'visible' => auth()->user()?->hasRole('saas_admin') ?? false,
+            ],
+            [
+                'title' => 'Calling Access',
+                'description' => 'Assign portal users to MightyCall and control calling, recording, and AI-summary access.',
+                'url' => TelephonyAccountResource::getUrl(),
+                'icon' => 'phone',
+                'visible' => auth()->user()?->canAccessSaasModule('calling') ?? false,
             ],
         ];
     }

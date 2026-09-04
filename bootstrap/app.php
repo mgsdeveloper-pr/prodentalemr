@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'saas/logout',
             'stripe/webhook',
             'paypal/webhook',
+            'webhooks/telephony/mightycall/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

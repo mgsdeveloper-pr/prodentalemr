@@ -18,6 +18,7 @@ class PanelPermissionMatrix
         return match ($panel) {
             'verification' => [
                 'verification' => 'Verification',
+                'calling' => 'Calling',
                 'portal_credentials' => 'Portal Credentials',
                 'insurance_directory' => 'Insurance Directory',
                 'template_management' => 'Template Management',
@@ -29,6 +30,7 @@ class PanelPermissionMatrix
             ],
             'saas' => [
                 'verification' => 'Verification',
+                'calling' => 'Calling Management',
                 'organizations' => 'Organizations',
                 'clinics' => 'Clinics',
                 'locations' => 'Locations',
@@ -50,6 +52,7 @@ class PanelPermissionMatrix
             ],
             'clinic' => [
                 'users' => 'Users',
+                'calling' => 'Calling',
                 'locations' => 'Locations',
                 'patients' => 'Patients',
                 'providers' => 'Providers',

@@ -89,6 +89,11 @@ class Organization extends Model
         return $this->hasMany(BillingWorkItem::class);
     }
 
+    public function telephonyAccounts(): HasMany
+    {
+        return $this->hasMany(TelephonyAccount::class);
+    }
+
     public function activeSubscription(): HasMany
     {
         return $this->hasMany(Subscription::class)->where('status', 'active');
