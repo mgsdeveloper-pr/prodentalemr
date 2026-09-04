@@ -86,6 +86,8 @@
             startedAt: null,
             timer: null,
             duration: 0,
+            eventsBound: false,
+            wasConnected: false,
 
             get formattedDuration() {
                 const minutes = Math.floor(this.duration / 60).toString().padStart(2, '0');
@@ -119,6 +121,71 @@
                 if (event && typeof event.subscribe === 'function') event.subscribe(callback);
             },
 
+            bindPhoneEvents() {
+                if (this.eventsBound) return;
+
+                const phone = window.MightyCallWebPhone.Phone;
+                this.eventsBound = true;
+
+                this.subscribe(phone.OnCallOutgoing, () => {
+                    this.statusLabel = 'Ringing';
+                    this.report('ringing');
+                });
+                this.subscribe(phone.OnCallStarted, () => {
+                    this.active = true;
+                    this.wasConnected = true;
+                    this.loading = false;
+                    this.startedAt = Date.now();
+                    this.statusLabel = 'Connected';
+                    this.report('connected');
+                    window.clearInterval(this.timer);
+                    this.timer = window.setInterval(() => {
+                        this.duration = Math.floor((Date.now() - this.startedAt) / 1000);
+                    }, 1000);
+                });
+                this.subscribe(phone.OnHangUp, () => {
+                    const completed = this.wasConnected;
+
+                    window.clearInterval(this.timer);
+                    this.active = false;
+                    this.loading = false;
+                    this.statusLabel = completed ? 'Call completed' : 'Call disconnected before connection';
+                    this.report(completed ? 'completed' : 'failed');
+                });
+            },
+
+            async waitForPhoneReady() {
+                const phone = window.MightyCallWebPhone.Phone;
+                const readyStatuses = ['ready', 'registered'];
+
+                if (readyStatuses.includes(phone.Status?.())) return;
+
+                await new Promise((resolve, reject) => {
+                    let settled = false;
+                    let interval;
+                    let timeout;
+
+                    const finish = (callback) => {
+                        if (settled) return;
+                        settled = true;
+                        window.clearInterval(interval);
+                        window.clearTimeout(timeout);
+                        phone.OnReady?.unsubscribe?.(onReady);
+                        callback();
+                    };
+                    const onReady = () => finish(resolve);
+
+                    this.subscribe(phone.OnReady, onReady);
+                    interval = window.setInterval(() => {
+                        if (readyStatuses.includes(phone.Status?.())) finish(resolve);
+                    }, 250);
+                    timeout = window.setTimeout(
+                        () => finish(() => reject(new Error('MightyCall did not become ready. Check microphone and network access.'))),
+                        20000,
+                    );
+                });
+            },
+
             async report(status) {
                 if (! this.callId) return;
                 await this.$wire.updateTelephonyCall(this.callId, status, this.duration);
@@ -128,6 +195,8 @@
                 this.loading = true;
                 this.error = '';
                 this.statusLabel = 'Connecting to MightyCall';
+                this.wasConnected = false;
+                this.duration = 0;
 
                 try {
                     const call = await this.$wire.startTelephonyCall(config.destination);
@@ -135,31 +204,10 @@
                     await this.loadSdk();
 
                     window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
+                    this.bindPhoneEvents();
                     window.MightyCallWebPhone.Phone.Init('mightycall-webphone-container');
-
-                    this.subscribe(window.MightyCallWebPhone.Phone.OnCallOutgoing, () => {
-                        this.statusLabel = 'Ringing';
-                        this.report('ringing');
-                    });
-                    this.subscribe(window.MightyCallWebPhone.Phone.OnCallStarted, () => {
-                        this.active = true;
-                        this.loading = false;
-                        this.startedAt = Date.now();
-                        this.statusLabel = 'Connected';
-                        this.report('connected');
-                        window.clearInterval(this.timer);
-                        this.timer = window.setInterval(() => {
-                            this.duration = Math.floor((Date.now() - this.startedAt) / 1000);
-                        }, 1000);
-                    });
-                    this.subscribe(window.MightyCallWebPhone.Phone.OnHangUp, () => {
-                        window.clearInterval(this.timer);
-                        this.active = false;
-                        this.loading = false;
-                        this.statusLabel = 'Call completed';
-                        this.report('completed');
-                    });
-
+                    await this.waitForPhoneReady();
+                    this.statusLabel = 'Starting call';
                     window.MightyCallWebPhone.Phone.Call(config.destination);
                 } catch (error) {
                     this.error = error?.message || 'The call could not be started.';

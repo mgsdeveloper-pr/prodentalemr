@@ -214,3 +214,16 @@ it('exposes calling setup and usage only through the SaaS management portal', fu
         ->assertOk()
         ->assertSee('Calling Access');
 });
+
+it('waits for MightyCall to be ready before placing an outbound call', function (): void {
+    $control = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/telephony-call-control.blade.php'
+    ));
+
+    expect($control)
+        ->toContain('async waitForPhoneReady()')
+        ->toContain("const readyStatuses = ['ready', 'registered'];")
+        ->toContain('await this.waitForPhoneReady();')
+        ->and(strpos($control, 'await this.waitForPhoneReady();'))
+        ->toBeLessThan(strpos($control, 'Phone.Call(config.destination)'));
+});
