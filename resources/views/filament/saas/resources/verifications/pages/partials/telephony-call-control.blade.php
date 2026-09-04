@@ -34,7 +34,7 @@
         x-cloak
         x-show="open"
         x-transition
-        x-on:click.outside="if (! active) open = false"
+        x-on:click.outside="if (! active && ! loading) open = false"
         style="position:absolute;right:0;top:48px;z-index:80;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 18px 42px rgba(15,23,42,.16);white-space:normal;"
     >
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
@@ -43,7 +43,7 @@
                 <div style="margin-top:3px;font-size:15px;font-weight:850;color:#0f172a;" x-text="config.insuranceName"></div>
                 <div style="margin-top:2px;font-size:13px;color:#475569;" x-text="config.destination"></div>
             </div>
-            <button type="button" x-on:click="open = false" aria-label="Close call panel" title="Close" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
+            <button type="button" x-show="! active && ! loading" x-on:click="open = false" aria-label="Close call panel" title="Close" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
         </div>
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
@@ -55,17 +55,21 @@
 
         <div x-show="! config.available" x-text="config.unavailableReason" style="margin-top:12px;padding:10px 11px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.45;"></div>
 
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:15px;padding:11px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;">
-            <span style="font-size:12px;font-weight:750;color:#475569;" x-text="statusLabel"></span>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:11px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;">
+            <div>
+                <div style="font-size:12px;font-weight:800;color:#334155;" x-text="statusLabel"></div>
+                <div x-show="statusDetail" x-text="statusDetail" style="margin-top:3px;font-size:10px;line-height:1.4;color:#64748b;"></div>
+            </div>
             <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#0f172a;" x-text="formattedDuration"></span>
         </div>
 
         <div id="mightycall-webphone-container" style="margin-top:10px;"></div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
-            <button type="button" x-show="config.available && ! active" x-bind:disabled="loading" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
-                <span x-text="loading ? 'Connecting...' : 'Start call'"></span>
+            <button type="button" x-show="config.available && ! active && ! loading" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
+                Start call
             </button>
+            <button type="button" x-show="loading && ! active" x-on:click="cancelCall()" style="grid-column:1/-1;height:40px;border:1px solid #fda4af;border-radius:7px;background:#fff1f2;color:#be123c;font-size:12px;font-weight:850;cursor:pointer;">Cancel call</button>
             <button type="button" x-show="active" x-on:click="toggleMute()" style="height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;" x-text="muted ? 'Unmute' : 'Mute'"></button>
             <button type="button" x-show="active" x-on:click="endCall()" style="height:40px;border:0;border-radius:7px;background:#be123c;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">End call</button>
         </div>
@@ -88,11 +92,23 @@
             duration: 0,
             eventsBound: false,
             wasConnected: false,
+            terminalReported: false,
+            requestedEndStatus: null,
+            requestedEndLabel: '',
 
             get formattedDuration() {
                 const minutes = Math.floor(this.duration / 60).toString().padStart(2, '0');
                 const seconds = (this.duration % 60).toString().padStart(2, '0');
                 return `${minutes}:${seconds}`;
+            },
+
+            get statusDetail() {
+                if (this.statusLabel === 'Ringing insurer') return 'MightyCall accepted the call and is waiting for an answer.';
+                if (this.statusLabel === 'Connected') return 'The insurer answered. The call timer shows connected talk time.';
+                if (this.statusLabel === 'Call cancelled') return 'You stopped the call before it connected.';
+                if (this.statusLabel === 'Call ended without connection') return 'The call was not answered or was disconnected before connection.';
+                if (this.statusLabel === 'Call completed') return 'The connected call ended successfully.';
+                return '';
             },
 
             async loadSdk() {
@@ -128,7 +144,7 @@
                 this.eventsBound = true;
 
                 this.subscribe(phone.OnCallOutgoing, () => {
-                    this.statusLabel = 'Ringing';
+                    this.statusLabel = 'Ringing insurer';
                     this.report('ringing');
                 });
                 this.subscribe(phone.OnCallStarted, () => {
@@ -144,13 +160,10 @@
                     }, 1000);
                 });
                 this.subscribe(phone.OnHangUp, () => {
-                    const completed = this.wasConnected;
+                    const status = this.requestedEndStatus || (this.wasConnected ? 'completed' : 'failed');
+                    const label = this.requestedEndLabel || (this.wasConnected ? 'Call completed' : 'Call ended without connection');
 
-                    window.clearInterval(this.timer);
-                    this.active = false;
-                    this.loading = false;
-                    this.statusLabel = completed ? 'Call completed' : 'Call disconnected before connection';
-                    this.report(completed ? 'completed' : 'failed');
+                    this.finishCall(status, label);
                 });
             },
 
@@ -191,12 +204,26 @@
                 await this.$wire.updateTelephonyCall(this.callId, status, this.duration);
             },
 
+            async finishCall(status, label) {
+                if (this.terminalReported) return;
+
+                this.terminalReported = true;
+                window.clearInterval(this.timer);
+                this.active = false;
+                this.loading = false;
+                this.statusLabel = label;
+                await this.report(status);
+            },
+
             async startCall() {
                 this.loading = true;
                 this.error = '';
                 this.statusLabel = 'Connecting to MightyCall';
                 this.wasConnected = false;
                 this.duration = 0;
+                this.terminalReported = false;
+                this.requestedEndStatus = null;
+                this.requestedEndLabel = '';
 
                 try {
                     const call = await this.$wire.startTelephonyCall(config.destination);
@@ -211,10 +238,16 @@
                     window.MightyCallWebPhone.Phone.Call(config.destination);
                 } catch (error) {
                     this.error = error?.message || 'The call could not be started.';
-                    this.statusLabel = 'Call failed';
-                    this.loading = false;
-                    await this.report('failed');
+                    await this.finishCall('failed', 'Call failed');
                 }
+            },
+
+            cancelCall() {
+                this.requestedEndStatus = 'failed';
+                this.requestedEndLabel = 'Call cancelled';
+                this.statusLabel = 'Cancelling call';
+                window.MightyCallWebPhone?.Phone?.HangUp();
+                window.setTimeout(() => this.finishCall('failed', 'Call cancelled'), 1000);
             },
 
             toggleMute() {
@@ -228,15 +261,11 @@
             },
 
             async endCall() {
-                try {
-                    window.MightyCallWebPhone?.Phone?.HangUp();
-                } finally {
-                    window.clearInterval(this.timer);
-                    this.active = false;
-                    this.loading = false;
-                    this.statusLabel = 'Call completed';
-                    await this.report('completed');
-                }
+                this.requestedEndStatus = 'completed';
+                this.requestedEndLabel = 'Call completed';
+                this.statusLabel = 'Ending call';
+                window.MightyCallWebPhone?.Phone?.HangUp();
+                window.setTimeout(() => this.finishCall('completed', 'Call completed'), 1000);
             },
         });
     </script>

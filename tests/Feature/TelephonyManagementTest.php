@@ -224,6 +224,9 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('async waitForPhoneReady()')
         ->toContain("const readyStatuses = ['ready', 'registered'];")
         ->toContain('await this.waitForPhoneReady();')
+        ->toContain('Cancel call')
+        ->toContain("this.statusLabel = 'Ringing insurer';")
+        ->toContain('this.finishCall(status, label);')
         ->and(strpos($control, 'await this.waitForPhoneReady();'))
         ->toBeLessThan(strpos($control, 'Phone.Call(config.destination)'));
 });
