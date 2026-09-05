@@ -63,12 +63,18 @@
                 <div style="font-size:12px;font-weight:800;color:#334155;" x-text="statusLabel"></div>
                 <div x-show="statusDetail" x-text="statusDetail" style="margin-top:3px;font-size:10px;line-height:1.4;color:#64748b;"></div>
             </div>
-            <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#0f172a;" x-text="formattedDuration"></span>
+            <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#047857;" x-text="`LIVE ${formattedDuration}`"></span>
         </div>
 
-        <div id="mightycall-webphone-container" x-show="loading || active || ending" style="margin-top:10px;"></div>
+        <div x-show="loading || active || ending">
+            <div
+                x-bind:style="dialPadOpen ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'height:0;overflow:hidden;visibility:hidden;margin-top:0;border:0;'"
+            >
+                <div id="mightycall-webphone-container"></div>
+            </div>
+        </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;">
             <button type="button" x-show="config.available && ! active && ! loading && ! ending && ! rearming" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
                 <span x-text="terminalReported ? 'Call again' : 'Start call'"></span>
             </button>
@@ -76,6 +82,16 @@
             <button type="button" x-show="rearming" disabled style="grid-column:1/-1;height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:800;">Preparing next call...</button>
             <button type="button" x-show="ending" disabled style="grid-column:1/-1;height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#64748b;font-size:12px;font-weight:800;">Ending call...</button>
             <button type="button" x-show="active && ! ending" x-on:click="toggleMute()" style="height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;" x-text="muted ? 'Unmute' : 'Mute'"></button>
+            <button
+                type="button"
+                x-show="active && ! ending"
+                x-on:click="dialPadOpen = ! dialPadOpen; if (dialPadOpen) window.MightyCallWebPhone?.Phone?.Focus?.()"
+                x-bind:aria-expanded="dialPadOpen"
+                x-bind:aria-pressed="dialPadOpen"
+                aria-controls="mightycall-webphone-container"
+                title="Open or close keypad"
+                x-bind:style="dialPadOpen ? 'height:40px;border:1px solid #0f766e;border-radius:7px;background:#f0fdfa;color:#0f766e;font-size:12px;font-weight:850;cursor:pointer;' : 'height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;'"
+            >Keypad</button>
             <button type="button" x-show="active && ! ending" x-on:click="endCall()" style="height:40px;border:0;border-radius:7px;background:#be123c;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">End call</button>
         </div>
     </div>
@@ -91,12 +107,14 @@
             ending: false,
             rearming: false,
             muted: false,
+            dialPadOpen: false,
             error: '',
             trackingWarning: '',
             statusLabel: 'Ready to call',
             callId: null,
             startedAt: null,
             timer: null,
+            phoneMonitor: null,
             duration: 0,
             eventsBound: false,
             phoneInitialized: false,
@@ -109,6 +127,12 @@
             attemptSequence: 0,
             activeAttemptId: 0,
             currentProviderCallId: null,
+            completedProviderCallIds: [],
+            attemptStartedAt: null,
+            callPhase: 'idle',
+            readyAfterCallChecks: 0,
+            providerCallObserved: false,
+            cancelRequested: false,
 
             get formattedDuration() {
                 const minutes = Math.floor(this.duration / 60).toString().padStart(2, '0');
@@ -155,10 +179,26 @@
                 return callInfo?.Id || callInfo?.id || null;
             },
 
+            providerEventTime(callInfo) {
+                const value = callInfo?.DateTimeUtc || callInfo?.dateTimeUtc || null;
+                const timestamp = value ? Date.parse(value) : Number.NaN;
+
+                return Number.isNaN(timestamp) ? null : timestamp;
+            },
+
             eventBelongsToActiveAttempt(callInfo) {
-                if (! this.callId || this.terminalReported) return false;
+                if (! this.callId || this.terminalReported || ! ['dialing', 'ringing', 'connected'].includes(this.callPhase)) return false;
 
                 const providerCallId = this.providerCallId(callInfo);
+                const providerEventTime = this.providerEventTime(callInfo);
+
+                if (providerCallId && this.completedProviderCallIds.includes(providerCallId)) {
+                    return false;
+                }
+
+                if (providerEventTime && this.attemptStartedAt && providerEventTime < (this.attemptStartedAt - 2000)) {
+                    return false;
+                }
 
                 if (providerCallId && this.currentProviderCallId && providerCallId !== this.currentProviderCallId) {
                     return false;
@@ -177,15 +217,20 @@
 
                 this.subscribe(phone.OnCallOutgoing, (callInfo) => {
                     if (! this.eventBelongsToActiveAttempt(callInfo)) return;
+                    this.callPhase = 'ringing';
                     this.statusLabel = 'Ringing insurer';
                     this.report('ringing', callInfo, 'outgoing');
                 });
                 this.subscribe(phone.OnCallStarted, (callInfo) => {
                     if (! this.eventBelongsToActiveAttempt(callInfo)) return;
+                    if (this.wasConnected) return;
+
                     this.active = true;
                     this.wasConnected = true;
+                    this.providerCallObserved = true;
                     this.loading = false;
                     this.startedAt = Date.now();
+                    this.callPhase = 'connected';
                     this.statusLabel = 'Connected';
                     this.report('connected', callInfo, 'started');
                     window.clearInterval(this.timer);
@@ -205,7 +250,7 @@
                     );
                 });
                 this.subscribe(phone.OnHangUp, () => {
-                    if (! this.callId || this.terminalReported) return;
+                    if (! this.callId || this.terminalReported || ! this.requestedEndStatus) return;
 
                     const attemptId = this.activeAttemptId;
                     const status = this.requestedEndStatus || (this.wasConnected ? 'completed' : 'failed');
@@ -227,6 +272,11 @@
                     if (! this.loading && ! this.active) return;
 
                     const message = typeof error === 'string' ? error : (error?.message || 'MightyCall reported an unknown error.');
+                    if (this.active) {
+                        this.trackingWarning = `MightyCall reported: ${message}. The call remains active until MightyCall confirms it ended.`;
+                        return;
+                    }
+
                     this.error = `MightyCall: ${message}`;
                     this.finishCall('failed', 'Call failed', null, 'error', this.activeAttemptId);
                 });
@@ -321,18 +371,63 @@
                 }
             },
 
+            startPhoneMonitor(attemptId) {
+                window.clearInterval(this.phoneMonitor);
+                this.readyAfterCallChecks = 0;
+                this.phoneMonitor = window.setInterval(() => {
+                    if (attemptId !== this.activeAttemptId || this.terminalReported) {
+                        window.clearInterval(this.phoneMonitor);
+                        return;
+                    }
+
+                    const status = window.MightyCallWebPhone?.Phone?.Status?.();
+                    const providerReady = ['ready', 'registered'].includes(status);
+                    const providerInCall = ['busy', 'call_outgoing', 'call_started'].includes(status);
+                    const callWasAccepted = ['ringing', 'connected'].includes(this.callPhase);
+
+                    if (providerInCall) this.providerCallObserved = true;
+
+                    this.readyAfterCallChecks = providerReady && callWasAccepted && this.providerCallObserved
+                        ? this.readyAfterCallChecks + 1
+                        : 0;
+
+                    if (this.readyAfterCallChecks < 3) return;
+
+                    const connected = this.wasConnected;
+                    this.finishCall(
+                        connected ? 'completed' : 'failed',
+                        connected ? 'Call completed' : 'Call ended without connection',
+                        null,
+                        'status_ready',
+                        attemptId,
+                    );
+                }, 500);
+            },
+
             async finishCall(status, label, callInfo = null, providerEvent = null, attemptId = this.activeAttemptId) {
                 if (attemptId !== this.activeAttemptId || this.terminalReported) return;
 
                 this.terminalReported = true;
                 window.clearInterval(this.timer);
+                window.clearInterval(this.phoneMonitor);
+                const providerCallId = this.providerCallId(callInfo) || this.currentProviderCallId;
+                if (providerCallId && ! this.completedProviderCallIds.includes(providerCallId)) {
+                    this.completedProviderCallIds = [...this.completedProviderCallIds.slice(-9), providerCallId];
+                }
                 this.active = false;
                 this.loading = false;
                 this.ending = false;
                 this.muted = false;
+                this.dialPadOpen = false;
+                this.callPhase = 'finished';
                 this.statusLabel = label;
                 await this.report(status, callInfo, providerEvent);
-                this.rearmPhone(attemptId);
+                if (attemptId === this.activeAttemptId) this.callId = null;
+                if (this.phoneInitialized) {
+                    this.rearmPhone(attemptId);
+                } else {
+                    this.rearming = false;
+                }
             },
 
             async rearmPhone(attemptId) {
@@ -362,7 +457,9 @@
 
                 const attemptId = ++this.attemptSequence;
                 this.activeAttemptId = attemptId;
+                this.callId = null;
                 this.loading = true;
+                this.dialPadOpen = false;
                 this.error = '';
                 this.trackingWarning = '';
                 this.statusLabel = 'Connecting to MightyCall';
@@ -372,17 +469,32 @@
                 this.requestedEndStatus = null;
                 this.requestedEndLabel = '';
                 this.currentProviderCallId = null;
+                this.attemptStartedAt = Date.now();
+                this.callPhase = 'preparing';
+                this.providerCallObserved = false;
+                this.cancelRequested = false;
 
                 try {
                     const call = await this.$wire.startTelephonyCall(config.destination);
                     if (attemptId !== this.activeAttemptId) return;
                     this.callId = call.public_id;
                     this.config.destination = call.destination;
+                    if (this.cancelRequested) {
+                        await this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId);
+                        return;
+                    }
                     await this.preparePhone();
                     if (attemptId !== this.activeAttemptId) return;
+                    if (this.cancelRequested) {
+                        window.MightyCallWebPhone?.Phone?.HangUp();
+                        await this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId);
+                        return;
+                    }
+                    this.callPhase = 'dialing';
                     this.statusLabel = 'Starting call';
                     window.MightyCallWebPhone.Phone.Call(config.destination);
                     window.MightyCallWebPhone.Phone.Focus?.();
+                    this.startPhoneMonitor(attemptId);
                 } catch (error) {
                     this.error = error?.message || 'The call could not be started.';
                     await this.finishCall('failed', 'Call failed', null, 'error', attemptId);
@@ -394,11 +506,14 @@
 
                 const attemptId = this.activeAttemptId;
                 this.ending = true;
+                this.cancelRequested = true;
                 this.requestedEndStatus = 'failed';
                 this.requestedEndLabel = 'Call cancelled';
                 this.statusLabel = 'Cancelling call';
-                window.MightyCallWebPhone?.Phone?.HangUp();
-                window.setTimeout(() => this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId), 1000);
+                if (this.callId) {
+                    window.MightyCallWebPhone?.Phone?.HangUp();
+                    window.setTimeout(() => this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId), 1000);
+                }
             },
 
             toggleMute() {

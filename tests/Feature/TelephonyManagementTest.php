@@ -184,6 +184,59 @@ it('accepts a secured MightyCall completion webhook and updates the call', funct
     ]), [])->assertNotFound();
 });
 
+it('does not regress a finished call when provider events arrive out of order', function (): void {
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id,
+        'name' => 'Ordered Webhook MightyCall',
+        'api_key' => 'ordered-webhook-key',
+        'is_active' => true,
+    ]);
+
+    $call = TelephonyCall::create([
+        'telephony_account_id' => $account->id,
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'billing_work_item_id' => $this->workItem->id,
+        'user_id' => $this->user->id,
+        'provider_call_id' => 'mc-ordered-123',
+        'to_number' => '+15557654321',
+        'status' => 'completed',
+        'started_at' => now()->subMinutes(2),
+        'answered_at' => now()->subMinute(),
+        'ended_at' => now(),
+        'duration_seconds' => 60,
+    ]);
+
+    $this->postJson($account->webhookUrl(), [
+        'EventType' => 'OutgoingCallStarted',
+        'CallId' => 'mc-ordered-123',
+        'To' => '+15557654321',
+        'DurationSeconds' => 58,
+    ])->assertNoContent();
+
+    $call->refresh();
+
+    expect($call->status)->toBe('completed')
+        ->and($call->duration_seconds)->toBe(60)
+        ->and(data_get($call->provider_payload, 'webhook_events.0.event'))->toBe('outgoingcallstarted');
+});
+
+it('allows call statuses to move forward but never out of a terminal state', function (): void {
+    $call = new TelephonyCall(['status' => 'initiated']);
+
+    expect($call->canTransitionTo('ringing'))->toBeTrue()
+        ->and($call->canTransitionTo('connected'))->toBeTrue();
+
+    $call->status = 'connected';
+    expect($call->canTransitionTo('ringing'))->toBeFalse()
+        ->and($call->canTransitionTo('completed'))->toBeTrue();
+
+    $call->status = 'completed';
+    expect($call->isTerminal())->toBeTrue()
+        ->and($call->canTransitionTo('connected'))->toBeFalse()
+        ->and($call->canTransitionTo('failed'))->toBeFalse();
+});
+
 it('exposes calling setup and usage only through the SaaS management portal', function (): void {
     $admin = User::factory()->create(['status' => true]);
     $admin->assignRole('saas_admin');
@@ -235,10 +288,23 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('while (this.pendingReports.length > 0)')
         ->toContain('phoneInitialized: false')
         ->toContain('attemptSequence: 0')
+        ->toContain("callPhase: 'idle'")
+        ->toContain('completedProviderCallIds: []')
+        ->toContain('dialPadOpen: false')
+        ->toContain('>Keypad</button>')
+        ->toContain('x-bind:aria-pressed="dialPadOpen"')
+        ->toContain('grid-template-columns:repeat(3,minmax(0,1fr))')
+        ->toContain('aria-controls="mightycall-webphone-container"')
+        ->toContain('providerCallObserved: false')
+        ->toContain('cancelRequested: false')
+        ->toContain('if (this.cancelRequested)')
+        ->toContain('startPhoneMonitor(attemptId)')
+        ->toContain("'status_ready',")
         ->toContain('async rearmPhone(attemptId)')
         ->toContain('this.config.destination = call.destination;')
         ->toContain('x-show="loading || active || ending"')
-        ->toContain("this.finishCall(status, label, null, 'hangup', attemptId)")
+        ->toContain('! this.requestedEndStatus')
+        ->toContain('The call remains active until MightyCall confirms it ended.')
         ->and(strpos($control, 'await this.waitForPhoneReady();'))
         ->toBeLessThan(strpos($control, 'Phone.Call(config.destination)'));
 });

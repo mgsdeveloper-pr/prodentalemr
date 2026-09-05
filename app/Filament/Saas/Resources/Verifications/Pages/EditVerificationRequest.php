@@ -240,7 +240,7 @@ class EditVerificationRequest extends EditRecord
         ?string $providerEvent = null,
     ): void {
         $allowedStatuses = ['initiated', 'ringing', 'connected', 'completed', 'failed'];
-        $allowedProviderEvents = ['outgoing', 'started', 'completed', 'hangup', 'offline', 'error', 'cancelled'];
+        $allowedProviderEvents = ['outgoing', 'started', 'completed', 'hangup', 'offline', 'error', 'cancelled', 'status_ready'];
         abort_unless(in_array($status, $allowedStatuses, true), 422);
 
         $providerCallId = filled($providerCallId) ? trim($providerCallId) : null;
@@ -249,10 +249,12 @@ class EditVerificationRequest extends EditRecord
 
         $call = TelephonyCall::query()->where('public_id', $publicId)->firstOrFail();
         abort_unless($call->user_id === auth()->id() || auth()->user()?->isSaasAdmin(), 403);
-        $wasTerminal = in_array($call->status, ['completed', 'failed'], true);
+        $wasTerminal = $call->isTerminal();
+        $statusChanged = $call->canTransitionTo($status) && $call->status !== $status;
+        $effectiveStatus = $statusChanged ? $status : $call->status;
 
         $updates = [
-            'status' => $status,
+            'status' => $effectiveStatus,
             'duration_seconds' => max($call->duration_seconds, min($durationSeconds, 86400)),
         ];
 
@@ -274,18 +276,18 @@ class EditVerificationRequest extends EditRecord
             $updates['provider_payload'] = array_merge($providerPayload, ['browser_events' => $browserEvents]);
         }
 
-        if ($status === 'connected' && ! $call->answered_at) {
+        if ($effectiveStatus === 'connected' && ! $call->answered_at) {
             $updates['answered_at'] = now();
         }
 
-        if (! $wasTerminal && in_array($status, ['completed', 'failed'], true)) {
+        if (! $wasTerminal && in_array($effectiveStatus, TelephonyCall::TERMINAL_STATUSES, true)) {
             $updates['ended_at'] = now();
         }
 
         $call->update($updates);
 
-        if (! $wasTerminal && in_array($status, ['completed', 'failed'], true)) {
-            $this->record->recordActivity('insurance_call_'.$status, 'Insurance call '.$status.'.', [
+        if (! $wasTerminal && $statusChanged && in_array($effectiveStatus, TelephonyCall::TERMINAL_STATUSES, true)) {
+            $this->record->recordActivity('insurance_call_'.$effectiveStatus, 'Insurance call '.$effectiveStatus.'.', [
                 'call_public_id' => $call->public_id,
                 'duration_seconds' => $updates['duration_seconds'],
                 'user_name' => auth()->user()?->name,

@@ -10,6 +10,14 @@ class TelephonyCall extends Model
 {
     use HasPublicId;
 
+    public const TERMINAL_STATUSES = ['completed', 'failed'];
+
+    private const STATUS_TRANSITIONS = [
+        'initiated' => ['ringing', 'connected', 'completed', 'failed'],
+        'ringing' => ['connected', 'completed', 'failed'],
+        'connected' => ['completed', 'failed'],
+    ];
+
     protected $fillable = [
         'telephony_account_id',
         'organization_id',
@@ -47,6 +55,24 @@ class TelephonyCall extends Model
             'provider_payload' => 'encrypted:array',
             'estimated_cost' => 'decimal:4',
         ];
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, self::TERMINAL_STATUSES, true);
+    }
+
+    public function canTransitionTo(string $status): bool
+    {
+        if ($status === $this->status) {
+            return true;
+        }
+
+        if ($this->isTerminal()) {
+            return false;
+        }
+
+        return in_array($status, self::STATUS_TRANSITIONS[$this->status] ?? [], true);
     }
 
     public function telephonyAccount(): BelongsTo

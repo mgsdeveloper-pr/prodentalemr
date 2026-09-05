@@ -43,6 +43,7 @@ class MightyCallWebhookController extends Controller
 
         if ($call) {
             $status = $this->statusForEvent($event);
+            $effectiveStatus = $status && $call->canTransitionTo($status) ? $status : $call->status;
             $duration = (int) ($this->first($payload, [
                 'Duration', 'duration', 'DurationSeconds', 'durationSeconds', 'Call.Duration', 'call.duration',
             ]) ?: $call->duration_seconds);
@@ -50,18 +51,30 @@ class MightyCallWebhookController extends Controller
                 'CallRecord', 'callRecord', 'RecordingUrl', 'recordingUrl', 'recording_url',
             ]);
 
+            $providerPayload = $call->provider_payload ?? [];
+            $webhookEvents = collect($providerPayload['webhook_events'] ?? [])
+                ->push([
+                    'event' => $event,
+                    'status' => $status,
+                    'received_at' => now()->toIso8601String(),
+                    'payload' => $payload,
+                ])
+                ->take(-20)
+                ->values()
+                ->all();
+
             $updates = [
                 'provider_call_id' => filled($providerCallId) ? (string) $providerCallId : $call->provider_call_id,
-                'status' => $status ?? $call->status,
+                'status' => $effectiveStatus,
                 'duration_seconds' => max($call->duration_seconds, $duration),
-                'provider_payload' => $payload,
+                'provider_payload' => array_merge($providerPayload, ['webhook_events' => $webhookEvents]),
             ];
 
-            if ($status === 'connected' && ! $call->answered_at) {
+            if ($effectiveStatus === 'connected' && ! $call->answered_at) {
                 $updates['answered_at'] = now();
             }
 
-            if ($status === 'completed' || $status === 'failed') {
+            if (! $call->isTerminal() && in_array($effectiveStatus, TelephonyCall::TERMINAL_STATUSES, true)) {
                 $updates['ended_at'] = now();
             }
 
