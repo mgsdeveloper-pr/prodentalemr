@@ -202,6 +202,10 @@
                 return String(this.config.destination || '').replace(/\D/g, '').length >= 8;
             },
 
+            phoneStatus(phone = window.MightyCallWebPhone?.Phone) {
+                return String(phone?.Status?.() || '').trim().toLowerCase();
+            },
+
             updateCallingTarget(target = {}) {
                 const nextTarget = {
                     destination: typeof target.destination === 'string' ? target.destination : '',
@@ -378,7 +382,7 @@
                 await this.loadSdk();
 
                 const phone = window.MightyCallWebPhone.Phone;
-                const status = phone.Status?.();
+                const status = this.phoneStatus(phone);
                 const readyStatuses = ['ready', 'registered'];
 
                 this.bindPhoneEvents();
@@ -388,7 +392,7 @@
                     return;
                 }
 
-                if (! status || ['inactive', 'offline'].includes(status)) {
+                if (! status || ['inactive', 'offline', 'closed'].includes(status)) {
                     window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
                     phone.Init('mightycall-webphone-container');
                 }
@@ -401,7 +405,7 @@
                 const phone = window.MightyCallWebPhone.Phone;
                 const readyStatuses = ['ready', 'registered'];
 
-                if (readyStatuses.includes(phone.Status?.())) return;
+                if (readyStatuses.includes(this.phoneStatus(phone))) return;
 
                 await new Promise((resolve, reject) => {
                     let settled = false;
@@ -420,11 +424,11 @@
 
                     this.subscribe(phone.OnReady, onReady);
                     interval = window.setInterval(() => {
-                        if (readyStatuses.includes(phone.Status?.())) finish(resolve);
+                        if (readyStatuses.includes(this.phoneStatus(phone))) finish(resolve);
                     }, 250);
                     timeout = window.setTimeout(
                         () => {
-                            const finalStatus = phone.Status?.() || 'unknown';
+                            const finalStatus = this.phoneStatus(phone) || 'unknown';
                             finish(() => reject(new Error(`MightyCall did not become ready (status: ${finalStatus}). Check microphone permission and network access.`)));
                         },
                         20000,
@@ -479,7 +483,7 @@
                         return;
                     }
 
-                    const status = window.MightyCallWebPhone?.Phone?.Status?.();
+                    const status = this.phoneStatus();
                     const providerReady = ['ready', 'registered'].includes(status);
                     const providerInCall = ['busy', 'call_outgoing', 'call_started'].includes(status);
                     const callWasAccepted = ['ringing', 'connected'].includes(this.callPhase);
@@ -536,7 +540,7 @@
                 for (let attempt = 0; attempt < 40; attempt += 1) {
                     if (attemptId !== this.activeAttemptId) return;
 
-                    const status = window.MightyCallWebPhone?.Phone?.Status?.();
+                    const status = this.phoneStatus();
 
                     if (['ready', 'registered'].includes(status)) {
                         this.rearming = false;
