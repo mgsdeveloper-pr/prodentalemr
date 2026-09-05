@@ -257,6 +257,15 @@ it('builds quick reference from live worksheet data before saved fallbacks', fun
             'phone' => '800-555-0199',
         ])
         ->not->toHaveKey('practice_npi');
+
+    $page->data['vf_insurance_provider_name'] = 'New Carrier Without Phone';
+    $page->data['vf_insurance_company_phone_number'] = null;
+
+    expect($page->getQuickReferenceCard())
+        ->toMatchArray([
+            'insurance_name' => 'New Carrier Without Phone',
+            'phone' => '-',
+        ]);
 });
 
 it('renders template three quick reference as a fixed collapsible drawer', function (): void {
@@ -282,6 +291,9 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain('position: fixed;')
         ->toContain('transform: translateX(100%);')
         ->toContain('.vt3-reference-drawer.is-open {')
+        ->toContain('.vt3-call-drawer {')
+        ->toContain('position: fixed;')
+        ->toContain('.vt3-call-drawer__footer {')
         ->toContain('overflow-y: auto;');
 
     expect(strpos($page, '$isTemplateThreeVerificationForm ='))
@@ -292,6 +304,7 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain("'edgeTrigger' => true")
         ->toContain('telephony-call-control')
         ->toContain('class="vt3-reference-drawer__body"')
+        ->toContain('verification-close-telephony-drawer')
         ->toContain('Quick Reference')
         ->toContain("\$dispatch('verification-open-telephony'")
         ->not->toContain('href="tel:');

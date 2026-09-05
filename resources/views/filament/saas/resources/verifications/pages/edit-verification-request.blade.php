@@ -204,10 +204,10 @@
         ob_start();
     @endphp
         <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;">
-            @if ((! $isTemplateThreeVerificationForm || $this->focusMode) && ($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
+            @if ((! $isTemplateThreeVerificationForm || $this->focusMode) && ($callingWorkspace['visible'] ?? false))
                 @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
                     'callingWorkspace' => $callingWorkspace,
-                    'destinationNumber' => $quickReference['phone'],
+                    'destinationNumber' => ($quickReference['phone'] ?? '-') !== '-' ? $quickReference['phone'] : '',
                     'insuranceName' => $quickReference['insurance_name'] ?? 'Insurance',
                 ])
             @endif
@@ -561,6 +561,113 @@
         .vt3-call-tool__trigger svg {
             width: 19px;
             height: 19px;
+        }
+
+        .vt3-call-tool__live {
+            position: absolute;
+            top: 7px;
+            right: 48px;
+            padding: 5px 8px;
+            border: 1px solid #bbf7d0;
+            border-radius: 999px;
+            background: #f0fdf4;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+            color: #166534;
+            font-size: 11px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .vt3-call-drawer {
+            position: fixed;
+            inset: 0;
+            z-index: 4;
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            border-left: 1px solid #dbe4ee;
+            background: #ffffff;
+            box-shadow: -12px 0 28px rgba(15, 23, 42, 0.14);
+            white-space: normal;
+        }
+
+        .vt3-call-drawer-transition {
+            transition: transform 180ms ease, opacity 180ms ease;
+        }
+
+        .vt3-call-drawer-transition-start {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+
+        .vt3-call-drawer-transition-end {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .vt3-call-drawer__header {
+            min-height: 64px;
+            flex: 0 0 auto;
+            align-items: center !important;
+            padding: 12px 18px;
+            border-bottom: 1px solid #dbe4ee;
+        }
+
+        .vt3-call-drawer__header h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 900;
+        }
+
+        .vt3-call-drawer__close {
+            width: 34px !important;
+            height: 34px !important;
+            flex: 0 0 34px;
+            border: 0 !important;
+            border-radius: 5px !important;
+            background: transparent !important;
+        }
+
+        .vt3-call-drawer__close:hover {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        .vt3-call-drawer__body {
+            min-height: 0;
+            flex: 1;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 8px 18px 20px;
+            scrollbar-width: thin;
+        }
+
+        .vt3-call-drawer__destination {
+            padding: 14px 0 16px;
+            border-bottom: 1px solid #dbe4ee;
+        }
+
+        .vt3-call-drawer__destination div {
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 900;
+        }
+
+        .vt3-call-drawer__destination span {
+            display: block;
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .vt3-call-drawer__footer {
+            flex: 0 0 auto;
+            margin-top: 0 !important;
+            padding: 14px 18px;
+            border-top: 1px solid #dbe4ee;
+            background: #ffffff;
         }
 
         .vt3-reference-drawer__tab {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
 use App\Models\ManagedBillingService;
@@ -14,6 +15,7 @@ use App\Support\TelephonyAccess;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     $this->seed(RoleSeeder::class);
@@ -166,6 +168,41 @@ it('keeps each client on its own connection before using the platform default', 
         ]))->is($default))->toBeTrue();
 });
 
+it('rejects a stale dialer number after the selected insurance changes', function (): void {
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id,
+        'name' => 'Target Guard MightyCall',
+        'api_key' => 'target-guard-key',
+        'is_active' => true,
+    ]);
+
+    TelephonyUserAssignment::create([
+        'telephony_account_id' => $account->id,
+        'user_id' => $this->user->id,
+        'user_key' => 'target-guard-user-key',
+        'can_call' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($this->user);
+
+    $page = new class extends EditVerificationRequest {};
+    $page->record = $this->workItem->fresh();
+    $page->data = [
+        'vf_insurance_provider_name' => 'Current Insurance',
+        'vf_insurance_company_phone_number' => '+15557654321',
+    ];
+
+    expect(fn () => $page->startTelephonyCall('+18005550144'))
+        ->toThrow(ValidationException::class, 'The insurance phone number changed.')
+        ->and(TelephonyCall::query()->count())->toBe(0);
+
+    $result = $page->startTelephonyCall('+15557654321');
+
+    expect($result['destination'])->toBe('+15557654321')
+        ->and(TelephonyCall::query()->where('to_number', '+15557654321')->exists())->toBeTrue();
+});
+
 it('accepts a secured MightyCall completion webhook and updates the call', function (): void {
     $account = TelephonyAccount::create([
         'organization_id' => $this->organization->id,
@@ -281,6 +318,13 @@ it('renders the quick reference phone trigger without a dynamic icon dependency'
         ->toContain('class="vt3-call-tool"')
         ->toContain('class="vt3-call-tool__trigger"')
         ->toContain('aria-label="Call insurance"')
+        ->toContain('verification-telephony-target-updated.window')
+        ->toContain('verification-close-telephony-drawer.window')
+        ->toContain('class="vt3-call-drawer"')
+        ->toContain('class="vt3-call-drawer__body"')
+        ->toContain('class="vt3-call-drawer__footer"')
+        ->toContain('aria-label="Minimize insurance call"')
+        ->toContain('Insurance phone number required.')
         ->toContain('viewBox="0 0 24 24"')
         ->not->toContain('Call Insurance</button>');
 });
@@ -347,6 +391,9 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('aria-controls="mightycall-webphone-container"')
         ->toContain('providerCallObserved: false')
         ->toContain('cancelRequested: false')
+        ->toContain('pendingCallingTarget: null')
+        ->toContain('updateCallingTarget(target = {})')
+        ->toContain('if (! this.hasCallingDestination)')
         ->toContain('if (this.cancelRequested)')
         ->toContain('startPhoneMonitor(attemptId)')
         ->toContain("'status_ready',")

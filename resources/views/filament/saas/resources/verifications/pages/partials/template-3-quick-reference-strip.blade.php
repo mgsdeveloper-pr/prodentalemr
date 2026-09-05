@@ -28,7 +28,7 @@
                                 @if ($templateThreeQuickReferenceLabel === 'Insurance Phone' && filled($templateThreeQuickReferenceValue) && $templateThreeQuickReferenceValue !== '-' && ($callingWorkspace['available'] ?? false))
                                     <button
                                         type="button"
-                                        x-on:click="$dispatch('verification-open-telephony', { destination: @js(preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue)) })"
+                                        x-on:click="$dispatch('verification-open-telephony', { destination: @js(preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue)), insuranceName: @js($quickReference['insurance_name'] ?? 'Insurance') })"
                                         aria-label="Call insurance at {{ $templateThreeQuickReferenceValue }}"
                                         title="Open portal dialer"
                                         style="appearance:none;padding:0;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;"

@@ -8,8 +8,10 @@
     $triggerStyle = $edgeTrigger
         ? ''
         : 'display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border:1px solid '.($callingAvailable ? '#0f766e' : '#cbd5e1').';border-radius:10px;background:'.($callingAvailable ? '#0f766e' : '#f8fafc').';color:'.($callingAvailable ? '#ffffff' : '#475569').';font-size:12px;font-weight:850;cursor:pointer;';
-    $panelRight = $edgeTrigger ? '50px' : '0';
-    $panelTop = $edgeTrigger ? '0' : '48px';
+    $panelClass = $edgeTrigger ? 'vt3-call-drawer' : '';
+    $panelStyle = $edgeTrigger
+        ? ''
+        : 'position:absolute;right:0;top:48px;z-index:80;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 18px 42px rgba(15,23,42,.16);white-space:normal;';
     $telephonyConfig = [
         'provider' => $callingWorkspace['provider'] ?? 'mightycall',
         'apiKey' => $callingWorkspace['api_key'] ?? '',
@@ -29,12 +31,14 @@
     class="{{ $rootClass }}"
     x-data="verificationTelephonyControl(@js($telephonyConfig))"
     x-on:keydown.escape.window="open = false"
-    x-on:verification-open-telephony.window="config.destination = $event.detail.destination || config.destination; open = true"
+    x-on:verification-open-telephony.window="updateCallingTarget($event.detail); @if ($edgeTrigger) quickReferenceDrawerOpen = true; @endif open = true"
+    x-on:verification-telephony-target-updated.window="updateCallingTarget($event.detail)"
+    x-on:verification-close-telephony-drawer.window="open = false"
     style="{{ $edgeTrigger ? '' : 'position:relative;' }}"
 >
     <button
         type="button"
-        x-on:click="open = ! open"
+        x-on:click="@if ($edgeTrigger) if (! open) quickReferenceDrawerOpen = true; @endif open = ! open"
         aria-label="Call insurance"
         title="Call insurance"
         class="{{ $triggerClass }}"
@@ -48,23 +52,49 @@
             {{ ($callingWorkspace['available'] ?? false) ? 'Call Insurance' : 'Calling unavailable' }}
         @endif
     </button>
+    @if ($edgeTrigger)
+        <span x-cloak x-show="active && ! open" class="vt3-call-tool__live" x-text="formattedDuration" aria-label="Active call duration"></span>
+    @endif
 
     <div
         x-cloak
         x-show="open"
-        x-transition
-        x-on:click.outside="if (! active && ! loading && ! ending) open = false"
-        style="position:absolute;right:{{ $panelRight }};top:{{ $panelTop }};z-index:80;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 18px 42px rgba(15,23,42,.16);white-space:normal;"
+        @if ($edgeTrigger)
+            x-transition:enter="vt3-call-drawer-transition"
+            x-transition:enter-start="vt3-call-drawer-transition-start"
+            x-transition:enter-end="vt3-call-drawer-transition-end"
+            x-transition:leave="vt3-call-drawer-transition"
+            x-transition:leave-start="vt3-call-drawer-transition-end"
+            x-transition:leave-end="vt3-call-drawer-transition-start"
+        @else
+            x-transition
+        @endif
+        @unless ($edgeTrigger)
+            x-on:click.outside="if (! active && ! loading && ! ending) open = false"
+        @endunless
+        class="{{ $panelClass }}"
+        style="{{ $panelStyle }}"
     >
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-            <div>
-                <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;">Insurance call</div>
-                <div style="margin-top:3px;font-size:15px;font-weight:850;color:#0f172a;" x-text="config.insuranceName"></div>
-                <div style="margin-top:2px;font-size:13px;color:#475569;" x-text="config.destination"></div>
-            </div>
-            <button type="button" x-show="! active && ! loading && ! ending" x-on:click="open = false" aria-label="Close call panel" title="Close" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
+        <div class="{{ $edgeTrigger ? 'vt3-call-drawer__header' : '' }}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+            @if ($edgeTrigger)
+                <h2>Insurance Call</h2>
+            @else
+                <div>
+                    <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;">Insurance call</div>
+                    <div style="margin-top:3px;font-size:15px;font-weight:850;color:#0f172a;" x-text="config.insuranceName"></div>
+                    <div style="margin-top:2px;font-size:13px;color:#475569;" x-text="config.destination"></div>
+                </div>
+            @endif
+            <button type="button" x-show="@js($edgeTrigger) || (! active && ! loading && ! ending)" x-on:click="open = false" aria-label="{{ $edgeTrigger ? 'Minimize insurance call' : 'Close call panel' }}" title="{{ $edgeTrigger ? 'Minimize' : 'Close' }}" class="{{ $edgeTrigger ? 'vt3-call-drawer__close' : '' }}" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
         </div>
 
+        <div class="{{ $edgeTrigger ? 'vt3-call-drawer__body' : '' }}">
+        @if ($edgeTrigger)
+            <section class="vt3-call-drawer__destination" aria-label="Call destination">
+                <div x-text="config.insuranceName"></div>
+                <span x-text="config.destination || 'No phone number configured'"></span>
+            </section>
+        @endif
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">
             <span x-show="config.recordingEnabled" style="padding:4px 7px;border-radius:999px;background:#f0fdfa;color:#0f766e;font-size:10px;font-weight:800;">Recording enabled</span>
             <span x-show="config.aiSummaryEnabled" style="padding:4px 7px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:800;">AI summary enabled</span>
@@ -75,6 +105,8 @@
         <div x-show="trackingWarning" x-text="trackingWarning" style="margin-top:12px;padding:9px 10px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:11px;line-height:1.45;"></div>
 
         <div x-show="! config.available" x-text="config.unavailableReason" style="margin-top:12px;padding:10px 11px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.45;"></div>
+
+        <div x-show="config.available && ! hasCallingDestination" style="margin-top:12px;padding:10px 11px;border:1px solid #fde68a;border-radius:6px;background:#fffbeb;color:#92400e;font-size:12px;line-height:1.45;">Insurance phone number required.</div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:15px;padding:11px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;">
             <div>
@@ -91,9 +123,16 @@
                 <div id="mightycall-webphone-container"></div>
             </div>
         </div>
+        </div>
 
-        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;">
-            <button type="button" x-show="config.available && ! active && ! loading && ! ending && ! rearming" x-on:click="startCall()" style="grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">
+        <div class="{{ $edgeTrigger ? 'vt3-call-drawer__footer' : '' }}" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px;">
+            <button
+                type="button"
+                x-show="config.available && ! active && ! loading && ! ending && ! rearming"
+                x-bind:disabled="! hasCallingDestination"
+                x-on:click="startCall()"
+                x-bind:style="hasCallingDestination ? 'grid-column:1/-1;height:40px;border:0;border-radius:7px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;' : 'grid-column:1/-1;height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#94a3b8;font-size:12px;font-weight:850;cursor:not-allowed;'"
+            >
                 <span x-text="terminalReported ? 'Call again' : 'Start call'"></span>
             </button>
             <button type="button" x-show="loading && ! active && ! ending" x-on:click="cancelCall()" style="grid-column:1/-1;height:40px;border:1px solid #fda4af;border-radius:7px;background:#fff1f2;color:#be123c;font-size:12px;font-weight:850;cursor:pointer;">Cancel call</button>
@@ -151,11 +190,46 @@
             readyAfterCallChecks: 0,
             providerCallObserved: false,
             cancelRequested: false,
+            pendingCallingTarget: null,
 
             get formattedDuration() {
                 const minutes = Math.floor(this.duration / 60).toString().padStart(2, '0');
                 const seconds = (this.duration % 60).toString().padStart(2, '0');
                 return `${minutes}:${seconds}`;
+            },
+
+            get hasCallingDestination() {
+                return String(this.config.destination || '').replace(/\D/g, '').length >= 8;
+            },
+
+            updateCallingTarget(target = {}) {
+                const nextTarget = {
+                    destination: typeof target.destination === 'string' ? target.destination : '',
+                    insuranceName: String(target.insuranceName || 'Insurance'),
+                };
+
+                if (this.active || this.loading || this.ending || this.rearming) {
+                    this.pendingCallingTarget = nextTarget;
+                    return;
+                }
+
+                this.applyCallingTarget(nextTarget);
+            },
+
+            applyCallingTarget(target) {
+                this.config.destination = target.destination;
+                this.config.insuranceName = target.insuranceName;
+                this.pendingCallingTarget = null;
+                this.error = '';
+
+                if (this.terminalReported) {
+                    this.terminalReported = false;
+                    this.statusLabel = this.hasCallingDestination ? 'Ready to call' : 'Insurance phone required';
+                }
+            },
+
+            applyPendingCallingTarget() {
+                if (this.pendingCallingTarget) this.applyCallingTarget(this.pendingCallingTarget);
             },
 
             get statusDetail() {
@@ -445,6 +519,7 @@
                     this.rearmPhone(attemptId);
                 } else {
                     this.rearming = false;
+                    this.applyPendingCallingTarget();
                 }
             },
 
@@ -458,6 +533,7 @@
 
                     if (['ready', 'registered'].includes(status)) {
                         this.rearming = false;
+                        this.applyPendingCallingTarget();
                         return;
                     }
 
@@ -467,11 +543,16 @@
                 if (attemptId === this.activeAttemptId) {
                     this.phoneInitialized = false;
                     this.rearming = false;
+                    this.applyPendingCallingTarget();
                 }
             },
 
             async startCall() {
                 if (this.loading || this.active || this.ending || this.rearming) return;
+                if (! this.hasCallingDestination) {
+                    this.statusLabel = 'Insurance phone required';
+                    return;
+                }
 
                 const attemptId = ++this.attemptSequence;
                 this.activeAttemptId = attemptId;

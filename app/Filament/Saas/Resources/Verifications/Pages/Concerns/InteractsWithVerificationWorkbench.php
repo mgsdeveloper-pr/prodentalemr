@@ -363,11 +363,12 @@ trait InteractsWithVerificationWorkbench
             $primaryPlan?->payer_name,
             $record->patient?->insurance_provider
         );
-        $insurancePhone = $this->firstFilled(
-            data_get($data, 'vf_insurance_company_phone_number'),
-            $profile?->insurance_company_phone_number,
-            $record->insurancePolicy?->payer_phone
-        );
+        $insurancePhone = array_key_exists('vf_insurance_company_phone_number', $data)
+            ? data_get($data, 'vf_insurance_company_phone_number')
+            : $this->firstFilled(
+                $profile?->insurance_company_phone_number,
+                $record->insurancePolicy?->payer_phone
+            );
         $groupNumber = $this->firstFilled(
             data_get($data, 'vf_group_number'),
             $profile?->group_number,

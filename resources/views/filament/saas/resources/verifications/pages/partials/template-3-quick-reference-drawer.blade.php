@@ -4,10 +4,10 @@
     x-bind:aria-hidden="(! quickReferenceDrawerOpen).toString()"
     aria-labelledby="template3-quick-reference-drawer-title"
 >
-    @if (($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
+    @if ($callingWorkspace['visible'] ?? false)
         @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
             'callingWorkspace' => $callingWorkspace,
-            'destinationNumber' => $quickReference['phone'],
+            'destinationNumber' => ($quickReference['phone'] ?? '-') !== '-' ? $quickReference['phone'] : '',
             'insuranceName' => $quickReference['insurance_name'] ?? 'Insurance',
             'edgeTrigger' => true,
         ])
@@ -16,7 +16,7 @@
     <button
         type="button"
         class="vt3-reference-drawer__tab"
-        x-on:click="quickReferenceDrawerOpen = ! quickReferenceDrawerOpen"
+        x-on:click="$dispatch('verification-close-telephony-drawer'); quickReferenceDrawerOpen = ! quickReferenceDrawerOpen"
         x-bind:aria-expanded="quickReferenceDrawerOpen.toString()"
         aria-controls="template3-quick-reference-drawer-body"
         x-bind:title="quickReferenceDrawerOpen ? 'Close quick reference' : 'Open quick reference'"
@@ -31,7 +31,7 @@
         <button
             type="button"
             class="vt3-reference-drawer__close"
-            x-on:click="quickReferenceDrawerOpen = false"
+            x-on:click="$dispatch('verification-close-telephony-drawer'); quickReferenceDrawerOpen = false"
             aria-label="Close quick reference"
             title="Close quick reference"
         >
@@ -51,7 +51,7 @@
                                 @if ($templateThreeQuickReferenceLabel === 'Insurance Phone' && filled($templateThreeQuickReferenceValue) && $templateThreeQuickReferenceValue !== '-' && ($callingWorkspace['available'] ?? false))
                                     <button
                                         type="button"
-                                        x-on:click="$dispatch('verification-open-telephony', { destination: @js(preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue)) })"
+                                        x-on:click="$dispatch('verification-open-telephony', { destination: @js(preg_replace('/[^0-9+]/', '', (string) $templateThreeQuickReferenceValue)), insuranceName: @js($quickReference['insurance_name'] ?? 'Insurance') })"
                                         aria-label="Call insurance at {{ $templateThreeQuickReferenceValue }}"
                                         title="Open portal dialer"
                                         style="appearance:none;padding:0;border:0;background:transparent;color:#0f766e;font:inherit;cursor:pointer;"

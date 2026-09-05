@@ -174,6 +174,21 @@ class EditVerificationRequest extends EditRecord
         abort_unless(TelephonyAccess::canCall(auth()->user(), $this->record), 403);
 
         $destination = InsurancePhoneNumber::normalize($destination) ?? '';
+        $selectedDestination = InsurancePhoneNumber::normalize(
+            (string) ($this->getQuickReferenceCard()['phone'] ?? '')
+        ) ?? '';
+
+        if ($selectedDestination === '') {
+            throw ValidationException::withMessages([
+                'telephony' => 'The selected insurance does not have a valid phone number.',
+            ]);
+        }
+
+        if ($destination !== $selectedDestination) {
+            throw ValidationException::withMessages([
+                'telephony' => 'The insurance phone number changed. Reopen the call panel and try again.',
+            ]);
+        }
 
         if (! preg_match('/^\+[1-9][0-9]{7,14}$/', $destination)) {
             throw ValidationException::withMessages([
@@ -657,6 +672,12 @@ class EditVerificationRequest extends EditRecord
         $this->data['vf_insurance_claim_mailing_address'] = $effective['claims_address'] ?: null;
         $this->data['vf_fee_schedule'] = $carrier->networkProfile?->feeScheduleReferenceName();
         $this->auditReady = false;
+
+        $this->dispatch(
+            'verification-telephony-target-updated',
+            destination: InsurancePhoneNumber::normalize((string) ($this->data['vf_insurance_company_phone_number'] ?? '')) ?? '',
+            insuranceName: (string) $this->data['vf_insurance_provider_name'],
+        );
     }
 
     public function canRequestClinicInfo(): bool
