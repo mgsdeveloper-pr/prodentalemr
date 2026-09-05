@@ -370,6 +370,11 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain("\$rootClass = \$edgeTrigger ? 'vt3-call-tool' : ''")
         ->toContain('viewBox="0 0 24 24"')
         ->toContain('async waitForPhoneReady()')
+        ->toContain('async ensureMicrophoneAccess()')
+        ->toContain('navigator.mediaDevices.getUserMedia({ audio: true })')
+        ->toContain('stream?.getTracks().forEach((track) => track.stop())')
+        ->toContain('No working microphone was found.')
+        ->toContain('Close other calling apps or select another input device')
         ->toContain("const readyStatuses = ['ready', 'registered'];")
         ->toContain('if (readyStatuses.includes(this.phoneStatus(phone)))')
         ->toContain('phoneStatus(phone = window.MightyCallWebPhone?.Phone)')
@@ -422,4 +427,7 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
 
     expect(strpos($control, 'await this.preparePhone();'))
         ->toBeLessThan(strpos($control, 'this.$wire.startTelephonyCall(config.destination)'));
+
+    expect(strpos($control, 'await this.ensureMicrophoneAccess();'))
+        ->toBeLessThan(strpos($control, 'await this.loadSdk();'));
 });

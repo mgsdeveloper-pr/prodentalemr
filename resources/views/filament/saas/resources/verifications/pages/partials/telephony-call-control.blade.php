@@ -380,6 +380,7 @@
             },
 
             async preparePhone() {
+                await this.ensureMicrophoneAccess();
                 await this.loadSdk();
 
                 const phone = window.MightyCallWebPhone.Phone;
@@ -409,6 +410,36 @@
 
                 await this.waitForPhoneReady();
                 this.phoneInitialized = true;
+            },
+
+            async ensureMicrophoneAccess() {
+                if (! window.isSecureContext || ! navigator.mediaDevices?.getUserMedia) {
+                    throw new Error('Microphone access is unavailable in this browser. Use the secure portal in an up-to-date browser.');
+                }
+
+                let stream;
+
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                } catch (error) {
+                    const errorName = String(error?.name || '');
+
+                    if (['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(errorName)) {
+                        throw new Error('Microphone access is blocked. Allow the microphone for this portal, then refresh the page.');
+                    }
+
+                    if (['NotFoundError', 'DevicesNotFoundError'].includes(errorName)) {
+                        throw new Error('No working microphone was found. Connect or enable a microphone, then try again.');
+                    }
+
+                    if (['NotReadableError', 'TrackStartError', 'AbortError'].includes(errorName)) {
+                        throw new Error('The microphone could not be opened. Close other calling apps or select another input device, then try again.');
+                    }
+
+                    throw new Error('The microphone could not be started. Check the browser and Windows microphone settings.');
+                } finally {
+                    stream?.getTracks().forEach((track) => track.stop());
+                }
             },
 
             async waitForPhoneFrameLoad(frame) {
