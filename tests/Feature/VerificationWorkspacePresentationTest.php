@@ -286,6 +286,8 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
 
     expect($quickReference)
         ->toContain('class="vt3-reference-drawer__tab"')
+        ->toContain("'edgeTrigger' => true")
+        ->toContain('telephony-call-control')
         ->toContain('class="vt3-reference-drawer__body"')
         ->toContain('Quick Reference')
         ->toContain("\$dispatch('verification-open-telephony'")

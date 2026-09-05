@@ -4,6 +4,15 @@
     x-bind:aria-hidden="(! quickReferenceDrawerOpen).toString()"
     aria-labelledby="template3-quick-reference-drawer-title"
 >
+    @if (($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
+        @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
+            'callingWorkspace' => $callingWorkspace,
+            'destinationNumber' => $quickReference['phone'],
+            'insuranceName' => $quickReference['insurance_name'] ?? 'Insurance',
+            'edgeTrigger' => true,
+        ])
+    @endif
+
     <button
         type="button"
         class="vt3-reference-drawer__tab"

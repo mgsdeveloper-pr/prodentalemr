@@ -275,6 +275,8 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
 
     expect($control)
         ->toContain('wire:ignore')
+        ->toContain("'vt3-call-tool' => \$edgeTrigger")
+        ->toContain('<x-heroicon-o-phone')
         ->toContain('async waitForPhoneReady()')
         ->toContain("const readyStatuses = ['ready', 'registered'];")
         ->toContain('await this.waitForPhoneReady();')

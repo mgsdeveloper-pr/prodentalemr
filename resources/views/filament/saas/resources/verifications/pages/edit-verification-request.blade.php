@@ -203,7 +203,7 @@
         ob_start();
     @endphp
         <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;">
-            @if (($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
+            @if ((! $isTemplateThreeVerificationForm || $this->focusMode) && ($callingWorkspace['visible'] ?? false) && filled($quickReference['phone'] ?? null))
                 @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
                     'callingWorkspace' => $callingWorkspace,
                     'destinationNumber' => $quickReference['phone'],
@@ -513,6 +513,54 @@
 
         .vt3-reference-drawer.is-open {
             transform: translateX(0);
+        }
+
+        .vt3-call-tool {
+            position: absolute;
+            top: calc(34% - 50px);
+            left: -42px;
+            z-index: 2;
+            width: 42px;
+        }
+
+        .vt3-call-tool__trigger {
+            display: inline-grid;
+            width: 42px;
+            height: 42px;
+            padding: 0;
+            place-items: center;
+            border: 0;
+            border-radius: 6px 0 0 6px;
+            background: #0f766e;
+            color: #ffffff;
+            cursor: pointer;
+            box-shadow: -4px 4px 12px rgba(15, 23, 42, 0.14);
+        }
+
+        .vt3-call-tool__trigger:hover {
+            background: #115e59;
+        }
+
+        .vt3-call-tool__trigger.is-active {
+            background: #15803d;
+        }
+
+        .vt3-call-tool__trigger.has-error {
+            background: #b91c1c;
+        }
+
+        .vt3-call-tool__trigger.is-unavailable {
+            background: #64748b;
+        }
+
+        .vt3-call-tool__trigger:focus-visible {
+            outline: 3px solid rgba(45, 212, 191, 0.42);
+            outline-offset: 2px;
+        }
+
+        .vt3-call-tool__trigger svg {
+            width: 19px;
+            height: 19px;
         }
 
         .vt3-reference-drawer__tab {
@@ -850,6 +898,16 @@
             .vt3-reference-drawer__tab {
                 left: -38px;
                 width: 38px;
+            }
+
+            .vt3-call-tool {
+                left: -38px;
+                width: 38px;
+            }
+
+            .vt3-call-tool__trigger {
+                width: 38px;
+                height: 38px;
             }
         }
     </style>

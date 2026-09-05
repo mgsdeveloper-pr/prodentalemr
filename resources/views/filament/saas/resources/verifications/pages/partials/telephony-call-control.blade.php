@@ -1,4 +1,5 @@
 @php
+    $edgeTrigger = (bool) ($edgeTrigger ?? false);
     $telephonyConfig = [
         'provider' => $callingWorkspace['provider'] ?? 'mightycall',
         'apiKey' => $callingWorkspace['api_key'] ?? '',
@@ -15,20 +16,30 @@
 
 <div
     wire:ignore
+    @class(['vt3-call-tool' => $edgeTrigger])
     x-data="verificationTelephonyControl(@js($telephonyConfig))"
     x-on:keydown.escape.window="open = false"
     x-on:verification-open-telephony.window="config.destination = $event.detail.destination || config.destination; open = true"
-    style="position:relative;"
+    style="{{ $edgeTrigger ? '' : 'position:relative;' }}"
 >
     <button
         type="button"
         x-on:click="open = ! open"
         aria-label="Call insurance"
         title="Call insurance"
-        style="display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border:1px solid {{ ($callingWorkspace['available'] ?? false) ? '#0f766e' : '#cbd5e1' }};border-radius:10px;background:{{ ($callingWorkspace['available'] ?? false) ? '#0f766e' : '#f8fafc' }};color:{{ ($callingWorkspace['available'] ?? false) ? '#ffffff' : '#475569' }};font-size:12px;font-weight:850;cursor:pointer;"
+        @class([
+            'vt3-call-tool__trigger' => $edgeTrigger,
+            'is-unavailable' => $edgeTrigger && ! ($callingWorkspace['available'] ?? false),
+        ])
+        x-bind:class="{ 'is-active': active, 'has-error': error }"
+        style="{{ $edgeTrigger ? '' : 'display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 14px;border:1px solid '.(($callingWorkspace['available'] ?? false) ? '#0f766e' : '#cbd5e1').';border-radius:10px;background:'.(($callingWorkspace['available'] ?? false) ? '#0f766e' : '#f8fafc').';color:'.(($callingWorkspace['available'] ?? false) ? '#ffffff' : '#475569').';font-size:12px;font-weight:850;cursor:pointer;' }}"
     >
-        <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"/></svg>
-        {{ ($callingWorkspace['available'] ?? false) ? 'Call Insurance' : 'Calling unavailable' }}
+        <x-heroicon-o-phone aria-hidden="true" />
+        @if ($edgeTrigger)
+            <span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">{{ ($callingWorkspace['available'] ?? false) ? 'Call Insurance' : 'Calling unavailable' }}</span>
+        @else
+            {{ ($callingWorkspace['available'] ?? false) ? 'Call Insurance' : 'Calling unavailable' }}
+        @endif
     </button>
 
     <div
@@ -36,7 +47,7 @@
         x-show="open"
         x-transition
         x-on:click.outside="if (! active && ! loading && ! ending) open = false"
-        style="position:absolute;right:0;top:48px;z-index:80;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 18px 42px rgba(15,23,42,.16);white-space:normal;"
+        style="position:absolute;right:{{ $edgeTrigger ? '50px' : '0' }};top:{{ $edgeTrigger ? '0' : '48px' }};z-index:80;width:min(360px,calc(100vw - 32px));padding:16px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;box-shadow:0 18px 42px rgba(15,23,42,.16);white-space:normal;"
     >
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
             <div>
