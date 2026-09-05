@@ -384,6 +384,7 @@
                 const phone = window.MightyCallWebPhone.Phone;
                 const status = this.phoneStatus(phone);
                 const readyStatuses = ['ready', 'registered'];
+                const frameExists = Boolean(document.getElementById('mightyCallWebPhoneFrame'));
 
                 this.bindPhoneEvents();
 
@@ -392,13 +393,40 @@
                     return;
                 }
 
-                if (! status || ['inactive', 'offline', 'closed'].includes(status)) {
-                    window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
+                window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
+
+                if (! frameExists) {
                     phone.Init('mightycall-webphone-container');
+                }
+
+                await this.waitForPhoneBridge();
+
+                if (status === 'closed') {
+                    phone.SwitchOn();
                 }
 
                 await this.waitForPhoneReady();
                 this.phoneInitialized = true;
+            },
+
+            async waitForPhoneBridge() {
+                if (typeof window.MightyCallWebPhoneCore?.Phone?.SwitchOn === 'function') return;
+
+                await new Promise((resolve, reject) => {
+                    const startedAt = Date.now();
+                    const interval = window.setInterval(() => {
+                        if (typeof window.MightyCallWebPhoneCore?.Phone?.SwitchOn === 'function') {
+                            window.clearInterval(interval);
+                            resolve();
+                            return;
+                        }
+
+                        if (Date.now() - startedAt >= 10000) {
+                            window.clearInterval(interval);
+                            reject(new Error('MightyCall phone controls could not be loaded. Refresh the page and try again.'));
+                        }
+                    }, 100);
+                });
             },
 
             async waitForPhoneReady() {
