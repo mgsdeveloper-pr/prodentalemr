@@ -118,7 +118,7 @@
 
         <div x-show="loading || active || ending">
             <div
-                x-bind:style="dialPadOpen ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'height:0;overflow:hidden;visibility:hidden;margin-top:0;border:0;'"
+                x-bind:style="dialPadOpen ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'position:fixed;left:-10000px;top:0;width:360px;height:520px;overflow:hidden;visibility:visible;pointer-events:none;'"
             >
                 <div id="mightycall-webphone-container"></div>
             </div>
@@ -379,18 +379,22 @@
 
                 const phone = window.MightyCallWebPhone.Phone;
                 const status = phone.Status?.();
+                const readyStatuses = ['ready', 'registered'];
 
                 this.bindPhoneEvents();
 
-                if (! this.phoneInitialized || ['inactive', 'offline'].includes(status)) {
-                    window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
-                    phone.Init('mightycall-webphone-container');
-                    await this.waitForPhoneReady();
+                if (readyStatuses.includes(status)) {
                     this.phoneInitialized = true;
                     return;
                 }
 
+                if (! status || ['inactive', 'offline'].includes(status)) {
+                    window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
+                    phone.Init('mightycall-webphone-container');
+                }
+
                 await this.waitForPhoneReady();
+                this.phoneInitialized = true;
             },
 
             async waitForPhoneReady() {
@@ -419,7 +423,10 @@
                         if (readyStatuses.includes(phone.Status?.())) finish(resolve);
                     }, 250);
                     timeout = window.setTimeout(
-                        () => finish(() => reject(new Error('MightyCall did not become ready. Check microphone and network access.'))),
+                        () => {
+                            const finalStatus = phone.Status?.() || 'unknown';
+                            finish(() => reject(new Error(`MightyCall did not become ready (status: ${finalStatus}). Check microphone permission and network access.`)));
+                        },
                         20000,
                     );
                 });
