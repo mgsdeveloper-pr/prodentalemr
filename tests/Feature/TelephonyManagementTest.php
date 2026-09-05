@@ -237,6 +237,31 @@ it('allows call statuses to move forward but never out of a terminal state', fun
         ->and($call->canTransitionTo('failed'))->toBeFalse();
 });
 
+it('renders the quick reference phone trigger without a dynamic icon dependency', function (): void {
+    $html = view('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
+        'callingWorkspace' => [
+            'provider' => 'mightycall',
+            'available' => true,
+            'visible' => true,
+            'api_key' => 'test-api-key',
+            'user_key' => 'test-user-key',
+            'sdk_url' => 'https://ccapi.mightycall.com/v4/sdk/mightycall.webphone.sdk.js',
+            'recording_enabled' => true,
+            'ai_summary_enabled' => false,
+        ],
+        'destinationNumber' => '+18005550144',
+        'insuranceName' => 'Test Insurance',
+        'edgeTrigger' => true,
+    ])->render();
+
+    expect($html)
+        ->toContain('class="vt3-call-tool"')
+        ->toContain('class="vt3-call-tool__trigger"')
+        ->toContain('aria-label="Call insurance"')
+        ->toContain('viewBox="0 0 24 24"')
+        ->not->toContain('Call Insurance</button>');
+});
+
 it('exposes calling setup and usage only through the SaaS management portal', function (): void {
     $admin = User::factory()->create(['status' => true]);
     $admin->assignRole('saas_admin');
@@ -275,8 +300,8 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
 
     expect($control)
         ->toContain('wire:ignore')
-        ->toContain("'vt3-call-tool' => \$edgeTrigger")
-        ->toContain('<x-heroicon-o-phone')
+        ->toContain("\$rootClass = \$edgeTrigger ? 'vt3-call-tool' : ''")
+        ->toContain('viewBox="0 0 24 24"')
         ->toContain('async waitForPhoneReady()')
         ->toContain("const readyStatuses = ['ready', 'registered'];")
         ->toContain('await this.waitForPhoneReady();')
