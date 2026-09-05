@@ -233,7 +233,11 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('Phone.Focus?.();')
         ->toContain('pendingReports: []')
         ->toContain('while (this.pendingReports.length > 0)')
-        ->toContain("this.finishCall(status, label, null, 'hangup')")
+        ->toContain('phoneInitialized: false')
+        ->toContain('attemptSequence: 0')
+        ->toContain('async rearmPhone(attemptId)')
+        ->toContain('x-show="loading || active || ending"')
+        ->toContain("this.finishCall(status, label, null, 'hangup', attemptId)")
         ->and(strpos($control, 'await this.waitForPhoneReady();'))
         ->toBeLessThan(strpos($control, 'Phone.Call(config.destination)'));
 });
