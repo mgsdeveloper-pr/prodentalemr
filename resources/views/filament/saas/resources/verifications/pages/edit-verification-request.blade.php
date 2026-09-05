@@ -1,6 +1,7 @@
 <x-filament-panels::page>
     @php
         $record = $this->getRecord();
+        $isTemplateThreeVerificationForm = $this->formTemplate === 'template_3';
         $summaryCards = $this->getWorkbenchSummary();
         $quickReference = $this->getQuickReferenceCard();
         $templateThreeContextRows = $this->getContextRows();
@@ -278,7 +279,6 @@
         </div>
     @php
         $verificationFormHeroActions = trim(ob_get_clean());
-        $isTemplateThreeVerificationForm = $this->formTemplate === 'template_3';
         $focusModeSaveState = $this->getFocusModeSaveState();
         $focusModePatient = $record->verificationProfile?->patient_full_name ?: ($record->patient?->full_name ?? 'Verification Request');
     @endphp

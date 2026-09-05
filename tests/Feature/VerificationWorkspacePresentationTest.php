@@ -284,6 +284,9 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain('.vt3-reference-drawer.is-open {')
         ->toContain('overflow-y: auto;');
 
+    expect(strpos($page, '$isTemplateThreeVerificationForm ='))
+        ->toBeLessThan(strpos($page, '! $isTemplateThreeVerificationForm || $this->focusMode'));
+
     expect($quickReference)
         ->toContain('class="vt3-reference-drawer__tab"')
         ->toContain("'edgeTrigger' => true")

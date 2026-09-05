@@ -76,10 +76,10 @@ return new class extends Migration
             $table->text('recording_url')->nullable();
             $table->unsignedInteger('recording_duration_seconds')->nullable();
             $table->longText('transcript')->nullable();
-            $table->json('ai_summary')->nullable();
+            $table->longText('ai_summary')->nullable();
             $table->string('ai_review_status')->default('not_requested');
             $table->decimal('estimated_cost', 10, 4)->nullable();
-            $table->json('provider_payload')->nullable();
+            $table->longText('provider_payload')->nullable();
             $table->timestamps();
 
             $table->index(['organization_id', 'created_at']);

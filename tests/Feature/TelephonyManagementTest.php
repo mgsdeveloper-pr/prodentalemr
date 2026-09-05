@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Support\TelephonyAccess;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     $this->seed(RoleSeeder::class);
@@ -118,6 +119,28 @@ it('keeps provider credentials encrypted and requires an active assigned user', 
         ->and($workspace['user_key'])->toBe('user-secret')
         ->and($workspace['recording_enabled'])->toBeTrue()
         ->and($workspace['ai_summary_enabled'])->toBeTrue();
+});
+
+it('stores encrypted telephony payloads in text-compatible columns', function (): void {
+    expect(Schema::getColumnType('telephony_calls', 'provider_payload'))->toBeIn(['text', 'longtext'])
+        ->and(Schema::getColumnType('telephony_calls', 'ai_summary'))->toBeIn(['text', 'longtext']);
+
+    $call = TelephonyCall::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'billing_work_item_id' => $this->workItem->id,
+        'user_id' => $this->user->id,
+        'to_number' => '+15557654321',
+        'provider_payload' => ['event' => 'completed'],
+        'ai_summary' => ['summary' => 'Coverage confirmed.'],
+    ]);
+
+    $storedPayload = DB::table('telephony_calls')->where('id', $call->id)->value('provider_payload');
+
+    expect($storedPayload)->toBeString()
+        ->and(str_contains($storedPayload, 'completed'))->toBeFalse()
+        ->and($call->fresh()->provider_payload)->toBe(['event' => 'completed'])
+        ->and($call->fresh()->ai_summary)->toBe(['summary' => 'Coverage confirmed.']);
 });
 
 it('keeps each client on its own connection before using the platform default', function (): void {
