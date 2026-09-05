@@ -19,6 +19,7 @@ use App\Models\VerificationTemplateSection;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\WorkflowService;
+use App\Support\InsurancePhoneNumber;
 use App\Support\SaasEntitlements;
 use App\Support\TelephonyAccess;
 use App\Support\VerificationAutoAssigner;
@@ -172,11 +173,11 @@ class EditVerificationRequest extends EditRecord
     {
         abort_unless(TelephonyAccess::canCall(auth()->user(), $this->record), 403);
 
-        $destination = preg_replace('/[^0-9+]/', '', trim($destination)) ?: '';
+        $destination = InsurancePhoneNumber::normalize($destination) ?? '';
 
-        if (! preg_match('/^\+?[0-9]{7,15}$/', $destination)) {
+        if (! preg_match('/^\+[1-9][0-9]{7,14}$/', $destination)) {
             throw ValidationException::withMessages([
-                'telephony' => 'Enter a valid insurance phone number before starting the call.',
+                'telephony' => 'Enter a valid insurance phone number with country code and store extensions separately.',
             ]);
         }
 
@@ -225,7 +226,10 @@ class EditVerificationRequest extends EditRecord
             'user_name' => auth()->user()?->name,
         ]);
 
-        return ['public_id' => $call->public_id];
+        return [
+            'public_id' => $call->public_id,
+            'destination' => $destination,
+        ];
     }
 
     public function updateTelephonyCall(
@@ -1701,6 +1705,16 @@ class EditVerificationRequest extends EditRecord
 
         $formData = $this->normalizeVerificationDateFieldsForStorage($formData);
         $workItemData = $this->normalizeVerificationDateFieldsForStorage($workItemData);
+
+        foreach (['vf_insurance_company_phone_number'] as $phoneField) {
+            if (array_key_exists($phoneField, $formData)) {
+                $formData[$phoneField] = InsurancePhoneNumber::normalize($formData[$phoneField]);
+            }
+
+            if (array_key_exists($phoneField, $workItemData)) {
+                $workItemData[$phoneField] = InsurancePhoneNumber::normalize($workItemData[$phoneField]);
+            }
+        }
 
         $waitingPeriodSummary = match ($this->waitingPeriodAnswer) {
             'yes' => $this->formatWaitingPeriodDetails(),

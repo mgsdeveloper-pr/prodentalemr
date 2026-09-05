@@ -82,7 +82,7 @@ it('previews and imports insurance carriers without duplicating matches', functi
 
     expect($updated['updated'])->toBe(1)
         ->and(InsuranceCarrier::query()->count())->toBe(2)
-        ->and(InsuranceCarrier::query()->where('payer_id', 'AETNA01')->value('payer_phone'))->toBe('800-555-9999');
+        ->and(InsuranceCarrier::query()->where('payer_id', 'AETNA01')->value('payer_phone'))->toBe('+18005559999');
 
     @unlink($path);
 });

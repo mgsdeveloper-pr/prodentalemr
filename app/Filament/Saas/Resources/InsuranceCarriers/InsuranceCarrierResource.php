@@ -91,6 +91,9 @@ class InsuranceCarrierResource extends Resource
                                     ->columnSpan(3),
                                 TextInput::make('payer_phone')
                                     ->label('Payer Phone')
+                                    ->tel()
+                                    ->placeholder('+18005550199')
+                                    ->helperText('Stored in international format, including country code.')
                                     ->maxLength(255)
                                     ->columnSpan(3),
                                 Textarea::make('claims_address')

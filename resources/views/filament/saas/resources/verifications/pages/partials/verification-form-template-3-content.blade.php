@@ -2316,7 +2316,7 @@
                 </div>
                 <div class="uel2-field">
                     <label>Phone Number</label>
-                    <input wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="Enter payer phone" style="{{ $templateThreeInput }}">
+                    <input type="tel" wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="+18005550199" style="{{ $templateThreeInput }}">
                 </div>
                 <div class="uel2-field" style="grid-column:1/-1;">
                     <label>Claims Address</label>

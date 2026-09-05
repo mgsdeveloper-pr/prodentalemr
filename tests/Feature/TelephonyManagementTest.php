@@ -236,6 +236,7 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('phoneInitialized: false')
         ->toContain('attemptSequence: 0')
         ->toContain('async rearmPhone(attemptId)')
+        ->toContain('this.config.destination = call.destination;')
         ->toContain('x-show="loading || active || ending"')
         ->toContain("this.finishCall(status, label, null, 'hangup', attemptId)")
         ->and(strpos($control, 'await this.waitForPhoneReady();'))

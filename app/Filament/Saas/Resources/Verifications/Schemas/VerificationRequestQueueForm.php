@@ -304,6 +304,9 @@ class VerificationRequestQueueForm
                                     ->columnSpan(4),
                                 TextInput::make('vf_insurance_company_phone_number')
                                     ->label('Insurance phone')
+                                    ->tel()
+                                    ->placeholder('+18005550199')
+                                    ->helperText('Stored in international format, including country code.')
                                     ->columnSpan(2),
                                 TextInput::make('vf_insurance_claim_mailing_address')
                                     ->label('Claim mailing address')

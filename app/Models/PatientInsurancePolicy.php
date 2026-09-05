@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\InsurancePhoneNumber;
 use App\Traits\HasPublicId;
-
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -98,7 +98,14 @@ class PatientInsurancePolicy extends Model
     protected function displayTitle(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => trim(($this->patient?->full_name ?? 'Patient') . ' - ' . ($this->insurance_company ?? 'Insurance')),
+            get: fn (): string => trim(($this->patient?->full_name ?? 'Patient').' - '.($this->insurance_company ?? 'Insurance')),
+        );
+    }
+
+    protected function payerPhone(): Attribute
+    {
+        return Attribute::make(
+            set: fn (mixed $value): ?string => InsurancePhoneNumber::normalize($value),
         );
     }
 }

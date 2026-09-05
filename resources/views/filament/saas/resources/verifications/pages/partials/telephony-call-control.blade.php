@@ -377,6 +377,7 @@
                     const call = await this.$wire.startTelephonyCall(config.destination);
                     if (attemptId !== this.activeAttemptId) return;
                     this.callId = call.public_id;
+                    this.config.destination = call.destination;
                     await this.preparePhone();
                     if (attemptId !== this.activeAttemptId) return;
                     this.statusLabel = 'Starting call';

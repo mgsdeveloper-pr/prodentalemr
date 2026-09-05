@@ -590,7 +590,7 @@ it('creates a patient and insurance policy together from the appointment form', 
         ->and($policy->member_id)->toBe('MEMBER-100')
         ->and($policy->subscriber_name)->toBe('New Patient')
         ->and($policy->subscriber_dob?->toDateString())->toBe('1990-05-15')
-        ->and($policy->payer_phone)->toBe('800-555-0100');
+        ->and($policy->payer_phone)->toBe('+18005550100');
 });
 
 it('allows appointment patient creation without insurance', function () {

@@ -103,6 +103,8 @@ class PatientInsurancePolicyForm
                                 TextInput::make('payer_phone')
                                     ->label('Payer phone')
                                     ->tel()
+                                    ->placeholder('+18005550199')
+                                    ->helperText('Stored in international format, including country code.')
                                     ->maxLength(255),
                                 Select::make('status')
                                     ->label('Status')

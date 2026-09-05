@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\InsurancePhoneNumber;
 use App\Traits\HasPublicId;
-
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -167,6 +168,13 @@ class VerificationProfile extends Model
             'coverage_prosthodontics' => 'integer',
             'coverage_implant' => 'integer',
         ];
+    }
+
+    protected function insuranceCompanyPhoneNumber(): Attribute
+    {
+        return Attribute::make(
+            set: fn (mixed $value): ?string => InsurancePhoneNumber::normalize($value),
+        );
     }
 
     public function workItem(): BelongsTo
