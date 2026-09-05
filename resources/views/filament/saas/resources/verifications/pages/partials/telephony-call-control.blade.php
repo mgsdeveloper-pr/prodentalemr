@@ -116,9 +116,9 @@
             <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#047857;" x-text="`LIVE ${formattedDuration}`"></span>
         </div>
 
-        <div x-show="loading || active || ending">
+        <div x-show="loading || active || ending || phoneDiagnosticsOpen">
             <div
-                x-bind:style="dialPadOpen ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'position:fixed;left:-10000px;top:0;width:360px;height:520px;overflow:hidden;visibility:visible;pointer-events:none;'"
+                x-bind:style="(dialPadOpen || phoneDiagnosticsOpen) ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'position:fixed;left:-10000px;top:0;width:360px;height:520px;overflow:hidden;visibility:visible;pointer-events:none;'"
             >
                 <div id="mightycall-webphone-container"></div>
             </div>
@@ -165,6 +165,7 @@
             rearming: false,
             muted: false,
             dialPadOpen: false,
+            phoneDiagnosticsOpen: false,
             error: '',
             trackingWarning: '',
             statusLabel: 'Ready to call',
@@ -382,31 +383,53 @@
                 await this.loadSdk();
 
                 const phone = window.MightyCallWebPhone.Phone;
-                const status = this.phoneStatus(phone);
                 const readyStatuses = ['ready', 'registered'];
-                const frameExists = Boolean(document.getElementById('mightyCallWebPhoneFrame'));
+                let frame = document.getElementById('mightyCallWebPhoneFrame');
 
                 this.bindPhoneEvents();
 
-                if (readyStatuses.includes(status)) {
+                if (readyStatuses.includes(this.phoneStatus(phone))) {
                     this.phoneInitialized = true;
                     return;
                 }
 
                 window.MightyCallWebPhone.ApplyConfig({ login: config.apiKey, password: config.userKey });
 
-                if (! frameExists) {
+                if (! frame) {
                     phone.Init('mightycall-webphone-container');
+                    frame = document.getElementById('mightyCallWebPhoneFrame');
+                    await this.waitForPhoneFrameLoad(frame);
                 }
 
                 await this.waitForPhoneBridge();
 
-                if (status === 'closed') {
+                if (this.phoneStatus(phone) === 'closed') {
                     phone.SwitchOn();
                 }
 
                 await this.waitForPhoneReady();
                 this.phoneInitialized = true;
+            },
+
+            async waitForPhoneFrameLoad(frame) {
+                if (! frame) {
+                    throw new Error('MightyCall did not create its embedded phone. Refresh the page and try again.');
+                }
+
+                await new Promise((resolve, reject) => {
+                    const timeout = window.setTimeout(
+                        () => reject(new Error('MightyCall embedded phone could not be loaded. Check network or browser content-blocking settings.')),
+                        15000,
+                    );
+                    frame.addEventListener('load', () => {
+                        window.clearTimeout(timeout);
+                        resolve();
+                    }, { once: true });
+                    frame.addEventListener('error', () => {
+                        window.clearTimeout(timeout);
+                        reject(new Error('MightyCall embedded phone failed to load.'));
+                    }, { once: true });
+                });
             },
 
             async waitForPhoneBridge() {
@@ -457,7 +480,11 @@
                     timeout = window.setTimeout(
                         () => {
                             const finalStatus = this.phoneStatus(phone) || 'unknown';
-                            finish(() => reject(new Error(`MightyCall did not become ready (status: ${finalStatus}). Check microphone permission and network access.`)));
+                            this.phoneDiagnosticsOpen = true;
+                            const message = finalStatus === 'closed'
+                                ? 'MightyCall could not switch on. Verify this portal user\'s MightyCall User Key in User Calling Access.'
+                                : `MightyCall did not become ready (status: ${finalStatus}). Check microphone permission and network access.`;
+                            finish(() => reject(new Error(message)));
                         },
                         20000,
                     );
@@ -598,6 +625,7 @@
                 this.callId = null;
                 this.loading = true;
                 this.dialPadOpen = false;
+                this.phoneDiagnosticsOpen = false;
                 this.error = '';
                 this.trackingWarning = '';
                 this.statusLabel = 'Connecting to MightyCall';
@@ -613,16 +641,13 @@
                 this.cancelRequested = false;
 
                 try {
+                    await this.preparePhone();
+                    if (attemptId !== this.activeAttemptId) return;
+                    if (this.cancelRequested || this.terminalReported) return;
                     const call = await this.$wire.startTelephonyCall(config.destination);
                     if (attemptId !== this.activeAttemptId) return;
                     this.callId = call.public_id;
                     this.config.destination = call.destination;
-                    if (this.cancelRequested) {
-                        await this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId);
-                        return;
-                    }
-                    await this.preparePhone();
-                    if (attemptId !== this.activeAttemptId) return;
                     if (this.cancelRequested) {
                         window.MightyCallWebPhone?.Phone?.HangUp();
                         await this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId);
@@ -634,6 +659,7 @@
                     window.MightyCallWebPhone.Phone.Focus?.();
                     this.startPhoneMonitor(attemptId);
                 } catch (error) {
+                    if (this.cancelRequested || this.terminalReported) return;
                     this.error = error?.message || 'The call could not be started.';
                     await this.finishCall('failed', 'Call failed', null, 'error', attemptId);
                 }
@@ -651,6 +677,8 @@
                 if (this.callId) {
                     window.MightyCallWebPhone?.Phone?.HangUp();
                     window.setTimeout(() => this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId), 1000);
+                } else {
+                    this.finishCall('failed', 'Call cancelled', null, 'cancelled', attemptId);
                 }
             },
 
