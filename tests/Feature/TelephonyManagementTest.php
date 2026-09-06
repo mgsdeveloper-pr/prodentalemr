@@ -420,7 +420,8 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('phone.SwitchOn();')
         ->toContain('position:fixed;left:-10000px')
         ->toContain('status: ${finalStatus}')
-        ->toContain('MightyCall could not switch on.')
+        ->toContain('Select an available microphone in the phone settings.')
+        ->toContain('verify the WebPhone credential in User Calling Access.')
         ->toContain('this.phoneDiagnosticsOpen = true;')
         ->toContain('await this.waitForPhoneReady();')
         ->toContain('Cancel call')
@@ -438,7 +439,8 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
         ->toContain('dialPadOpen: false')
         ->toContain('phoneDiagnosticsOpen: false')
         ->toContain('loading || active || ending || phoneDiagnosticsOpen')
-        ->toContain('>Keypad</button>')
+        ->toContain("x-text=\"dialPadOpen ? 'Hide phone' : 'Phone'\"")
+        ->toContain('title="Show or hide MightyCall phone"')
         ->toContain('x-bind:aria-pressed="dialPadOpen"')
         ->toContain('grid-template-columns:repeat(3,minmax(0,1fr))')
         ->toContain('aria-controls="mightycall-webphone-container"')
@@ -464,4 +466,23 @@ it('waits for MightyCall to be ready before placing an outbound call', function 
 
     expect(strpos($control, 'await this.ensureMicrophoneAccess();'))
         ->toBeLessThan(strpos($control, 'await this.loadSdk();'));
+});
+
+it('provides self-service guidance for calling and audio problems', function (): void {
+    $control = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/telephony-call-control.blade.php'
+    ));
+    $guide = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/partials/telephony-user-guide.blade.php'
+    ));
+
+    expect($control)
+        ->toContain("@include('filament.saas.resources.verifications.pages.partials.telephony-user-guide')")
+        ->and($guide)
+        ->toContain('Calling help')
+        ->toContain('Before your first call')
+        ->toContain('Microphone not detected:')
+        ->toContain('Changed headset:')
+        ->toContain('User Calling Access')
+        ->toContain('Select <strong>Keyboard</strong> inside MightyCall');
 });

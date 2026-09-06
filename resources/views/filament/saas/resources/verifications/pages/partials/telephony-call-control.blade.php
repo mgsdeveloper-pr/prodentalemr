@@ -116,6 +116,8 @@
             <span x-show="active" style="font-variant-numeric:tabular-nums;font-size:13px;font-weight:850;color:#047857;" x-text="`LIVE ${formattedDuration}`"></span>
         </div>
 
+        @include('filament.saas.resources.verifications.pages.partials.telephony-user-guide')
+
         <div x-show="loading || active || ending || phoneDiagnosticsOpen">
             <div
                 x-bind:style="(dialPadOpen || phoneDiagnosticsOpen) ? 'max-height:min(520px,calc(100vh - 260px));overflow:auto;visibility:visible;margin-top:10px;border:1px solid #e2e8f0;border-radius:6px;' : 'position:fixed;left:-10000px;top:0;width:360px;height:520px;overflow:hidden;visibility:visible;pointer-events:none;'"
@@ -146,9 +148,10 @@
                 x-bind:aria-expanded="dialPadOpen"
                 x-bind:aria-pressed="dialPadOpen"
                 aria-controls="mightycall-webphone-container"
-                title="Open or close keypad"
+                title="Show or hide MightyCall phone"
                 x-bind:style="dialPadOpen ? 'height:40px;border:1px solid #0f766e;border-radius:7px;background:#f0fdfa;color:#0f766e;font-size:12px;font-weight:850;cursor:pointer;' : 'height:40px;border:1px solid #cbd5e1;border-radius:7px;background:#ffffff;color:#334155;font-size:12px;font-weight:800;cursor:pointer;'"
-            >Keypad</button>
+                x-text="dialPadOpen ? 'Hide phone' : 'Phone'"
+            ></button>
             <button type="button" x-show="active && ! ending" x-on:click="endCall()" style="height:40px;border:0;border-radius:7px;background:#be123c;color:#ffffff;font-size:12px;font-weight:850;cursor:pointer;">End call</button>
         </div>
     </div>
@@ -513,7 +516,7 @@
                             const finalStatus = this.phoneStatus(phone) || 'unknown';
                             this.phoneDiagnosticsOpen = true;
                             const message = finalStatus === 'closed'
-                                ? 'MightyCall could not switch on. Verify this portal user\'s MightyCall User Key in User Calling Access.'
+                                ? 'MightyCall could not switch on. Select an available microphone in the phone settings. If audio is working, verify the WebPhone credential in User Calling Access.'
                                 : `MightyCall did not become ready (status: ${finalStatus}). Check microphone permission and network access.`;
                             finish(() => reject(new Error(message)));
                         },
