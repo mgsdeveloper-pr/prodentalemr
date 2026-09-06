@@ -292,7 +292,7 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain('transform: translateX(100%);')
         ->toContain('.vt3-reference-drawer.is-open {')
         ->toContain('.vt3-call-drawer {')
-        ->toContain('position: absolute;')
+        ->toContain('position: fixed;')
         ->toContain('.vt3-call-drawer__footer {')
         ->toContain('overflow-y: auto;');
 
