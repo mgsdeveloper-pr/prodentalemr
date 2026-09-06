@@ -354,10 +354,12 @@ it('renders the quick reference phone trigger without a dynamic icon dependency'
         ->toContain('aria-label="Call insurance"')
         ->toContain('verification-telephony-target-updated.window')
         ->toContain('verification-close-telephony-drawer.window')
+        ->toContain("utilityDrawerMode = 'call'")
+        ->toContain("open && utilityDrawerMode === 'call'")
         ->toContain('class="vt3-call-drawer"')
         ->toContain('class="vt3-call-drawer__body"')
         ->toContain('class="vt3-call-drawer__footer"')
-        ->toContain('aria-label="Minimize insurance call"')
+        ->toContain('aria-label="Close insurance call drawer"')
         ->toContain('Insurance phone number required.')
         ->toContain('viewBox="0 0 24 24"')
         ->not->toContain('Call Insurance</button>');

@@ -278,7 +278,7 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
 
     expect($page)
         ->toContain('class="vt3-integrated-header"')
-        ->toContain('quickReferenceDrawerOpen: true')
+        ->toContain("utilityDrawerMode: 'reference'")
         ->toContain("@include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-drawer')")
         ->toContain("['Insurance Phone', \$quickReference['phone'] ?? '-']")
         ->toContain("['Location', \$templateThreePracticeContext->get('Location', '-')]")
@@ -292,7 +292,7 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
         ->toContain('transform: translateX(100%);')
         ->toContain('.vt3-reference-drawer.is-open {')
         ->toContain('.vt3-call-drawer {')
-        ->toContain('position: fixed;')
+        ->toContain('position: absolute;')
         ->toContain('.vt3-call-drawer__footer {')
         ->toContain('overflow-y: auto;');
 
@@ -301,12 +301,16 @@ it('renders template three quick reference as a fixed collapsible drawer', funct
 
     expect($quickReference)
         ->toContain('class="vt3-reference-drawer__tab"')
+        ->toContain("utilityDrawerMode === 'reference'")
+        ->toContain("utilityDrawerMode === 'call' ? 'Insurance Call' : 'Quick Reference'")
+        ->toContain('utilityDrawerMode = null')
         ->toContain("'edgeTrigger' => true")
         ->toContain('telephony-call-control')
         ->toContain('class="vt3-reference-drawer__body"')
         ->toContain('verification-close-telephony-drawer')
         ->toContain('Quick Reference')
         ->toContain("\$dispatch('verification-open-telephony'")
+        ->not->toContain('quickReferenceDrawerOpen')
         ->not->toContain('href="tel:');
 });
 

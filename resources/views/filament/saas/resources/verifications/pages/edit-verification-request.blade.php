@@ -515,6 +515,11 @@
             transform: translateX(0);
         }
 
+        .vt3-call-tool__trigger.is-selected,
+        .vt3-reference-drawer__tab.is-selected {
+            background: #115e59;
+        }
+
         .vt3-call-tool {
             position: absolute;
             top: calc(34% - 50px);
@@ -580,7 +585,7 @@
         }
 
         .vt3-call-drawer {
-            position: fixed;
+            position: absolute;
             inset: 0;
             z-index: 4;
             display: flex;
@@ -1035,8 +1040,8 @@
         @elseif ($isTemplateThreeVerificationForm)
             <section
                 class="vt3-integrated-header"
-                x-data="{ quickReferenceDrawerOpen: true }"
-                x-on:keydown.escape.window="quickReferenceDrawerOpen = false"
+                x-data="{ utilityDrawerMode: 'reference' }"
+                x-on:keydown.escape.window="$dispatch('verification-close-telephony-drawer'); utilityDrawerMode = null"
             >
                 <div class="vt3-compact-workbar">
                     <div class="vt3-compact-workbar__identity">

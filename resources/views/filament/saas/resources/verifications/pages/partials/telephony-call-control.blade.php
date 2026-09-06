@@ -31,18 +31,20 @@
     class="{{ $rootClass }}"
     x-data="verificationTelephonyControl(@js($telephonyConfig))"
     x-on:keydown.escape.window="open = false"
-    x-on:verification-open-telephony.window="updateCallingTarget($event.detail); @if ($edgeTrigger) quickReferenceDrawerOpen = true; @endif open = true"
+    x-on:verification-open-telephony.window="updateCallingTarget($event.detail); @if ($edgeTrigger) utilityDrawerMode = 'call'; @endif open = true"
     x-on:verification-telephony-target-updated.window="updateCallingTarget($event.detail)"
     x-on:verification-close-telephony-drawer.window="open = false"
     style="{{ $edgeTrigger ? '' : 'position:relative;' }}"
 >
     <button
         type="button"
-        x-on:click="@if ($edgeTrigger) if (! open) quickReferenceDrawerOpen = true; @endif open = ! open"
+        x-on:click="@if ($edgeTrigger) if (utilityDrawerMode === 'call') { utilityDrawerMode = null; open = false } else { utilityDrawerMode = 'call'; open = true } @else open = ! open @endif"
+        x-bind:aria-expanded="@if ($edgeTrigger) (open && utilityDrawerMode === 'call').toString() @else open.toString() @endif"
+        aria-controls="mightycall-insurance-call-drawer"
         aria-label="Call insurance"
         title="Call insurance"
         class="{{ $triggerClass }}"
-        x-bind:class="{ 'is-active': active, 'has-error': error }"
+        x-bind:class="{ 'is-selected': @js($edgeTrigger) && open && utilityDrawerMode === 'call', 'is-active': active, 'has-error': error }"
         style="{{ $triggerStyle }}"
     >
         <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.84.56 2.8.69A2 2 0 0 1 22 16.92z"/></svg>
@@ -58,7 +60,7 @@
 
     <div
         x-cloak
-        x-show="open"
+        x-show="@if ($edgeTrigger) open && utilityDrawerMode === 'call' @else open @endif"
         @if ($edgeTrigger)
             x-transition:enter="vt3-call-drawer-transition"
             x-transition:enter-start="vt3-call-drawer-transition-start"
@@ -73,6 +75,7 @@
             x-on:click.outside="if (! active && ! loading && ! ending) open = false"
         @endunless
         class="{{ $panelClass }}"
+        id="mightycall-insurance-call-drawer"
         style="{{ $panelStyle }}"
     >
         <div class="{{ $edgeTrigger ? 'vt3-call-drawer__header' : '' }}" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
@@ -85,7 +88,7 @@
                     <div style="margin-top:2px;font-size:13px;color:#475569;" x-text="config.destination"></div>
                 </div>
             @endif
-            <button type="button" x-show="@js($edgeTrigger) || (! active && ! loading && ! ending)" x-on:click="open = false" aria-label="{{ $edgeTrigger ? 'Minimize insurance call' : 'Close call panel' }}" title="{{ $edgeTrigger ? 'Minimize' : 'Close' }}" class="{{ $edgeTrigger ? 'vt3-call-drawer__close' : '' }}" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
+            <button type="button" x-show="@js($edgeTrigger) || (! active && ! loading && ! ending)" x-on:click="open = false; @if ($edgeTrigger) utilityDrawerMode = null @endif" aria-label="{{ $edgeTrigger ? 'Close insurance call drawer' : 'Close call panel' }}" title="Close" class="{{ $edgeTrigger ? 'vt3-call-drawer__close' : '' }}" style="width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#ffffff;color:#475569;font-size:18px;cursor:pointer;">&times;</button>
         </div>
 
         <div class="{{ $edgeTrigger ? 'vt3-call-drawer__body' : '' }}">

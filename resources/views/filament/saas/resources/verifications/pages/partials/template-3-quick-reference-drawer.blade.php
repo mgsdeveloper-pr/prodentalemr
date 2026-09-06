@@ -1,8 +1,8 @@
 <aside
     class="vt3-reference-drawer"
-    x-bind:class="{ 'is-open': quickReferenceDrawerOpen }"
-    x-bind:aria-hidden="(! quickReferenceDrawerOpen).toString()"
-    aria-labelledby="template3-quick-reference-drawer-title"
+    x-bind:class="{ 'is-open': utilityDrawerMode !== null }"
+    x-bind:aria-hidden="(utilityDrawerMode === null).toString()"
+    x-bind:aria-label="utilityDrawerMode === 'call' ? 'Insurance Call' : 'Quick Reference'"
 >
     @if ($callingWorkspace['visible'] ?? false)
         @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
@@ -16,22 +16,23 @@
     <button
         type="button"
         class="vt3-reference-drawer__tab"
-        x-on:click="$dispatch('verification-close-telephony-drawer'); quickReferenceDrawerOpen = ! quickReferenceDrawerOpen"
-        x-bind:aria-expanded="quickReferenceDrawerOpen.toString()"
+        x-bind:class="{ 'is-selected': utilityDrawerMode === 'reference' }"
+        x-on:click="if (utilityDrawerMode === 'reference') { utilityDrawerMode = null } else { $dispatch('verification-close-telephony-drawer'); utilityDrawerMode = 'reference' }"
+        x-bind:aria-expanded="(utilityDrawerMode === 'reference').toString()"
         aria-controls="template3-quick-reference-drawer-body"
-        x-bind:title="quickReferenceDrawerOpen ? 'Close quick reference' : 'Open quick reference'"
+        x-bind:title="utilityDrawerMode === 'reference' ? 'Close quick reference' : 'Open quick reference'"
     >
-        <x-heroicon-o-chevron-left x-show="! quickReferenceDrawerOpen" aria-hidden="true" />
-        <x-heroicon-o-chevron-right x-show="quickReferenceDrawerOpen" aria-hidden="true" />
+        <x-heroicon-o-chevron-left x-show="utilityDrawerMode !== 'reference'" aria-hidden="true" />
+        <x-heroicon-o-chevron-right x-show="utilityDrawerMode === 'reference'" aria-hidden="true" />
         <span>Quick Reference</span>
     </button>
 
-    <div class="vt3-reference-drawer__header">
+    <div x-cloak x-show="utilityDrawerMode === 'reference'" class="vt3-reference-drawer__header">
         <h2 id="template3-quick-reference-drawer-title">Quick Reference</h2>
         <button
             type="button"
             class="vt3-reference-drawer__close"
-            x-on:click="$dispatch('verification-close-telephony-drawer'); quickReferenceDrawerOpen = false"
+            x-on:click="$dispatch('verification-close-telephony-drawer'); utilityDrawerMode = null"
             aria-label="Close quick reference"
             title="Close quick reference"
         >
@@ -39,7 +40,7 @@
         </button>
     </div>
 
-    <div id="template3-quick-reference-drawer-body" class="vt3-reference-drawer__body">
+    <div x-cloak x-show="utilityDrawerMode === 'reference'" id="template3-quick-reference-drawer-body" class="vt3-reference-drawer__body">
         @foreach ($templateThreeQuickReferenceRows as $templateThreeQuickReferenceGroup => $templateThreeQuickReferenceFields)
             <section class="vt3-reference-drawer__group">
                 <h3>{{ $templateThreeQuickReferenceGroup }}</h3>
