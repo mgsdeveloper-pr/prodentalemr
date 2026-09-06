@@ -6,6 +6,7 @@ use App\Filament\Saas\Resources\TelephonyAccounts\Pages\CreateTelephonyAccount;
 use App\Filament\Saas\Resources\TelephonyAccounts\Pages\EditTelephonyAccount;
 use App\Filament\Saas\Resources\TelephonyAccounts\Pages\ListTelephonyAccounts;
 use App\Models\TelephonyAccount;
+use App\Models\TelephonyUserAssignment;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -169,7 +170,12 @@ class TelephonyAccountResource extends Resource
                                     ->label('MightyCall user key')
                                     ->password()
                                     ->revealable()
-                                    ->required()
+                                    ->placeholder(fn (?TelephonyUserAssignment $record): ?string => $record?->exists
+                                        ? 'Stored key unchanged'
+                                        : null)
+                                    ->helperText('Leave blank to keep the stored key. Enter a value only to add or replace it.')
+                                    ->required(fn (?TelephonyUserAssignment $record): bool => ! $record?->exists)
+                                    ->dehydrated(fn (?string $state): bool => filled($state))
                                     ->maxLength(500)
                                     ->columnSpan(2),
                                 Toggle::make('can_call')

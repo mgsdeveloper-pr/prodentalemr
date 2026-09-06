@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Saas\Resources\TelephonyAccounts\Pages\EditTelephonyAccount;
 use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
@@ -13,9 +14,11 @@ use App\Models\TelephonyUserAssignment;
 use App\Models\User;
 use App\Support\TelephonyAccess;
 use Database\Seeders\RoleSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 beforeEach(function (): void {
     $this->seed(RoleSeeder::class);
@@ -121,6 +124,37 @@ it('keeps provider credentials encrypted and requires an active assigned user', 
         ->and($workspace['user_key'])->toBe('user-secret')
         ->and($workspace['recording_enabled'])->toBeTrue()
         ->and($workspace['ai_summary_enabled'])->toBeTrue();
+});
+
+it('keeps an existing MightyCall user key when other calling settings change', function (): void {
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id,
+        'name' => 'Editable MightyCall',
+        'api_key' => 'editable-api-key',
+        'is_active' => true,
+    ]);
+
+    $assignment = TelephonyUserAssignment::create([
+        'telephony_account_id' => $account->id,
+        'user_id' => $this->user->id,
+        'user_key' => 'keep-this-user-key',
+        'can_call' => true,
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($admin);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    Livewire::test(EditTelephonyAccount::class, ['record' => $account->getRouteKey()])
+        ->fillForm(['name' => 'Renamed MightyCall'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($account->fresh()->name)->toBe('Renamed MightyCall')
+        ->and($assignment->fresh()->user_key)->toBe('keep-this-user-key');
 });
 
 it('stores encrypted telephony payloads in text-compatible columns', function (): void {
