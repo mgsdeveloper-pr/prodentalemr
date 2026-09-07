@@ -92,13 +92,15 @@ it('keeps the maintenance bypass cookie available for Laravel validation', funct
     expect($bootstrap)->toContain("encryptCookies(except: ['laravel_maintenance'])");
 });
 
-it('uses release cache commands that do not require the optional icons namespace', function (): void {
+it('refreshes generated release files without running console cache commands inside the web request', function (): void {
     $manager = file_get_contents(app_path('Services/SystemUpdateManager.php'));
 
     expect($manager)
-        ->toContain("'filament:clear-cached-components'")
-        ->toContain("'route:cache'")
-        ->toContain("'filament:cache-components'")
+        ->toContain('getCachedRoutesPath()')
+        ->toContain("storage_path('framework/views')")
+        ->toContain("Cache::forever('illuminate:queue:restart'")
         ->not->toContain("'filament:optimize-clear'")
-        ->not->toContain("'optimize:clear'");
+        ->not->toContain("'optimize:clear'")
+        ->not->toContain("'route:cache'")
+        ->not->toContain("'view:cache'");
 });

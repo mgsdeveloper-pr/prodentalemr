@@ -101,12 +101,7 @@ class SystemUpdateManager
             ];
 
             try {
-                $this->rebuildApplicationCaches();
-                $this->runArtisanTask('queue:restart');
-
-                if (function_exists('opcache_reset')) {
-                    @opcache_reset();
-                }
+                $this->refreshApplicationRuntime();
 
                 $activation['completed_at'] = now()->toIso8601String();
                 $this->recordHistory($activation);
@@ -263,11 +258,11 @@ class SystemUpdateManager
                 }
 
                 if ($run['phase'] === 'optimize') {
-                    $run['message'] = 'Rebuilding application caches.';
+                    $run['message'] = 'Refreshing application caches.';
                     $this->writeState($run);
-                    $this->rebuildApplicationCaches();
+                    $this->refreshApplicationRuntime();
                     $run['phase'] = 'queue';
-                    $run['message'] = 'Application caches rebuilt.';
+                    $run['message'] = 'Application caches refreshed.';
                     $this->writeState($run);
 
                     return $run;
@@ -276,7 +271,7 @@ class SystemUpdateManager
                 if ($run['phase'] === 'queue') {
                     $run['message'] = 'Refreshing background workers.';
                     $this->writeState($run);
-                    $this->runArtisanTask('queue:restart');
+                    $this->signalQueueRestart();
                     $run['phase'] = 'complete';
                     $this->writeState($run);
 
@@ -366,23 +361,50 @@ class SystemUpdateManager
         }
     }
 
-    private function rebuildApplicationCaches(): void
+    private function refreshApplicationRuntime(): void
     {
-        foreach ([
-            'filament:clear-cached-components',
-            'cache:clear',
-            'config:clear',
-            'event:clear',
-            'route:clear',
-            'view:clear',
-            'config:cache',
-            'event:cache',
-            'route:cache',
-            'view:cache',
-            'filament:cache-components',
-        ] as $command) {
-            $this->runArtisanTask($command);
+        $application = app();
+
+        foreach (array_unique([
+            $application->getCachedConfigPath(),
+            $application->getCachedEventsPath(),
+            $application->getCachedRoutesPath(),
+        ]) as $path) {
+            if (File::exists($path) && ! File::delete($path)) {
+                throw new RuntimeException('A generated application cache file could not be removed.');
+            }
         }
+
+        $directories = [
+            storage_path('framework/views'),
+            (config('filament.cache_path') ?? base_path('bootstrap/cache/filament')).DIRECTORY_SEPARATOR.'panels',
+        ];
+
+        foreach ($directories as $directory) {
+            if (! File::isDirectory($directory)) {
+                continue;
+            }
+
+            $paths = collect(File::files($directory))
+                ->reject(fn (\SplFileInfo $file): bool => $file->getFilename() === '.gitignore')
+                ->map(fn (\SplFileInfo $file): string => $file->getPathname())
+                ->all();
+
+            if ($paths !== [] && ! File::delete($paths)) {
+                throw new RuntimeException('Generated view or panel cache files could not be removed.');
+            }
+        }
+
+        $this->signalQueueRestart();
+
+        if (function_exists('opcache_reset')) {
+            @opcache_reset();
+        }
+    }
+
+    private function signalQueueRestart(): void
+    {
+        Cache::forever('illuminate:queue:restart', now()->getTimestamp());
     }
 
     /**

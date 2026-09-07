@@ -139,14 +139,18 @@ class SystemUpdates extends Page
 
             Notification::make()
                 ->title('Latest code activated')
-                ->body('Application routes, views, components, and background workers are now current.')
+                ->body('Generated routes, views, components, and background workers are now current.')
                 ->success()
                 ->persistent()
                 ->send();
+
+            $this->redirect(Dashboard::getUrl(), navigate: false);
         } catch (Throwable $exception) {
             Notification::make()
                 ->title('Latest code could not be activated')
-                ->body($exception->getMessage())
+                ->body(filled($exception->getMessage())
+                    ? $exception->getMessage()
+                    : 'The server could not refresh generated application files. Check application write permissions.')
                 ->danger()
                 ->persistent()
                 ->send();
