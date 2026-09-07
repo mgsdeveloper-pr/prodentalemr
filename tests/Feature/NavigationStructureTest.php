@@ -126,3 +126,17 @@ it('keeps verification navigation focused on requests and resources', function (
         ->and(VerificationAppointmentResource::shouldRegisterNavigation())->toBeFalse()
         ->and(VerificationPatientResource::shouldRegisterNavigation())->toBeFalse();
 });
+
+it('presents an action-oriented personal mailbox setup state', function (): void {
+    $mailboxView = file_get_contents(resource_path('views/filament/admin/pages/user-mailbox.blade.php'));
+
+    expect($mailboxView)
+        ->toContain('Connect your personal mailbox')
+        ->toContain('Connect Mailbox')
+        ->toContain('View setup guide')
+        ->toContain('Mailbox not connected')
+        ->toContain('user-mailbox-folder-nav')
+        ->not->toContain('Default Host')
+        ->not->toContain('IMAP Port')
+        ->not->toContain('Live IMAP');
+});

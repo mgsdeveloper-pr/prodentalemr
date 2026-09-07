@@ -24,30 +24,38 @@
         @endif
 
         @if (! $this->isConfigured())
-            <section style="border: 1px solid #dbe4ee; border-radius: 26px; background: #ffffff; box-shadow: 0 14px 32px rgba(15, 23, 42, 0.07); overflow: hidden;">
-                <div style="padding: 34px 32px; display: flex; flex-direction: column; gap: 18px; max-width: 760px;">
-                    <h3 style="margin: 0; font-size: 28px; font-weight: 800; color: #0f172a;">Connect your mailbox</h3>
-                    <p style="margin: 0; font-size: 15px; line-height: 1.8; color: #64748b;">
-                        Open <strong>Settings &gt; Mailbox &gt; My Mailbox</strong> to enter your mailbox user ID and password. By default, we prefill:
-                        <strong>Host:</strong> mail.medityaglobalservices.com
-                        and
-                        <strong>IMAP Port:</strong> 993.
-                        You can also replace those values if your email provider changes later.
-                    </p>
-                    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
-                        <div style="padding: 18px; border-radius: 18px; border: 1px solid #dbe4ee; background: #fbfdff;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Default Host</div>
-                            <div style="margin-top: 8px; font-size: 18px; font-weight: 800; color: #0f172a;">mail.medityaglobalservices.com</div>
+            <section class="user-mailbox-empty-shell">
+                <aside class="user-mailbox-folder-nav" aria-label="Mailbox folders">
+                    @foreach ([
+                        ['label' => 'Inbox', 'icon' => 'heroicon-o-inbox'],
+                        ['label' => 'Sent', 'icon' => 'heroicon-o-paper-airplane'],
+                        ['label' => 'Drafts', 'icon' => 'heroicon-o-document'],
+                        ['label' => 'Spam', 'icon' => 'heroicon-o-shield-exclamation'],
+                    ] as $folder)
+                        <div class="user-mailbox-folder {{ $loop->first ? 'is-active' : '' }}" aria-disabled="true">
+                            <x-dynamic-component :component="$folder['icon']" style="width: 19px; height: 19px;" />
+                            <span>{{ $folder['label'] }}</span>
                         </div>
-                        <div style="padding: 18px; border-radius: 18px; border: 1px solid #dbe4ee; background: #fbfdff;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">IMAP Port</div>
-                            <div style="margin-top: 8px; font-size: 18px; font-weight: 800; color: #0f172a;">993</div>
-                        </div>
-                        <div style="padding: 18px; border-radius: 18px; border: 1px solid #dbe4ee; background: #fbfdff;">
-                            <div style="font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #64748b;">Mode</div>
-                            <div style="margin-top: 8px; font-size: 18px; font-weight: 800; color: #0f172a;">Live IMAP</div>
-                        </div>
+                    @endforeach
+                </aside>
+
+                <div class="user-mailbox-empty-state">
+                    <span class="user-mailbox-status">
+                        <span aria-hidden="true"></span>
+                        Not connected
+                    </span>
+                    <div class="user-mailbox-empty-icon" aria-hidden="true">
+                        <x-heroicon-o-envelope style="width: 42px; height: 42px;" />
                     </div>
+                    <h2>Connect your personal mailbox</h2>
+                    <p>Connect your work email to view and manage messages here.</p>
+                    <a href="{{ \App\Filament\Admin\Pages\UserMailboxSettingsPage::getUrl() }}" wire:navigate class="user-mailbox-connect-button">
+                        Connect Mailbox
+                    </a>
+                    <a href="{{ \App\Filament\Admin\Pages\UserMailboxSettingsPage::getUrl() }}" wire:navigate class="user-mailbox-setup-link">
+                        View setup guide
+                    </a>
+                    <span class="user-mailbox-connection-note">Mailbox not connected</span>
                 </div>
             </section>
         @else
@@ -211,9 +219,169 @@
     </div>
 
     <style>
+        .user-mailbox-empty-shell {
+            display: grid;
+            grid-template-columns: 250px minmax(0, 1fr);
+            min-height: 560px;
+            border: 1px solid #dbe4ee;
+            border-radius: 8px;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .user-mailbox-folder-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 28px 18px;
+            border-right: 1px solid #e5edf5;
+            background: #ffffff;
+        }
+
+        .user-mailbox-folder {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 44px;
+            padding: 0 14px;
+            border-radius: 6px;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .user-mailbox-folder.is-active {
+            background: #e8f7f5;
+            color: #0f766e;
+        }
+
+        .user-mailbox-empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            padding: 48px 24px;
+            text-align: center;
+        }
+
+        .user-mailbox-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 28px;
+            padding: 6px 10px;
+            border: 1px solid #dbe4ee;
+            border-radius: 999px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .user-mailbox-status > span {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: #94a3b8;
+        }
+
+        .user-mailbox-empty-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            color: #0f9488;
+        }
+
+        .user-mailbox-empty-state h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+        .user-mailbox-empty-state p {
+            margin: 10px 0 24px;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .user-mailbox-connect-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 20px;
+            border-radius: 6px;
+            background: #0f8077;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: background 0.16s ease;
+        }
+
+        .user-mailbox-connect-button:hover {
+            background: #0b6f67;
+        }
+
+        .user-mailbox-setup-link {
+            margin-top: 14px;
+            color: #0f766e;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .user-mailbox-setup-link:hover {
+            text-decoration: underline;
+        }
+
+        .user-mailbox-connection-note {
+            margin-top: 26px;
+            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
         @media (max-width: 980px) {
             .user-mailbox-header {
                 grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            .user-mailbox-empty-shell {
+                grid-template-columns: minmax(0, 1fr);
+                min-height: 520px;
+            }
+
+            .user-mailbox-folder-nav {
+                flex-direction: row;
+                gap: 4px;
+                padding: 12px;
+                border-right: 0;
+                border-bottom: 1px solid #e5edf5;
+                overflow-x: auto;
+            }
+
+            .user-mailbox-folder {
+                flex: 0 0 auto;
+                min-height: 40px;
+                padding: 0 12px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .user-mailbox-empty-state {
+                padding: 40px 20px;
+            }
+
+            .user-mailbox-empty-state h2 {
+                font-size: 20px;
             }
         }
 

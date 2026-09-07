@@ -92,6 +92,13 @@ class UserMailboxPage extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('mailboxSettings')
+                ->label('Mailbox settings')
+                ->icon('heroicon-o-cog-6-tooth')
+                ->color('gray')
+                ->iconButton()
+                ->tooltip('Mailbox settings')
+                ->url(UserMailboxSettingsPage::getUrl()),
             Action::make('refreshMailbox')
                 ->label('Refresh')
                 ->icon('heroicon-o-arrow-path')
@@ -116,9 +123,7 @@ class UserMailboxPage extends Page
 
     public function getSubheading(): ?string
     {
-        $status = $this->getConnectionStatus();
-
-        return 'Review live inbox, spam, and sent mail from your connected mailbox. Connection: '.$status['label'].'.';
+        return 'View and manage messages from your connected work mailbox.';
     }
 
     public function getBreadcrumbs(): array
