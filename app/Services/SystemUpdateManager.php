@@ -368,9 +368,21 @@ class SystemUpdateManager
 
     private function rebuildApplicationCaches(): void
     {
-        $this->runArtisanTask('filament:optimize-clear');
-        $this->runArtisanTask('optimize:clear');
-        $this->runArtisanTask('optimize');
+        foreach ([
+            'filament:clear-cached-components',
+            'cache:clear',
+            'config:clear',
+            'event:clear',
+            'route:clear',
+            'view:clear',
+            'config:cache',
+            'event:cache',
+            'route:cache',
+            'view:cache',
+            'filament:cache-components',
+        ] as $command) {
+            $this->runArtisanTask($command);
+        }
     }
 
     /**

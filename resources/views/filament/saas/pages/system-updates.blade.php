@@ -141,7 +141,7 @@
                         @if(count($history) > 0)
                             <div class="system-update-history">
                                 @foreach(array_slice($history, 0, 6) as $item)
-                                    <div class="system-update-history-item"><strong>{{ ($item['type'] ?? null) === 'code_activation' ? 'Code activation '.($item['status'] ?? 'unknown') : ucfirst($item['status'] ?? 'unknown') }}</strong><div class="system-update-code">{{ $item['id'] ?? '-' }}</div><div>{{ ($item['type'] ?? null) === 'code_activation' ? 'Application caches and workers refreshed' : count($item['completed_migrations'] ?? []).' migration(s) applied' }} &middot; {{ $item['completed_at'] ?? $item['started_at'] ?? '-' }}</div></div>
+                                    <div class="system-update-history-item"><strong>{{ ($item['type'] ?? null) === 'code_activation' ? 'Code activation '.($item['status'] ?? 'unknown') : ucfirst($item['status'] ?? 'unknown') }}</strong><div class="system-update-code">{{ $item['id'] ?? '-' }}</div><div>{{ ($item['type'] ?? null) === 'code_activation' ? (($item['status'] ?? null) === 'completed' ? 'Application caches and workers refreshed' : 'Activation did not complete') : count($item['completed_migrations'] ?? []).' migration(s) applied' }} &middot; {{ $item['completed_at'] ?? $item['started_at'] ?? '-' }}</div></div>
                                 @endforeach
                             </div>
                         @else
