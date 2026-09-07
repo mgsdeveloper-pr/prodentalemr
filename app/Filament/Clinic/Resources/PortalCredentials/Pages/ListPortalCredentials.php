@@ -22,6 +22,8 @@ class ListPortalCredentials extends ListRecords
 
     public string $search = '';
 
+    public string $statusFilter = 'all';
+
     public bool $passwordModalOpen = false;
 
     public ?int $editingCredentialId = null;
@@ -35,6 +37,30 @@ class ListPortalCredentials extends ListRecords
     public string $newPassword = '';
 
     public string $newPasswordConfirmation = '';
+
+    public bool $infoModalOpen = false;
+
+    public ?int $infoCredentialId = null;
+
+    public ?string $infoCredentialName = null;
+
+    public ?string $infoCredentialCategory = null;
+
+    public ?string $infoCredentialUsername = null;
+
+    public ?string $infoCredentialPassword = null;
+
+    public ?string $infoCredentialAuthentication = null;
+
+    public ?string $infoCredentialAuthenticationDetail = null;
+
+    public ?string $infoCredentialStatus = null;
+
+    public ?string $infoCredentialUpdatedAt = null;
+
+    public ?string $infoCredentialRegistrationQaNotes = null;
+
+    public ?string $infoCredentialGeneralNotes = null;
 
     public function getSelectedClinicName(): ?string
     {
@@ -54,6 +80,16 @@ class ListPortalCredentials extends ListRecords
                         ->orWhere('account_reference', 'like', '%'.$this->search.'%');
                 });
             })
+            ->when($this->statusFilter === 'active', fn ($query) => $query->where('is_active', true))
+            ->when($this->statusFilter === 'inactive', fn ($query) => $query->where('is_active', false))
+            ->when($this->statusFilter === 'attention', fn ($query) => $query->where(function ($builder): void {
+                $builder
+                    ->where('is_active', false)
+                    ->orWhereNull('login_url')
+                    ->orWhere('login_url', '')
+                    ->orWhereNull('username')
+                    ->orWhereNull('password');
+            }))
             ->orderByDesc('is_active')
             ->orderBy('portal_name')
             ->get();
@@ -61,13 +97,54 @@ class ListPortalCredentials extends ListRecords
 
     public function getCredentialSummary(): array
     {
-        $credentials = $this->getPortalCredentials();
+        $credentials = $this->getScopedPortalCredentialQuery()
+            ->withCount('securityQuestions')
+            ->get();
 
         return [
             'total' => $credentials->count(),
             'active' => $credentials->where('is_active', true)->count(),
-            'mfa' => $credentials->where('mfa_required', true)->count(),
+            'security_questions' => $credentials
+                ->where('mfa_required', true)
+                ->where('mfa_method', 'security_question')
+                ->count(),
+            'attention' => $credentials->filter(fn (PortalCredential $credential): bool => $this->credentialNeedsAttention($credential))->count(),
         ];
+    }
+
+    public function credentialNeedsAttention(PortalCredential $credential): bool
+    {
+        return ! $credential->is_active
+            || blank($credential->login_url)
+            || blank($credential->username)
+            || blank($credential->password);
+    }
+
+    public function credentialStatusLabel(PortalCredential $credential): string
+    {
+        if (! $credential->is_active) {
+            return 'Inactive';
+        }
+
+        return $this->credentialNeedsAttention($credential) ? 'Needs attention' : 'Active';
+    }
+
+    public function credentialAuthenticationLabel(PortalCredential $credential): string
+    {
+        if (! $credential->mfa_required) {
+            return 'Password only';
+        }
+
+        return PortalCredential::MFA_METHOD_OPTIONS[$credential->mfa_method ?: 'none'] ?? 'Additional verification';
+    }
+
+    public function credentialAuthenticationDetail(PortalCredential $credential): string
+    {
+        if ($credential->mfa_required && $credential->mfa_method === 'security_question') {
+            return $credential->security_questions_count.' configured';
+        }
+
+        return $credential->mfa_required ? 'Required at sign-in' : 'No additional step';
     }
 
     public function canUpdatePasswords(): bool
@@ -85,6 +162,54 @@ class ListPortalCredentials extends ListRecords
     public function createCredentialUrl(): string
     {
         return PortalCredentialResource::getUrl('create');
+    }
+
+    public function openCredentialInfo(int $credentialId): void
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId)->loadCount('securityQuestions');
+
+        $this->infoCredentialId = $credential->getKey();
+        $this->infoCredentialName = $credential->portal_name;
+        $this->infoCredentialCategory = PortalCredential::CATEGORY_OPTIONS[$credential->portal_category ?: 'other'] ?? 'Other';
+        $this->infoCredentialUsername = PortalCredential::maskSecret($credential->username);
+        $this->infoCredentialPassword = PortalCredential::maskSecret($credential->password);
+        $this->infoCredentialAuthentication = $this->credentialAuthenticationLabel($credential);
+        $this->infoCredentialAuthenticationDetail = $this->credentialAuthenticationDetail($credential);
+        $this->infoCredentialStatus = $this->credentialStatusLabel($credential);
+        $this->infoCredentialUpdatedAt = optional($credential->updated_at)->format('M d, Y');
+        $this->editingCredentialLink = $credential->login_url;
+        $this->infoCredentialRegistrationQaNotes = $credential->registration_qa_notes ?: $credential->notes;
+        $this->infoCredentialGeneralNotes = $credential->general_notes;
+        $this->infoModalOpen = true;
+        $this->resetErrorBag();
+    }
+
+    public function closeCredentialInfo(): void
+    {
+        $this->infoModalOpen = false;
+        $this->infoCredentialId = null;
+        $this->infoCredentialName = null;
+        $this->infoCredentialCategory = null;
+        $this->infoCredentialUsername = null;
+        $this->infoCredentialPassword = null;
+        $this->infoCredentialAuthentication = null;
+        $this->infoCredentialAuthenticationDetail = null;
+        $this->infoCredentialStatus = null;
+        $this->infoCredentialUpdatedAt = null;
+        $this->editingCredentialLink = null;
+        $this->infoCredentialRegistrationQaNotes = null;
+        $this->infoCredentialGeneralNotes = null;
+    }
+
+    public function setCredentialActive(int $credentialId, bool $active): void
+    {
+        $credential = $this->resolveAccessibleCredential($credentialId);
+        $credential->update(['is_active' => $active]);
+
+        Notification::make()
+            ->success()
+            ->title($active ? 'Credential activated' : 'Credential disabled')
+            ->send();
     }
 
     public function openPasswordEditor(int $credentialId): void

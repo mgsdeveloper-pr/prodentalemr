@@ -6,6 +6,7 @@
         class="pd-credential-workspace"
         wire:poll.30s="clearExpiredPortalCredentialValues"
         x-data="{
+            openMenu: null,
             copyProtectedValue(value) {
                 if (!value) return;
                 const fallback = () => {
@@ -29,13 +30,13 @@
     >
         <header class="pd-credential-header">
             <div>
-                <h1>Portal Credentials</h1>
-                <p>Use the payer portal access assigned to the selected clinic.</p>
                 <nav aria-label="Breadcrumb">
                     <span>Verification</span>
                     <x-heroicon-o-chevron-right />
                     <strong>Portal Credentials</strong>
                 </nav>
+                <h1>Portal Credentials</h1>
+                <p>Secure payer portal access for the selected clinic.</p>
             </div>
             <div class="pd-credential-header-actions">
                 <div class="pd-credential-scope">
@@ -52,19 +53,33 @@
         </header>
 
         <section class="pd-credential-summary" aria-label="Credential summary">
-            <div><span>Available portals</span><strong>{{ number_format($summary['total']) }}</strong></div>
-            <div><span>Active</span><strong>{{ number_format($summary['active']) }}</strong></div>
-            <div><span>MFA enabled</span><strong>{{ number_format($summary['mfa']) }}</strong></div>
-            <p>Credentials are maintained per clinic. Secret access is recorded for security review.</p>
+            <span><strong>{{ number_format($summary['total']) }}</strong> portal{{ $summary['total'] === 1 ? '' : 's' }}</span>
+            <i aria-hidden="true"></i>
+            <span><strong>{{ number_format($summary['active']) }}</strong> active</span>
+            <i aria-hidden="true"></i>
+            <span><strong>{{ number_format($summary['security_questions']) }}</strong> use{{ $summary['security_questions'] === 1 ? 's' : '' }} security questions</span>
+            <i aria-hidden="true"></i>
+            <span class="{{ $summary['attention'] > 0 ? 'needs-attention' : '' }}"><strong>{{ number_format($summary['attention']) }}</strong> need attention</span>
         </section>
 
         <section class="pd-credential-table-card">
             <div class="pd-credential-toolbar">
                 <label class="pd-credential-search">
                     <x-heroicon-o-magnifying-glass />
-                    <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search portal, category, or account">
+                    <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search portals or accounts">
                 </label>
-                <span>{{ $credentials->count() }} result{{ $credentials->count() === 1 ? '' : 's' }}</span>
+                <div class="pd-credential-toolbar-end">
+                    <label>
+                        <span class="sr-only">Filter by status</span>
+                        <select wire:model.live="statusFilter">
+                            <option value="all">All statuses</option>
+                            <option value="active">Active</option>
+                            <option value="attention">Needs attention</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </label>
+                    <span>{{ $credentials->count() }} result{{ $credentials->count() === 1 ? '' : 's' }}</span>
+                </div>
             </div>
 
             <div class="pd-credential-table-wrap">
@@ -72,12 +87,10 @@
                     <thead>
                         <tr>
                             <th>Portal</th>
-                            <th>Portal Access</th>
-                            <th>Username</th>
-                            <th>Password</th>
-                            <th>MFA</th>
+                            <th>Account</th>
+                            <th>Authentication</th>
                             <th>Status</th>
-                            <th>Updated</th>
+                            <th>Last updated</th>
                             <th aria-label="Actions"></th>
                         </tr>
                     </thead>
@@ -91,61 +104,119 @@
                                     </div>
                                 </td>
                                 <td>
-                                    @if (filled($credential->login_url))
-                                        <a class="pd-credential-link" href="{{ $credential->login_url }}" target="_blank" rel="noopener noreferrer">
-                                            <x-heroicon-o-arrow-top-right-on-square /><span>Open portal</span>
-                                        </a>
-                                    @else
-                                        <span class="pd-muted">Not provided</span>
-                                    @endif
-                                </td>
-                                <td>
-                                    <div class="pd-secret-field">
-                                        <code id="portal-username-{{ $credential->getKey() }}">{{ $this->portalCredentialDisplayValue('portal-username-'.$credential->getKey(), \App\Models\PortalCredential::maskSecret($credential->username)) }}</code>
-                                        @if (filled($credential->username) && $this->canUpdatePasswords())
-                                            <button type="button" wire:click="revealCredentialSecret({{ $credential->getKey() }}, 'username')" wire:loading.attr="disabled" wire:target="revealCredentialSecret({{ $credential->getKey() }}, 'username')" title="Reveal username" aria-label="Reveal username for {{ $credential->portal_name }}"><x-heroicon-o-eye /></button>
-                                            <button type="button" x-on:click="$wire.copyCredentialSecret({{ $credential->getKey() }}, 'username').then(value => copyProtectedValue(value))" wire:loading.attr="disabled" wire:target="copyCredentialSecret({{ $credential->getKey() }}, 'username')" title="Copy username" aria-label="Copy username for {{ $credential->portal_name }}"><x-heroicon-o-clipboard /></button>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td>
-                                    <div class="pd-secret-field">
-                                        <code id="portal-password-{{ $credential->getKey() }}">{{ $this->portalCredentialDisplayValue('portal-password-'.$credential->getKey(), \App\Models\PortalCredential::maskSecret($credential->password)) }}</code>
-                                        @if (filled($credential->password) && $this->canUpdatePasswords())
-                                            <button type="button" wire:click="revealCredentialSecret({{ $credential->getKey() }}, 'password')" wire:loading.attr="disabled" wire:target="revealCredentialSecret({{ $credential->getKey() }}, 'password')" title="Reveal password" aria-label="Reveal password for {{ $credential->portal_name }}"><x-heroicon-o-eye /></button>
-                                            <button type="button" x-on:click="$wire.copyCredentialSecret({{ $credential->getKey() }}, 'password').then(value => copyProtectedValue(value))" wire:loading.attr="disabled" wire:target="copyCredentialSecret({{ $credential->getKey() }}, 'password')" title="Copy password" aria-label="Copy password for {{ $credential->portal_name }}"><x-heroicon-o-clipboard /></button>
-                                        @endif
-                                    </div>
+                                    <code class="pd-credential-account">{{ \App\Models\PortalCredential::maskSecret($credential->username) }}</code>
                                 </td>
                                 <td>
                                     <div class="pd-mfa-summary">
-                                        <span class="pd-credential-pill {{ $credential->mfa_required ? 'is-info' : '' }}">{{ $credential->mfa_required ? (\App\Models\PortalCredential::MFA_METHOD_OPTIONS[$credential->mfa_method ?: 'none'] ?? 'Required') : 'Not required' }}</span>
-                                        @if ($credential->mfa_required && $credential->mfa_method === 'security_question')
-                                            <span>{{ $credential->security_questions_count }} question{{ $credential->security_questions_count === 1 ? '' : 's' }}</span>
+                                        <span class="pd-credential-pill {{ $credential->mfa_required ? 'is-info' : '' }}">{{ $this->credentialAuthenticationLabel($credential) }}</span>
+                                        <span>{{ $this->credentialAuthenticationDetail($credential) }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    @php($statusLabel = $this->credentialStatusLabel($credential))
+                                    <span class="pd-credential-pill {{ $statusLabel === 'Active' ? 'is-active' : ($statusLabel === 'Needs attention' ? 'is-warning' : '') }}">{{ $statusLabel }}</span>
+                                </td>
+                                <td class="pd-date">{{ optional($credential->updated_at)->format('M d, Y') ?: '-' }}</td>
+                                <td>
+                                    <div class="pd-credential-row-actions">
+                                        @if (filled($credential->login_url))
+                                            <a class="pd-credential-open" href="{{ $credential->login_url }}" target="_blank" rel="noopener noreferrer">
+                                                <x-heroicon-o-arrow-top-right-on-square /><span>Open Portal</span>
+                                            </a>
+                                        @else
+                                            <button type="button" class="pd-credential-open" disabled title="Portal URL is not configured">
+                                                <x-heroicon-o-arrow-top-right-on-square /><span>Open Portal</span>
+                                            </button>
+                                        @endif
+                                        @if ($this->canUpdatePasswords())
+                                            <div class="pd-credential-menu" x-on:click.outside="openMenu = null">
+                                                <button type="button" class="pd-credential-menu-trigger" x-on:click="openMenu = openMenu === {{ $credential->getKey() }} ? null : {{ $credential->getKey() }}" x-bind:aria-expanded="openMenu === {{ $credential->getKey() }}" aria-haspopup="menu" aria-label="Actions for {{ $credential->portal_name }}">
+                                                    <x-heroicon-o-ellipsis-vertical />
+                                                </button>
+                                                <div class="pd-credential-menu-popover" x-cloak x-show="openMenu === {{ $credential->getKey() }}" x-transition.origin.top.right role="menu">
+                                                    <button type="button" wire:click="openCredentialInfo({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-eye /><span>View credentials</span></button>
+                                                    @if (filled($credential->username))
+                                                        <button type="button" x-on:click="$wire.copyCredentialSecret({{ $credential->getKey() }}, 'username').then(value => copyProtectedValue(value)); openMenu = null"><x-heroicon-o-clipboard /><span>Copy username</span></button>
+                                                    @endif
+                                                    @if (filled($credential->password))
+                                                        <button type="button" x-on:click="$wire.copyCredentialSecret({{ $credential->getKey() }}, 'password').then(value => copyProtectedValue(value)); openMenu = null"><x-heroicon-o-lock-closed /><span>Copy password</span></button>
+                                                    @endif
+                                                    <span class="pd-credential-menu-rule"></span>
+                                                    <a href="{{ $this->editCredentialUrl($credential) }}" wire:navigate><x-heroicon-o-pencil-square /><span>Edit</span></a>
+                                                    <button type="button" wire:click="openPasswordEditor({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-key /><span>Change password</span></button>
+                                                    @if ($credential->security_questions_count > 0)
+                                                        <button type="button" wire:click="openSecurityQuestions({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-shield-check /><span>Manage authentication</span></button>
+                                                    @else
+                                                        <a href="{{ $this->editCredentialUrl($credential) }}" wire:navigate><x-heroicon-o-shield-check /><span>Manage authentication</span></a>
+                                                    @endif
+                                                    <span class="pd-credential-menu-rule"></span>
+                                                    <button type="button" class="is-danger" wire:click="setCredentialActive({{ $credential->getKey() }}, {{ $credential->is_active ? 'false' : 'true' }})" x-on:click="openMenu = null">
+                                                        @if ($credential->is_active)<x-heroicon-o-no-symbol /><span>Disable</span>@else<x-heroicon-o-check-circle /><span>Activate</span>@endif
+                                                    </button>
+                                                </div>
+                                            </div>
                                         @endif
                                     </div>
                                 </td>
-                                <td><span class="pd-credential-pill {{ $credential->is_active ? 'is-active' : '' }}">{{ $credential->is_active ? 'Active' : 'Inactive' }}</span></td>
-                                <td class="pd-date">{{ optional($credential->updated_at)->format('M d, Y') ?: '-' }}</td>
-                                <td>
-                                    @if ($this->canUpdatePasswords())
-                                        <div class="pd-credential-actions">
-                                            <a href="{{ $this->editCredentialUrl($credential) }}" wire:navigate title="Edit credential"><x-heroicon-o-pencil-square /><span>Edit</span></a>
-                                            <button type="button" wire:click="openPasswordEditor({{ $credential->getKey() }})" title="Change password"><x-heroicon-o-key /><span>Password</span></button>
-                                            @if ($credential->security_questions_count > 0)
-                                                <button type="button" wire:click="openSecurityQuestions({{ $credential->getKey() }})" wire:loading.attr="disabled" wire:target="openSecurityQuestions({{ $credential->getKey() }})" title="View security questions and answers"><x-heroicon-o-shield-check /><span>Security Q&amp;A</span></button>
-                                            @endif
-                                        </div>
-                                    @endif
-                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8"><div class="pd-credential-empty"><x-heroicon-o-key /><strong>No portal credentials available</strong><span>No visible credentials have been assigned to this clinic yet.</span>@if ($this->canCreatePortalCredentials())<a class="pd-credential-add" href="{{ $this->createCredentialUrl() }}" wire:navigate><x-heroicon-o-plus /><span>Add Credential</span></a>@endif</div></td></tr>
+                            <tr><td colspan="6"><div class="pd-credential-empty"><x-heroicon-o-key /><strong>No portal credentials available</strong><span>No credentials match the selected clinic and filters.</span>@if ($this->canCreatePortalCredentials())<a class="pd-credential-add" href="{{ $this->createCredentialUrl() }}" wire:navigate><x-heroicon-o-plus /><span>Add Credential</span></a>@endif</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
         </section>
+
+    @if ($this->infoModalOpen)
+        <div class="pd-password-backdrop" wire:keydown.escape.window="closeCredentialInfo">
+            <section class="pd-credential-details-modal" role="dialog" aria-modal="true" aria-labelledby="credential-details-title">
+                <header>
+                    <div>
+                        <span>Protected portal access</span>
+                        <h2 id="credential-details-title">{{ $this->infoCredentialName }}</h2>
+                        <p>{{ $this->infoCredentialCategory }} credential details</p>
+                    </div>
+                    <button type="button" wire:click="closeCredentialInfo" aria-label="Close credential details"><x-heroicon-o-x-mark /></button>
+                </header>
+                <div class="pd-credential-details-body">
+                    <div class="pd-credential-details-meta">
+                        <div><span>Status</span><strong>{{ $this->infoCredentialStatus }}</strong></div>
+                        <div><span>Authentication</span><strong>{{ $this->infoCredentialAuthentication }}</strong><small>{{ $this->infoCredentialAuthenticationDetail }}</small></div>
+                        <div><span>Last updated</span><strong>{{ $this->infoCredentialUpdatedAt ?: '-' }}</strong></div>
+                    </div>
+                    <div class="pd-credential-protected-value">
+                        <span>Username</span>
+                        <div class="pd-secret-field">
+                            <code>{{ $this->portalCredentialDisplayValue('portal-username-'.$this->infoCredentialId, $this->infoCredentialUsername ?: '-') }}</code>
+                            <button type="button" wire:click="revealCredentialSecret({{ $this->infoCredentialId }}, 'username')" title="Reveal username" aria-label="Reveal username"><x-heroicon-o-eye /></button>
+                            <button type="button" x-on:click="$wire.copyCredentialSecret({{ $this->infoCredentialId }}, 'username').then(value => copyProtectedValue(value))" title="Copy username" aria-label="Copy username"><x-heroicon-o-clipboard /></button>
+                        </div>
+                    </div>
+                    <div class="pd-credential-protected-value">
+                        <span>Password</span>
+                        <div class="pd-secret-field">
+                            <code>{{ $this->portalCredentialDisplayValue('portal-password-'.$this->infoCredentialId, $this->infoCredentialPassword ?: '-') }}</code>
+                            <button type="button" wire:click="revealCredentialSecret({{ $this->infoCredentialId }}, 'password')" title="Reveal password" aria-label="Reveal password"><x-heroicon-o-eye /></button>
+                            <button type="button" x-on:click="$wire.copyCredentialSecret({{ $this->infoCredentialId }}, 'password').then(value => copyProtectedValue(value))" title="Copy password" aria-label="Copy password"><x-heroicon-o-clipboard /></button>
+                        </div>
+                    </div>
+                    @if (filled($this->infoCredentialRegistrationQaNotes) || filled($this->infoCredentialGeneralNotes))
+                        <div class="pd-credential-details-notes">
+                            @if (filled($this->infoCredentialRegistrationQaNotes))<div><span>Registration notes</span><p>{{ $this->infoCredentialRegistrationQaNotes }}</p></div>@endif
+                            @if (filled($this->infoCredentialGeneralNotes))<div><span>Internal notes</span><p>{{ $this->infoCredentialGeneralNotes }}</p></div>@endif
+                        </div>
+                    @endif
+                    <p class="pd-password-note">Reveal and copy actions are recorded in the security audit.</p>
+                </div>
+                <footer>
+                    <button type="button" class="is-neutral" wire:click="closeCredentialInfo">Close</button>
+                    @if (filled($this->editingCredentialLink))
+                        <a class="is-primary" href="{{ $this->editingCredentialLink }}" target="_blank" rel="noopener noreferrer"><x-heroicon-o-arrow-top-right-on-square />Open Portal</a>
+                    @endif
+                </footer>
+            </section>
+        </div>
+    @endif
 
     @if ($this->passwordModalOpen)
         <div class="pd-password-backdrop" wire:keydown.escape.window="closePasswordEditor">
@@ -258,6 +329,184 @@
                 align-items: stretch;
                 flex-direction: column;
             }
+        }
+    </style>
+
+    <style>
+        [x-cloak] { display: none !important; }
+
+        .pd-credential-workspace { gap: 0; }
+        .pd-credential-header { padding-block: 18px; }
+        .pd-credential-header nav { margin-bottom: 16px; }
+        .pd-credential-header h1 { font-size: 26px; }
+        .pd-credential-header p { margin-bottom: 0; }
+
+        .pd-credential-summary {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 56px;
+            padding: 0 28px;
+            border: 0;
+            border-bottom: 1px solid #dbe4ee;
+            border-radius: 0;
+            background: transparent;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .pd-credential-summary span { color: #64748b; font-size: 12px; font-weight: 600; }
+        .pd-credential-summary strong { display: inline; margin: 0; color: #0f172a; font-size: inherit; }
+        .pd-credential-summary i { width: 3px; height: 3px; border-radius: 999px; background: #94a3b8; }
+        .pd-credential-summary .needs-attention,
+        .pd-credential-summary .needs-attention strong { color: #b45309; }
+
+        .pd-credential-table-card {
+            margin-top: 20px;
+            overflow: visible;
+            box-shadow: none;
+        }
+
+        .pd-credential-toolbar-end { display: flex; align-items: center; gap: 20px; }
+        .pd-credential-toolbar-end select {
+            min-width: 170px;
+            height: 40px;
+            padding: 0 34px 0 12px;
+            border: 1px solid #cfd9e6;
+            border-radius: 6px;
+            background: #fff;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 700;
+            outline: none;
+        }
+        .pd-credential-toolbar-end select:focus { border-color: #0f8a83; box-shadow: 0 0 0 3px rgba(15,138,131,.1); }
+
+        .pd-credential-table-wrap { overflow: visible; }
+        .pd-credential-table { min-width: 900px; }
+        .pd-credential-table th,
+        .pd-credential-table td { padding-inline: 18px; }
+        .pd-credential-account { color: #475569; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+        .pd-credential-pill.is-warning { border-color: #fed7aa; background: #fff7ed; color: #b45309; }
+
+        .pd-credential-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+        .pd-credential-open {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            min-height: 36px;
+            padding: 0 12px;
+            border: 1px solid #cfd9e6;
+            border-radius: 6px;
+            background: #fff;
+            color: #334155;
+            font-size: 11px;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .pd-credential-open:hover { border-color: #99d5d1; color: #0f766e; }
+        .pd-credential-open:disabled { color: #94a3b8; cursor: not-allowed; }
+        .pd-credential-open svg { width: 15px; height: 15px; }
+
+        .pd-credential-menu { position: relative; }
+        .pd-credential-menu-trigger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: 1px solid #cfd9e6;
+            border-radius: 6px;
+            background: #fff;
+            color: #475569;
+            cursor: pointer;
+        }
+        .pd-credential-menu-trigger:hover { border-color: #99d5d1; color: #0f766e; }
+        .pd-credential-menu-trigger svg { width: 17px; height: 17px; }
+        .pd-credential-menu-popover {
+            position: absolute;
+            z-index: 30;
+            top: calc(100% + 6px);
+            right: 0;
+            width: 224px;
+            padding: 6px;
+            border: 1px solid #dbe4ee;
+            border-radius: 7px;
+            background: #fff;
+            box-shadow: 0 14px 32px rgba(15,23,42,.14);
+        }
+        .pd-credential-menu-popover button,
+        .pd-credential-menu-popover a {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            width: 100%;
+            min-height: 36px;
+            padding: 0 10px;
+            border: 0;
+            border-radius: 5px;
+            background: transparent;
+            color: #334155;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .pd-credential-menu-popover button:hover,
+        .pd-credential-menu-popover a:hover { background: #f8fafc; color: #0f766e; }
+        .pd-credential-menu-popover svg { flex: 0 0 auto; width: 16px; height: 16px; }
+        .pd-credential-menu-popover .is-danger { color: #dc2626; }
+        .pd-credential-menu-popover .is-danger:hover { background: #fef2f2; color: #b91c1c; }
+        .pd-credential-menu-rule { display: block; height: 1px; margin: 5px -6px; background: #edf2f7; }
+
+        .pd-credential-details-modal {
+            width: min(620px, 100%);
+            max-height: min(760px, calc(100vh - 48px));
+            border: 1px solid #dbe4ee;
+            border-radius: 8px;
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 28px 70px rgba(15,23,42,.25);
+        }
+        .pd-credential-details-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid #edf2f7; }
+        .pd-credential-details-modal > header span { color: #0f766e; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .pd-credential-details-modal h2 { margin: 5px 0 0; color: #07152f; font-size: 21px; }
+        .pd-credential-details-modal header p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
+        .pd-credential-details-modal header button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid #dbe4ee; border-radius: 6px; background: #fff; color: #475569; cursor: pointer; }
+        .pd-credential-details-modal header button svg { width: 18px; height: 18px; }
+        .pd-credential-details-body { display: flex; flex-direction: column; gap: 16px; max-height: 580px; padding: 20px 22px; overflow-y: auto; }
+        .pd-credential-details-meta { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+        .pd-credential-details-meta > div { padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; }
+        .pd-credential-details-meta span,
+        .pd-credential-protected-value > span,
+        .pd-credential-details-notes span { display: block; margin-bottom: 5px; color: #64748b; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .pd-credential-details-meta strong { display: block; color: #0f172a; font-size: 12px; }
+        .pd-credential-details-meta small { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
+        .pd-credential-protected-value { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .pd-credential-protected-value .pd-secret-field { display: flex; }
+        .pd-credential-protected-value code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+        .pd-credential-details-notes { display: grid; gap: 10px; }
+        .pd-credential-details-notes > div { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .pd-credential-details-notes p { margin: 0; color: #334155; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+        .pd-credential-details-modal footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid #edf2f7; }
+        .pd-credential-details-modal footer button,
+        .pd-credential-details-modal footer a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; border-radius: 6px; font-size: 12px; font-weight: 800; text-decoration: none; cursor: pointer; }
+        .pd-credential-details-modal footer .is-neutral { border: 1px solid #dbe4ee; background: #fff; color: #334155; }
+        .pd-credential-details-modal footer .is-primary { border: 1px solid #0f766e; background: #0f766e; color: #fff; }
+        .pd-credential-details-modal footer svg { width: 15px; height: 15px; }
+
+        @media (max-width: 1100px) {
+            .pd-credential-table-wrap { overflow-x: auto; }
+        }
+
+        @media (max-width: 640px) {
+            .pd-credential-summary { flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px; }
+            .pd-credential-toolbar-end { align-items: stretch; flex-direction: column; gap: 8px; }
+            .pd-credential-toolbar-end select { width: 100%; }
+            .pd-credential-details-meta { grid-template-columns: 1fr; }
         }
     </style>
 

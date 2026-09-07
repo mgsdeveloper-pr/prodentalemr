@@ -61,6 +61,12 @@ it('uses one compact audited portal credential workspace across clinic and verif
         ->and($verificationView)->toContain("@include('filament.shared.portal-credential-workspace')")
         ->and($sharedView)
         ->toContain('pd-credential-table')
+        ->toContain('Search portals or accounts')
+        ->toContain('<th>Authentication</th>')
+        ->toContain('View credentials')
+        ->toContain('Manage authentication')
+        ->toContain('Needs attention')
+        ->toContain('pd-credential-menu-popover')
         ->toContain('revealCredentialSecret')
         ->toContain('copyCredentialSecret')
         ->toContain('openSecurityQuestions')
@@ -81,6 +87,9 @@ it('uses one compact audited portal credential workspace across clinic and verif
         ->not->toContain('__pdPortalCredentialEventsRegistered')
         ->not->toContain('@js($credential->password)')
         ->not->toContain('@js($question')
+        ->not->toContain('<th>Password</th>')
+        ->not->toContain('<th>MFA</th>')
+        ->not->toContain('Security Q&amp;A</span>')
         ->not->toContain('portal-credential-card-grid');
 });
 
