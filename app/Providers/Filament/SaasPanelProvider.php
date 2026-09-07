@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Saas\Pages\AdaProcedureCodeImport;
 use App\Filament\Saas\Pages\BillingSettings;
 use App\Filament\Saas\Pages\ClientManagement;
+use App\Filament\Saas\Pages\Dashboard;
 use App\Filament\Saas\Pages\DsoOnboarding;
 use App\Filament\Saas\Pages\ModuleSettings;
 use App\Filament\Saas\Pages\NotificationCentre;
@@ -32,8 +33,6 @@ use App\Filament\Saas\Resources\TelephonyAccounts\TelephonyAccountResource;
 use App\Filament\Saas\Resources\TelephonyCalls\TelephonyCallResource;
 use App\Filament\Saas\Resources\Users\UserResource;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
-use App\Filament\Saas\Widgets\BillingHealthOverview;
-use App\Filament\Saas\Widgets\SaasBusinessOverview;
 use App\Http\Middleware\PanelAuthenticateRedirect;
 use App\Http\Middleware\SaasAccessMiddleware;
 use App\Models\SaasSetting;
@@ -43,7 +42,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\PanelRegistry;
@@ -142,10 +140,6 @@ class SaasPanelProvider extends PanelProvider
                 SetupChecks::class,
                 SystemUpdates::class,
                 SaasSettings::class,
-            ])
-            ->widgets([
-                SaasBusinessOverview::class,
-                BillingHealthOverview::class,
             ])
             ->middleware([
                 EncryptCookies::class,
