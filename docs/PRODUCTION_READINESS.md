@@ -63,6 +63,9 @@ When shell access is unavailable, an active SaaS Administrator can open **Settin
 - enables maintenance mode while preserving a signed, short-lived bypass for the initiating administrator;
 - applies one migration per request to reduce shared-hosting timeout risk;
 - rebuilds caches, restarts queue workers, verifies completion, and restores public access;
+- provides **Activate latest code** for releases with no pending migrations, rebuilding Laravel and Filament caches, restarting workers, and resetting PHP OPcache when supported;
 - stores a small server-local update history under private application storage.
 
 If a step fails, maintenance mode remains active and the page offers an authenticated recovery action. Investigate and correct the failed migration before attempting another update.
+
+After pulling any code-only release on a shared host, open **Settings → System Updates**, enter the current SaaS Administrator password under **Activate latest code**, and run the action before validating the changed screens.

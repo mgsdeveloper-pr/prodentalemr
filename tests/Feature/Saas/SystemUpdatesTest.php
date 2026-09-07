@@ -20,6 +20,7 @@ it('restricts the system update center to an active SaaS administrator', functio
         ->assertOk()
         ->assertSee('Database and application updates')
         ->assertSee('Pending database changes')
+        ->assertSee('Activate latest code')
         ->assertSee('Confirm SaaS Admin password');
 
     $this->actingAs($manager)
@@ -48,6 +49,27 @@ it('requires a verified backup and current password before starting', function (
         ->set('confirmationPassword', 'wrong-password')
         ->call('startUpdate')
         ->assertHasErrors(['confirmationPassword']);
+});
+
+it('requires the current SaaS administrator password before activating code', function (): void {
+    $this->seed(RoleSeeder::class);
+
+    $admin = User::factory()->create([
+        'status' => true,
+        'password' => bcrypt('correct-password'),
+    ]);
+    $admin->assignRole('saas_admin');
+
+    $this->actingAs($admin);
+
+    Livewire::test(SystemUpdates::class)
+        ->call('activateLatestCode')
+        ->assertHasErrors(['activationPassword']);
+
+    Livewire::test(SystemUpdates::class)
+        ->set('activationPassword', 'wrong-password')
+        ->call('activateLatestCode')
+        ->assertHasErrors(['activationPassword']);
 });
 
 it('returns safe pending migration metadata without exposing paths in the UI contract', function (): void {

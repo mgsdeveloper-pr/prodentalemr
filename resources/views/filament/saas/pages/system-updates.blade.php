@@ -71,6 +71,20 @@
         <div class="system-update-grid">
             <div style="display:grid;gap:20px;align-content:start;">
                 <section class="system-update-card">
+                    <div class="system-update-card-head"><h3>Activate latest code</h3><p>Use this after pulling a code-only release so live routes, views, and Filament components match the deployed files.</p></div>
+                    <div class="system-update-card-body">
+                        <div class="system-update-form">
+                            <div class="system-update-field">
+                                <label for="activation-password">Confirm SaaS Admin password</label>
+                                <input id="activation-password" type="password" wire:model="activationPassword" autocomplete="current-password">
+                                @error('activationPassword') <div class="system-update-error">{{ $message }}</div> @enderror
+                            </div>
+                            <button type="button" class="system-update-button" wire:click="activateLatestCode" wire:loading.attr="disabled" @disabled($isRunning || $isFailed)>Activate latest code</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="system-update-card">
                     <div class="system-update-card-head"><h3>Preflight checks</h3><p>Required production safeguards are checked again before an update starts.</p></div>
                     <div class="system-update-card-body">
                         <div class="system-update-checks">
@@ -127,7 +141,7 @@
                         @if(count($history) > 0)
                             <div class="system-update-history">
                                 @foreach(array_slice($history, 0, 6) as $item)
-                                    <div class="system-update-history-item"><strong>{{ ucfirst($item['status'] ?? 'unknown') }}</strong><div class="system-update-code">{{ $item['id'] ?? '-' }}</div><div>{{ count($item['completed_migrations'] ?? []) }} migration(s) applied · {{ $item['completed_at'] ?? $item['started_at'] ?? '-' }}</div></div>
+                                    <div class="system-update-history-item"><strong>{{ ($item['type'] ?? null) === 'code_activation' ? 'Code activation '.($item['status'] ?? 'unknown') : ucfirst($item['status'] ?? 'unknown') }}</strong><div class="system-update-code">{{ $item['id'] ?? '-' }}</div><div>{{ ($item['type'] ?? null) === 'code_activation' ? 'Application caches and workers refreshed' : count($item['completed_migrations'] ?? []).' migration(s) applied' }} &middot; {{ $item['completed_at'] ?? $item['started_at'] ?? '-' }}</div></div>
                                 @endforeach
                             </div>
                         @else

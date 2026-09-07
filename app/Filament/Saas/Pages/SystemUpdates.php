@@ -32,6 +32,8 @@ class SystemUpdates extends Page
 
     public string $confirmationPassword = '';
 
+    public string $activationPassword = '';
+
     public static function canAccess(): bool
     {
         return auth()->user()?->isSaasAdmin() ?? false;
@@ -112,6 +114,38 @@ class SystemUpdates extends Page
         } catch (Throwable $exception) {
             Notification::make()
                 ->title('System update stopped')
+                ->body($exception->getMessage())
+                ->danger()
+                ->persistent()
+                ->send();
+        }
+    }
+
+    public function activateLatestCode(): void
+    {
+        $this->validate([
+            'activationPassword' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($this->activationPassword, auth()->user()->password)) {
+            $this->addError('activationPassword', 'The password is incorrect.');
+
+            return;
+        }
+
+        try {
+            app(SystemUpdateManager::class)->activateLatestCode((int) auth()->id());
+            $this->reset('activationPassword');
+
+            Notification::make()
+                ->title('Latest code activated')
+                ->body('Application routes, views, components, and background workers are now current.')
+                ->success()
+                ->persistent()
+                ->send();
+        } catch (Throwable $exception) {
+            Notification::make()
+                ->title('Latest code could not be activated')
                 ->body($exception->getMessage())
                 ->danger()
                 ->persistent()

@@ -73,6 +73,63 @@ class SystemUpdateManager
     }
 
     /**
+     * Activate a code-only release when there are no database migrations to run.
+     *
+     * @return array<string, mixed>
+     */
+    public function activateLatestCode(int $userId): array
+    {
+        return Cache::lock(self::LOCK_NAME, 120)->block(5, function () use ($userId): array {
+            $active = $this->currentRun();
+            if (is_array($active) && in_array($active['status'] ?? null, ['preparing', 'running'], true)) {
+                throw new RuntimeException('A system update is already in progress.');
+            }
+
+            $activation = [
+                'id' => now()->format('YmdHis').'-'.Str::lower(Str::random(8)),
+                'type' => 'code_activation',
+                'status' => 'completed',
+                'phase' => 'complete',
+                'initiated_by' => $userId,
+                'started_at' => now()->toIso8601String(),
+                'completed_at' => null,
+                'initial_migrations' => [],
+                'completed_migrations' => [],
+                'current_migration' => null,
+                'message' => 'Latest application code activated successfully.',
+                'error' => null,
+            ];
+
+            try {
+                $this->rebuildApplicationCaches();
+                $this->runArtisanTask('queue:restart');
+
+                if (function_exists('opcache_reset')) {
+                    @opcache_reset();
+                }
+
+                $activation['completed_at'] = now()->toIso8601String();
+                $this->recordHistory($activation);
+
+                Log::notice('Latest SaaS application code activated.', [
+                    'release_id' => $activation['id'],
+                    'initiated_by' => $userId,
+                ]);
+
+                return $activation;
+            } catch (Throwable $exception) {
+                $activation['status'] = 'failed';
+                $activation['error'] = $exception->getMessage();
+                $activation['message'] = 'Latest application code could not be activated.';
+                $activation['completed_at'] = now()->toIso8601String();
+                $this->recordHistory($activation);
+
+                throw $exception;
+            }
+        });
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function currentRun(): ?array
@@ -208,7 +265,7 @@ class SystemUpdateManager
                 if ($run['phase'] === 'optimize') {
                     $run['message'] = 'Rebuilding application caches.';
                     $this->writeState($run);
-                    $this->runArtisanTask('optimize');
+                    $this->rebuildApplicationCaches();
                     $run['phase'] = 'queue';
                     $run['message'] = 'Application caches rebuilt.';
                     $this->writeState($run);
@@ -307,6 +364,13 @@ class SystemUpdateManager
         if (Artisan::call($command) !== 0) {
             throw new RuntimeException("{$command} failed.");
         }
+    }
+
+    private function rebuildApplicationCaches(): void
+    {
+        $this->runArtisanTask('filament:optimize-clear');
+        $this->runArtisanTask('optimize:clear');
+        $this->runArtisanTask('optimize');
     }
 
     /**
