@@ -17,19 +17,17 @@ use UnitEnum;
 
 class UserMailboxPage extends Page
 {
-    protected static bool $shouldRegisterNavigation = false;
-
     use WithFileUploads;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-envelope-open';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Dashboard';
+    protected static string|UnitEnum|null $navigationGroup = 'Verification Work';
 
-    protected static ?string $navigationLabel = 'Mailbox';
+    protected static ?string $navigationLabel = 'Personal Mailbox';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 5;
 
-    protected static ?string $title = 'Mailbox';
+    protected static ?string $title = 'Personal Mailbox';
 
     protected static ?string $slug = 'mailbox';
 
@@ -127,7 +125,7 @@ class UserMailboxPage extends Page
     {
         return [
             VerificationRequestResource::getUrl('index') => 'Verification',
-            'Mailbox',
+            'Personal Mailbox',
         ];
     }
 

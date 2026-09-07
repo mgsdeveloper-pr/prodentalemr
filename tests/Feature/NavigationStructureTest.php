@@ -2,6 +2,7 @@
 
 use App\Filament\Admin\Pages\Dashboard as VerificationDashboard;
 use App\Filament\Admin\Pages\DocumentCenter as VerificationDocumentCenter;
+use App\Filament\Admin\Pages\UserMailboxPage;
 use App\Filament\Admin\Pages\VerificationClinicAssignments;
 use App\Filament\Admin\Pages\VerificationInbox;
 use App\Filament\Admin\Pages\VerificationRequestResponse;
@@ -115,6 +116,9 @@ it('keeps verification navigation focused on requests and resources', function (
         ->and(VerificationUnassignedRequests::getNavigationLabel())->toBe('Unassigned Requests')
         ->and(VerificationRequestResponse::getNavigationLabel())->toBe('Clinic Requests')
         ->and(VerificationInbox::getNavigationLabel())->toBe('Shared Inbox')
+        ->and(UserMailboxPage::getNavigationGroup())->toBe('Verification Work')
+        ->and(UserMailboxPage::getNavigationLabel())->toBe('Personal Mailbox')
+        ->and(UserMailboxPage::shouldRegisterNavigation())->toBeTrue()
         ->and(VerificationClinicAssignments::getNavigationGroup())->toBe('Administration')
         ->and(VerificationClinicAssignments::getNavigationLabel())->toBe('Clinic Assignments')
         ->and(PortalCredentialResource::getNavigationGroup())->toBe('Resources')
