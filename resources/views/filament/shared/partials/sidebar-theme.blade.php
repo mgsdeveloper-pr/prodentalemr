@@ -1706,6 +1706,17 @@
     @media (min-width: 1024px) {
         html {
             --pd-app-sidebar-width: 17.5rem;
+            max-width: 100%;
+            overflow-x: hidden;
+            overflow-x: clip;
+        }
+
+        body,
+        .fi-body,
+        .fi-layout {
+            max-width: 100%;
+            overflow-x: hidden;
+            overflow-x: clip;
         }
 
         html.app-sidebar-collapsed {
@@ -1728,6 +1739,7 @@
 
         .fi-main-ctn {
             display: flex !important;
+            min-width: 0 !important;
             opacity: 1 !important;
         }
 
@@ -1811,6 +1823,7 @@
         }
 
         .fi-main {
+            min-width: 0 !important;
             padding-top: 0 !important;
         }
     }

@@ -52,6 +52,12 @@
         const applyState = () => {
             const isCollapsed = localStorage.getItem(key) === '1' || localStorage.getItem(legacyKey) === '1';
 
+            // Livewire navigation can retain the offset from a horizontally
+            // scrolled data region. Keep the application rail viewport-aligned.
+            if (document.scrollingElement?.scrollLeft) {
+                document.scrollingElement.scrollLeft = 0;
+            }
+
             root.classList.toggle('app-sidebar-collapsed', isCollapsed);
             localStorage.setItem(key, isCollapsed ? '1' : '0');
             localStorage.removeItem(legacyKey);

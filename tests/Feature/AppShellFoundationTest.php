@@ -62,6 +62,7 @@ it('keeps the desktop navigation mounted when the page is refreshed', function (
     expect($toggle)
         ->toContain('$store.sidebar.open()')
         ->toContain("window.Alpine.store('sidebar').open()")
+        ->toContain('document.scrollingElement.scrollLeft = 0')
         ->toContain("window.addEventListener('pageshow', applyState)")
         ->toContain("document.addEventListener('livewire:navigated', applyState)");
 
@@ -72,6 +73,8 @@ it('keeps the desktop navigation mounted when the page is refreshed', function (
         ->toContain('.fi-main-sidebar[x-cloak="-lg"]')
         ->toContain('width: var(--pd-app-sidebar-width) !important;')
         ->toContain('transform: translateX(0) !important;')
+        ->toContain('overflow-x: clip;')
+        ->toContain('min-width: 0 !important;')
         ->toContain('Render-safe desktop shell');
 });
 
