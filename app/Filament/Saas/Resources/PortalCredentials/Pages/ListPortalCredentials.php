@@ -464,6 +464,11 @@ class ListPortalCredentials extends ListRecords
         return '';
     }
 
+    public function getBreadcrumbs(): array
+    {
+        return [];
+    }
+
     protected function getHeaderActions(): array
     {
         return [];

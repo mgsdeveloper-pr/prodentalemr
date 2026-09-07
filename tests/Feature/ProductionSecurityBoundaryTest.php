@@ -55,10 +55,13 @@ it('uses one compact audited portal credential workspace across clinic and verif
     $verificationView = file_get_contents(resource_path('views/filament/saas/resources/portal-credentials/pages/list-portal-credentials.blade.php'));
     $sharedView = file_get_contents(resource_path('views/filament/shared/portal-credential-workspace.blade.php'));
     $interactionEngine = file_get_contents(app_path('Filament/Concerns/ManagesPortalCredentialSecurityQuestions.php'));
+    $verificationPage = file_get_contents(app_path('Filament/Saas/Resources/PortalCredentials/Pages/ListPortalCredentials.php'));
 
     expect($clinicView)
         ->toContain("@include('filament.shared.portal-credential-workspace')")
         ->and($verificationView)->toContain("@include('filament.shared.portal-credential-workspace')")
+        ->and($verificationPage)->toContain('public function getBreadcrumbs(): array')
+        ->toContain('return [];')
         ->and($sharedView)
         ->toContain('pd-credential-table')
         ->toContain('Search portals or accounts')
