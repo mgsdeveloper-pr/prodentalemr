@@ -140,3 +140,18 @@ it('presents an action-oriented personal mailbox setup state', function (): void
         ->not->toContain('IMAP Port')
         ->not->toContain('Live IMAP');
 });
+
+it('keeps collapsed sidebar account controls visible and contained', function (): void {
+    $footerView = file_get_contents(resource_path('views/filament/shared/partials/sidebar-user-footer.blade.php'));
+    $sidebarTheme = file_get_contents(resource_path('views/filament/shared/partials/sidebar-theme.blade.php'));
+
+    expect($footerView)
+        ->toContain('aria-label="Settings"')
+        ->toContain('aria-label="Logout"')
+        ->and($sidebarTheme)
+        ->toContain('html.app-sidebar-collapsed .app-sidebar-user-footer__actions')
+        ->toContain('flex-direction: column !important;')
+        ->toContain('border-top: 1px solid #e2e8f0 !important;')
+        ->toContain('border: 1px solid #e2e8f0 !important;')
+        ->toContain('.app-sidebar-user-footer__action:focus-visible');
+});

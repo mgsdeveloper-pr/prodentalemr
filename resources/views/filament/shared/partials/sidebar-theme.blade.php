@@ -1539,8 +1539,7 @@
     html.app-sidebar-collapsed .fi-sidebar-item-grouped-border,
     html.app-sidebar-collapsed .admin-workspace-scope-wrap,
     html.app-sidebar-collapsed .clinic-workspace-scope-wrap,
-    html.app-sidebar-collapsed .app-sidebar-user-footer__body,
-    html.app-sidebar-collapsed .app-sidebar-user-footer__actions {
+    html.app-sidebar-collapsed .app-sidebar-user-footer__body {
         display: none !important;
     }
 
@@ -1585,31 +1584,62 @@
 
     html.app-sidebar-collapsed .fi-sidebar-footer {
         display: flex !important;
+        box-sizing: border-box !important;
         width: 100% !important;
+        flex: 0 0 auto !important;
+        align-items: center !important;
         justify-content: center !important;
-        padding: 0.75rem 0 0.9rem !important;
+        margin-top: auto !important;
+        padding: 0.75rem 0.5rem 0.9rem !important;
+        border-top: 1px solid #e2e8f0 !important;
+        background: #ffffff !important;
         opacity: 1 !important;
         visibility: visible !important;
         max-width: none !important;
-        overflow: visible !important;
+        overflow: hidden !important;
         pointer-events: auto !important;
         transform: none !important;
     }
 
     html.app-sidebar-collapsed .app-sidebar-user-footer {
-        width: 2.5rem !important;
-        height: 2.5rem !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        height: auto !important;
         display: flex !important;
+        align-items: center !important;
         justify-content: center !important;
-        gap: 0 !important;
-        padding: 0 !important;
-        border: 0 !important;
-        background: transparent !important;
+        flex-direction: column !important;
+        gap: 0.45rem !important;
+        padding: 0.45rem !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 0.75rem !important;
+        background: #ffffff !important;
     }
 
     html.app-sidebar-collapsed .app-sidebar-user-footer__identity {
+        flex: 0 0 auto !important;
         justify-content: center !important;
         gap: 0 !important;
+    }
+
+    html.app-sidebar-collapsed .app-sidebar-user-footer__actions {
+        display: flex !important;
+        width: 100% !important;
+        align-items: center !important;
+        flex-direction: column !important;
+        gap: 0.4rem !important;
+    }
+
+    html.app-sidebar-collapsed .app-sidebar-user-footer__action {
+        width: 2.25rem !important;
+        height: 2.25rem !important;
+        flex-basis: 2.25rem !important;
+    }
+
+    .app-sidebar-user-footer__action:focus-visible {
+        border-color: #0f766e !important;
+        outline: 2px solid rgba(15, 118, 110, 0.24) !important;
+        outline-offset: 2px !important;
     }
 
     /*
