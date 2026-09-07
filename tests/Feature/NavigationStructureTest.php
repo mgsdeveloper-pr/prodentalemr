@@ -143,6 +143,7 @@ it('presents an action-oriented personal mailbox setup state', function (): void
 
 it('keeps collapsed sidebar account controls visible and contained', function (): void {
     $footerView = file_get_contents(resource_path('views/filament/shared/partials/sidebar-user-footer.blade.php'));
+    $toggleView = file_get_contents(resource_path('views/filament/shared/partials/sidebar-toggle.blade.php'));
     $sidebarTheme = file_get_contents(resource_path('views/filament/shared/partials/sidebar-theme.blade.php'));
 
     expect($footerView)
@@ -153,5 +154,11 @@ it('keeps collapsed sidebar account controls visible and contained', function ()
         ->toContain('flex-direction: column !important;')
         ->toContain('border-top: 1px solid #e2e8f0 !important;')
         ->toContain('border: 1px solid #e2e8f0 !important;')
-        ->toContain('.app-sidebar-user-footer__action:focus-visible');
+        ->toContain('.app-sidebar-user-footer__action:focus-visible')
+        ->toContain('html.app-sidebar-collapsed .app-sidebar-brand__mark')
+        ->toContain('html.app-sidebar-collapsed .app-sidebar-brand__name')
+        ->and($toggleView)
+        ->toContain('syncNavigationLabels')
+        ->toContain("item.setAttribute('title', label)")
+        ->toContain("item.setAttribute('aria-label', label)");
 });

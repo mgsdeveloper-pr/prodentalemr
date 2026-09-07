@@ -9,6 +9,9 @@
                 'app-sidebar-collapsed',
                 document.documentElement.classList.contains('app-sidebar-collapsed') ? '1' : '0'
             );
+            window.dispatchEvent(new CustomEvent('app-sidebar-collapse-changed', {
+                detail: { collapsed: document.documentElement.classList.contains('app-sidebar-collapsed') }
+            }));
             window.dispatchEvent(new Event('resize'));
         "
         class="app-sidebar-toggle-btn"
@@ -30,6 +33,22 @@
         const legacyKey = 'verification-sidebar-collapsed';
         const root = document.documentElement;
 
+        const syncNavigationLabels = (isCollapsed) => {
+            document.querySelectorAll('.fi-sidebar-item-btn').forEach((item) => {
+                const label = item.querySelector('.fi-sidebar-item-label')?.textContent?.trim();
+
+                if (!label) return;
+
+                if (isCollapsed) {
+                    item.setAttribute('title', label);
+                    item.setAttribute('aria-label', label);
+                } else {
+                    item.removeAttribute('title');
+                    item.removeAttribute('aria-label');
+                }
+            });
+        };
+
         const applyState = () => {
             const isCollapsed = localStorage.getItem(key) === '1' || localStorage.getItem(legacyKey) === '1';
 
@@ -42,11 +61,16 @@
             if (window.innerWidth >= 1024 && window.Alpine?.store('sidebar')) {
                 window.Alpine.store('sidebar').open();
             }
+
+            syncNavigationLabels(isCollapsed);
         };
 
         applyState();
         document.addEventListener('alpine:initialized', applyState, { once: true });
         document.addEventListener('livewire:navigated', applyState);
         window.addEventListener('pageshow', applyState);
+        window.addEventListener('app-sidebar-collapse-changed', (event) => {
+            syncNavigationLabels(Boolean(event.detail?.collapsed));
+        });
     })();
 </script>

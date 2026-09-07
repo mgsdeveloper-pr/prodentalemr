@@ -1281,7 +1281,7 @@
         .fi-topbar:has(.pd-appshell-global-header) {
             margin-inline-start: 17.5rem !important;
             width: calc(100% - 17.5rem) !important;
-            padding-inline: 1.5rem !important;
+            padding-inline: clamp(1.25rem, 2vw, 2rem) !important;
         }
 
         html.app-sidebar-collapsed .fi-topbar:has(.pd-appshell-global-header) {
@@ -1485,19 +1485,47 @@
     }
 
     html.app-sidebar-collapsed .fi-sidebar-header {
-        height: 4rem !important;
-        min-height: 4rem !important;
+        height: auto !important;
+        min-height: 7.1rem !important;
         align-items: center !important;
         justify-content: center !important;
-        padding: 0.75rem 0.45rem !important;
+        flex-direction: column !important;
+        gap: 0.6rem !important;
+        padding: 0.7rem 0.45rem !important;
+        border-bottom: 1px solid #e2e8f0 !important;
     }
 
     html.app-sidebar-collapsed .app-sidebar-greeting {
+        display: flex !important;
+        width: 100% !important;
+        flex: 0 0 auto !important;
+        justify-content: center !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        max-width: none !important;
+        overflow: visible !important;
+        pointer-events: auto !important;
+        transform: none !important;
+    }
+
+    html.app-sidebar-collapsed .app-sidebar-brand {
+        justify-content: center !important;
+        gap: 0 !important;
+    }
+
+    html.app-sidebar-collapsed .app-sidebar-brand__mark {
+        width: 2.35rem !important;
+        height: 2.35rem !important;
+    }
+
+    html.app-sidebar-collapsed .app-sidebar-brand__name {
         display: none !important;
     }
 
     html.app-sidebar-collapsed .app-sidebar-header-toggle {
-        margin-top: 0 !important;
+        width: 100% !important;
+        justify-content: center !important;
+        margin: 0 !important;
     }
 
     /*

@@ -1,6 +1,8 @@
 <x-filament-panels::page>
     @php($credentials = $this->getPortalCredentials())
     @php($summary = $this->getCredentialSummary())
+    @php($selectedClinicName = $this->getSelectedClinicName())
+    @php($showInitialEmptyState = $summary['total'] === 0 && blank($this->search) && $this->statusFilter === 'all')
 
     <div
         class="pd-credential-workspace"
@@ -41,7 +43,7 @@
             <div class="pd-credential-header-actions">
                 <div class="pd-credential-scope">
                     <span>Clinic</span>
-                    <strong>{{ $this->getSelectedClinicName() ?: 'Select clinic scope' }}</strong>
+                    <strong>{{ $selectedClinicName ?: 'Select clinic scope' }}</strong>
                 </div>
                 @if ($this->canCreatePortalCredentials())
                     <a class="pd-credential-add" href="{{ $this->createCredentialUrl() }}" wire:navigate>
@@ -52,17 +54,32 @@
             </div>
         </header>
 
-        <section class="pd-credential-summary" aria-label="Credential summary">
-            <span><strong>{{ number_format($summary['total']) }}</strong> portal{{ $summary['total'] === 1 ? '' : 's' }}</span>
-            <i aria-hidden="true"></i>
-            <span><strong>{{ number_format($summary['active']) }}</strong> active</span>
-            <i aria-hidden="true"></i>
-            <span><strong>{{ number_format($summary['security_questions']) }}</strong> use{{ $summary['security_questions'] === 1 ? 's' : '' }} security questions</span>
-            <i aria-hidden="true"></i>
-            <span class="{{ $summary['attention'] > 0 ? 'needs-attention' : '' }}"><strong>{{ number_format($summary['attention']) }}</strong> need attention</span>
-        </section>
+        @if ($summary['total'] > 0)
+            <section class="pd-credential-summary" aria-label="Credential summary">
+                <span><strong>{{ number_format($summary['total']) }}</strong> portal{{ $summary['total'] === 1 ? '' : 's' }}</span>
+                <i aria-hidden="true"></i>
+                <span><strong>{{ number_format($summary['active']) }}</strong> active</span>
+                <i aria-hidden="true"></i>
+                <span><strong>{{ number_format($summary['security_questions']) }}</strong> use{{ $summary['security_questions'] === 1 ? 's' : '' }} security questions</span>
+                <i aria-hidden="true"></i>
+                <span class="{{ $summary['attention'] > 0 ? 'needs-attention' : '' }}"><strong>{{ number_format($summary['attention']) }}</strong> need attention</span>
+            </section>
+        @endif
 
-        <section class="pd-credential-table-card">
+        @if ($showInitialEmptyState)
+            <section class="pd-credential-empty-state" aria-labelledby="portal-credential-empty-title">
+                <span class="pd-credential-empty-state__icon" aria-hidden="true"><x-heroicon-o-identification /></span>
+                <h2 id="portal-credential-empty-title">{{ $selectedClinicName ? 'No credentials configured' : 'Select a clinic to view credentials' }}</h2>
+                <p>{{ $selectedClinicName ? 'Add the first payer portal credential for this clinic.' : 'Choose a clinic from Clinic Scope to review its payer portal access.' }}</p>
+                @if ($this->canCreatePortalCredentials())
+                    <a class="pd-credential-empty-state__action" href="{{ $this->createCredentialUrl() }}" wire:navigate>
+                        <x-heroicon-o-plus />
+                        <span>Add Credential</span>
+                    </a>
+                @endif
+            </section>
+        @else
+            <section class="pd-credential-table-card">
             <div class="pd-credential-toolbar">
                 <label class="pd-credential-search">
                     <x-heroicon-o-magnifying-glass />
@@ -165,7 +182,8 @@
                     </tbody>
                 </table>
             </div>
-        </section>
+            </section>
+        @endif
 
     @if ($this->infoModalOpen)
         <div class="pd-password-backdrop" wire:keydown.escape.window="closeCredentialInfo">
@@ -378,6 +396,55 @@
             box-shadow: none;
         }
 
+        .pd-credential-empty-state {
+            display: flex;
+            min-height: 360px;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 9px;
+            margin-top: 20px;
+            padding: 48px 24px;
+            border: 1px solid #dbe4ee;
+            border-radius: 8px;
+            background: #ffffff;
+            color: #64748b;
+            text-align: center;
+        }
+        .pd-credential-empty-state__icon {
+            display: inline-flex;
+            width: 56px;
+            height: 56px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 7px;
+            border-radius: 999px;
+            background: #eefaf8;
+            color: #0f766e;
+        }
+        .pd-credential-empty-state__icon svg { width: 27px; height: 27px; }
+        .pd-credential-empty-state h2 { margin: 0; color: #0f172a; font-size: 17px; font-weight: 800; }
+        .pd-credential-empty-state p { max-width: 440px; margin: 0; font-size: 13px; line-height: 1.55; }
+        .pd-credential-empty-state__action {
+            display: inline-flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            margin-top: 10px;
+            padding: 0 14px;
+            border: 1px solid #0f766e;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #0f766e;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+        }
+        .pd-credential-empty-state__action:hover { background: #f0fdfa; color: #115e59; }
+        .pd-credential-empty-state__action:focus-visible { outline: 2px solid rgba(15,118,110,.24); outline-offset: 2px; }
+        .pd-credential-empty-state__action svg { width: 16px; height: 16px; }
+
         .pd-credential-toolbar-end { display: flex; align-items: center; gap: 20px; }
         .pd-credential-toolbar-end select {
             min-width: 170px;
@@ -515,6 +582,7 @@
 
         @media (max-width: 640px) {
             .pd-credential-summary { flex-wrap: wrap; gap: 8px 12px; padding: 12px 16px; }
+            .pd-credential-empty-state { min-height: 300px; padding: 40px 20px; }
             .pd-credential-toolbar-end { align-items: stretch; flex-direction: column; gap: 8px; }
             .pd-credential-toolbar-end select { width: 100%; }
             .pd-credential-details-meta { grid-template-columns: 1fr; }
