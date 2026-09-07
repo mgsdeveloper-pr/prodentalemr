@@ -21,10 +21,10 @@ class MightyCallWebhookController extends Controller
             'EventType', 'eventType', 'event_type', 'Event', 'event', 'Type', 'type',
         ]));
         $providerCallId = $this->first($payload, [
-            'CallId', 'callId', 'call_id', 'Id', 'id', 'Call.ID', 'call.id',
+            'CallId', 'callId', 'call_id', 'Id', 'id', 'Call.ID', 'call.id', 'Body.Id', 'body.id',
         ]);
         $toNumber = $this->normalizePhone((string) $this->first($payload, [
-            'To', 'to', 'Called.Phone', 'called.phone', 'Call.To', 'call.to',
+            'To', 'to', 'Called.Phone', 'called.phone', 'Call.To', 'call.to', 'Body.To', 'body.to',
         ]));
 
         $query = TelephonyCall::query()
@@ -44,12 +44,13 @@ class MightyCallWebhookController extends Controller
         if ($call) {
             $status = $this->statusForEvent($event);
             $effectiveStatus = $status && $call->canTransitionTo($status) ? $status : $call->status;
-            $duration = (int) ($this->first($payload, [
-                'Duration', 'duration', 'DurationSeconds', 'durationSeconds', 'Call.Duration', 'call.duration',
-            ]) ?: $call->duration_seconds);
+            $duration = $this->durationSeconds($this->first($payload, [
+                'CallDuration', 'callDuration', 'Duration', 'duration', 'DurationSeconds', 'durationSeconds', 'Call.Duration', 'call.duration',
+            ]), $call->duration_seconds);
             $recordingUrl = $this->first($payload, [
-                'CallRecord', 'callRecord', 'RecordingUrl', 'recordingUrl', 'recording_url',
+                'RecordingLink', 'recordingLink', 'recording_link', 'CallRecord', 'callRecord', 'RecordingUrl', 'recordingUrl', 'recording_url',
             ]);
+            $recordingUrl = TelephonyCall::normalizeMightyCallRecordingUrl($recordingUrl);
 
             $providerPayload = $call->provider_payload ?? [];
             $webhookEvents = collect($providerPayload['webhook_events'] ?? [])
@@ -78,8 +79,9 @@ class MightyCallWebhookController extends Controller
                 $updates['ended_at'] = now();
             }
 
-            if (filled($recordingUrl) && filter_var($recordingUrl, FILTER_VALIDATE_URL)) {
-                $updates['recording_url'] = (string) $recordingUrl;
+            if ($recordingUrl) {
+                $updates['recording_url'] = $recordingUrl;
+                $updates['recording_duration_seconds'] = max($call->recording_duration_seconds ?? 0, $duration);
             }
 
             $call->update($updates);
@@ -117,5 +119,18 @@ class MightyCallWebhookController extends Controller
     private function normalizePhone(string $phone): string
     {
         return preg_replace('/[^0-9+]/', '', $phone) ?: '';
+    }
+
+    private function durationSeconds(mixed $duration, int $fallback): int
+    {
+        if (is_numeric($duration)) {
+            return max(0, (int) $duration);
+        }
+
+        if (is_string($duration) && preg_match('/^(\d+):(\d{2}):(\d{2})$/', trim($duration), $parts)) {
+            return ((int) $parts[1] * 3600) + ((int) $parts[2] * 60) + (int) $parts[3];
+        }
+
+        return max(0, $fallback);
     }
 }

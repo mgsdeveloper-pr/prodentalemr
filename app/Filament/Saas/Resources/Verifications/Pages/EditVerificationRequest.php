@@ -232,6 +232,9 @@ class EditVerificationRequest extends EditRecord
             'to_number' => $destination,
             'status' => 'initiated',
             'started_at' => now(),
+            'provider_payload' => [
+                'recording_requested' => (bool) $account->recording_enabled,
+            ],
         ]);
 
         $this->record->recordActivity('insurance_call_started', 'Insurance call started from the verification form.', [

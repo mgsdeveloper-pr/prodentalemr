@@ -5,13 +5,16 @@ namespace App\Filament\Saas\Resources\Verifications\Pages;
 use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\BillingWorkItem;
+use App\Models\TelephonyCall;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\WorkflowService;
+use App\Support\TelephonyAccess;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Database\Eloquent\Collection;
 
 class ViewVerificationRequest extends ViewRecord
 {
@@ -159,6 +162,28 @@ class ViewVerificationRequest extends ViewRecord
     public function getResultAccessMessage(): ?string
     {
         return null;
+    }
+
+    public function getTelephonyCalls(): Collection
+    {
+        return $this->record->telephonyCalls()
+            ->with(['user', 'telephonyAccount'])
+            ->latest('started_at')
+            ->latest('id')
+            ->get();
+    }
+
+    public function canAccessTelephonyRecording(TelephonyCall $call): bool
+    {
+        return TelephonyAccess::canAccessRecording(auth()->user(), $call);
+    }
+
+    public function getTelephonyRecordingUrl(TelephonyCall $call): string
+    {
+        return route('admin.verifications.calls.recording', [
+            'billingWorkItem' => $this->record,
+            'telephonyCall' => $call,
+        ]);
     }
 
     protected function getDefaultQueueUrl(): string

@@ -22,6 +22,7 @@
         $formType = \App\Models\VerificationProfile::FORM_TYPE_OPTIONS[$record->verificationProfile?->form_type ?? 'full_form'] ?? 'Full Form';
         $profile = $record->verificationProfile;
         $resultSummary = app(\App\Services\Verification\VerificationResultService::class)->summary($record);
+        $telephonyCalls = $this->getTelephonyCalls();
         $eligibilityStatus = $resultSummary['eligibility_status'];
         $auditState = match ($record->normalized_status) {
             \App\Models\BillingWorkItem::STATUS_DONE => 'Audit Approved',
@@ -89,6 +90,15 @@
         .request-copy { border: 0; background: transparent; color: #0f766e; font-size: 11px; font-weight: 800; cursor: pointer; }
         .request-reference { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
         .request-reference__row { padding: 9px 0; border-bottom: 1px solid #edf2f7; }
+        .request-call { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .9fr); gap: 18px; align-items: center; padding: 15px 18px; border-bottom: 1px solid #edf2f7; }
+        .request-call:last-child { border-bottom: 0; }
+        .request-call__headline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .request-call__number { color: #172033; font-size: 13px; font-weight: 800; }
+        .request-call__meta { display: flex; flex-wrap: wrap; gap: 5px 13px; margin-top: 7px; color: #64748b; font-size: 11px; }
+        .request-call__media { min-width: 0; }
+        .request-call__media audio { display: block; width: 100%; height: 36px; }
+        .request-call__state { display: flex; align-items: center; justify-content: flex-end; gap: 7px; color: #64748b; font-size: 11px; font-weight: 700; }
+        .request-call__state svg { width: 16px; height: 16px; flex: 0 0 16px; }
         .request-pdf, .request-document, .request-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid #edf2f7; }
         .request-pdf:last-child, .request-document:last-child, .request-note:last-child { border-bottom: 0; }
         .request-pdf__actions { display: flex; gap: 6px; flex-shrink: 0; }
@@ -107,7 +117,7 @@
         .request-change-table__previous { background: #fffafa; color: #9f1239; }
         .request-change-table__current { background: #f6fffc; color: #166534; font-weight: 700; }
         @media (max-width: 1100px) { .request-detail__layout { grid-template-columns: 1fr; } .request-detail__aside { position: static; } }
-        @media (max-width: 720px) { .request-summary, .request-audit, .request-snapshot, .request-reference, .request-communication { grid-template-columns: 1fr; } .request-communication__item:first-child { border-right: 0; border-bottom: 1px solid #e8eef4; } .request-result-band--three, .request-result-band--four { grid-template-columns: repeat(2, minmax(0, 1fr)); } .request-result__item { border-bottom: 1px solid #e8eef4; } .request-result__item:nth-child(2n) { border-right: 0; } .request-result-band .request-result__item:nth-last-child(-n + 2) { border-bottom: 0; } .request-summary__group { padding: 0; } .request-summary__group:first-child { padding: 0 0 18px; margin-bottom: 18px; border-right: 0; border-bottom: 1px solid #e8eef4; } .request-change-table { grid-template-columns: 1fr; } .request-change-table__cell--head { display: none; } .request-change-table__question { border-top: 8px solid #f1f5f9; } }
+        @media (max-width: 720px) { .request-summary, .request-audit, .request-snapshot, .request-reference, .request-communication, .request-call { grid-template-columns: 1fr; } .request-call__state { justify-content: flex-start; } .request-communication__item:first-child { border-right: 0; border-bottom: 1px solid #e8eef4; } .request-result-band--three, .request-result-band--four { grid-template-columns: repeat(2, minmax(0, 1fr)); } .request-result__item { border-bottom: 1px solid #e8eef4; } .request-result__item:nth-child(2n) { border-right: 0; } .request-result-band .request-result__item:nth-last-child(-n + 2) { border-bottom: 0; } .request-summary__group { padding: 0; } .request-summary__group:first-child { padding: 0 0 18px; margin-bottom: 18px; border-right: 0; border-bottom: 1px solid #e8eef4; } .request-change-table { grid-template-columns: 1fr; } .request-change-table__cell--head { display: none; } .request-change-table__question { border-top: 8px solid #f1f5f9; } }
     </style>
 
     <div class="request-detail">
@@ -170,6 +180,70 @@
                                 <div class="request-result__item"><div class="request-field__label">{{ $label }} coverage</div><div class="request-result__value">{{ $value }}</div></div>
                             @endforeach
                         </div>
+                    </div>
+                </section>
+
+                <section class="request-card">
+                    <div class="request-card__header">
+                        <div><h3 class="request-card__title">Call History &amp; Recordings</h3><p class="request-card__hint">Insurance calls made for this verification. Recordings remain securely stored with MightyCall.</p></div>
+                        <span class="request-chip">{{ $telephonyCalls->count() }} {{ \Illuminate\Support\Str::plural('call', $telephonyCalls->count()) }}</span>
+                    </div>
+                    <div>
+                        @forelse ($telephonyCalls as $telephonyCall)
+                            @php
+                                $canAccessRecording = $this->canAccessTelephonyRecording($telephonyCall);
+                                $recordingState = $telephonyCall->recordingState($canAccessRecording);
+                                $callStatusLabel = match ($telephonyCall->status) {
+                                    'initiated' => 'Starting',
+                                    'ringing' => 'Ringing',
+                                    'connected' => 'Connected',
+                                    'completed' => 'Completed',
+                                    'failed' => 'Failed',
+                                    default => str($telephonyCall->status)->headline()->toString(),
+                                };
+                                $recordingStateLabel = match ($recordingState) {
+                                    'restricted' => 'Recording access required',
+                                    'pending' => 'Call in progress',
+                                    'processing' => 'Processing recording',
+                                    'not_recorded' => 'Not recorded',
+                                    default => 'Recording unavailable',
+                                };
+                            @endphp
+                            <div class="request-call">
+                                <div>
+                                    <div class="request-call__headline">
+                                        <span class="request-call__number">{{ $telephonyCall->to_number }}</span>
+                                        <span class="request-chip {{ $telephonyCall->status === 'completed' ? 'request-chip--active' : '' }}">{{ $callStatusLabel }}</span>
+                                    </div>
+                                    <div class="request-call__meta">
+                                        <span>{{ optional($telephonyCall->started_at)->format('M d, Y h:i A') ?: 'Time unavailable' }}</span>
+                                        <span>{{ $telephonyCall->user?->name ?: 'Unknown user' }}</span>
+                                        <span>{{ $telephonyCall->formattedDuration() }}</span>
+                                    </div>
+                                </div>
+                                <div class="request-call__media">
+                                    @if ($recordingState === 'available')
+                                        <audio controls controlsList="nodownload" preload="none" aria-label="Insurance call recording from {{ optional($telephonyCall->started_at)->format('M d, Y h:i A') }}">
+                                            <source src="{{ $this->getTelephonyRecordingUrl($telephonyCall) }}">
+                                            Your browser cannot play this recording.
+                                        </audio>
+                                    @else
+                                        <div class="request-call__state">
+                                            @if ($recordingState === 'restricted')
+                                                <x-heroicon-o-lock-closed />
+                                            @elseif ($recordingState === 'processing' || $recordingState === 'pending')
+                                                <x-heroicon-o-clock />
+                                            @else
+                                                <x-heroicon-o-no-symbol />
+                                            @endif
+                                            <span>{{ $recordingStateLabel }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @empty
+                            <div class="request-card__body"><p class="request-empty">No insurance calls have been recorded for this verification.</p></div>
+                        @endforelse
                     </div>
                 </section>
 

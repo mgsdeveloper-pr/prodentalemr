@@ -75,6 +75,64 @@ class TelephonyCall extends Model
         return in_array($status, self::STATUS_TRANSITIONS[$this->status] ?? [], true);
     }
 
+    public function recordingState(bool $canAccess): string
+    {
+        if (filled($this->recording_url)) {
+            return $canAccess ? 'available' : 'restricted';
+        }
+
+        if (! $this->isTerminal()) {
+            return 'pending';
+        }
+
+        if (data_get($this->provider_payload, 'recording_requested') === false) {
+            return 'not_recorded';
+        }
+
+        if ($this->status === 'failed' || (! $this->answered_at && $this->duration_seconds === 0)) {
+            return 'not_recorded';
+        }
+
+        if ($this->ended_at?->lt(now()->subMinutes(15))) {
+            return 'unavailable';
+        }
+
+        return 'processing';
+    }
+
+    public function formattedDuration(): string
+    {
+        $seconds = max(0, (int) $this->duration_seconds);
+
+        return sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
+    }
+
+    public static function normalizeMightyCallRecordingUrl(mixed $url): ?string
+    {
+        if (! is_string($url)) {
+            return null;
+        }
+
+        $url = trim($url);
+
+        if (preg_match('#^https:/([^/].*)$#i', $url, $matches)) {
+            $url = 'https://'.$matches[1];
+        }
+
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https'
+            || ($host !== 'mightycall.com' && ! str_ends_with($host, '.mightycall.com'))) {
+            return null;
+        }
+
+        return $url;
+    }
+
     public function telephonyAccount(): BelongsTo
     {
         return $this->belongsTo(TelephonyAccount::class);

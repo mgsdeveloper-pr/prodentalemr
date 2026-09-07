@@ -413,6 +413,11 @@ class BillingWorkItem extends Model
         return $this->hasMany(VerificationFormSubmission::class);
     }
 
+    public function telephonyCalls(): HasMany
+    {
+        return $this->hasMany(TelephonyCall::class, 'billing_work_item_id');
+    }
+
     public function recordActivity(string $type, string $description, array $meta = []): void
     {
         app(TimelineService::class)->record($this, $type, $description, $meta);

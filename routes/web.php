@@ -18,6 +18,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Saas\BillingWorkItemAttachmentController;
 use App\Http\Controllers\Saas\InvoicePdfController;
 use App\Http\Controllers\Verification\BillingWorkItemAttachmentController as VerificationBillingWorkItemAttachmentController;
+use App\Http\Controllers\Verification\TelephonyRecordingController;
 use App\Http\Controllers\Verification\UserMailboxAttachmentController;
 use App\Http\Controllers\Verification\UserMailboxMessagePreviewController;
 use App\Http\Controllers\Verification\VerificationAttentionQueueExportController;
@@ -105,6 +106,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/verification/verifications/{billingWorkItem}/download', [VerificationResultPdfController::class, 'downloadForAdmin'])->name('admin.verifications.pdf.download');
     Route::get('/verification/verifications/{billingWorkItem}/preview', [VerificationResultPdfController::class, 'previewForAdmin'])->name('admin.verifications.pdf.preview');
     Route::get('/verification/verifications/{billingWorkItem}/audit', [VerificationAuditTrailController::class, 'downloadForAdmin'])->name('admin.verifications.audit.download');
+    Route::get('/verification/verifications/{billingWorkItem}/calls/{telephonyCall}/recording', TelephonyRecordingController::class)
+        ->middleware('throttle:120,1')
+        ->name('admin.verifications.calls.recording');
     Route::get('/verification/attention-queue/export/excel', [VerificationAttentionQueueExportController::class, 'excel'])->name('admin.verification-attention-queue.export.excel');
     Route::get('/verification/attention-queue/export/pdf', [VerificationAttentionQueueExportController::class, 'pdf'])->name('admin.verification-attention-queue.export.pdf');
     Route::get('/verification/request-response/export', VerificationRequestResponseExportController::class)->name('admin.verification-request-response.export');

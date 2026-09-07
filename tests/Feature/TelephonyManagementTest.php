@@ -2,7 +2,9 @@
 
 use App\Filament\Saas\Resources\TelephonyAccounts\Pages\EditTelephonyAccount;
 use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
+use App\Filament\Saas\Resources\Verifications\Pages\ViewVerificationRequest;
 use App\Models\BillingWorkItem;
+use App\Models\ClientServiceEnrollment;
 use App\Models\Clinic;
 use App\Models\ManagedBillingService;
 use App\Models\Organization;
@@ -16,6 +18,7 @@ use App\Support\TelephonyAccess;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -62,6 +65,7 @@ beforeEach(function (): void {
 
     $this->user = User::factory()->create(['status' => true]);
     $this->user->assignRole('verification_user');
+    $this->user->verificationClinics()->attach($this->clinic->id);
 
     $this->service = ManagedBillingService::create([
         'name' => 'Calling Verification',
@@ -74,6 +78,14 @@ beforeEach(function (): void {
         'requires_policy' => false,
         'requires_claim' => false,
         'status' => true,
+    ]);
+
+    ClientServiceEnrollment::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'status' => 'active',
+        'start_date' => today(),
     ]);
 
     $this->workItem = BillingWorkItem::create([
@@ -260,8 +272,8 @@ it('accepts a secured MightyCall completion webhook and updates the call', funct
         'EventType' => 'OutgoingCallCompleted',
         'CallId' => 'mc-call-123',
         'To' => '+15557654321',
-        'DurationSeconds' => 125,
-        'RecordingUrl' => 'https://recordings.example.test/call-123.mp3',
+        'CallDuration' => '00:02:05',
+        'RecordingLink' => 'https://media.mightycall.com/call-123.mp3',
     ])->assertNoContent();
 
     $call->refresh();
@@ -269,13 +281,143 @@ it('accepts a secured MightyCall completion webhook and updates the call', funct
     expect($call->status)->toBe('completed')
         ->and($call->provider_call_id)->toBe('mc-call-123')
         ->and($call->duration_seconds)->toBe(125)
-        ->and($call->recording_url)->toBe('https://recordings.example.test/call-123.mp3')
+        ->and($call->recording_url)->toBe('https://media.mightycall.com/call-123.mp3')
+        ->and($call->recording_duration_seconds)->toBe(125)
         ->and($call->ended_at)->not->toBeNull();
+
+    expect(TelephonyCall::normalizeMightyCallRecordingUrl('https:/mightycall.com/recordings/call.mp3'))
+        ->toBe('https://mightycall.com/recordings/call.mp3')
+        ->and(TelephonyCall::normalizeMightyCallRecordingUrl('https://example.test/recording.mp3'))
+        ->toBeNull();
 
     $this->postJson(route('webhooks.telephony.mightycall', [
         'account' => $account->public_id,
         'token' => 'wrong-token',
     ]), [])->assertNotFound();
+});
+
+it('shows call history to verification users but streams recordings only with access', function (): void {
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id,
+        'name' => 'Recording Access MightyCall',
+        'api_key' => 'recording-access-key',
+        'is_active' => true,
+    ]);
+
+    $assignment = TelephonyUserAssignment::create([
+        'telephony_account_id' => $account->id,
+        'user_id' => $this->user->id,
+        'user_key' => 'recording-user-key',
+        'can_call' => true,
+        'can_access_recordings' => false,
+        'is_active' => true,
+    ]);
+
+    $call = TelephonyCall::create([
+        'telephony_account_id' => $account->id,
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'billing_work_item_id' => $this->workItem->id,
+        'user_id' => $this->user->id,
+        'provider_call_id' => 'mc-recording-123',
+        'to_number' => '+15557654321',
+        'status' => 'completed',
+        'started_at' => now()->subMinutes(3),
+        'answered_at' => now()->subMinutes(2),
+        'ended_at' => now()->subMinute(),
+        'duration_seconds' => 60,
+        'recording_url' => 'https://media.mightycall.com/recordings/mc-recording-123.mp3',
+    ]);
+
+    $this->actingAs($this->user);
+
+    $page = new ViewVerificationRequest;
+    $page->record = $this->workItem->fresh();
+
+    expect($page->getTelephonyCalls()->pluck('id')->all())->toBe([$call->id])
+        ->and($page->canAccessTelephonyRecording($call))->toBeFalse()
+        ->and($call->recordingState(false))->toBe('restricted');
+
+    $recordingRoute = route('admin.verifications.calls.recording', [
+        'billingWorkItem' => $this->workItem,
+        'telephonyCall' => $call,
+    ]);
+
+    $this->get($recordingRoute)->assertForbidden();
+
+    $assignment->update(['can_access_recordings' => true]);
+    Http::fake([
+        'https://media.mightycall.com/*' => Http::response('test-audio', 200, [
+            'Content-Type' => 'audio/mpeg',
+            'Content-Length' => '10',
+        ]),
+    ]);
+
+    expect($page->canAccessTelephonyRecording($call))->toBeTrue()
+        ->and($call->recordingState(true))->toBe('available');
+
+    $this->get($recordingRoute)
+        ->assertOk()
+        ->assertHeader('Content-Type', 'audio/mpeg')
+        ->assertHeader('Cache-Control', 'max-age=0, must-revalidate, no-cache, no-store, private');
+
+    expect($this->workItem->activities()
+        ->where('activity_type', 'insurance_call_recording_played')
+        ->exists())->toBeTrue();
+});
+
+it('gives SaaS Admin recording access and rejects a call from another verification', function (): void {
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id,
+        'name' => 'Admin Recording MightyCall',
+        'api_key' => 'admin-recording-key',
+        'is_active' => true,
+    ]);
+
+    $call = TelephonyCall::create([
+        'telephony_account_id' => $account->id,
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'billing_work_item_id' => $this->workItem->id,
+        'user_id' => $this->user->id,
+        'provider_call_id' => 'mc-admin-recording-123',
+        'to_number' => '+15557654321',
+        'status' => 'completed',
+        'started_at' => now()->subMinutes(2),
+        'answered_at' => now()->subMinute(),
+        'ended_at' => now(),
+        'duration_seconds' => 60,
+        'recording_url' => 'https://console.mightycall.com/recordings/mc-admin-recording-123.mp3',
+    ]);
+
+    $otherWorkItem = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Different verification',
+        'status' => BillingWorkItem::STATUS_PENDING,
+        'priority' => 'normal',
+        'source' => 'manual',
+    ]);
+
+    Http::fake(['https://console.mightycall.com/*' => Http::response('admin-audio', 200, ['Content-Type' => 'audio/mpeg'])]);
+    $this->actingAs($admin);
+
+    expect(TelephonyAccess::canAccessRecording($admin, $call))->toBeTrue();
+
+    $this->get(route('admin.verifications.calls.recording', [
+        'billingWorkItem' => $this->workItem,
+        'telephonyCall' => $call,
+    ]))->assertOk();
+
+    $this->get(route('admin.verifications.calls.recording', [
+        'billingWorkItem' => $otherWorkItem,
+        'telephonyCall' => $call,
+    ]))->assertNotFound();
 });
 
 it('does not regress a finished call when provider events arrive out of order', function (): void {
@@ -487,4 +629,19 @@ it('provides self-service guidance for calling and audio problems', function ():
         ->toContain('Changed headset:')
         ->toContain('User Calling Access')
         ->toContain('Select <strong>Keyboard</strong> inside MightyCall');
+});
+
+it('renders permission-aware call history on the verification result', function (): void {
+    $resultView = file_get_contents(resource_path(
+        'views/filament/saas/resources/verifications/pages/view-verification-request.blade.php'
+    ));
+
+    expect($resultView)
+        ->toContain('Call History &amp; Recordings')
+        ->toContain('Recordings remain securely stored with MightyCall.')
+        ->toContain('canAccessTelephonyRecording')
+        ->toContain('Recording access required')
+        ->toContain('controlsList="nodownload"')
+        ->toContain('getTelephonyRecordingUrl')
+        ->not->toContain('$telephonyCall->recording_url');
 });

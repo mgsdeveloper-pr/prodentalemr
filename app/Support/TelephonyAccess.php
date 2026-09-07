@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\BillingWorkItem;
 use App\Models\Organization;
 use App\Models\TelephonyAccount;
+use App\Models\TelephonyCall;
 use App\Models\TelephonyUserAssignment;
 use App\Models\User;
 
@@ -73,6 +74,31 @@ class TelephonyAccess
                 && $assignment->can_use_ai_summary
                 && SaasEntitlements::userFeatureAllowed($user, 'call_ai_summary', $workItem->clinic),
         ];
+    }
+
+    public static function canAccessRecording(?User $user, TelephonyCall $call): bool
+    {
+        $workItem = $call->workItem;
+
+        if (! $user?->status || ! $workItem || ! $user->can('view', $workItem)) {
+            return false;
+        }
+
+        if ($user->isSaasAdmin()) {
+            return true;
+        }
+
+        if (! $user->hasVerificationWorkspaceRole() || ! self::hasRolePermission($user, 'view')) {
+            return false;
+        }
+
+        if (! SaasEntitlements::userFeatureAllowed($user, 'call_recording', $workItem->clinic)) {
+            return false;
+        }
+
+        $assignment = self::assignmentFor($user, $call->telephonyAccount);
+
+        return (bool) ($assignment?->can_access_recordings);
     }
 
     private static function evaluate(?User $user, BillingWorkItem $workItem): array
