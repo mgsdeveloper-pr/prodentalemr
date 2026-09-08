@@ -118,7 +118,7 @@ class VerificationResultPdf
             default => 'pdf.verifications.standard',
         };
 
-        return Pdf::loadView($view, [
+        $pdf = Pdf::loadView($view, [
             'workItem' => $workItem,
             'state' => $state,
             'summary' => static::buildSummary($workItem, $state, $resultService, $submission),
@@ -139,8 +139,21 @@ class VerificationResultPdf
                 ->pluck('prompt')
                 ->all(),
         ])
-            ->setPaper('a4', $mode === 'custom_landscape' ? 'landscape' : 'portrait')
-            ->output();
+            ->setPaper('a4', $mode === 'custom_landscape' ? 'landscape' : 'portrait');
+
+        $pdf->render();
+        if ($mode === 'custom_landscape' && $pdf->getDomPDF()->getCanvas()->get_page_count() !== 1) {
+            $exception = \Illuminate\Validation\ValidationException::withMessages([
+                'pdf_layout' => 'The selected content exceeds one landscape page. Select fewer sections or questions, or use Standard output for the complete report. No answers have been removed.',
+            ]);
+            $exception->response = response($exception->getMessage(), 422, [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'Cache-Control' => 'no-store',
+            ]);
+            throw $exception;
+        }
+
+        return $pdf->output();
     }
 
     public static function normalizeOutputMode(?string $mode): string

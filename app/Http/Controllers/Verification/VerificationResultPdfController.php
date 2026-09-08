@@ -26,10 +26,11 @@ class VerificationResultPdfController extends Controller
         $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
         $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
         $submission = $this->resolveSubmission($request, $billingWorkItem);
+        $output = app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission);
         $this->recordPdfActivity($billingWorkItem, 'downloaded', 'admin', $mode);
 
         return response()->streamDownload(
-            fn () => print(app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission)),
+            fn () => print($output),
             app(PDFService::class)->fileName($billingWorkItem, $mode, $submission),
             $this->pdfHeaders('attachment; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );
@@ -64,10 +65,11 @@ class VerificationResultPdfController extends Controller
         $questionIds = $this->resolveQuestionIds($request, $billingWorkItem, $mode, $preset);
         $showBlankRows = $this->resolveShowBlankRows($request, $mode, $preset);
         $submission = $this->resolveSubmission($request, $billingWorkItem);
+        $output = app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission);
         $this->recordPdfActivity($billingWorkItem, 'downloaded', 'clinic', $mode);
 
         return response()->streamDownload(
-            fn () => print(app(PDFService::class)->output($billingWorkItem, $mode, $sections, $questionIds, $showBlankRows, $submission)),
+            fn () => print($output),
             app(PDFService::class)->fileName($billingWorkItem, $mode, $submission),
             $this->pdfHeaders('attachment; filename="' . app(PDFService::class)->fileName($billingWorkItem, $mode, $submission) . '"'),
         );

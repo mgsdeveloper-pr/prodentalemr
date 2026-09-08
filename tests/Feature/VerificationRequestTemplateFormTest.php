@@ -73,6 +73,35 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
+it('rejects a multipage custom landscape render before returning PDF bytes', function () {
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Oversized report', 'status' => 'pending', 'priority' => 'normal',
+    ]);
+    $dompdf = new \Dompdf\Dompdf();
+    $dompdf->loadHtml('<p>First page</p><p style="page-break-before: always">Second page</p>');
+    $dompdf->render();
+    $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+    $pdf->shouldReceive('setPaper')->once()->with('a4', 'landscape')->andReturnSelf();
+    $pdf->shouldReceive('render')->once()->andReturnSelf();
+    $pdf->shouldReceive('getDomPDF')->once()->andReturn($dompdf);
+    $pdf->shouldNotReceive('output');
+    \Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadView')->once()->andReturn($pdf);
+
+    try {
+        VerificationResultPdf::output($request, 'custom_landscape');
+        test()->fail('An oversized custom report must not download.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors())->toHaveKey('pdf_layout')
+            ->and($exception->response->getStatusCode())->toBe(422)
+            ->and($exception->response->getContent())->toContain('Select fewer sections');
+    }
+});
+
 it('raises an urgent request once and preserves saved answers and workflow', function () {
     $request = BillingWorkItem::create([
         'organization_id' => $this->organization->id,

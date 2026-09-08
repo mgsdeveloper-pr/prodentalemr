@@ -5,7 +5,7 @@
     <title>{{ $summary['reference_number'] }}</title>
     <style>
         @page { size: a4 landscape; margin: 7px; }
-        body { font-family: DejaVu Sans, sans-serif; color: #102033; font-size: 6.9px; line-height: 1.02; }
+        body { margin: 0; font-family: DejaVu Sans, sans-serif; color: #102033; font-size: 6.9px; line-height: 1.02; }
         h1, h2, p { margin: 0; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .pdf-head { width: 100%; border-bottom: 1px solid #cbd8e2; margin-bottom: 3px; padding-bottom: 2px; }
@@ -44,15 +44,7 @@
     $memberId = $state['vf_patient_identifier'] ?: $state['vf_subscriber_id'] ?: '-';
     $groupId = $state['vf_group_number'] ?: '-';
     $generatedDate = now()->format('M d, Y');
-    $leftKeys = [
-        'template_3_patient_subscriber',
-        'template_3_insurance',
-        'template_3_maximums_deductibles',
-        'template_3_coverage_category',
-        'template_3_plan_provisions',
-    ];
-    $leftSections = collect($sections)->filter(fn ($section) => in_array($section['key'], $leftKeys, true))->values();
-    $rightSections = collect($sections)->reject(fn ($section) => in_array($section['key'], $leftKeys, true))->values();
+    [$leftSections, $rightSections] = \App\Support\VerificationLandscapeLayout::columns($sections);
     $renderSections = function ($sections): string {
         return collect($sections)->map(function (array $section): string {
             $rows = collect($section['rows'])->map(function (array $row): string {
