@@ -191,7 +191,7 @@ it('stores encrypted telephony payloads in text-compatible columns', function ()
         ->and($call->fresh()->ai_summary)->toBe(['summary' => 'Coverage confirmed.']);
 });
 
-it('keeps each client on its own connection before using the platform default', function (): void {
+it('resolves the users connection instead of a client or default connection', function (): void {
     $default = TelephonyAccount::create([
         'name' => 'Platform MightyCall',
         'api_key' => 'platform-key',
@@ -206,12 +206,87 @@ it('keeps each client on its own connection before using the platform default', 
         'is_active' => true,
     ]);
 
-    expect(TelephonyAccess::accountFor($this->organization)->is($client))->toBeTrue()
-        ->and(TelephonyAccess::accountFor(Organization::create([
-            'name' => 'Other Dental',
-            'owner_name' => 'Other Owner',
-            'status' => true,
-        ]))->is($default))->toBeTrue();
+    expect(TelephonyAccess::accountForUser($this->user))->toBeNull();
+    TelephonyUserAssignment::create([
+        'telephony_account_id' => $default->id, 'user_id' => $this->user->id,
+        'provider_user_id' => 'agent-one', 'user_key' => 'user-one-key',
+        'can_call' => true, 'is_active' => true,
+    ]);
+    expect(TelephonyAccess::accountForUser($this->user)->is($default))->toBeTrue()
+        ->and(TelephonyAccess::workspace($this->user, $this->workItem)['api_key'])->toBe('platform-key');
+    $default->update(['is_active' => false]);
+    expect(TelephonyAccess::canCall($this->user, $this->workItem))->toBeFalse();
+});
+
+it('retains one agent across assigned clinics and rejects unassigned clinic access', function (): void {
+    $account = TelephonyAccount::create([
+        'organization_id' => $this->organization->id, 'name' => 'User connection',
+        'api_key' => 'same-api', 'is_active' => true,
+    ]);
+    TelephonyUserAssignment::create([
+        'telephony_account_id' => $account->id, 'user_id' => $this->user->id,
+        'provider_user_id' => 'same-agent', 'user_key' => 'same-key', 'can_call' => true, 'is_active' => true,
+    ]);
+    $organization = Organization::create(['name' => 'Second Client', 'owner_name' => 'Test Owner', 'status' => true]);
+    $clinic = Clinic::create(['organization_id' => $organization->id, 'clinic_name' => 'Second Clinic',
+        'clinic_code' => 'SECOND-CALL', 'status' => true, 'verification_services_enabled' => true]);
+    Subscription::create(['organization_id' => $organization->id, 'subscription_scope' => 'organization',
+        'subscription_plan_id' => $this->plan->id, 'start_date' => today(), 'status' => 'active', 'service_status' => 'active']);
+    ClientServiceEnrollment::create(['organization_id' => $organization->id, 'clinic_id' => $clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'status' => 'active', 'start_date' => today()]);
+    $request = BillingWorkItem::create([
+        'organization_id' => $organization->id, 'clinic_id' => $clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'assigned_to' => $this->user->id,
+        'title' => 'Second request', 'source' => 'manual', 'status' => 'pending',
+    ]);
+    expect(TelephonyAccess::workspace($this->user, $request))->not->toHaveKey('user_key');
+    $this->user->verificationClinics()->attach($clinic->id);
+    $user = $this->user->fresh();
+    expect(TelephonyAccess::workspace($user, $request)['reason'] ?? null)->toBeNull();
+    expect(TelephonyAccess::workspace($user, $request)['user_key'])->toBe('same-key')
+        ->and(TelephonyAccess::workspace($user, $this->workItem)['user_key'])->toBe('same-key');
+    $this->actingAs($user);
+    $page = new class extends EditVerificationRequest {};
+    $page->record = $request->fresh();
+    $page->data = ['vf_insurance_provider_name' => 'Test Insurance', 'vf_insurance_company_phone_number' => '+15557654321'];
+    $result = $page->startTelephonyCall('+15557654321');
+    $call = TelephonyCall::where('public_id', $result['public_id'])->firstOrFail();
+    expect($call->telephony_account_id)->toBe($account->id)
+        ->and($call->clinic_id)->toBe($clinic->id)->and($call->user_id)->toBe($user->id);
+    $call->update(['duration_seconds' => 60]);
+    $account->update(['monthly_minute_limit' => 1]);
+    $page->record = $this->workItem->fresh();
+    expect(fn () => $page->startTelephonyCall('+15557654321'))
+        ->toThrow(ValidationException::class, 'Your calling connection has reached its monthly allowance.');
+});
+
+it('rejects duplicate user and agent identities even across calling connections', function (): void {
+    $first = TelephonyAccount::create(['name' => 'First', 'api_key' => 'first']);
+    $second = TelephonyAccount::create(['name' => 'Second', 'api_key' => 'second']);
+    $assignment = TelephonyUserAssignment::create(['telephony_account_id' => $first->id,
+        'user_id' => $this->user->id, 'provider_user_id' => 'agent-123', 'user_key' => 'key']);
+    expect(fn () => TelephonyUserAssignment::create(['telephony_account_id' => $second->id,
+        'user_id' => $this->user->id, 'provider_user_id' => 'other-agent']))->toThrow(ValidationException::class);
+    $other = User::factory()->create();
+    expect(fn () => TelephonyUserAssignment::create(['telephony_account_id' => $second->id,
+        'user_id' => $other->id, 'provider_user_id' => ' AGENT-123 ']))->toThrow(ValidationException::class);
+    $assignment->update(['can_call' => false]);
+    expect($assignment->fresh()->provider_user_id)->toBe('agent-123');
+});
+
+it('stops migration on legacy duplicate mappings without removing them', function (): void {
+    $migration = require database_path('migrations/2026_09_08_000003_enforce_unique_calling_user_identities.php');
+    $migration->down();
+    $first = TelephonyAccount::create(['name' => 'Legacy First', 'api_key' => 'first']);
+    $second = TelephonyAccount::create(['name' => 'Legacy Second', 'api_key' => 'second']);
+    foreach ([$first, $second] as $account) {
+        DB::table('telephony_user_assignments')->insert([
+            'telephony_account_id' => $account->id, 'user_id' => $this->user->id,
+            'provider_user_id' => 'legacy-'.$account->id,
+        ]);
+    }
+    expect(fn () => $migration->up())->toThrow(RuntimeException::class, 'duplicate portal users')
+        ->and(DB::table('telephony_user_assignments')->count())->toBe(2);
 });
 
 it('rejects a stale dialer number after the selected insurance changes', function (): void {

@@ -7,6 +7,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TelephonyUserAssignment extends Model
 {
+    protected static function booted(): void
+    {
+        static::saving(function (self $assignment): void {
+            $assignment->provider_user_id = filled($assignment->provider_user_id)
+                ? trim($assignment->provider_user_id) : null;
+            $others = static::query()->when($assignment->exists,
+                fn ($query) => $query->whereKeyNot($assignment->id));
+            if ((clone $others)->where('user_id', $assignment->user_id)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'user_id' => 'This user already has a calling identity. Edit their existing assignment.',
+                ]);
+            }
+            if ($assignment->provider_user_id !== null
+                && (clone $others)->whereRaw('LOWER(provider_user_id) = ?', [mb_strtolower($assignment->provider_user_id)])->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'provider_user_id' => 'This MightyCall agent ID is already assigned to another user.',
+                ]);
+            }
+        });
+    }
+
     protected $fillable = [
         'telephony_account_id',
         'user_id',

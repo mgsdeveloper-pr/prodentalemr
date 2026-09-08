@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\BillingWorkItem;
-use App\Models\Organization;
 use App\Models\TelephonyAccount;
 use App\Models\TelephonyCall;
 use App\Models\TelephonyUserAssignment;
@@ -11,29 +10,20 @@ use App\Models\User;
 
 class TelephonyAccess
 {
-    public static function accountFor(?Organization $organization): ?TelephonyAccount
+    public static function accountForUser(?User $user): ?TelephonyAccount
     {
-        return TelephonyAccount::query()
-            ->where('is_active', true)
-            ->where(function ($query) use ($organization): void {
-                $query
-                    ->when($organization, fn ($builder) => $builder->where('organization_id', $organization->getKey()))
-                    ->orWhere(fn ($builder) => $builder
-                        ->whereNull('organization_id')
-                        ->where('is_platform_default', true));
-            })
-            ->orderByRaw('CASE WHEN organization_id IS NULL THEN 1 ELSE 0 END')
-            ->latest('id')
-            ->first();
+        $account = self::assignmentFor($user)?->telephonyAccount;
+
+        return $account?->is_active ? $account : null;
     }
 
-    public static function assignmentFor(?User $user, ?TelephonyAccount $account): ?TelephonyUserAssignment
+    public static function assignmentFor(?User $user): ?TelephonyUserAssignment
     {
-        if (! $user || ! $account) {
+        if (! $user) {
             return null;
         }
 
-        return $account->userAssignments()
+        return TelephonyUserAssignment::query()->with('telephonyAccount')
             ->where('user_id', $user->getKey())
             ->where('is_active', true)
             ->first();
@@ -96,7 +86,7 @@ class TelephonyAccess
             return false;
         }
 
-        $assignment = self::assignmentFor($user, $call->telephonyAccount);
+        $assignment = self::assignmentFor($user);
 
         return (bool) ($assignment?->can_access_recordings);
     }
@@ -119,6 +109,11 @@ class TelephonyAccess
             return $unavailable('Your portal user account is inactive.');
         }
 
+        if (! $user->can('view', $workItem)
+            || ! $user->canAccessVerificationClinic((int) $workItem->clinic_id)) {
+            return $unavailable('You do not have access to this verification request or its clinic.');
+        }
+
         if (! $workItem->organization) {
             return $unavailable('This verification request is not connected to a client organization.');
         }
@@ -131,13 +126,7 @@ class TelephonyAccess
             return $unavailable('Your role does not have permission to place calls.');
         }
 
-        $account = self::accountFor($workItem->organization);
-
-        if (! $account) {
-            return $unavailable('No active Calling Account is assigned to this client.');
-        }
-
-        $assignment = $account->userAssignments()
+        $assignment = TelephonyUserAssignment::query()->with('telephonyAccount')
             ->where('user_id', $user->getKey())
             ->first();
 
@@ -149,6 +138,11 @@ class TelephonyAccess
             return $unavailable('Your User Calling Access assignment is inactive.');
         }
 
+        $account = $assignment->telephonyAccount;
+        if (! $account?->is_active) {
+            return $unavailable('Your assigned Calling Account is inactive or unavailable.');
+        }
+
         if (! $assignment->can_call) {
             return $unavailable('Calling is disabled for your user assignment.');
         }
@@ -156,11 +150,15 @@ class TelephonyAccess
         $callingUserLimit = SaasEntitlements::limitFor($workItem->clinic, 'calling_users');
 
         if ($callingUserLimit !== null) {
-            $allowedUserIds = $account->userAssignments()
+            $allowedUserIds = TelephonyUserAssignment::query()->with('user')
                 ->where('is_active', true)
                 ->where('can_call', true)
+                ->whereHas('telephonyAccount', fn ($query) => $query->where('is_active', true))
                 ->orderBy('id')
-                ->limit(max(0, (int) $callingUserLimit))
+                ->get()
+                ->filter(fn ($item): bool => $item->user?->status
+                    && $item->user->canAccessVerificationClinic((int) $workItem->clinic_id))
+                ->take(max(0, (int) $callingUserLimit))
                 ->pluck('user_id')
                 ->all();
 

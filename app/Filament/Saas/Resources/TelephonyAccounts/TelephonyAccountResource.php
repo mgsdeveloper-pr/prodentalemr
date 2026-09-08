@@ -49,19 +49,13 @@ class TelephonyAccountResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Client & Provider')
-                    ->description('Connect MightyCall once and control which client can use it.')
+                Section::make('Calling Connection')
+                    ->description('Assign each portal user one MightyCall agent identity for their authorized clinics.')
                     ->schema([
                         TextInput::make('name')
                             ->label('Connection name')
                             ->required()
                             ->maxLength(255),
-                        Select::make('organization_id')
-                            ->label('Client organization')
-                            ->relationship('organization', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->helperText('Leave empty only for the platform-wide default connection.'),
                         Select::make('provider')
                             ->options([TelephonyAccount::PROVIDER_MIGHTYCALL => 'MightyCall'])
                             ->default(TelephonyAccount::PROVIDER_MIGHTYCALL)
@@ -72,10 +66,6 @@ class TelephonyAccountResource extends Resource
                             ->tel()
                             ->placeholder('+15551234567')
                             ->maxLength(32),
-                        Toggle::make('is_platform_default')
-                            ->label('Platform default')
-                            ->helperText('Used only when a client does not have its own calling connection.')
-                            ->default(false),
                         Toggle::make('is_active')
                             ->label('Connection active')
                             ->default(true),
@@ -143,7 +133,7 @@ class TelephonyAccountResource extends Resource
                     ])
                     ->columns(3),
                 Section::make('User Calling Access')
-                    ->description('Map portal users to their MightyCall user key and grant only the features they need.')
+                    ->description('One portal user per MightyCall agent ID. Clinic assignments remain managed through user access.')
                     ->schema([
                         Repeater::make('userAssignments')
                             ->relationship()
@@ -159,9 +149,16 @@ class TelephonyAccountResource extends Resource
                                     ->searchable(['name', 'email'])
                                     ->preload()
                                     ->required()
+                                    ->distinct()
+                                    ->unique(table: 'telephony_user_assignments', column: 'user_id', ignoreRecord: true)
                                     ->columnSpan(2),
                                 TextInput::make('provider_user_id')
-                                    ->label('MightyCall user ID')
+                                    ->label('MightyCall agent ID')
+                                    ->required(fn (?TelephonyUserAssignment $record): bool => ! $record?->exists || filled($record->provider_user_id))
+                                    ->distinct()
+                                    ->unique(table: 'telephony_user_assignments', column: 'provider_user_id', ignoreRecord: true)
+                                    ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null)
+                                    ->helperText('Use the agent ID for this user, not a clinic ID.')
                                     ->maxLength(255),
                                 TextInput::make('extension')
                                     ->label('Extension')
@@ -206,7 +203,6 @@ class TelephonyAccountResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('name')->searchable()->sortable()->weight('bold'),
-                TextColumn::make('scope_label')->label('Client')->searchable(query: fn ($query, string $search) => $query->whereHas('organization', fn ($builder) => $builder->where('name', 'like', "%{$search}%"))),
                 TextColumn::make('provider')->formatStateUsing(fn (): string => 'MightyCall')->badge()->color('info'),
                 TextColumn::make('business_number')->label('Caller number')->placeholder('-'),
                 TextColumn::make('user_assignments_count')->label('Users')->counts('userAssignments')->badge(),

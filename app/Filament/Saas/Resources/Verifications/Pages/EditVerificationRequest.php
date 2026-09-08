@@ -226,7 +226,7 @@ class EditVerificationRequest extends EditRecord
             ]);
         }
 
-        $account = TelephonyAccess::accountFor($this->record->organization);
+        $account = TelephonyAccess::accountForUser(auth()->user());
         abort_unless($account, 403);
 
         $planLimit = SaasEntitlements::limitFor(
@@ -235,19 +235,24 @@ class EditVerificationRequest extends EditRecord
             null
         );
         $accountLimit = $account->monthly_minute_limit;
-        $limits = array_map('intval', array_values(array_filter(
-            [$planLimit, $accountLimit],
-            fn (mixed $limit): bool => $limit !== null
-        )));
-        $effectiveLimit = $limits === [] ? null : min($limits);
         $usedSeconds = (int) TelephonyCall::query()
             ->where('organization_id', $this->record->organization_id)
             ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
             ->sum('duration_seconds');
 
-        if ($effectiveLimit !== null && $usedSeconds >= ($effectiveLimit * 60)) {
+        if ($planLimit !== null && $usedSeconds >= ((int) $planLimit * 60)) {
             throw ValidationException::withMessages([
                 'telephony' => 'This client has reached its monthly calling allowance.',
+            ]);
+        }
+
+        $accountSeconds = (int) TelephonyCall::query()
+            ->where('telephony_account_id', $account->id)
+            ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
+            ->sum('duration_seconds');
+        if ($accountLimit !== null && $accountSeconds >= ((int) $accountLimit * 60)) {
+            throw ValidationException::withMessages([
+                'telephony' => 'Your calling connection has reached its monthly allowance.',
             ]);
         }
 
