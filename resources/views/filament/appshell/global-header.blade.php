@@ -2,22 +2,21 @@
     $workspaceLabel = match ($workspace) {
         'platform' => 'Administration',
         'verification' => 'Verification',
-        'organization' => 'Organization',
-        'dso' => 'Organization',
+        'organization' => 'Clinic',
+        'dso' => 'DSO',
         default => ucfirst((string) $workspace),
     };
 
     $user = auth()->user();
     $panelRegistry = app(\Filament\PanelRegistry::class);
     $workspaceLinks = collect([
-        'platform' => ['panel' => 'saas', 'label' => 'Administration', 'url' => url('/saas')],
-        'verification' => ['panel' => 'admin', 'label' => 'Verification', 'url' => url('/verification')],
-        'organization' => ['panel' => 'clinic', 'label' => 'Organization', 'url' => url('/clinic')],
-        'dso' => ['panel' => 'dso', 'label' => 'DSO', 'url' => url('/dso')],
+        'platform' => ['panel' => 'saas', 'label' => 'Administration', 'icon' => 'heroicon-o-cog-6-tooth', 'url' => url('/saas')],
+        'verification' => ['panel' => 'admin', 'label' => 'Verification', 'icon' => 'heroicon-o-clipboard-document-check', 'url' => url('/verification')],
+        'organization' => ['panel' => 'clinic', 'label' => 'Clinic', 'icon' => 'heroicon-o-building-office-2', 'url' => url('/clinic')],
+        'dso' => ['panel' => 'dso', 'label' => 'DSO', 'icon' => 'heroicon-o-building-office', 'url' => url('/dso')],
     ])
         ->filter(fn (array $item): bool => $user?->canAccessPanel($panelRegistry->get($item['panel'])) ?? false)
         ->all();
-    $visibleWorkspaceLabels = collect($workspaceLinks)->pluck('label')->all();
     $userName = $user?->name ?: 'Profile';
     $userEmail = $user?->email;
     $userRole = trim((string) ($user?->getPrimaryRoleLabel() ?? 'User'));
@@ -56,25 +55,27 @@
             <span class="pd-appshell-global-header__brand-name">ProDental</span>
         </a>
 
-        <details class="pd-appshell-workspace-switcher">
+        <details class="pd-appshell-workspace-switcher"
+            @click.outside="$el.removeAttribute('open')"
+            @keydown.escape.stop.prevent="$el.removeAttribute('open'); $el.querySelector('summary').focus()">
             <summary class="pd-appshell-workspace-switcher__summary" aria-label="Workspace switcher">
                 <span>{{ $workspaceLabel }}</span>
                 @svg('heroicon-o-chevron-down', 'pd-appshell-workspace-switcher__icon', ['aria-hidden' => 'true'])
             </summary>
             <nav class="pd-appshell-workspace-switcher__menu" aria-label="Workspace switcher">
+                <span class="pd-appshell-workspace-switcher__heading">Switch workspace</span>
                 @foreach ($workspaceLinks as $key => $item)
                     <a
                         class="pd-appshell-workspace-switcher__link {{ $key === $workspace ? 'pd-appshell-workspace-switcher__link--active' : '' }}"
                         href="{{ $item['url'] }}"
                         @if ($key === $workspace) aria-current="page" @endif
                     >
-                        {{ $item['label'] }}
+                        @svg($item['icon'], 'pd-appshell-workspace-switcher__item-icon', ['aria-hidden' => 'true'])
+                        <span>{{ $item['label'] }}</span>
+                        @if ($key === $workspace)
+                            @svg('heroicon-o-check', 'pd-appshell-workspace-switcher__check', ['aria-hidden' => 'true'])
+                        @endif
                     </a>
-                @endforeach
-                @foreach (['Reports', 'Revenue', 'Administration', 'Future AI'] as $futureWorkspace)
-                    @unless (in_array($futureWorkspace, $visibleWorkspaceLabels, true))
-                        <span class="pd-appshell-workspace-switcher__future">{{ $futureWorkspace }}</span>
-                    @endunless
                 @endforeach
             </nav>
         </details>

@@ -225,7 +225,8 @@
         left: 0;
         z-index: 60;
         display: grid;
-        min-width: 12rem;
+        width: 15rem;
+        max-width: calc(100vw - 2rem);
         gap: 0.2rem;
         border: 1px solid var(--pwdl-border-subtle);
         border-radius: var(--pwdl-radius-lg);
@@ -239,7 +240,6 @@
     }
 
     .pd-appshell-workspace-switcher__link,
-    .pd-appshell-workspace-switcher__future,
     .pd-appshell-slot {
         display: inline-flex;
         align-items: center;
@@ -262,8 +262,33 @@
         color: var(--pwdl-brand-primary);
     }
 
-    .pd-appshell-workspace-switcher__future {
-        opacity: 0.52;
+    .pd-appshell-workspace-switcher__heading {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--pd-muted);
+        font-weight: 600;
+    }
+
+    .pd-appshell-workspace-switcher__link {
+        gap: 0.625rem;
+        min-height: 2.5rem;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+
+    .pd-appshell-workspace-switcher__link:hover {
+        background: var(--pwdl-brand-primary-soft);
+    }
+
+    .pd-appshell-workspace-switcher__item-icon,
+    .pd-appshell-workspace-switcher__check {
+        width: 1.125rem;
+        height: 1.125rem;
+        flex-shrink: 0;
+    }
+
+    .pd-appshell-workspace-switcher__check {
+        margin-left: auto;
     }
 
     .pd-appshell-global-header__search {

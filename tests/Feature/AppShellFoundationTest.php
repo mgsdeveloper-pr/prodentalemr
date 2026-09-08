@@ -1,5 +1,29 @@
 <?php
 
+it('shows only accessible real workspaces and marks the current workspace', function (string $workspace, string $panel, string $label): void {
+    $user = Mockery::mock(\App\Models\User::class)->makePartial();
+    $user->name = 'Workspace Tester';
+    $user->shouldReceive('getPrimaryRoleLabel')->andReturn('User');
+    $user->shouldReceive('canAccessPanel')->andReturnUsing(
+        fn (\Filament\Panel $candidate): bool => $candidate->getId() === $panel
+    );
+    $this->actingAs($user);
+
+    $html = view('filament.appshell.global-header', compact('workspace'))->render();
+    preg_match('/<nav class="pd-appshell-workspace-switcher__menu".*?<\/nav>/s', $html, $matches);
+    $menu = $matches[0];
+
+    expect($menu)->toContain('Switch workspace')->toContain($label)
+        ->toContain('aria-current="page"')->toContain('pd-appshell-workspace-switcher__check')
+        ->not->toContain('Future AI')->not->toContain('Reports')->not->toContain('Revenue');
+    expect(substr_count($menu, 'href='))->toBe(1);
+})->with([
+    ['platform', 'saas', 'Administration'],
+    ['verification', 'admin', 'Verification'],
+    ['organization', 'clinic', 'Clinic'],
+    ['dso', 'dso', 'DSO'],
+]);
+
 it('renders the enterprise appshell foundation partials', function (): void {
     $globalHeader = view('filament.appshell.global-header', ['workspace' => 'verification'])->render();
 
