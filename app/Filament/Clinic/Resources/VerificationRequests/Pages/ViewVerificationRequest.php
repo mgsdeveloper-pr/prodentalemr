@@ -20,6 +20,7 @@ class ViewVerificationRequest extends BaseViewVerificationRequest
     protected function getHeaderActions(): array
     {
         $actions = [
+            $this->getRaiseUrgentRequestAction(),
             Action::make('queue')
                 ->label('Back to Queue')
                 ->icon('heroicon-o-arrow-left')

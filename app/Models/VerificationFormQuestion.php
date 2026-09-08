@@ -15,6 +15,28 @@ class VerificationFormQuestion extends Model
 
     public const DEFAULT_TEMPLATE_KEY = 'template_3';
 
+    public const INFORMATION_SCOPE_OPTIONS = [
+        'unclassified' => 'Not classified',
+        'plan' => 'Plan benefit or rule',
+        'member' => 'Member-specific information',
+        'provider' => 'Provider-specific information',
+        'request' => 'This verification only',
+    ];
+
+    public const REUSE_POLICY_OPTIONS = [
+        'fresh_verification' => 'Fresh verification required',
+        'review_required' => 'Plan information: review before reuse',
+    ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $question): void {
+            $question->semantic_key ??= 'question:'.Str::uuid();
+            $question->information_scope ??= 'unclassified';
+            $question->reuse_policy ??= 'fresh_verification';
+        });
+    }
+
     public const TEMPLATE_OPTIONS = [
         'template_3' => 'Master Template',
     ];
@@ -287,6 +309,8 @@ class VerificationFormQuestion extends Model
         'clinic_id',
         'template_version_id',
         'source_question_id',
+        'information_scope',
+        'reuse_policy',
         'template_key',
         'question_kind',
         'parent_question_id',
@@ -332,6 +356,22 @@ class VerificationFormQuestion extends Model
     public function answers(): HasMany
     {
         return $this->hasMany(VerificationFormAnswer::class);
+    }
+
+    public function reviewRules(): array
+    {
+        $parent = $this->parentQuestion;
+
+        return [
+            'parent' => $parent ? ($parent->semantic_key ?: ($parent->source_question_id ?: $parent->id)) : null,
+            ...$this->only([
+                'question_kind', 'trigger_answer', 'field_key', 'secondary_field_key',
+                'secondary_input_type', 'select_options', 'frequency_response_mode',
+                'frequency_response_fields', 'has_note', 'note_label', 'note_placeholder',
+                'help_text', 'placeholder', 'is_required_for_audit', 'is_locked_by_admin',
+                'information_scope', 'reuse_policy',
+            ]),
+        ];
     }
 
     public function parentQuestion(): BelongsTo

@@ -72,6 +72,98 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
+it('raises an urgent request once and preserves saved answers and workflow', function () {
+    $this->user->verificationClinics()->attach($this->clinic->id);
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Urgent review', 'status' => 'pending', 'priority' => 'normal',
+        'due_at' => now()->addHour(),
+    ]);
+    $due = $request->due_at->toDateTimeString();
+    $action = app(\App\Actions\Verification\EscalateVerificationRequestAction::class);
+    $action->execute($request, 'Appointment brought forward', $this->user);
+    $action->execute($request, 'Repeated click', $this->user);
+    expect($request->fresh()->priority)->toBe('urgent')
+        ->and($request->fresh()->status)->toBe('pending')
+        ->and($request->fresh()->due_at->toDateTimeString())->toBe($due)
+        ->and($request->activities()->where('activity_type', 'verification_escalated')->count())->toBe(1);
+});
+
+it('rejects unauthorized and completed urgent escalations', function () {
+    $this->user->verificationClinics()->attach($this->clinic->id);
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'assigned_to' => $this->user->id, 'title' => 'Protected request',
+        'status' => 'pending', 'priority' => 'normal',
+    ]);
+    $action = app(\App\Actions\Verification\EscalateVerificationRequestAction::class);
+    $outsider = User::factory()->create();
+    expect(fn () => $action->execute($request, 'Unauthorized', $outsider))
+        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+    expect(fn () => $action->execute($request, ' ', $this->user))
+        ->toThrow(ValidationException::class);
+    $request->forceFill(['status' => BillingWorkItem::STATUS_DONE])->saveQuietly();
+    expect(fn () => $action->execute($request, 'Too late', $this->user))
+        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+    expect($request->fresh()->priority)->toBe('normal');
+});
+
+it('separates saved state from audit readiness', function () {
+    $page = new EditVerificationRequest;
+    $page->auditReady = false;
+    expect($page->getFocusModeSaveState()['label'])->toBe('Saved');
+    $page->updated('data.custom_question_1', 'Changed');
+    expect($page->getFocusModeSaveState()['label'])->toBe('Unsaved Changes');
+});
+
+it('includes validation and response rules in template comparisons', function () {
+    $question = new VerificationFormQuestion(['input_type' => 'select', 'select_options' => 'Yes,No', 'is_required_for_audit' => false]);
+    $before = $question->reviewRules();
+    $question->is_required_for_audit = true;
+    expect($question->reviewRules())->not->toBe($before);
+    $before = $question->reviewRules();
+    $question->select_options = 'Yes,No,Unknown';
+    expect($question->reviewRules())->not->toBe($before);
+});
+
+it('blocks publication of conditional questions without an active parent', function () {
+    $service = app(VerificationTemplateVersionService::class);
+    $published = $service->ensureClinicPublishedVersion($this->clinic);
+    $draft = $service->createDraftFromPublished($published);
+    VerificationFormQuestion::create([
+        'template_version_id' => $draft->id, 'template_key' => 'template_3',
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'prompt' => 'Orphan follow-up', 'section_key' => 'template_3_plan_provisions',
+        'question_kind' => 'conditional', 'trigger_answer' => 'yes', 'input_type' => 'text',
+        'is_active' => true, 'form_type' => 'both',
+    ]);
+    expect(fn () => $service->publishDraft($draft))->toThrow(ValidationException::class);
+    expect($published->fresh()->is_active)->toBeTrue();
+});
+
+it('preserves question identity and reuse settings through clinic template versions', function () {
+    $service = app(VerificationTemplateVersionService::class);
+    $published = $service->ensureClinicPublishedVersion($this->clinic);
+    $draft = $service->createDraftFromPublished($published);
+    $question = $draft->questions()->firstOrFail();
+    expect($question->semantic_key)->not->toBeEmpty()
+        ->and($question->reuse_policy)->toBe('fresh_verification');
+    $question->update(['information_scope' => 'plan', 'reuse_policy' => 'review_required', 'is_active' => true]);
+    $next = $service->publishDraft($draft);
+    $copy = $service->createDraftFromPublished($next)->questions()
+        ->where('source_question_id', $question->id)->firstOrFail();
+    expect($copy->semantic_key)->toBe($question->semantic_key)
+        ->and($copy->information_scope)->toBe('plan')
+        ->and($copy->reuse_policy)->toBe('review_required');
+    $copy->update(['information_scope' => 'member']);
+    expect(fn () => $service->publishDraft($copy->templateVersion))->toThrow(ValidationException::class);
+});
+
 it('attaches the active clinic template snapshot when a verification request is created', function () {
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 

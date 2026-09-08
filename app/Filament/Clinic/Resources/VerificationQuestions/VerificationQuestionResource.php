@@ -308,6 +308,7 @@ class VerificationQuestionResource extends Resource
                                             ->columnSpan(3),
                                     ]),
                             ]),
+                        \App\Support\VerificationQuestionInformationSchema::make(),
                         Section::make('Field Binding')
                             ->description('Only use these fields when the question should map directly to stored verification values or a matrix-style worksheet row.')
                             ->columnSpan(12)

@@ -547,6 +547,33 @@ class VerificationTemplateVersionService
                 'template' => "The field {$duplicateFieldKey} is included more than once. Remove the duplicate before publishing.",
             ]);
         }
+
+        $questions = $version->questions()->where('is_active', true)->get()->keyBy('id');
+        foreach ($questions as $question) {
+            if (! array_key_exists($question->information_scope ?? 'unclassified', VerificationFormQuestion::INFORMATION_SCOPE_OPTIONS)
+                || ! array_key_exists($question->reuse_policy ?? 'fresh_verification', VerificationFormQuestion::REUSE_POLICY_OPTIONS)
+                || ($question->reuse_policy === 'review_required' && $question->information_scope !== 'plan')) {
+                throw ValidationException::withMessages(['template' => 'Only plan information may be marked for reviewed reuse. Check the question information settings.']);
+            }
+            if ($question->question_kind !== VerificationFormQuestion::QUESTION_KIND_CONDITIONAL) {
+                continue;
+            }
+            $parent = $questions->get($question->parent_question_id);
+            if (! $parent || $parent->id === $question->id
+                || ! array_key_exists((string) $question->trigger_answer, VerificationFormQuestion::CONDITIONAL_TRIGGER_OPTIONS)) {
+                throw ValidationException::withMessages([
+                    'template' => 'A conditional question has a missing or invalid parent or trigger. Review the draft before publishing.',
+                ]);
+            }
+            $visited = [$question->id];
+            while ($parent) {
+                if (in_array($parent->id, $visited, true)) {
+                    throw ValidationException::withMessages(['template' => 'Conditional questions contain a circular dependency.']);
+                }
+                $visited[] = $parent->id;
+                $parent = $questions->get($parent->parent_question_id);
+            }
+        }
     }
 
     public function markWorkingDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
@@ -687,6 +714,7 @@ class VerificationTemplateVersionService
                 $copy = $question->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
                 $copy->template_version_id = $target->id;
                 $copy->source_question_id = $question->id;
+                $copy->semantic_key = $question->semantic_key ?: 'question:'.$question->id;
                 $copy->organization_id = $clinic?->organization_id ?? $target->organization_id;
                 $copy->clinic_id = $clinic?->id ?? $target->clinic_id;
                 $copy->parent_question_id = null;

@@ -48,6 +48,7 @@ class ViewVerificationRequest extends ViewRecord
     protected function getHeaderActions(): array
     {
         $actions = [
+            $this->getRaiseUrgentRequestAction(),
             Action::make('queue')
                 ->label('Back to Queue')
                 ->icon('heroicon-o-arrow-left')
@@ -78,6 +79,23 @@ class ViewVerificationRequest extends ViewRecord
         }
 
         return $actions;
+    }
+
+    protected function getRaiseUrgentRequestAction(): Action
+    {
+        return Action::make('raiseUrgentRequest')
+            ->label('Raise urgent request')
+            ->icon('heroicon-o-exclamation-triangle')
+            ->color('danger')
+            ->visible(fn (): bool => $this->record->priority !== 'urgent'
+                && $this->record->normalized_status !== BillingWorkItem::STATUS_DONE
+                && (auth()->user()?->can('update', $this->record) ?? false))
+            ->schema([Textarea::make('urgentReason')->label('Reason for urgency')->required()->maxLength(1000)])
+            ->action(function (array $data): void {
+                $this->record = app(\App\Actions\Verification\EscalateVerificationRequestAction::class)
+                    ->execute($this->record, $data['urgentReason'], auth()->user());
+                Notification::make()->title('Urgent request raised')->success()->send();
+            });
     }
 
     protected function getPdfOutputActionGroup(): ActionGroup

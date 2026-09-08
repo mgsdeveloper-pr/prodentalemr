@@ -131,6 +131,23 @@ beforeEach(function (): void {
     $this->outsideRequest = $makeRequest($this->clinicB, $this->otherSpecialist, 'Outside assigned clinic');
 });
 
+it('enforces the same tenant and role boundaries when raising urgent requests', function (): void {
+    $action = app(\App\Actions\Verification\EscalateVerificationRequestAction::class);
+    foreach ([$this->otherRequest, $this->outsideRequest] as $request) {
+        expect(fn () => $action->execute($request, 'Urgent follow-up', $this->specialist))
+            ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+    }
+    expect(fn () => $action->execute($this->ownRequest, 'Urgent follow-up', $this->clinicUser))
+        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+    $this->clinicAdmin->givePermissionTo(Permission::findOrCreate(
+        PanelPermissionMatrix::permissionName('clinic', 'verification_requests', 'update'), 'web',
+    ));
+    $action->execute($this->ownRequest, 'Appointment moved forward', $this->clinicAdmin);
+    expect($this->ownRequest->fresh()->priority)->toBe('urgent');
+    expect(fn () => $action->execute($this->outsideRequest, 'Other clinic', $this->clinicAdmin))
+        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+});
+
 it('enforces the verification request boundary for every verification role', function (): void {
     expect($this->specialist->can('view', $this->ownRequest))->toBeTrue()
         ->and($this->specialist->can('view', $this->otherRequest))->toBeFalse()

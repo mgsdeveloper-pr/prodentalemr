@@ -8,6 +8,7 @@
 
 <div class="verification-queue-kpis" role="navigation" aria-label="Verification request queues">
     <a href="{{ $queueUrl() }}" @class(['verification-queue-kpi', 'is-active' => $activeQueue === 'all'])>All requests</a>
+    <a href="{{ $queueUrl('urgent_requests') }}" @class(['verification-queue-kpi', 'is-active' => $activeQueue === 'urgent_requests'])>Urgent requests</a>
     <a href="{{ $queueUrl('unassigned') }}" @class(['verification-queue-kpi', 'is-active' => $activeQueue === 'unassigned'])>Unassigned</a>
     <a href="{{ $queueUrl('in_progress') }}" @class(['verification-queue-kpi', 'is-active' => $activeQueue === 'in_progress'])>In progress</a>
     <a href="{{ $queueUrl('waiting_clinic') }}" @class(['verification-queue-kpi', 'is-active' => $activeQueue === 'waiting_clinic'])>Waiting on clinic</a>

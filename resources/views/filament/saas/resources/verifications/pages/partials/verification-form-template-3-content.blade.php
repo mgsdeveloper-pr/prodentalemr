@@ -44,8 +44,8 @@
     $templateThreeServiceHistoryQuestions = $this->getTemplateThreeQuestionsForSection('template_3_service_history');
     $templateThreeCustomSections = $this->getTemplateThreeCustomSections();
     $templateThreeVerificationSection = $this->getTemplateThreeVerificationInformationSection();
-    $templateThreeInput = 'width:100%;min-height:38px;border:1px solid #dce8e3;border-radius:6px;background:#fff;padding:8px 10px;font-size:13px;outline:none;color:#142e25;';
-    $templateThreeReadonly = 'width:100%;min-height:38px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:8px 10px;font-size:13px;font-weight:700;color:#334155;';
+    $templateThreeInput = 'width:100%;min-height:38px;border:1px solid #dce8e3;border-radius:6px;background:#fff;padding:8px 10px;font-size:var(--pwdl-font-size-body,0.875rem);outline:none;color:#142e25;';
+    $templateThreeReadonly = 'width:100%;min-height:38px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;padding:8px 10px;font-size:var(--pwdl-font-size-body,0.875rem);font-weight:700;color:#334155;';
     $templateThreeFrequencyFieldLabels = array_merge(
         \App\Models\VerificationFormQuestion::FREQUENCY_BASE_RESPONSE_FIELDS,
         \App\Models\VerificationFormQuestion::FREQUENCY_CURRENT_OPTIONAL_FIELDS,
@@ -476,7 +476,7 @@
 
     .uel2-quick-strip__header h3 {
         margin: 0;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 900;
         letter-spacing: .06em;
         text-transform: uppercase;
@@ -733,7 +733,7 @@
     .uel2-progress-item__label {
         min-width: 0;
         color: var(--uel2-dark);
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 700;
         line-height: 1.35;
     }
@@ -894,7 +894,7 @@
 
     .uel2-question-row__label {
         color: var(--uel2-dark);
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 800;
         line-height: 1.4;
     }
@@ -916,7 +916,7 @@
         border-radius: 6px;
         background: #ffffff;
         color: #142e25;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
     }
 
     .uel2-coverage-list,
@@ -970,7 +970,7 @@
         border-radius: 6px;
         background: #ffffff;
         color: #142e25;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
     }
 
     .uel2-detail-panel {
@@ -994,7 +994,7 @@
         padding: 10px 12px;
         border-bottom: 1px solid var(--uel2-line);
         background: #f8fbfa;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         letter-spacing: .04em;
         text-transform: uppercase;
     }
@@ -1089,7 +1089,7 @@
         border-radius: 6px;
         background: #ffffff;
         color: #142e25;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
     }
 
     .uel2-page input:focus,
@@ -1189,7 +1189,7 @@
         border-radius: 0;
         background: #ffffff;
         color: #142e25;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
     }
 
     .uel2-page .uel2-input-addon > input:focus {
@@ -1231,7 +1231,7 @@
         min-height: 38px;
         padding: 7px 14px;
         color: #29443a;
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 700;
     }
 
@@ -1261,7 +1261,7 @@
         border-radius: 6px;
         background: #ffffff;
         color: #142e25 !important;
-        font-size: 13px !important;
+        font-size: var(--pwdl-font-size-body,0.875rem) !important;
         font-weight: 700 !important;
         letter-spacing: 0 !important;
         text-transform: none !important;
@@ -1341,7 +1341,7 @@
 
     .uel2-benefit-description {
         color: var(--uel2-dark);
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 800;
         line-height: 1.4;
     }
@@ -1411,7 +1411,7 @@
 
     .uel2-question-label {
         color: var(--uel2-dark);
-        font-size: 13px;
+        font-size: var(--pwdl-font-size-body,0.875rem);
         font-weight: 800;
         line-height: 1.4;
     }
@@ -1554,7 +1554,7 @@
                 <summary>
                     <span class="uel2-progress-disclosure__summary">Verification Progress</span>
                     <span class="uel2-progress-disclosure__status">
-                        <span>{{ $templateThreeProgressPercent }}% complete</span>
+                        <span>{{ $templateThreeProgressPercent }}% answered</span>
                         <span class="uel2-pill">{{ $templateThreeProgressCompleted }}/{{ $templateThreeProgressSections->sum('total') }}</span>
                     </span>
                 </summary>
@@ -1564,7 +1564,7 @@
                             <span style="width: {{ min(100, max(0, $templateThreeProgressPercent)) }}%;"></span>
                         </div>
                         <div class="uel2-progress-total">
-                            <span>{{ $templateThreeProgressPercent }}% complete</span>
+                            <span>{{ $templateThreeProgressPercent }}% answered</span>
                             <span>{{ $templateThreeProgressCompleted }} / {{ $templateThreeProgressSections->sum('total') }} fields</span>
                         </div>
                     </div>
@@ -1675,7 +1675,7 @@
         @endphp
         @if (in_array($templateThreeRelationship, ['spouse', 'dependent'], true))
             <div class="uel2-body" style="padding-top:0;">
-                <div style="border:1px solid #dbe8e2;border-radius:6px;background:#f8fbfa;padding:12px 14px;color:#5f7469;font-size:13px;line-height:1.55;">
+                <div style="border:1px solid #dbe8e2;border-radius:6px;background:#f8fbfa;padding:12px 14px;color:#5f7469;font-size:var(--pwdl-font-size-body,0.875rem);line-height:1.55;">
                     Enter subscriber details separately because the policy holder is different from the patient.
                 </div>
             </div>
@@ -2290,7 +2290,7 @@
                 <div>
                     <div style="margin-bottom:6px;color:#0b6b4f;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Insurance Directory</div>
                     <h3 id="add-insurance-title" style="margin:0;color:#0f172a;font-size:24px;font-weight:900;">Add Insurance</h3>
-                    <p style="margin:7px 0 0;color:#64748b;font-size:13px;line-height:1.6;">Create the missing carrier and use it immediately in this verification.</p>
+                    <p style="margin:7px 0 0;color:#64748b;font-size:var(--pwdl-font-size-body,0.875rem);line-height:1.6;">Create the missing carrier and use it immediately in this verification.</p>
                 </div>
                 <button
                     type="button"

@@ -204,6 +204,20 @@
         ob_start();
     @endphp
         <div class="vt3-top-actions" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;">
+            <span role="status" style="font-size:var(--pwdl-font-size-caption,0.75rem);color:#475569;">
+                <span wire:loading wire:target="saveAsDraft,save">Saving...</span>
+                <span wire:loading.remove wire:target="saveAsDraft,save">
+                    <span wire:dirty>Unsaved Changes</span>
+                    <span wire:dirty.remove>{{ $this->getFocusModeSaveState()['label'] }}</span>
+                </span>
+            </span>
+            @if ($record->priority === 'urgent')
+                <x-filament::badge color="danger" icon="heroicon-o-exclamation-triangle">Urgent</x-filament::badge>
+            @elseif ($this->canRaiseUrgentRequest())
+                <x-filament::button color="danger" outlined icon="heroicon-o-exclamation-triangle" wire:click="openUrgentRequestModal">
+                    Raise urgent request
+                </x-filament::button>
+            @endif
             @if ((! $isTemplateThreeVerificationForm || $this->focusMode) && ($callingWorkspace['visible'] ?? false))
                 @include('filament.saas.resources.verifications.pages.partials.telephony-call-control', [
                     'callingWorkspace' => $callingWorkspace,
@@ -1473,4 +1487,15 @@
             }
         });
     </script>
+    <x-filament::modal id="raise-urgent-request" width="md">
+        <x-slot name="heading">Raise urgent request</x-slot>
+        <form wire:submit="raiseUrgentRequest">
+            <label for="urgent-request-reason">Reason for urgency</label>
+            <textarea id="urgent-request-reason" wire:model="urgentReason" rows="3" maxlength="1000" required
+                style="width:100%;margin:8px 0 16px;border:1px solid #dbe4ee;border-radius:6px;font-size:var(--pwdl-font-size-body,0.875rem);"></textarea>
+            @error('urgentReason') <p role="alert" style="color:#b42318;">{{ $message }}</p> @enderror
+            <x-filament::button type="submit" color="danger" wire:loading.attr="disabled" wire:target="raiseUrgentRequest">Raise urgent request</x-filament::button>
+            <x-filament::button color="gray" x-on:click="$dispatch('close-modal', { id: 'raise-urgent-request' })">Cancel</x-filament::button>
+        </form>
+    </x-filament::modal>
 </x-filament-panels::page>

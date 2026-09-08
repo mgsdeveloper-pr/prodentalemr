@@ -3,6 +3,7 @@
 namespace App\Filament\Saas\Resources\Verifications\Pages;
 
 use App\Actions\Verification\RefreshVerificationTemplateAction;
+use App\Actions\Verification\EscalateVerificationRequestAction;
 use App\Actions\Verification\SaveVerificationAnswerAction;
 use App\Actions\Verification\TakeVerificationOwnershipAction;
 use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
@@ -67,6 +68,35 @@ class EditVerificationRequest extends EditRecord
     public array $clinicResponseAttachments = [];
 
     public bool $auditReady = false;
+
+    public bool $hasUnsavedVerificationChanges = false;
+
+    public string $urgentReason = '';
+
+    public function canRaiseUrgentRequest(): bool
+    {
+        return $this->record->priority !== 'urgent'
+            && $this->record->normalized_status !== BillingWorkItem::STATUS_DONE
+            && (auth()->user()?->can('update', $this->record) ?? false);
+    }
+
+    public function openUrgentRequestModal(): void
+    {
+        abort_unless($this->canRaiseUrgentRequest(), 403);
+        $this->resetValidation('urgentReason');
+        $this->urgentReason = '';
+        $this->dispatch('open-modal', id: 'raise-urgent-request');
+    }
+
+    public function raiseUrgentRequest(): void
+    {
+        $this->record = app(EscalateVerificationRequestAction::class)
+            ->execute($this->record, $this->urgentReason, auth()->user());
+        $this->data['priority'] = $this->record->priority;
+        $this->dispatch('close-modal', id: 'raise-urgent-request');
+        $this->urgentReason = '';
+        Notification::make()->title('Urgent request raised')->success()->send();
+    }
 
     public ?string $returnToQueue = null;
 
@@ -394,9 +424,9 @@ class EditVerificationRequest extends EditRecord
 
     public function getFocusModeSaveState(): array
     {
-        return $this->auditReady
-            ? ['label' => 'Saved', 'status' => 'success']
-            : ['label' => 'Unsaved Changes', 'status' => 'warning'];
+        return $this->hasUnsavedVerificationChanges
+            ? ['label' => 'Unsaved Changes', 'status' => 'warning']
+            : ['label' => 'Saved', 'status' => 'success'];
     }
 
     public function getWorkContextEngine(
@@ -458,6 +488,7 @@ class EditVerificationRequest extends EditRecord
             || str_starts_with((string) $name, 'waitingPeriod')
         ) {
             $this->auditReady = false;
+            $this->hasUnsavedVerificationChanges = true;
         }
 
         if ($name === 'waitingPeriodAnswer' && $value !== 'yes') {
@@ -1052,6 +1083,7 @@ class EditVerificationRequest extends EditRecord
         $this->waitingPeriodDetails = $this->defaultWaitingPeriodDetails();
         $this->data = $this->applyAutofillDefaults($this->data ?? []);
         $this->auditReady = false;
+        $this->hasUnsavedVerificationChanges = true;
         $this->resetErrorBag();
 
         Notification::make()
@@ -1977,10 +2009,12 @@ class EditVerificationRequest extends EditRecord
             $this->syncWorkflowStatusFromForm();
         }
         if (! $this->shouldCaptureSubmissionOnSave) {
+            $this->hasUnsavedVerificationChanges = false;
             return;
         }
 
         $submission = $this->captureFormSubmissionSnapshot();
+        $this->hasUnsavedVerificationChanges = false;
 
         if ($submission) {
             $this->record->recordActivity('form_submitted', 'Verification form submitted and stored in timeline.', [

@@ -950,6 +950,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         $sections = $this->templateSectionRows($version);
         $questions = $version->questions()
+            ->with('parentQuestion')
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->orderBy('section_key')
             ->orderBy('sort_order')
@@ -1136,6 +1137,7 @@ class ListVerificationFormQuestions extends ListRecords
                         || $publishedQuestion['input_type'] !== $draftQuestion['input_type']
                         || $publishedQuestion['is_active'] !== $draftQuestion['is_active']
                         || $publishedQuestion['sort_order'] !== $draftQuestion['sort_order']
+                        || $publishedQuestion['rules'] !== $draftQuestion['rules']
                     ) => 'changed',
                     default => 'unchanged',
                 };
@@ -1256,6 +1258,7 @@ class ListVerificationFormQuestions extends ListRecords
                     'input_type' => $question->input_type,
                     'is_active' => (bool) $question->is_active,
                     'sort_order' => (int) $question->sort_order,
+                    'rules' => $question->reviewRules(),
                 ]];
             })
             ->all();
