@@ -80,7 +80,10 @@ class VerificationUnassignedRequests extends Page implements HasTable
             ->query($this->getTableQuery())
             ->heading('Unassigned Verification Requests')
             ->description('Assign incoming verification requests that do not currently have an owner.')
-            ->defaultSort('updated_at', 'desc')
+            ->defaultSort(fn (Builder $query): Builder => $query
+                ->orderByRaw("case when priority = 'urgent' then 0 else 1 end")
+                ->orderByRaw('case when due_at is null then 1 else 0 end')
+                ->orderBy('due_at')->orderBy('created_at'))
             ->columns([
                 TextColumn::make('patient_name')
                     ->label('Patient')

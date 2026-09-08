@@ -13,6 +13,9 @@ use App\Models\Provider;
 use App\Models\VerificationPlanSnapshot;
 use App\Models\VerificationProfile;
 use App\Support\ClinicPanelScope;
+use App\Support\VerificationCreationContext;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
@@ -20,7 +23,6 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TimePicker;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -32,7 +34,7 @@ class VerificationRequestForm
     public static function configure(Schema $schema): Schema
     {
         $user = auth()->user();
-        $scopedClinic = ClinicPanelScope::selectedClinic();
+        $scopedClinic = ClinicPanelScope::selectedClinic()?->fresh();
         $scopedClinicId = $scopedClinic?->id ?? $user?->clinic_id;
         $scopedOrganizationId = $scopedClinic?->organization_id ?? $user?->organization_id;
         $needsClinicSelection = $user?->shouldBypassClinicScope() && blank($scopedClinicId);
@@ -69,60 +71,15 @@ class VerificationRequestForm
                     ]),
 
                 Section::make('Start Request')
-                    ->description('Start from an appointment or patient record when one is available.')
+                    ->contained(false)->extraAttributes(['class' => 'pd-intake-section'])
                     ->columnSpanFull()
                     ->disabled($needsClinicSelection)
                     ->schema([
-                        Grid::make(2)->schema([
-                            Select::make('import_appointment_id')
-                                ->label('Import Appointment')
-                                ->options(fn (Get $get): array => static::appointmentImportOptions(
-                                    $scopedOrganizationId,
-                                    $scopedClinicId,
-                                    filled($get('location_id')) ? (int) $get('location_id') : null,
-                                ))
-                                ->searchable()
-                                ->preload()
-                                ->live()
-                                ->dehydrated(false)
-                                ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
-                                    if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
-                                        return;
-                                    }
-
-                                    static::applyImportedAppointment(
-                                        (int) $state,
-                                        $get,
-                                        $set,
-                                        (int) $scopedOrganizationId,
-                                        (int) $scopedClinicId,
-                                    );
-                                }),
-                            Select::make('import_patient_id')
-                                ->label('Import Patient')
-                                ->options(fn (Get $get): array => static::patientImportOptions(
-                                    $scopedOrganizationId,
-                                    $scopedClinicId,
-                                    filled($get('location_id')) ? (int) $get('location_id') : null,
-                                ))
-                                ->searchable()
-                                ->preload()
-                                ->live()
-                                ->dehydrated(false)
-                                ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($scopedOrganizationId, $scopedClinicId): void {
-                                    if (blank($state) || blank($scopedOrganizationId) || blank($scopedClinicId)) {
-                                        return;
-                                    }
-
-                                    static::applyImportedPatient(
-                                        (int) $state,
-                                        $get,
-                                        $set,
-                                        (int) $scopedOrganizationId,
-                                        (int) $scopedClinicId,
-                                    );
-                                }),
-                        ]),
+                        ...\App\Support\VerificationPatientSelector::components(
+                            fn (int $id, Get $get, Set $set) => static::applyImportedPatient($id, $get, $set, (int) $scopedOrganizationId, (int) $scopedClinicId),
+                            fn (int $id, Get $get, Set $set) => static::applyImportedAppointment($id, $get, $set, (int) $scopedOrganizationId, (int) $scopedClinicId),
+                            true,
+                        ),
                         Grid::make(3)->schema([
                             Select::make('vf_form_type')
                                 ->label('Form Type')
@@ -131,12 +88,12 @@ class VerificationRequestForm
                                 ->live()
                                 ->native(false)
                                 ->required(),
-                            Select::make('priority')
+                            ToggleButtons::make('priority')
                                 ->label('Priority')
-                                ->options(BillingWorkItem::PRIORITY_OPTIONS)
+                                ->options(['normal' => 'Normal', 'urgent' => 'Urgent'])
+                                ->colors(['normal' => 'primary', 'urgent' => 'danger'])->inline()->grouped()
                                 ->default('normal')
                                 ->live()
-                                ->native(false)
                                 ->required(),
                             Select::make('processing_mode')
                                 ->label('Completed By')
@@ -159,15 +116,36 @@ class VerificationRequestForm
                                 ->native(false)
                                 ->required(),
                         ]),
+                        Textarea::make('urgency_reason')->label('Reason for urgency')->maxLength(1000)
+                            ->visible(fn (Get $get): bool => $get('priority') === 'urgent')
+                            ->required(fn (Get $get): bool => $get('priority') === 'urgent')->columnSpanFull(),
+                        Grid::make(2)->schema([
+                        Placeholder::make('response_target')->label('Estimated response target')
+                            ->content(fn (Get $get): string => app(\App\Services\Verification\SLAService::class)->resolveDueAt([
+                                'priority' => $get('priority'), 'client_service_enrollment_id' => $get('processing_mode') === BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE
+                                    ? $get('client_service_enrollment_id') : null,
+                            ])->setTimezone($scopedClinic?->timezone ?: config('app.timezone'))->format('M d, Y g:i A T')),
+                        Placeholder::make('assignment_policy')->label('Assignment')
+                            ->content(fn (Get $get): string => $get('processing_mode') === BillingWorkItem::PROCESSING_MODE_SELF_MANAGED
+                                ? 'Clinic workflow' : ($scopedClinic?->verification_assignment_method === 'auto' ? 'Auto-assign' : 'Unassigned queue')),
+                        ]),
+                        Placeholder::make('existing_appointment_request')->hiddenLabel()
+                            ->content(fn (Get $get) => VerificationCreationContext::appointmentNotice($get('appointment_id') ? (int) $get('appointment_id') : null, true))
+                            ->visible(fn (Get $get): bool => VerificationCreationContext::appointmentNotice($get('appointment_id') ? (int) $get('appointment_id') : null, true) !== null)->columnSpanFull(),
                     ]),
 
                 Section::make('Patient & Appointment')
+                    ->contained(false)->extraAttributes(['class' => 'pd-intake-section'])
                     ->columnSpanFull()
                     ->disabled($needsClinicSelection)
                     ->schema([
+                        ...\App\Support\VerificationIntakeSummary::components(true),
                         Grid::make(2)
+                            ->hidden(fn (Get $get): bool => \App\Support\VerificationIntakeSummary::showsSummary($get))
+                            ->dehydratedWhenHidden()
                             ->schema([
                                 Section::make('Appointment Information')
+                                    ->contained(false)
                                     ->schema([
                                         Grid::make(2)
                                             ->schema([
@@ -191,6 +169,7 @@ class VerificationRequestForm
                                                                 ->find($state)
                                                             : null;
 
+                                                        VerificationCreationContext::clearImportedDetails($set);
                                                         $set('provider_id', null);
                                                         $set('patient_id', null);
                                                         $set('patient_insurance_policy_id', null);
@@ -228,28 +207,15 @@ class VerificationRequestForm
                                                 DatePicker::make('vf_appointment_date')
                                                     ->label('Appointment Date')
                                                     ->native(false)
+                                                    ->disabled(fn (Get $get): bool => filled($get('appointment_id')))->dehydrated()
                                                     ->required(),
-                                                TimePicker::make('vf_appointment_time')
-                                                    ->label('Appointment Time')
-                                                    ->seconds(false),
-                                                TextInput::make('vf_pms_id')
-                                                    ->label('PMS ID')
-                                                    ->live(onBlur: true)
-                                                    ->afterStateUpdated(fn (?string $state, Get $get, Set $set) => static::applyPatientLookup($get, $set, ClinicPanelScope::selectedOrganizationId() ?? $user?->organization_id, ClinicPanelScope::selectedClinicId() ?? $user?->clinic_id, 'pms'))
-                                                    ->maxLength(255)
-                                                    ->columnSpanFull(),
-                                                Placeholder::make('matched_patient_hint')
-                                                    ->label('')
-                                                    ->content(fn (Get $get): ?string => static::matchedPatientHint($get))
-                                                    ->hidden(fn (Get $get): bool => blank(static::matchedPatientHint($get)))
-                                                    ->columnSpanFull(),
-                                                Checkbox::make('vf_is_pre_registered')
-                                                    ->label('Pre-registered'),
+                                                Hidden::make('vf_appointment_time'),
                                             ]),
                                     ]),
                                 Section::make('Patient Information')
+                                    ->contained(false)
                                     ->schema([
-                                        Grid::make(1)
+                                        Grid::make(2)
                                             ->schema([
                                                 TextInput::make('vf_patient_full_name')
                                                     ->label('Full Name')
@@ -259,7 +225,7 @@ class VerificationRequestForm
                                                         static::syncSubscriberFromPatient($get, $set);
                                                     })
                                                     ->required()
-                                                    ->maxLength(255),
+                                                    ->maxLength(255)->columnSpanFull(),
                                                 DatePicker::make('vf_patient_dob')
                                                     ->label('Date of Birth')
                                                     ->native(false)
@@ -282,7 +248,28 @@ class VerificationRequestForm
                             ]),
                     ]),
 
-                Section::make('Insurance Plans')
+                Section::make('Additional Details')
+                    ->contained(false)
+                    ->collapsible()
+                    ->collapsed()
+                    ->columnSpanFull()
+                    ->visible(fn (Get $get): bool => $get('intake_mode') === 'manual')
+                    ->dehydratedWhenHidden()
+                    ->schema([
+                        TextInput::make('vf_pms_id')
+                            ->label('Patient ID in Clinic System')
+                            ->dehydratedWhenHidden()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (?string $state, Get $get, Set $set) => static::applyPatientLookup($get, $set, ClinicPanelScope::selectedOrganizationId() ?? $user?->organization_id, ClinicPanelScope::selectedClinicId() ?? $user?->clinic_id, 'pms'))
+                            ->maxLength(255),
+                        Placeholder::make('matched_patient_hint')
+                            ->hiddenLabel()
+                            ->content(fn (Get $get): ?string => static::matchedPatientHint($get))
+                            ->hidden(fn (Get $get): bool => blank(static::matchedPatientHint($get))),
+                    ]),
+
+                Section::make('Insurance Details')
+                    ->contained(false)->extraAttributes(['class' => 'pd-intake-section'])
                     ->columnSpanFull()
                     ->disabled($needsClinicSelection)
                     ->schema([
@@ -324,12 +311,12 @@ class VerificationRequestForm
                                     ->required(),
                             ]),
                         Repeater::make('verification_plan_snapshots')
-                            ->label('')
+                            ->hiddenLabel()
                             ->default([
                                 ['plan_priority' => 'primary'],
                             ])
                             ->minItems(1)
-                            ->addActionLabel('Add Another Plan')
+                            ->addActionLabel('Add Insurance Plan')->collapsible()
                             ->itemLabel(fn (array $state): ?string => match ($state['plan_priority'] ?? 'primary') {
                                 'secondary' => 'Secondary Plan',
                                 'tertiary' => 'Tertiary Plan',
@@ -413,29 +400,6 @@ class VerificationRequestForm
         static::applyMatchedPatient($patient, $set, $get);
     }
 
-    protected static function patientImportOptions(?int $organizationId, ?int $clinicId, ?int $locationId): array
-    {
-        if (blank($organizationId) || blank($clinicId)) {
-            return [];
-        }
-
-        return Patient::query()
-            ->where('organization_id', $organizationId)
-            ->where('clinic_id', $clinicId)
-            ->when(filled($locationId), fn ($query) => $query->where('location_id', $locationId))
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->get()
-            ->mapWithKeys(fn (Patient $patient): array => [
-                $patient->id => collect([
-                    $patient->full_name,
-                    optional($patient->dob)->format('m/d/Y'),
-                    filled($patient->pms_patient_id) ? 'PMS ' . $patient->pms_patient_id : null,
-                ])->filter()->implode(' | '),
-            ])
-            ->all();
-    }
-
     protected static function applyImportedPatient(int $patientId, Get $get, Set $set, int $organizationId, int $clinicId): void
     {
         $patient = Patient::query()
@@ -447,10 +411,13 @@ class VerificationRequestForm
             ->find($patientId);
 
         if (! $patient) {
-            return;
+            throw \Illuminate\Validation\ValidationException::withMessages(['data.import_patient_id' => 'Select a patient from the current clinic.']);
         }
 
-        if (blank($get('location_id')) && filled($patient->location_id)) {
+        VerificationCreationContext::clearImportedDetails($set);
+        $set('import_patient_id', $patient->id);
+
+        if (filled($patient->location_id)) {
             $set('location_id', $patient->location_id);
 
             $location = Location::query()
@@ -463,32 +430,6 @@ class VerificationRequestForm
         }
 
         static::applyMatchedPatient($patient, $set, $get);
-    }
-
-    protected static function appointmentImportOptions(?int $organizationId, ?int $clinicId, ?int $locationId): array
-    {
-        if (blank($organizationId) || blank($clinicId)) {
-            return [];
-        }
-
-        return Appointment::query()
-            ->with(['patient', 'provider.user'])
-            ->where('organization_id', $organizationId)
-            ->where('clinic_id', $clinicId)
-            ->when(filled($locationId), fn ($query) => $query->where('location_id', $locationId))
-            ->orderByDesc('appointment_date')
-            ->orderByDesc('start_time')
-            ->limit(100)
-            ->get()
-            ->mapWithKeys(fn (Appointment $appointment): array => [
-                $appointment->id => collect([
-                    optional($appointment->appointment_date)->format('M d, Y'),
-                    $appointment->patient?->full_name,
-                    $appointment->provider?->display_name,
-                    $appointment->start_time,
-                ])->filter()->implode(' | '),
-            ])
-            ->all();
     }
 
     protected static function applyImportedAppointment(int $appointmentId, Get $get, Set $set, int $organizationId, int $clinicId): void
@@ -508,6 +449,9 @@ class VerificationRequestForm
         if (! $appointment) {
             return;
         }
+
+        VerificationCreationContext::clearImportedDetails($set);
+        $set('import_appointment_id', $appointment->id);
 
         if (filled($appointment->location_id)) {
             $set('location_id', $appointment->location_id);

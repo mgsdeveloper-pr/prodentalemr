@@ -46,6 +46,7 @@ beforeEach(function () {
         'status' => true,
     ]);
     $this->user->assignRole('verification_manager');
+    $this->user->verificationClinics()->attach($this->clinic->id);
 
     $this->service = ManagedBillingService::create([
         'name' => 'Eligibility & Benefits Verification',
@@ -73,7 +74,6 @@ beforeEach(function () {
 });
 
 it('raises an urgent request once and preserves saved answers and workflow', function () {
-    $this->user->verificationClinics()->attach($this->clinic->id);
     $request = BillingWorkItem::create([
         'organization_id' => $this->organization->id,
         'clinic_id' => $this->clinic->id,
@@ -94,7 +94,6 @@ it('raises an urgent request once and preserves saved answers and workflow', fun
 });
 
 it('rejects unauthorized and completed urgent escalations', function () {
-    $this->user->verificationClinics()->attach($this->clinic->id);
     $request = BillingWorkItem::create([
         'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
         'managed_billing_service_id' => $this->service->id,

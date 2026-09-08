@@ -15,6 +15,7 @@ use Filament\Support\Enums\Width;
 
 class CreateVerificationRequest extends CreateRecord
 {
+    use \App\Support\HasVerificationIntakePresentation;
     protected static string $resource = VerificationRequestResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -23,7 +24,11 @@ class CreateVerificationRequest extends CreateRecord
 
     protected array $verificationPlanSnapshotData = [];
 
+    protected string $urgencyReason = '';
+
     protected static bool $canCreateAnother = false;
+
+    protected ?bool $hasDatabaseTransactions = true;
 
     public function form(Schema $schema): Schema
     {
@@ -32,15 +37,32 @@ class CreateVerificationRequest extends CreateRecord
 
     public function getTitle(): string
     {
-        return 'Create Insurance Verification Request';
+        return 'New Verification Request';
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $data['source'] = 'manual';
+        $data['processing_mode'] = \App\Models\BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE;
+        $data['created_by'] = auth()->id();
+        $data['assignment_method'] ??= 'unassigned';
+        if ($data['assignment_method'] !== 'unassigned' && ! auth()->user()?->canManageVerificationQueue()) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['assignment_method' => 'Only queue managers can assign requests.']);
+        }
+        if ($data['assignment_method'] !== 'manual') {
+            $data['assigned_to'] = null;
+        }
+        $this->urgencyReason = \App\Support\VerificationCreationContext::validate($data);
+        unset($data['urgency_reason']);
         $this->verificationPlanSnapshotData = $data['verification_plan_snapshots'] ?? [];
         unset($data['verification_plan_snapshots']);
 
         [$data, $this->verificationProfileData] = static::splitVerificationProfileData($data);
+        if (filled($data['appointment_id'] ?? null)) {
+            $appointment = \App\Models\Appointment::findOrFail($data['appointment_id']);
+            $this->verificationProfileData['appointment_date'] = $appointment->appointment_date->toDateString();
+            $this->verificationProfileData['appointment_time'] = $appointment->start_time;
+        }
 
         $patientName = $this->verificationProfileData['patient_full_name'] ?? null;
         $appointmentDate = $this->verificationProfileData['appointment_date'] ?? null;
@@ -71,6 +93,9 @@ class CreateVerificationRequest extends CreateRecord
 
     protected function afterCreate(): void
     {
+        if ($this->urgencyReason !== '') {
+            $this->record->recordActivity('verification_escalated', 'Urgent request raised at creation.', ['reason' => $this->urgencyReason]);
+        }
         $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->record->verificationPlanSnapshots()->delete();

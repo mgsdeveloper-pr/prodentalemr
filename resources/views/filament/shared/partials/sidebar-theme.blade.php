@@ -1,4 +1,73 @@
 <style>
+    .pd-verification-intake { background: transparent; padding-bottom: 1.5rem; }
+    .pd-verification-intake .pd-intake-surface {
+        background: #fff;
+        border: 1px solid var(--pwdl-border-default, #dbe4ee);
+        border-radius: 6px;
+        padding: 1.5rem;
+        min-width: 0;
+    }
+    .pd-verification-intake .pd-intake-summary {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem;
+        padding-block: 0.75rem;
+    }
+    .pd-verification-intake .pd-intake-summary section + section {
+        border-left: 1px solid var(--pwdl-border-default, #dbe4ee); padding-left: 1.5rem;
+    }
+    .pd-verification-intake .pd-intake-summary h3 { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .pd-verification-intake .pd-intake-summary dl > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 1rem; margin-top: 0.5rem; }
+    .pd-verification-intake .pd-intake-summary dt { color: #64748b; }
+    .pd-verification-intake .pd-intake-summary dd { margin: 0; overflow-wrap: anywhere; }
+    .pd-verification-intake .fi-sc-has-gap { gap: 1rem; }
+    .pd-verification-intake .pd-intake-section {
+        border-bottom: 1px solid var(--pwdl-border-default, #dbe4ee);
+        padding-block: 0.25rem 1.5rem;
+    }
+    .pd-verification-intake .pd-intake-toolbar > .fi-grid { align-items: center; }
+    .pd-verification-intake .pd-patient-appointments > .fi-grid { align-items: center; }
+    @media (min-width: 1280px) {
+        .pd-verification-intake .pd-assignment-row > .fi-grid {
+            grid-template-columns: minmax(12rem, 1fr) 10rem minmax(12rem, 1fr) minmax(12rem, 1fr) !important;
+        }
+    }
+    .pd-verification-intake .fi-section-header { padding-bottom: 0; }
+    @media (min-width: 768px) {
+        .pd-verification-intake .pd-intake-toolbar > .fi-grid {
+            grid-template-columns: max-content minmax(0, 1fr) !important;
+            column-gap: 1.5rem;
+        }
+    }
+    .pd-verification-intake .fi-section-header-heading {
+        font-size: 1.125rem; line-height: 1.5; letter-spacing: 0;
+    }
+    .pd-verification-intake .fi-fo-field-label,
+    .pd-verification-intake .fi-input {
+        font-size: var(--pwdl-font-size-body, 0.875rem); letter-spacing: 0;
+    }
+    .pd-verification-intake .fi-fo-repeater-item { border-radius: 0.375rem; box-shadow: none; }
+    .pd-verification-intake .fi-fo-toggle-buttons-input:checked + label.fi-color-primary {
+        background: #0f766e !important; color: #fff !important;
+    }
+    .pd-verification-intake .pd-intake-actions > .fi-ac {
+        justify-content: flex-end !important; align-items: center; background: transparent;
+        margin-inline: 0 !important; max-width: 100%; box-sizing: border-box;
+        border-radius: 0 !important;
+        border-top: 0;
+        padding: 1rem 0; gap: 0.75rem !important;
+    }
+    .pd-verification-intake .pd-intake-actions .fi-btn {
+        min-height: 2.5rem; min-width: 5.5rem;
+    }
+    @media (max-width: 640px) {
+        .pd-verification-intake .pd-intake-surface { padding: 1rem; }
+        .pd-verification-intake .pd-intake-summary { grid-template-columns: minmax(0, 1fr); }
+        .pd-verification-intake .pd-intake-summary section + section { border-left: 0; border-top: 1px solid #dbe4ee; padding: 1rem 0 0; }
+        .pd-verification-intake .pd-intake-summary dl > div { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+        .pd-verification-intake .pd-intake-section { padding-bottom: 1rem; }
+        .pd-verification-intake .pd-intake-actions > .fi-ac {
+            padding: 0.75rem 0; width: 100%;
+        }
+    }
     .fi-main-sidebar {
         background: linear-gradient(180deg, rgba(255, 252, 245, 0.96) 0%, rgba(255, 255, 255, 0.985) 100%);
         border-inline-end: 1px solid rgba(222, 226, 233, 0.95);
@@ -2653,7 +2722,7 @@
         }
     }
 
-    body:has(.fi-resource-verifications) .fi-dropdown-panel,
+    body:has(.fi-resource-verifications) .fi-dropdown-panel:not([role="listbox"]),
     body:has(.fi-resource-verifications) .pd-verification-column-panel {
         width: min(22rem, calc(100vw - 2rem)) !important;
         max-height: min(46vh, 21rem) !important;

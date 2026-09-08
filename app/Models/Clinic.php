@@ -49,6 +49,7 @@ class Clinic extends Model
         'timezone',
         'status',
         'verification_services_enabled',
+        'verification_assignment_method',
         'clinic_operations_enabled',
         'service_status',
         'pms_service_status',

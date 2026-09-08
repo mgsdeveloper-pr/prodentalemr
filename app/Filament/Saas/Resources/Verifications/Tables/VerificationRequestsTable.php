@@ -408,7 +408,7 @@ class VerificationRequestsTable
                     ])
                     ->query(function ($query, array $data) {
                         return match ($data['value'] ?? null) {
-                            'pending_unassigned' => $query->where('status', BillingWorkItem::STATUS_PENDING)->whereNull('assigned_to'),
+                            'pending_unassigned' => $query->whereIn('status', [BillingWorkItem::STATUS_PENDING, 'unassigned'])->whereNull('assigned_to'),
                             'unassigned' => $query->whereNull('assigned_to')->where('status', '!=', BillingWorkItem::STATUS_DONE),
                             'in_progress' => $query->where('status', BillingWorkItem::STATUS_IN_PROGRESS),
                             'waiting_clinic' => $query->where('status', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),

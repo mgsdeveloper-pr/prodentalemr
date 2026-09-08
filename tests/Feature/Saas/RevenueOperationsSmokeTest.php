@@ -420,6 +420,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
         'status' => true,
     ]);
     $specialist->assignRole('verification_user');
+    $specialist->verificationClinics()->syncWithoutDetaching([$this->clinic->id]);
 
     $clinicUser = User::factory()->create([
         'name' => 'Cross Panel Clinic User',

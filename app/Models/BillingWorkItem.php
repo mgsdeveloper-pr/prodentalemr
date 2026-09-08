@@ -142,6 +142,7 @@ class BillingWorkItem extends Model
         'status',
         'outcome_status',
         'priority',
+        'assignment_method',
         'source',
         'processing_mode',
         'pms_sync_status',
@@ -206,18 +207,23 @@ class BillingWorkItem extends Model
                 $assignee = $workItem->assignedTo?->name ?? 'Unassigned';
 
                 $workItem->recordActivity('assignment_changed', "Assigned to {$assignee}.", [
-                    'assignment_mode' => 'auto_on_create',
+                    'assignment_mode' => $workItem->assignment_method ?? 'unspecified',
                 ]);
 
                 if ($workItem->priority === 'urgent') {
                     $workItem->recordActivity('urgent_priority_assigned', "Urgent verification assigned to {$assignee}.", [
-                        'assignment_mode' => 'auto_on_create',
+                        'assignment_mode' => $workItem->assignment_method ?? 'unspecified',
                     ]);
                 }
             }
 
             if ($workItem->priority === 'urgent') {
                 $workItem->recordActivity('urgent_priority_flagged', 'Verification marked as urgent.');
+            }
+            if ($workItem->assignment_method === 'auto' && blank($workItem->assigned_to)) {
+                $workItem->recordActivity('auto_assignment_unavailable', 'No eligible verifier was available. Request remains unassigned.');
+            } elseif ($workItem->assignment_method === 'unassigned') {
+                $workItem->recordActivity('assignment_method_selected', 'Request entered the unassigned queue.');
             }
         });
 

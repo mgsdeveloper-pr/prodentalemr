@@ -187,9 +187,10 @@ class VerificationIntakeService
 
         $assignee = User::query()->whereKey($data['assigned_to'])->where('status', true)->first();
 
-        if (! $assignee || ! $assignee->canAccessVerificationWorkspace()) {
+        if (! $assignee || ! $assignee->canAccessVerificationWorkspace()
+            || ! $assignee->canAccessVerificationClinic((int) $data['clinic_id'])) {
             throw ValidationException::withMessages([
-                'assigned_to' => 'Select an active user who can access the Verification workspace.',
+                'assigned_to' => 'Select an active verification user assigned to this clinic.',
             ]);
         }
     }

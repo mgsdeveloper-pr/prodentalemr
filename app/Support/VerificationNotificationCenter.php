@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Collection;
 class VerificationNotificationCenter
 {
     protected const LEVELS = [
+        'auto_assignment_unavailable' => 'warning',
         'managed_service_requested' => 'warning',
         'admin_import_created' => 'warning',
         'assignment_changed' => 'info',
@@ -46,6 +47,7 @@ class VerificationNotificationCenter
     ];
 
     protected const EVENT_SETTING_MAP = [
+        'auto_assignment_unavailable' => 'verification_notify_on_assignment_changed',
         'managed_service_requested' => 'verification_notify_on_managed_service_requested',
         'clinic_self_service_created' => 'verification_notify_on_clinic_self_service_created',
         'verification_request_created' => 'verification_notify_on_verification_request_created',

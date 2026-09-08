@@ -1129,11 +1129,6 @@ class EditVerificationRequest extends EditRecord
         $locationName = $record->location?->location_name ?: '-';
         $providerName = $record->provider?->display_name ?: $record->provider?->user?->name ?: '-';
         $appointment = $record->appointment;
-        $appointmentTime = $appointment?->start_time;
-
-        if ($appointmentTime instanceof Carbon || $appointmentTime instanceof CarbonInterface) {
-            $appointmentTime = $appointmentTime->format('h:i A');
-        }
 
         return [
             [
@@ -1174,7 +1169,6 @@ class EditVerificationRequest extends EditRecord
                 'accent' => '#f59e0b',
                 'fields' => [
                     ['label' => 'Appointment Date', 'field' => 'vf_appointment_date', 'type' => 'date'],
-                    ['label' => 'Appointment Time', 'field' => 'vf_appointment_time', 'placeholder' => $appointmentTime],
                     ['label' => 'Service / Procedure', 'field' => 'title', 'placeholder' => $appointment?->appointment_type ?: 'Service being verified'],
                     ['label' => 'Group Name', 'field' => 'vf_group_name'],
                     ['label' => 'Group Number', 'field' => 'vf_group_number'],

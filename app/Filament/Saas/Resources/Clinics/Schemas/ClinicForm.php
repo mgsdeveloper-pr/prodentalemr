@@ -112,6 +112,11 @@ class ClinicForm
                                     ->visible(fn (Get $get): bool => (bool) $get('verification_services_enabled'))
                                     ->required(fn (Get $get): bool => (bool) $get('verification_services_enabled'))
                                     ->native(false),
+                                Select::make('verification_assignment_method')
+                                    ->label('Incoming managed request assignment')
+                                    ->options(['unassigned' => 'Unassigned', 'auto' => 'Auto-assign'])
+                                    ->default('unassigned')->required()->native(false)
+                                    ->visible(fn (Get $get): bool => (bool) $get('verification_services_enabled')),
                                 Toggle::make('allow_verification_manager_template_edits')
                                     ->label('Allow Verification Manager template changes')
                                     ->helperText('Allows an assigned Verification Manager to create and publish clinic-specific template drafts.')
