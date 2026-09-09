@@ -13,7 +13,8 @@ class VerificationLandscapeLayout
 
         // Estimate wrapped rows, then keep section order while balancing column heights.
         $weights = $sections->map(function (array $section): int {
-            return 2 + collect($section['rows'])->sum(function (array $row): int {
+            $headingRows = collect($section['rows'])->contains(fn (array $row): bool => ($row['kind'] ?? null) === 'coverage_matrix') ? 3 : 2;
+            return $headingRows + collect($section['rows'])->sum(function (array $row): int {
                 $value = ($row['kind'] ?? null) === 'coverage_matrix'
                     ? ($row['deductible'] ?? '-').' | '.($row['percent'] ?? '-')
                     : ($row['value'] ?? '-');

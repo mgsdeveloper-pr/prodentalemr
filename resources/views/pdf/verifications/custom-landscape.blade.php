@@ -30,6 +30,11 @@
         .sheet td:last-child { border-right: none; }
         .label { width: 60%; font-weight: 700; color: #102033; }
         .value { width: 40%; color: #334155; }
+        .coverage-answer { text-align: center; color: #334155; }
+        .sheet td.coverage-wrap { padding: 0; border: 0; }
+        .coverage-table .label { width: 50%; }
+        .coverage-table .coverage-answer { width: 25%; }
+        .sheet .coverage-head th { background: #f8fbfa; color: #516579; border-right: 1px solid #e1e8ee; }
         .empty { color: #8ca0af; }
         .report-footer { margin-top: 2px; padding-top: 2px; border-top: 1px solid #cbd8e2; color: #66758a; font-size: 5.8px; text-align: center; }
     </style>
@@ -47,16 +52,26 @@
     [$leftSections, $rightSections] = \App\Support\VerificationLandscapeLayout::columns($sections);
     $renderSections = function ($sections): string {
         return collect($sections)->map(function (array $section): string {
-            $rows = collect($section['rows'])->map(function (array $row): string {
-            $value = ($row['kind'] ?? null) === 'coverage_matrix'
-                ? (($row['deductible'] ?? '-') . ' | ' . ($row['percent'] ?? '-'))
-                : ($row['value'] ?? '-');
+            $hasCoverage = collect($section['rows'])->contains(fn (array $row): bool => ($row['kind'] ?? null) === 'coverage_matrix');
+            $rows = collect($section['rows'])->map(function (array $row) use ($hasCoverage): string {
+            if (($row['kind'] ?? null) === 'coverage_matrix') {
+                return '<tr><td class="label">' . e($row['label'] ?? '-') . '</td>'
+                    . '<td class="coverage-answer">' . e($row['deductible'] ?? '-') . '</td>'
+                    . '<td class="coverage-answer">' . e($row['percent'] ?? '-') . '</td></tr>';
+            }
+            $value = $row['value'] ?? '-';
             $valueClass = in_array($value, ['-', '- | -'], true) ? 'value empty' : 'value';
 
-            return '<tr><td class="label">' . e($row['label'] ?? '-') . '</td><td class="' . $valueClass . '">' . e($value) . '</td></tr>';
+            return '<tr><td class="label">' . e($row['label'] ?? '-') . '</td><td' . ($hasCoverage ? ' colspan="2"' : '') . ' class="' . $valueClass . '">' . e($value) . '</td></tr>';
             })->implode('');
 
-            return '<tr><th colspan="2">' . e($section['title']) . '</th></tr>' . $rows;
+            if ($hasCoverage) {
+                $rows = '<tr><td colspan="2" class="coverage-wrap"><table class="coverage-table">'
+                    . '<tr class="coverage-head"><th style="width:50%">Category</th><th style="width:25%">Deductible Applies</th><th style="width:25%">Coverage %</th></tr>'
+                    . $rows . '</table></td></tr>';
+            }
+            $title = ($section['key'] ?? '') === 'template_3_frequency_orthodontics' ? 'Orthodontic Benefits' : $section['title'];
+            return '<tr><th colspan="2">' . e($title) . '</th></tr>' . $rows;
         })->implode('');
     };
 @endphp

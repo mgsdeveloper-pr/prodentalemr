@@ -393,11 +393,28 @@ class VerificationResultPdf
                 ['sort_order', 'asc'],
                 ['id', 'asc'],
             ])
-            ->map(function ($row) use ($allowedSignatures): array {
+            ->flatMap(function ($row) use ($allowedSignatures, $category): array {
                 $configuration = $allowedSignatures->get(
                     static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')),
                     [],
                 );
+                if ($configuration['orthodontic_payment'] ?? false) {
+                    $policy = trim((string) data_get($row, 'payment_guideline'));
+                    $schedule = trim((string) data_get($row, 'frequency'));
+                    $knownPolicy = in_array(strtolower($policy), ['dental', 'medical', 'both', 'not confirmed'], true);
+                    $rows = [
+                        ['label' => 'Benefit Paid Under', 'value' => $knownPolicy ? ucfirst(strtolower($policy)) : 'Not confirmed'],
+                        ['label' => 'Payment Schedule', 'value' => $schedule !== '' ? $schedule : 'Not confirmed'],
+                    ];
+                    if ($policy !== '' && ! $knownPolicy) {
+                        $rows[] = ['label' => 'Previously Recorded Payment Answer', 'value' => $policy];
+                    }
+                    if (filled(data_get($row, 'notes'))) {
+                        $rows[] = ['label' => 'Payment Notes', 'value' => data_get($row, 'notes')];
+                    }
+
+                    return array_map(fn (array $answer): array => ['question_id' => null, 'kind' => 'frequency_code', ...$answer], $rows);
+                }
                 $labels = array_replace([
                     'coverage_status' => 'Status',
                     'age_limit' => 'Age',
@@ -429,12 +446,34 @@ class VerificationResultPdf
                         : null)->all(),
                 ])->filter()->implode(' | ');
 
-                return [
+                if ($category === 'Orthodontics') {
+                    $fields = array_merge($configuration['primary_fields'] ?? [], $configuration['detail_fields'] ?? []);
+                    $parts = collect($fields)->map(function (string $field) use ($row, $configuration): ?string {
+                        $value = data_get($row, $field);
+                        if (! filled($value)) {
+                            return null;
+                        }
+                        if ($field === 'coverage_percent' && is_numeric($value)) {
+                            return number_format((float) $value, 0).'%';
+                        }
+                        $label = strtolower($configuration['field_labels'][$field] ?? '');
+                        if ($field === 'payment_guideline' && (str_contains($label, 'maximum') || str_contains($label, 'deductible')) && is_numeric($value)) {
+                            return '$'.number_format((float) $value, 2);
+                        }
+
+                        return (string) $value;
+                    })->filter(fn ($value): bool => $value !== null)->implode(' | ');
+                    if (filled(data_get($row, 'notes'))) {
+                        $parts .= ($parts !== '' ? ' | ' : '').'Notes: '.data_get($row, 'notes');
+                    }
+                }
+
+                return [[
                     'question_id' => null,
                     'kind' => 'frequency_code',
                     'label' => trim(collect([data_get($row, 'code'), data_get($row, 'description')])->filter()->implode(' - ')) ?: 'Frequency row',
                     'value' => $parts !== '' ? $parts : '-',
-                ];
+                ]];
             })
             ->values();
     }

@@ -948,7 +948,19 @@ class VerificationFormQuestion extends Model
         }
 
         if (str_contains($prompt, 'how') && str_contains($prompt, 'paid')) {
-            return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Payment method', 'Enter how orthodontics is paid');
+            return array_replace($configuration, [
+                'primary_fields' => [],
+                'detail_fields' => ['payment_guideline', 'frequency'],
+                'field_labels' => ['payment_guideline' => 'Benefit paid under', 'frequency' => 'Payment schedule'],
+                'field_placeholders' => ['frequency' => 'Monthly, quarterly, lump sum, or not confirmed'],
+                'field_options' => ['payment_guideline' => [
+                    '' => 'Not confirmed', 'Dental' => 'Dental', 'Medical' => 'Medical',
+                    'Both' => 'Both', 'Not confirmed' => 'Not confirmed',
+                ]],
+                'single_line_fields' => ['frequency'],
+                'required_any' => ['payment_guideline', 'frequency'],
+                'orthodontic_payment' => true,
+            ]);
         }
 
         if (str_contains($prompt, 'work in progress')) {

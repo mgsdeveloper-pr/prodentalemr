@@ -796,7 +796,7 @@ it('uses and persists the correct responses for downgrade and orthodontic busine
         ['category' => 'Orthodontics', 'description' => $definitions[3][1], 'payment_guideline' => '$50'],
         ['category' => 'Orthodontics', 'description' => $definitions[4][1], 'age_limit' => '19'],
         ['category' => 'Orthodontics', 'description' => $definitions[5][1], 'coverage_percent' => 25],
-        ['category' => 'Orthodontics', 'description' => $definitions[6][1], 'payment_guideline' => 'Monthly installments'],
+        ['category' => 'Orthodontics', 'description' => $definitions[6][1], 'payment_guideline' => 'Dental', 'frequency' => 'Monthly installments'],
         ['category' => 'Orthodontics', 'description' => $definitions[7][1], 'coverage_status' => 'Yes'],
     ];
     $coverageRows = collect($coverageRows)->map(fn (array $row, int $index): array => [
@@ -859,6 +859,7 @@ it('uses and persists the correct responses for downgrade and orthodontic busine
         ->and($configurations[$definitions[1][1]]['detail_fields'])->toBe(['payment_guideline'])
         ->and($configurations[$definitions[4][1]]['detail_fields'])->toBe(['age_limit'])
         ->and($configurations[$definitions[5][1]]['primary_fields'])->toBe(['coverage_percent'])
+        ->and($configurations[$definitions[6][1]]['detail_fields'])->toBe(['payment_guideline', 'frequency'])
         ->and($configurations[$definitions[7][1]]['yes_no_fields'])->toBe(['coverage_status'])
         ->and($questions->first()->missingFrequencyResponseFields(['downgrade_applies' => 'Yes']))->toHaveKey('downgrade_to');
 
@@ -870,11 +871,30 @@ it('uses and persists the correct responses for downgrade and orthodontic busine
         ->and($savedRows[$definitions[1][1]]->payment_guideline)->toBe('$2,000')
         ->and($savedRows[$definitions[4][1]]->age_limit)->toBe('19')
         ->and($savedRows[$definitions[5][1]]->coverage_percent)->toBe('25.00')
+        ->and($savedRows[$definitions[6][1]]->payment_guideline)->toBe('Dental')
+        ->and($savedRows[$definitions[6][1]]->frequency)->toBe('Monthly installments')
         ->and($savedRows[$definitions[7][1]]->coverage_status)->toBe('Yes');
 
     foreach ($questions as $question) {
         expect($question->missingFrequencyResponseFields($savedRows[$question->prompt]))->toBe([]);
     }
+
+    $orthoMethod = new ReflectionMethod(VerificationResultPdf::class, 'mapCoverageCodeRowsForSection');
+    $orthoRows = $orthoMethod->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_orthodontics')->keyBy('label');
+    expect($orthoRows['Benefit Paid Under']['value'])->toBe('Dental')
+        ->and($orthoRows['Payment Schedule']['value'])->toBe('Monthly installments')
+        ->and($orthoRows[$definitions[1][1]]['value'])->toBe('$2,000')
+        ->and($orthoRows[$definitions[7][1]]['value'])->toBe('Yes');
+
+    $savedRows[$definitions[6][1]]->update(['payment_guideline' => 'Quarterly installments', 'frequency' => null]);
+    $savedRows[$definitions[3][1]]->update(['payment_guideline' => '10']);
+    $savedRows[$definitions[1][1]]->update(['payment_guideline' => 'No']);
+    $legacyRows = $orthoMethod->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_orthodontics')->keyBy('label');
+    expect($legacyRows['Benefit Paid Under']['value'])->toBe('Not confirmed')
+        ->and($legacyRows['Payment Schedule']['value'])->toBe('Not confirmed')
+        ->and($legacyRows['Previously Recorded Payment Answer']['value'])->toBe('Quarterly installments')
+        ->and($legacyRows[$definitions[3][1]]['value'])->toBe('$10.00')
+        ->and($legacyRows[$definitions[1][1]]['value'])->toBe('No');
 
     $pdfRows = (new ReflectionMethod(VerificationResultPdf::class, 'mapCoverageCodeRowsForSection'))
         ->invoke(null, $request->fresh()->load('verificationCoverageCodes'), 'template_3_frequency_major');

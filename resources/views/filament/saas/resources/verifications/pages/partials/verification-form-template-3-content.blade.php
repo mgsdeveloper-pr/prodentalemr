@@ -2110,7 +2110,7 @@
                                             'notes',
                                         ];
                                         $detailFields = collect(data_get($responseConfiguration, 'detail_fields', $configuredFields))
-                                            ->reject(fn (string $field): bool => in_array($field, ['coverage_percent', 'frequency'], true))
+                                            ->reject(fn (string $field): bool => in_array($field, $primaryFields, true))
                                             ->sortBy(fn (string $field): int => array_search($field, $fieldOrder, true) === false ? 999 : array_search($field, $fieldOrder, true))
                                             ->values()
                                             ->all();
@@ -2178,7 +2178,11 @@
                                                                 $placeholder = $fieldPlaceholders[$field] ?? $label;
                                                                 $selectOptions = in_array($field, $yesNoFields, true)
                                                                     ? ['' => 'Select an option', 'Yes' => 'Yes', 'No' => 'No']
-                                                                    : ($templateThreeFrequencySelectFields[$field] ?? null);
+                                                                    : (data_get($responseConfiguration, 'field_options.' . $field) ?? $templateThreeFrequencySelectFields[$field] ?? null);
+                                                                $currentValue = data_get($this->codeCoverageData, $rowIndex . '.' . $field);
+                                                                if (is_array($selectOptions) && filled($currentValue) && ! array_key_exists($currentValue, $selectOptions)) {
+                                                                    $selectOptions[$currentValue] = 'Previously recorded: ' . $currentValue;
+                                                                }
                                                             @endphp
                                                             <div
                                                                 @if ($field === 'pre_auth_details')
