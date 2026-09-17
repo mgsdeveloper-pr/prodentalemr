@@ -58,6 +58,13 @@ class SaasSettings extends Page implements HasForms
     public function getSettingsTools(): array
     {
         return [
+            ...(EligibilityConnectionSettings::canAccess() ? [[
+                'eyebrow' => 'Eligibility',
+                'title' => 'Eligibility Connections',
+                'description' => 'Manage eligibility providers and connection setup.',
+                'url' => EligibilityConnections::getUrl(),
+                'tone' => 'emerald',
+            ]] : []),
             [
                 'eyebrow' => 'Payments',
                 'title' => 'Payment Credentials',

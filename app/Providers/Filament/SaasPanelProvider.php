@@ -4,9 +4,12 @@ namespace App\Providers\Filament;
 
 use App\Filament\Saas\Pages\AdaProcedureCodeImport;
 use App\Filament\Saas\Pages\BillingSettings;
+use App\Filament\Saas\Pages\CallingProviders;
 use App\Filament\Saas\Pages\ClientManagement;
 use App\Filament\Saas\Pages\Dashboard;
 use App\Filament\Saas\Pages\DsoOnboarding;
+use App\Filament\Saas\Pages\EligibilityConnections;
+use App\Filament\Saas\Pages\EligibilityConnectionSettings;
 use App\Filament\Saas\Pages\ModuleSettings;
 use App\Filament\Saas\Pages\NotificationCentre;
 use App\Filament\Saas\Pages\OrganizationWorkspace;
@@ -132,6 +135,9 @@ class SaasPanelProvider extends PanelProvider
                 DsoOnboarding::class,
                 NotificationCentre::class,
                 PaymentCredentials::class,
+                EligibilityConnectionSettings::class,
+                EligibilityConnections::class,
+                CallingProviders::class,
                 BillingSettings::class,
                 AdaProcedureCodeImport::class,
                 UserManagement::class,
