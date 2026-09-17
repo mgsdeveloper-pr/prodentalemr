@@ -15,13 +15,18 @@
                     </p>
                 </div>
                 <div style="padding: 20px;">
-                    <form wire:submit="save">
-                        {{ $this->form }}
-                    </form>
+                    @if ($this->hasClinicScope())
+                        <form wire:submit="save">
+                            {{ $this->form }}
+                        </form>
+                    @else
+                        <h3 class="text-base font-semibold">Select a clinic to view settings</h3>
+                        <p class="mt-2 text-sm text-gray-600">Choose a clinic from the workspace selector. If you changed clinics in another tab, reload this page before editing.</p>
+                    @endif
                 </div>
             </section>
 
-            @if (! $this->canManageClinicSettings())
+            @if ($this->hasClinicScope() && ! $this->canManageClinicSettings())
                 <div style="padding: 12px 14px; border: 1px solid #dbe4ee; border-radius: 8px; background: #f8fafc; color: #667085; font-size: 12px;">
                     Clinic settings are shown according to your role and permissions.
                 </div>

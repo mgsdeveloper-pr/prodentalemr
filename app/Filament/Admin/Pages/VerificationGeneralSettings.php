@@ -18,6 +18,8 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Cache;
+use Livewire\Attributes\Locked;
 use UnitEnum;
 
 class VerificationGeneralSettings extends Page implements HasForms
@@ -42,6 +44,14 @@ class VerificationGeneralSettings extends Page implements HasForms
 
     protected ?Clinic $clinicRecord = null;
 
+    #[Locked]
+    public ?int $settingsClinicId = null;
+
+    public function boot(): void
+    {
+        $this->clinicRecord = AdminClinicScope::selectedClinic()?->fresh('organization');
+    }
+
     public static function canAccess(): bool
     {
         return auth()->user()?->canAccessVerificationWorkspace() ?? false;
@@ -49,7 +59,7 @@ class VerificationGeneralSettings extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->clinicRecord = AdminClinicScope::selectedClinic();
+        $this->settingsClinicId = $this->clinicRecord?->id;
 
         $this->form->fill([
             'verification_default_form_template' => $this->clinicRecord?->getVerificationDefaultFormTemplate()
@@ -79,8 +89,13 @@ class VerificationGeneralSettings extends Page implements HasForms
                             ->label('Default verification template')
                             ->options(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS)
                             ->native(false)
+                            ->visible(count(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS) > 1)
                             ->required()
                             ->disabled(fn (): bool => ! $this->canManageClinicSettings()),
+                        Placeholder::make('default_template_label')
+                            ->label('Default verification template')
+                            ->content(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS[VerificationFormQuestion::defaultTemplateKey()])
+                            ->visible(count(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS) === 1),
                         Toggle::make('allow_verification_manager_template_edits')
                             ->label('Allow Verification Manager template edits')
                             ->helperText('Allows assigned Verification Managers to create and publish clinic-specific template drafts.')
@@ -117,7 +132,7 @@ class VerificationGeneralSettings extends Page implements HasForms
     {
         abort_unless($this->canManageClinicSettings(), 403);
 
-        $clinic = AdminClinicScope::selectedClinic();
+        $clinic = $this->clinicRecord;
 
         if (! $clinic) {
             Notification::make()
@@ -131,11 +146,14 @@ class VerificationGeneralSettings extends Page implements HasForms
 
         $state = $this->form->getState();
         $clinic->update([
-            'verification_default_form_template' => $state['verification_default_form_template'],
+            'verification_default_form_template' => count(VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS) === 1
+                ? VerificationFormQuestion::defaultTemplateKey()
+                : $state['verification_default_form_template'],
             'allow_verification_manager_template_edits' => (bool) ($state['allow_verification_manager_template_edits'] ?? false),
         ]);
 
         $this->clinicRecord = $clinic->fresh('organization');
+        Cache::forget("admin_clinic_scope.selected_clinic.{$clinic->id}");
 
         Notification::make()
             ->title('General settings saved')
@@ -151,11 +169,22 @@ class VerificationGeneralSettings extends Page implements HasForms
 
     public function canManageClinicSettings(): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return $this->hasClinicScope()
+            && (auth()->user()?->canManageVerificationSettings() ?? false);
+    }
+
+    public function hasClinicScope(): bool
+    {
+        return $this->clinicRecord !== null
+            && $this->settingsClinicId === $this->clinicRecord->id;
     }
 
     protected function serviceModelLabel(): string
     {
+        if (! $this->hasClinicScope()) {
+            return 'Select a clinic';
+        }
+
         return match ($this->clinicRecord?->managed_services_status) {
             'active', 'trial' => 'Managed Service',
             'requested' => 'Hybrid / activation requested',
