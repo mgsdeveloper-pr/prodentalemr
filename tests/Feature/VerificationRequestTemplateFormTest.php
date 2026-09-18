@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Verification\CreateVerificationRequestAction;
+use App\Actions\Verification\EscalateVerificationRequestAction;
 use App\Actions\Verification\SaveVerificationAnswerAction;
 use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Filament\Saas\Resources\Verifications\Tables\VerificationRequestsTable;
@@ -14,10 +15,14 @@ use App\Models\User;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
+use App\Services\Verification\PDFService;
 use App\Services\Verification\VerificationAuditService;
 use App\Support\VerificationResultPdf;
 use App\Support\VerificationTemplateVersionService;
+use Barryvdh\DomPDF\PDF;
 use Database\Seeders\RoleSeeder;
+use Dompdf\Dompdf;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -73,6 +78,36 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
+it('serves an authenticated PDF viewer with matching download and raw PDF URLs', function () {
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Viewer test', 'status' => 'pending', 'priority' => 'normal',
+    ]);
+    $this->withoutVite();
+    $url = route('admin.verifications.pdf.preview', ['billingWorkItem' => $request, 'mode' => 'custom_landscape']);
+    $this->get($url)->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
+        ->assertSee('Download PDF')->assertSee('raw=1')->assertSee('custom_landscape')
+        ->assertSee('id="pdf-page"', false);
+
+    $pdf = Mockery::mock(PDFService::class);
+    $pdf->shouldReceive('output')->once()->withArgs(fn ($item, $mode) => $item->id === $request->id && $mode === 'custom_landscape')
+        ->andReturn('%PDF-1.7 test');
+    $pdf->shouldReceive('fileName')->andReturn('report.pdf');
+    app()->instance(PDFService::class, $pdf);
+    $this->get($url.'&raw=1')->assertOk()->assertHeader('Content-Type', 'application/pdf')
+        ->assertContent('%PDF-1.7 test');
+
+    $other = User::factory()->create(['status' => true]);
+    $other->assignRole('verification_user');
+    $this->actingAs($other);
+    $this->get($url)->assertForbidden();
+    $this->get($url.'&raw=1')->assertForbidden();
+});
+
 it('rejects a multipage custom landscape render before returning PDF bytes', function () {
     $request = BillingWorkItem::create([
         'organization_id' => $this->organization->id,
@@ -82,15 +117,15 @@ it('rejects a multipage custom landscape render before returning PDF bytes', fun
         'assigned_to' => $this->user->id,
         'title' => 'Oversized report', 'status' => 'pending', 'priority' => 'normal',
     ]);
-    $dompdf = new \Dompdf\Dompdf();
+    $dompdf = new Dompdf;
     $dompdf->loadHtml('<p>First page</p><p style="page-break-before: always">Second page</p>');
     $dompdf->render();
-    $pdf = Mockery::mock(\Barryvdh\DomPDF\PDF::class);
+    $pdf = Mockery::mock(PDF::class);
     $pdf->shouldReceive('setPaper')->once()->with('a4', 'landscape')->andReturnSelf();
     $pdf->shouldReceive('render')->once()->andReturnSelf();
     $pdf->shouldReceive('getDomPDF')->once()->andReturn($dompdf);
     $pdf->shouldNotReceive('output');
-    \Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadView')->once()->andReturn($pdf);
+    Barryvdh\DomPDF\Facade\Pdf::shouldReceive('loadView')->once()->andReturn($pdf);
 
     try {
         VerificationResultPdf::output($request, 'custom_landscape');
@@ -113,7 +148,7 @@ it('raises an urgent request once and preserves saved answers and workflow', fun
         'due_at' => now()->addHour(),
     ]);
     $due = $request->due_at->toDateTimeString();
-    $action = app(\App\Actions\Verification\EscalateVerificationRequestAction::class);
+    $action = app(EscalateVerificationRequestAction::class);
     $action->execute($request, 'Appointment brought forward', $this->user);
     $action->execute($request, 'Repeated click', $this->user);
     expect($request->fresh()->priority)->toBe('urgent')
@@ -129,15 +164,15 @@ it('rejects unauthorized and completed urgent escalations', function () {
         'assigned_to' => $this->user->id, 'title' => 'Protected request',
         'status' => 'pending', 'priority' => 'normal',
     ]);
-    $action = app(\App\Actions\Verification\EscalateVerificationRequestAction::class);
+    $action = app(EscalateVerificationRequestAction::class);
     $outsider = User::factory()->create();
     expect(fn () => $action->execute($request, 'Unauthorized', $outsider))
-        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+        ->toThrow(AuthorizationException::class);
     expect(fn () => $action->execute($request, ' ', $this->user))
         ->toThrow(ValidationException::class);
     $request->forceFill(['status' => BillingWorkItem::STATUS_DONE])->saveQuietly();
     expect(fn () => $action->execute($request, 'Too late', $this->user))
-        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+        ->toThrow(AuthorizationException::class);
     expect($request->fresh()->priority)->toBe('normal');
 });
 

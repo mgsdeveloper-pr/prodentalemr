@@ -7,13 +7,13 @@
         menu-description="Clinic, mailbox, output, and administrative configuration."
     >
         <div style="display: flex; flex-direction: column; gap: 22px;">
-            <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06); overflow: hidden;">
+            <section>
                 <div style="padding: 18px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
                     <div>
-                        <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #0f766e;">Verification Workflow</div>
-                        <h3 style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a;">Assignment Management</h3>
+                        <div style="margin-bottom: 8px; font-size: 14px; font-weight: 600; color: #0f766e;">Platform-wide settings</div>
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">All verification clinics</h3>
                         <p style="margin: 10px 0 0; max-width: 760px; font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Control how managed-service verification work is routed when no assignee is selected manually. Keep assignment rules separate from PDF template settings for a cleaner workflow.
+                            These rules apply only to Auto assignment. Manual assignments and Unassigned requests are unchanged.
                         </p>
                     </div>
                 </div>

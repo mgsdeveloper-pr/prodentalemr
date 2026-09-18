@@ -41,12 +41,13 @@ class VerificationAssignmentManagement extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->canManageVerificationSettings() ?? false;
+        return (auth()->user()?->isSaasAdmin() ?? false)
+            && (auth()->user()?->canManageVerificationSettings() ?? false);
     }
 
     public function getSubheading(): ?string
     {
-        return 'Control how managed-service verification requests are assigned when no user is selected.';
+        return 'Platform-wide: choose the strategy used when Auto assignment is requested. Unassigned requests remain unassigned.';
     }
 
     public function getBreadcrumbs(): array
@@ -73,11 +74,11 @@ class VerificationAssignmentManagement extends Page implements HasForms
             ->statePath('data')
             ->components([
                 Section::make('Assignment Rules')
-                    ->description('Control how new managed-service verification requests are assigned when no user is selected manually.')
+                    ->description('Applies across clinics only when Auto assignment is selected. Manual and Unassigned choices are unchanged.')
                     ->schema([
                         Toggle::make('verification_round_robin_enabled')
                             ->label('Enable round-robin auto assignment')
-                            ->helperText('When enabled, new verification requests rotate evenly across eligible verification users. When disabled, the system falls back to the current lightest-workload assignment logic.')
+                            ->helperText('Auto mode uses round-robin when enabled, or lightest workload when disabled. This switch does not enable assignment for Unassigned requests.')
                             ->default(false),
                     ])
                     ->columns(1),
@@ -95,8 +96,10 @@ class VerificationAssignmentManagement extends Page implements HasForms
 
     public function save(): void
     {
+        abort_unless(static::canAccess(), 403);
+        $state = $this->form->getState();
         SaasSetting::current()->update([
-            'verification_round_robin_enabled' => (bool) ($this->data['verification_round_robin_enabled'] ?? false),
+            'verification_round_robin_enabled' => (bool) ($state['verification_round_robin_enabled'] ?? false),
         ]);
 
         Notification::make()

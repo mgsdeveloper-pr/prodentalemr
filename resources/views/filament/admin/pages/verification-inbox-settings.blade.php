@@ -9,6 +9,7 @@
         menu-description="Clinic, mailbox, output, and administrative configuration."
     >
         <div style="display: flex; flex-direction: column; gap: 24px;">
+            @if ($this->hasClinicScope())
             <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
                 @foreach ([
                     'Current Clinic' => $this->getSelectedClinicLabel(),
@@ -18,16 +19,20 @@
                     'Last Cleanup' => $summary['last_cleanup'],
                 ] as $label => $value)
                     <div style="padding: 14px 16px; border-radius: 8px; border: 1px solid #dbe4ee; background: #ffffff;">
-                        <div style="margin-bottom: 5px; color: #667085; font-size: 11px; font-weight: 700;">{{ $label }}</div>
+                        <div style="margin-bottom: 5px; color: #667085; font-size: 14px; font-weight: 600;">{{ $label }}</div>
                         <div style="color: #101828; font-size: 13px; font-weight: 800;">{{ $value }}</div>
                     </div>
                 @endforeach
             </section>
-            <section style="border: 1px solid #dbe4ee; border-radius: 24px; background: #ffffff; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06); overflow: hidden;">
-                <div style="padding: 22px 24px;">
+            <section>
+                <div>
                     {{ $this->form }}
                 </div>
             </section>
+            @else
+                <h2 class="text-base font-semibold">Select a clinic to view inbox settings</h2>
+                <p class="text-sm text-gray-600">Choose a clinic from the workspace selector. Reload this page if you changed clinics in another tab.</p>
+            @endif
         </div>
     </x-verification-management-shell>
 </x-filament-panels::page>

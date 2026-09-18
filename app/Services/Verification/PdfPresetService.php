@@ -4,10 +4,36 @@ namespace App\Services\Verification;
 
 use App\Models\Clinic;
 use App\Models\VerificationPdfPreset;
+use App\Support\VerificationResultPdf;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PdfPresetService
 {
+    public function setDefaultOutputMode(Clinic $clinic, string $mode): void
+    {
+        validator(['mode' => $mode], ['mode' => ['required', Rule::in(array_keys(VerificationResultPdf::OUTPUT_MODE_OPTIONS))]])->validate();
+
+        DB::transaction(function () use ($clinic, $mode): void {
+            $clinic = Clinic::query()->lockForUpdate()->findOrFail($clinic->getKey());
+            $preset = $this->defaultForClinic($clinic);
+            if ($preset) {
+                // Keep saved section/question selections when changing only the layout.
+                if ($preset->getOutputMode() !== $mode) {
+                    $preset->show_blank_rows = $mode === 'standard';
+                }
+                $preset->output_mode = $mode;
+                $preset->updated_by = auth()->id();
+                $preset->save();
+                $clinic->verification_pdf_output_sections = $preset->getSectionKeys();
+                $clinic->verification_pdf_output_question_ids = $preset->getQuestionIds();
+            }
+            $clinic->verification_pdf_output_mode = $mode;
+            $clinic->save();
+        });
+    }
+
     public function optionsForClinic(Clinic $clinic): array
     {
         return $this->queryForClinic($clinic)
@@ -57,7 +83,7 @@ class PdfPresetService
             'output_mode' => $data['output_mode'] ?? 'standard',
             'section_keys' => $data['section_keys'] ?? [],
             'question_ids' => $data['question_ids'] ?? [],
-            'show_blank_rows' => (bool) ($data['show_blank_rows'] ?? ! \App\Support\VerificationResultPdf::isCustomOutputMode($data['output_mode'] ?? 'standard')),
+            'show_blank_rows' => (bool) ($data['show_blank_rows'] ?? ! VerificationResultPdf::isCustomOutputMode($data['output_mode'] ?? 'standard')),
             'is_default' => (bool) ($data['is_default'] ?? false),
             'is_active' => true,
         ]);
@@ -71,8 +97,8 @@ class PdfPresetService
 
             $clinic->default_verification_pdf_preset_id = $preset->getKey();
             $clinic->verification_pdf_output_mode = $preset->getOutputMode();
-            $clinic->verification_pdf_output_sections = \App\Support\VerificationResultPdf::isCustomOutputMode($preset->getOutputMode()) ? $preset->getSectionKeys() : [];
-            $clinic->verification_pdf_output_question_ids = \App\Support\VerificationResultPdf::isCustomOutputMode($preset->getOutputMode()) ? $preset->getQuestionIds() : [];
+            $clinic->verification_pdf_output_sections = VerificationResultPdf::isCustomOutputMode($preset->getOutputMode()) ? $preset->getSectionKeys() : [];
+            $clinic->verification_pdf_output_question_ids = VerificationResultPdf::isCustomOutputMode($preset->getOutputMode()) ? $preset->getQuestionIds() : [];
             $clinic->save();
         }
 
@@ -89,10 +115,10 @@ class PdfPresetService
             $this->saveForClinic($clinic, [
                 'name' => 'Full Verification Report',
                 'description' => 'Complete verification report with all standard output.',
-                'output_mode' => 'standard',
-                'section_keys' => [],
-                'question_ids' => [],
-                'show_blank_rows' => true,
+                'output_mode' => $clinic->getVerificationPdfOutputMode(),
+                'section_keys' => $clinic->getVerificationPdfOutputSections(),
+                'question_ids' => $clinic->getVerificationPdfOutputQuestionIds(),
+                'show_blank_rows' => $clinic->getVerificationPdfOutputMode() === 'standard',
                 'is_default' => true,
             ]),
             $this->saveForClinic($clinic, [

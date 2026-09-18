@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Traits\HasPublicId;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -71,7 +70,7 @@ class VerificationInboxMailbox extends Model
             'verification_inbox_port' => 993,
             'verification_inbox_protocol' => 'imap',
             'verification_inbox_encryption' => 'ssl',
-            'verification_inbox_validate_certificate' => false,
+            'verification_inbox_validate_certificate' => true,
             'verification_inbox_username' => null,
             'verification_inbox_password' => null,
             'verification_inbox_folder_inbox' => 'INBOX',

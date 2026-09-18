@@ -4,8 +4,8 @@ namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\SaasSetting;
-use BackedEnum;
 use App\Support\VerificationSettingsNavigation;
+use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -43,16 +43,15 @@ class VerificationNotificationControl extends Page implements HasForms
 
     public ?array $data = [];
 
-    protected SaasSetting $settings;
-
     public static function canAccess(): bool
     {
-        return auth()->user()?->canManageVerificationNotifications() ?? false;
+        return (auth()->user()?->isSaasAdmin() ?? false)
+            && (auth()->user()?->canManageVerificationNotifications() ?? false);
     }
 
     public function getSubheading(): ?string
     {
-        return 'Control verification recipients, workflow events, and urgent alerts.';
+        return 'Platform-wide: notification rules for all verification clinics.';
     }
 
     public function getBreadcrumbs(): array
@@ -66,13 +65,13 @@ class VerificationNotificationControl extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->settings = SaasSetting::current();
-        $settings = $this->settings->only($this->settingKeys());
+        $record = SaasSetting::current();
+        $settings = $record->only($this->settingKeys());
         $settings['verification_notify_on_new_request'] = (bool) (
-            $this->settings->verification_notify_on_managed_service_requested
-            || $this->settings->verification_notify_on_clinic_self_service_created
-            || $this->settings->verification_notify_on_verification_request_created
-            || $this->settings->verification_notify_on_admin_import_created
+            $record->verification_notify_on_managed_service_requested
+            || $record->verification_notify_on_clinic_self_service_created
+            || $record->verification_notify_on_verification_request_created
+            || $record->verification_notify_on_admin_import_created
         );
 
         $this->form->fill($settings);
@@ -158,6 +157,7 @@ class VerificationNotificationControl extends Page implements HasForms
 
     public function save(): void
     {
+        abort_unless(static::canAccess(), 403);
         $state = $this->form->getState();
         $newRequestEnabled = (bool) ($state['verification_notify_on_new_request'] ?? true);
 
@@ -167,7 +167,7 @@ class VerificationNotificationControl extends Page implements HasForms
         $state['verification_notify_on_admin_import_created'] = $newRequestEnabled;
         unset($state['verification_notify_on_new_request']);
 
-        $this->settings->update($state);
+        SaasSetting::current()->update($state);
 
         Notification::make()
             ->title('Verification notification control saved')

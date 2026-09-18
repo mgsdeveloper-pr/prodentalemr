@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Traits\HasPublicId;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -62,7 +61,7 @@ class UserMailbox extends Model
             'imap_host' => 'mail.medityaglobalservices.com',
             'imap_port' => 993,
             'imap_encryption' => 'ssl',
-            'imap_validate_certificate' => false,
+            'imap_validate_certificate' => true,
             'imap_username' => $defaultEmail,
             'imap_password' => null,
             'inbox_folder' => 'INBOX',

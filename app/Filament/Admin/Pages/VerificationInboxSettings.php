@@ -3,7 +3,9 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
+use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMailbox;
+use App\Models\VerificationInboxMessage;
 use App\Support\AdminClinicScope;
 use App\Support\SaasEntitlements;
 use App\Support\VerificationInboxService;
@@ -20,7 +22,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
+use Livewire\Attributes\Locked;
 use UnitEnum;
 
 class VerificationInboxSettings extends Page implements HasForms
@@ -45,6 +47,15 @@ class VerificationInboxSettings extends Page implements HasForms
 
     protected ?VerificationInboxMailbox $settings = null;
 
+    #[Locked]
+    public ?int $settingsClinicId = null;
+
+    #[Locked]
+    public array $cleanupMessageIds = [];
+
+    #[Locked]
+    public int $cleanupAttachmentCount = 0;
+
     public static function canAccess(): bool
     {
         return (auth()->user()?->canManageVerificationSettings() ?? false)
@@ -58,6 +69,7 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function mount(): void
     {
+        $this->settingsClinicId = AdminClinicScope::selectedClinic()?->id;
         if ($this->selectedClinicId()) {
             $this->settings = $this->getSettingsRecord();
             $state = $this->settings->only($this->settingKeys());
@@ -80,7 +92,7 @@ class VerificationInboxSettings extends Page implements HasForms
                                 ->default(false),
                             Toggle::make('verification_inbox_validate_certificate')
                                 ->label('Validate mailbox certificate')
-                                ->default(false),
+                                ->default(true),
                             TextInput::make('verification_inbox_provider')
                                 ->label('Provider label')
                                 ->placeholder('Gmail, Outlook, Zoho, Custom IMAP'),
@@ -90,6 +102,7 @@ class VerificationInboxSettings extends Page implements HasForms
                             TextInput::make('verification_inbox_port')
                                 ->label('Port')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)->maxValue(65535)
                                 ->default(993),
                             Select::make('verification_inbox_protocol')
                                 ->label('Protocol')
@@ -122,10 +135,12 @@ class VerificationInboxSettings extends Page implements HasForms
                             TextInput::make('verification_inbox_sync_frequency_minutes')
                                 ->label('Sync frequency (minutes)')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)
                                 ->default(15),
                             TextInput::make('verification_inbox_sync_window_days')
                                 ->label('Sync window (days)')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)
                                 ->default(90),
                         ]),
                     ]),
@@ -148,14 +163,17 @@ class VerificationInboxSettings extends Page implements HasForms
                             TextInput::make('verification_inbox_retention_days')
                                 ->label('Message retention (days)')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)
                                 ->default(90),
                             TextInput::make('verification_inbox_keep_latest_count')
                                 ->label('Keep latest emails')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)
                                 ->default(5000),
                             TextInput::make('verification_inbox_spam_retention_days')
                                 ->label('Spam retention (days)')
                                 ->numeric()
+                                ->integer()->required()->minValue(1)
                                 ->default(30),
                             Toggle::make('verification_inbox_preserve_flagged')
                                 ->label('Keep flagged/starred emails during cleanup')
@@ -169,18 +187,27 @@ class VerificationInboxSettings extends Page implements HasForms
     {
         return [
             Action::make('testConnection')
+                ->visible(fn (): bool => $this->hasClinicScope())
                 ->label('Test connection')
                 ->action('testConnection')
                 ->color('gray'),
             Action::make('syncNow')
+                ->visible(fn (): bool => $this->hasClinicScope())
                 ->label('Sync now')
                 ->action('syncNow')
                 ->color('gray'),
             Action::make('runCleanup')
+                ->visible(fn (): bool => $this->hasClinicScope())
                 ->label('Run cleanup')
-                ->action('runCleanup')
-                ->color('gray'),
+                ->requiresConfirmation()
+                ->mountUsing(fn () => $this->prepareCleanupPreview())
+                ->modalHeading('Delete stored inbox messages?')
+                ->modalDescription(fn (): string => $this->cleanupPreview())
+                ->modalSubmitActionLabel('Delete previewed messages')
+                ->action(fn () => $this->runCleanup(app(VerificationInboxService::class)))
+                ->color('danger'),
             Action::make('save')
+                ->visible(fn (): bool => $this->hasClinicScope())
                 ->label('Save inbox settings')
                 ->action('save'),
         ];
@@ -188,7 +215,7 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function getSubheading(): ?string
     {
-        return 'Configure mailbox connection, synchronization, and retention for the selected clinic.';
+        return 'Selected clinic: mailbox connection and retention. Sync and cleanup use saved settings only.';
     }
 
     public function getBreadcrumbs(): array
@@ -234,8 +261,13 @@ class VerificationInboxSettings extends Page implements HasForms
             return;
         }
 
-        $this->saveDraftState();
-        $result = $service->testConnection($this->selectedClinicId());
+        $state = $this->form->getState();
+        if (blank($state['verification_inbox_password'] ?? null)) {
+            unset($state['verification_inbox_password']);
+        }
+        $draft = clone $this->getSettingsRecord();
+        $draft->fill($state);
+        $result = $service->testMailboxConnection($draft);
 
         Notification::make()
             ->title($result['ok'] ? 'Mailbox connection verified' : 'Mailbox connection failed')
@@ -250,7 +282,6 @@ class VerificationInboxSettings extends Page implements HasForms
             return;
         }
 
-        $this->saveDraftState();
         $result = $service->sync(force: true, clinicId: $this->selectedClinicId());
 
         Notification::make()
@@ -262,14 +293,14 @@ class VerificationInboxSettings extends Page implements HasForms
         $this->settings = $this->getSettingsRecord()->fresh();
     }
 
-    public function runCleanup(VerificationInboxService $service): void
+    protected function runCleanup(VerificationInboxService $service): void
     {
         if (! $this->ensureClinicSelected()) {
             return;
         }
 
-        $this->saveDraftState();
-        $result = $service->cleanup($this->selectedClinicId());
+        $result = $service->cleanup($this->selectedClinicId(), $this->cleanupMessageIds);
+        $this->cleanupMessageIds = [];
 
         Notification::make()
             ->title($result['ok'] ? 'Inbox cleanup finished' : 'Inbox cleanup skipped')
@@ -290,9 +321,9 @@ class VerificationInboxSettings extends Page implements HasForms
         $clinicId = $this->selectedClinicId();
 
         return [
-            'messages' => $clinicId ? \App\Models\VerificationInboxMessage::query()->where('clinic_id', $clinicId)->count() : 0,
+            'messages' => $clinicId ? VerificationInboxMessage::query()->where('clinic_id', $clinicId)->count() : 0,
             'attachments' => $clinicId
-                ? \App\Models\VerificationInboxAttachment::query()
+                ? VerificationInboxAttachment::query()
                     ->whereHas('message', fn ($query) => $query->where('clinic_id', $clinicId))
                     ->count()
                 : 0,
@@ -301,18 +332,19 @@ class VerificationInboxSettings extends Page implements HasForms
         ];
     }
 
-    protected function saveDraftState(): void
+    protected function prepareCleanupPreview(): void
     {
-        $state = $this->form->getState();
-        $password = $state['verification_inbox_password'] ?? null;
+        abort_unless(static::canAccess() && $this->hasClinicScope(), 403);
+        $this->cleanupMessageIds = app(VerificationInboxService::class)->cleanupMessageIds($this->getSettingsRecord());
+        $this->cleanupAttachmentCount = VerificationInboxAttachment::query()
+            ->whereIn('verification_inbox_message_id', $this->cleanupMessageIds)->count();
+    }
 
-        if (blank($password)) {
-            unset($state['verification_inbox_password']);
-        }
-
-        $settings = $this->getSettingsRecord();
-        $settings->update($state);
-        $this->settings = $settings->fresh();
+    protected function cleanupPreview(): string
+    {
+        return count($this->cleanupMessageIds).' stored messages and '.$this->cleanupAttachmentCount
+            .' attachments qualify under the saved retention rules for '.$this->getSelectedClinicLabel()
+            .'. Deletion is permanent. Unsaved settings are not applied. Messages on the mail server are unchanged.';
     }
 
     public function getSelectedClinicLabel(): string
@@ -352,11 +384,18 @@ class VerificationInboxSettings extends Page implements HasForms
 
     protected function selectedClinicId(): ?int
     {
-        return AdminClinicScope::selectedClinicId();
+        return $this->hasClinicScope() ? $this->settingsClinicId : null;
+    }
+
+    public function hasClinicScope(): bool
+    {
+        return $this->settingsClinicId !== null
+            && $this->settingsClinicId === AdminClinicScope::selectedClinic()?->id;
     }
 
     protected function ensureClinicSelected(): bool
     {
+        abort_unless(static::canAccess(), 403);
         if ($this->selectedClinicId()) {
             return true;
         }

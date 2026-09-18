@@ -6,6 +6,7 @@ use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
 use App\Models\UserMailbox;
 use App\Support\SaasEntitlements;
 use App\Support\UserMailboxService;
+use App\Support\VerificationSettingsNavigation;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -18,6 +19,8 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class UserMailboxSettingsPage extends Page implements HasForms
@@ -80,7 +83,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
     {
         $status = $this->getConnectionStatus();
 
-        return 'Configure the mailbox used to receive and send verification-related email. Connection: ' . $status['label'] . '.';
+        return 'My account: personal mailbox settings. Connection: '.$status['label'].'.';
     }
 
     public function getBreadcrumbs(): array
@@ -99,10 +102,10 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function getVerificationNavItems(): array
     {
-        return \App\Support\VerificationSettingsNavigation::items();
+        return VerificationSettingsNavigation::items();
     }
 
-    public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
+    public function form(Schema $schema): Schema
     {
         return $schema
             ->statePath('data')
@@ -146,7 +149,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
                                 ->placeholder('Gmail, Outlook, Zoho, Custom'),
                             Toggle::make('imap_validate_certificate')
                                 ->label('Validate IMAP certificate')
-                                ->default(false),
+                                ->default(true),
                             TextInput::make('imap_host')
                                 ->label('IMAP host')
                                 ->required(fn (Get $get): bool => $get('mailbox_provider_mode') === self::PROVIDER_CUSTOM)
@@ -231,6 +234,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function save(): void
     {
+        abort_unless(static::canAccess(), 403);
         $state = $this->normalizeMailboxState($this->form->getState());
         $existing = $this->getMailboxRecord();
 
@@ -283,8 +287,9 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function testConnection(UserMailboxService $service): void
     {
+        abort_unless(static::canAccess(), 403);
         $state = $this->normalizeMailboxState($this->form->getState());
-        $mailbox = $this->getMailboxRecord();
+        $mailbox = clone $this->getMailboxRecord();
 
         if (blank($state['imap_password'] ?? null)) {
             unset($state['imap_password']);
@@ -297,9 +302,14 @@ class UserMailboxSettingsPage extends Page implements HasForms
         $mailbox->fill($state);
 
         $result = $service->testConnection($mailbox);
+        if ($result['ok']) {
+            Cache::put($this->connectionTestKey($mailbox), now()->toIso8601String(), now()->addDays(30));
+        } else {
+            Cache::forget($this->connectionTestKey($mailbox));
+        }
 
         Notification::make()
-            ->title($result['ok'] ? 'Mailbox ready' : 'Connection failed')
+            ->title($result['ok'] ? 'IMAP connection verified' : 'Connection failed')
             ->body($result['message'])
             ->{$result['ok'] ? 'success' : 'danger'}()
             ->send();
@@ -334,11 +344,22 @@ class UserMailboxSettingsPage extends Page implements HasForms
             ];
         }
 
+        $testedAt = Cache::get($this->connectionTestKey($mailbox));
+
         return [
-            'tone' => 'success',
-            'label' => 'Mailbox ready',
-            'description' => 'Your mailbox is ready for live inbox and direct sending.',
+            'tone' => $testedAt ? 'success' : 'warning',
+            'label' => $testedAt ? 'IMAP verified' : 'Configured, not tested',
+            'description' => $testedAt
+                ? 'Last successful IMAP test: '.$testedAt.'. Outgoing email has not been tested.'
+                : 'Saved connection details have not passed a recent IMAP test. Outgoing email is not verified.',
         ];
+    }
+
+    protected function connectionTestKey(UserMailbox $mailbox): string
+    {
+        $fields = $mailbox->only(['imap_host', 'imap_port', 'imap_encryption', 'imap_validate_certificate', 'imap_username', 'imap_password', 'inbox_folder']);
+
+        return 'mailbox.imap_test.'.$mailbox->user_id.'.'.hash_hmac('sha256', json_encode($fields), (string) config('app.key'));
     }
 
     protected function getMailboxRecord(): UserMailbox
@@ -390,7 +411,7 @@ class UserMailboxSettingsPage extends Page implements HasForms
                 'imap_host' => self::MEDITYA_HOST,
                 'imap_port' => 993,
                 'imap_encryption' => 'ssl',
-                'imap_validate_certificate' => false,
+                'imap_validate_certificate' => true,
                 'inbox_folder' => 'INBOX',
                 'spam_folder' => 'INBOX.Spam',
                 'sent_folder' => 'INBOX.Sent',
