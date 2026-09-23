@@ -44,8 +44,20 @@ it('refuses to reassign an existing email and rolls back client creation', funct
     expect($existing->fresh()->clinic_id)->toBeNull();
 });
 
-it('requires the private tax ID before creating records', function () {
+it('provisions with a clearly pending tax ID when deployment configuration is absent', function () {
     config(['client_provisioning.by_design_dentals_tax_id' => null]);
+    $this->seed(ByDesignDentalsSeeder::class);
+    $clinic = Clinic::where('clinic_code', ByDesignDentalsSeeder::CODE)->firstOrFail();
+    expect($clinic->tax_id)->toBeNull();
+    expect($clinic->service_notes)->toContain('Tax ID pending');
+    expect($clinic->organization->onboarding_status)->toBe('in_progress');
+    $clinic->update(['tax_id' => '987654321']);
+    $this->seed(ByDesignDentalsSeeder::class);
+    expect($clinic->fresh()->tax_id)->toBe('987654321');
+});
+
+it('rejects an invalid supplied tax ID without partial records', function () {
+    config(['client_provisioning.by_design_dentals_tax_id' => 'invalid']);
     expect(fn () => $this->seed(ByDesignDentalsSeeder::class))->toThrow(RuntimeException::class);
     expect(Organization::where('name', 'By Design Dentals')->exists())->toBeFalse();
 });

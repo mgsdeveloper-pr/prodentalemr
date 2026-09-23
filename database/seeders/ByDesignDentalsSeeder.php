@@ -43,9 +43,9 @@ class ByDesignDentalsSeeder extends Seeder
                 || Clinic::withTrashed()->where('clinic_name', 'By Design Dentals')->exists()) {
                 throw new RuntimeException('A matching client or user already exists. Reconcile it before provisioning; existing users will not be reassigned.');
             }
-            $taxId = (string) config('client_provisioning.by_design_dentals_tax_id');
-            if (! preg_match('/^\d{9}$/', $taxId)) {
-                throw new RuntimeException('Set BY_DESIGN_DENTALS_TAX_ID securely to the supplied nine-digit tax ID before running this migration.');
+            $taxId = trim((string) config('client_provisioning.by_design_dentals_tax_id'));
+            if ($taxId !== '' && ! preg_match('/^\d{9}$/', $taxId)) {
+                throw new RuntimeException('BY_DESIGN_DENTALS_TAX_ID must contain nine digits when supplied. Correct it or leave it unset and enter the tax ID in clinic settings later.');
             }
             $role = Role::findByName('clinic_admin', 'web');
             $address = [
@@ -62,14 +62,15 @@ class ByDesignDentalsSeeder extends Seeder
             $clinic = Clinic::create([
                 ...$address, 'organization_id' => $organization->id,
                 'clinic_name' => 'By Design Dentals', 'clinic_code' => self::CODE,
-                'email' => self::ADMIN_EMAIL, 'tax_id' => $taxId,
+                'email' => self::ADMIN_EMAIL, 'tax_id' => $taxId !== '' ? $taxId : null,
                 'timezone' => 'America/New_York', 'status' => true,
                 'verification_services_enabled' => true, 'verification_service_status' => 'active',
                 'clinic_operations_enabled' => true, 'pms_service_status' => 'active',
                 'service_status' => 'active', 'managed_services_status' => 'active',
                 'verification_assignment_method' => 'unassigned',
                 'verification_pdf_output_mode' => 'custom_landscape',
-                'service_notes' => 'Hybrid: both clinic staff and assigned internal verifiers handle verification. One assignee per request. Pricing not agreed; no paid subscription created.',
+                'service_notes' => 'Hybrid: both clinic staff and assigned internal verifiers handle verification. One assignee per request. Pricing not agreed; no paid subscription created.'
+                    .($taxId === '' ? ' Tax ID pending: enter securely in clinic settings before billing or payer submissions.' : ''),
                 'demo_mode' => false,
             ]);
             $location = Location::create([

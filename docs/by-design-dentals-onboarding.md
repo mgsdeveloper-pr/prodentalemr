@@ -6,8 +6,8 @@ The supplied NPI and license belong to the provider, not the clinic. The legal o
 ## Deployment
 
 - Back up the target database and confirm the target environment.
-- Set `BY_DESIGN_DENTALS_TAX_ID` securely on the target server to the supplied tax ID. Never put its value in Git.
-- Refresh cached configuration after setting it, then run migrations through the normal protected update process.
+- Optionally set `BY_DESIGN_DENTALS_TAX_ID` securely on the target server. Never put its value in Git. If absent, provisioning succeeds with a blank tax ID and a pending note; enter the tax ID securely in clinic settings before billing or payer submissions.
+- Refresh cached configuration if changing it, then run migrations through the normal protected update process. A supplied but invalid tax ID is rejected.
 - The migration requires the existing `clinic_admin` role. It stops on conflicting client/email records rather than taking over another account.
 - Reruns preserve existing records and passwords. Rollback deliberately does not delete client or clinical data.
 - Production provisioning is skipped in automated test migrations; the explicit seeder is covered by isolated tests.
@@ -27,3 +27,7 @@ The supplied NPI and license belong to the provider, not the clinic. The legal o
 ## Remaining setup
 
 Confirm the legal owner and administrator's actual name; establish the administrator password; assign internal verifiers; agree subscription/usage pricing; select and validate the clinic's verification template before real requests.
+
+## Recovering an update stopped by the earlier tax-ID prerequisite
+
+Restore application access using the System Updates recovery action and the SaaS Admin password. Deploy the corrected seeder, confirm the database backup, and rerun the protected update. The failed migration remains pending and will retry; do not manually mark it completed. The existing local client's tax ID and credentials are preserved.
