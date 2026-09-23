@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\Clinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Cache;
 
 class ClinicPanelScope
 {
@@ -15,21 +14,26 @@ class ClinicPanelScope
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || ! $user->status) {
+            session()->forget(self::SESSION_KEY);
+
             return null;
         }
 
-        if (! $user->shouldBypassClinicScope()) {
-            return filled($user->clinic_id) ? (int) $user->clinic_id : null;
+        $options = self::clinicOptions();
+        $clinicId = $user->shouldBypassClinicScope() ? session(self::SESSION_KEY) : $user->clinic_id;
+        if (filled($clinicId) && array_key_exists((int) $clinicId, $options)) {
+            return (int) $clinicId;
+        }
+        session()->forget(self::SESSION_KEY);
+        if (count($options) === 1) {
+            $clinicId = (int) array_key_first($options);
+            session([self::SESSION_KEY => $clinicId]);
+
+            return $clinicId;
         }
 
-        $clinicId = session(self::SESSION_KEY);
-
-        if (! filled($clinicId)) {
-            return null;
-        }
-
-        return (int) $clinicId;
+        return null;
     }
 
     public static function selectedClinic(): ?Clinic
@@ -40,42 +44,12 @@ class ClinicPanelScope
             return null;
         }
 
-        return Cache::remember(
-            "clinic_panel_scope.selected_clinic.{$clinicId}",
-            now()->addMinutes(5),
-            fn (): ?Clinic => Clinic::query()->with('organization')->find($clinicId),
-        );
+        return Clinic::query()->with('organization')->find($clinicId);
     }
 
     public static function initializeFor(User $user): ?Clinic
     {
-        if (! $user->shouldBypassClinicScope()) {
-            return $user->clinic;
-        }
-
-        $selected = self::selectedClinic();
-
-        if ($selected?->status
-            && ($selected->hasActiveVerificationServices() || $selected->hasActiveClinicOperations())) {
-            return $selected;
-        }
-
-        $clinic = Clinic::query()
-            ->where('status', true)
-            ->orderBy('clinic_name')
-            ->get()
-            ->first(fn (Clinic $candidate): bool => $candidate->hasActiveVerificationServices()
-                || $candidate->hasActiveClinicOperations());
-
-        if (! $clinic) {
-            session()->forget(self::SESSION_KEY);
-
-            return null;
-        }
-
-        session([self::SESSION_KEY => $clinic->getKey()]);
-
-        return $clinic;
+        return self::selectedClinic();
     }
 
     public static function selectedOrganizationId(): ?int
@@ -95,33 +69,31 @@ class ClinicPanelScope
     {
         $user = auth()->user();
 
-        if (! $user instanceof User) {
+        if (! $user instanceof User || ! $user->status) {
             return [];
         }
 
         if ($user->shouldBypassClinicScope()) {
-            return Cache::remember(
-                'clinic_panel_scope.master_clinic_options',
-                now()->addMinutes(5),
-                fn (): array => Clinic::query()
-                    ->with('organization')
-                    ->orderBy('clinic_name')
-                    ->get()
-                    ->mapWithKeys(fn (Clinic $clinic): array => [
-                        $clinic->getKey() => trim($clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')),
-                    ])
-                    ->all(),
-            );
+            return Clinic::query()
+                ->where('status', true)
+                ->with('organization')
+                ->orderBy('clinic_name')
+                ->get()
+                ->mapWithKeys(fn (Clinic $clinic): array => [
+                    $clinic->getKey() => trim($clinic->clinic_name.' - '.($clinic->organization?->name ?? '')),
+                ])
+                ->all();
         }
 
-        $clinic = $user->clinic?->loadMissing('organization');
+        $clinic = Clinic::query()->with('organization')->where('status', true)
+            ->where('organization_id', $user->organization_id)->find($user->clinic_id);
 
         if (! $clinic) {
             return [];
         }
 
         return [
-            $clinic->getKey() => trim($clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')),
+            $clinic->getKey() => trim($clinic->clinic_name.' - '.($clinic->organization?->name ?? '')),
         ];
     }
 
@@ -130,7 +102,7 @@ class ClinicPanelScope
         $clinicId = self::selectedClinicId();
 
         if (! $clinicId) {
-            return $query;
+            return $query->whereRaw('1 = 0');
         }
 
         return $query->where($column, $clinicId);

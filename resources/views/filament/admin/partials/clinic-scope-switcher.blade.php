@@ -196,6 +196,9 @@
 
         <input type="hidden" name="redirect" value="{{ url()->full() }}">
 
+        @if (count($clinicOptions) <= 1)
+            <div style="font-weight: 600; overflow-wrap: anywhere;" aria-label="Active clinic">{{ $selectedClinicName ?: 'No clinic assigned. Contact your administrator.' }}</div>
+        @else
         <div class="admin-workspace-scope__selector" @click.outside="open = false">
             <button type="button" class="admin-workspace-scope__trigger" aria-haspopup="listbox" :aria-expanded="open.toString()" @click="open = ! open">
                 <span>{{ $activeScopeLabel }}</span>
@@ -220,5 +223,6 @@
         <div class="admin-workspace-scope__status">
             Active: <strong>{{ $activeScopeLabel }}</strong>
         </div>
+        @endif
     </form>
 </div>

@@ -3,11 +3,9 @@
 namespace App\Support;
 
 use App\Models\Clinic;
-use App\Models\ClientServiceEnrollment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 
 class AdminClinicScope
 {
@@ -15,13 +13,26 @@ class AdminClinicScope
 
     public static function selectedClinicId(): ?int
     {
-        $clinicId = session(self::SESSION_KEY);
+        $user = auth()->user();
+        if (! $user instanceof User || ! $user->status) {
+            session()->forget(self::SESSION_KEY);
 
-        if (! filled($clinicId)) {
             return null;
         }
+        $clinicId = session(self::SESSION_KEY);
+        if (filled($clinicId) && $user->canAccessVerificationClinic((int) $clinicId)
+            && Clinic::whereKey($clinicId)->where('status', true)->exists()) {
+            return (int) $clinicId;
+        }
+        session()->forget(self::SESSION_KEY);
+        $ids = self::accessibleManagedServiceClinicQuery($user)->limit(2)->pluck('clinics.id');
+        if ($ids->count() === 1) {
+            session([self::SESSION_KEY => (int) $ids->first()]);
 
-        return (int) $clinicId;
+            return (int) $ids->first();
+        }
+
+        return null;
     }
 
     public static function selectedClinic(): ?Clinic
@@ -38,11 +49,7 @@ class AdminClinicScope
             return null;
         }
 
-        return Cache::remember(
-            "admin_clinic_scope.selected_clinic.{$clinicId}",
-            now()->addMinutes(5),
-            fn (): ?Clinic => Clinic::query()->with('organization')->find($clinicId),
-        );
+        return Clinic::query()->with('organization')->find($clinicId);
     }
 
     public static function clinicOptions(): array
@@ -54,7 +61,7 @@ class AdminClinicScope
             ->orderBy('clinic_name')
             ->get()
             ->mapWithKeys(fn (Clinic $clinic): array => [
-                $clinic->getKey() => trim($clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '')),
+                $clinic->getKey() => trim($clinic->clinic_name.' - '.($clinic->organization?->name ?? '')),
             ])
             ->all();
     }
@@ -75,7 +82,7 @@ class AdminClinicScope
         $clinicId = self::selectedClinicId();
 
         if (! $user instanceof User) {
-            return $query;
+            return $query->whereRaw('1 = 0');
         }
 
         if ($clinicId && $user->canAccessVerificationClinic($clinicId)) {
@@ -113,6 +120,7 @@ class AdminClinicScope
     public static function managedServiceClinicQuery(): Builder
     {
         return Clinic::query()
+            ->where('status', true)
             ->where('verification_services_enabled', true)
             ->whereHas('serviceEnrollments', function (Builder $query): void {
                 $query
@@ -128,7 +136,10 @@ class AdminClinicScope
         $user ??= auth()->user();
         $query = self::managedServiceClinicQuery();
 
-        if (! $user instanceof User || $user->hasFullVerificationClinicAccess()) {
+        if (! $user instanceof User || ! $user->status) {
+            return $query->whereRaw('1 = 0');
+        }
+        if ($user->hasFullVerificationClinicAccess()) {
             return $query;
         }
 

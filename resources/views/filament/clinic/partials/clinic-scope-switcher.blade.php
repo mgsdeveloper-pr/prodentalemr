@@ -1,7 +1,7 @@
 @php
     $selectedClinicId = \App\Support\ClinicPanelScope::selectedClinicId();
     $selectedClinicName = \App\Support\ClinicPanelScope::selectedClinic()?->clinic_name;
-    $activeScopeName = $selectedClinicId ? ($selectedClinicName ?: 'Selected clinic') : 'All Clinics';
+    $activeScopeName = $selectedClinicId ? ($selectedClinicName ?: 'Selected clinic') : 'Select a clinic';
 @endphp
 
 <style>
@@ -209,6 +209,9 @@
 
         <input type="hidden" name="redirect" value="{{ url()->full() }}">
 
+        @if (count($clinicOptions) <= 1)
+            <div style="font-weight: 600; overflow-wrap: anywhere;" aria-label="Active clinic">{{ $selectedClinicName ?: 'No clinic assigned. Contact your administrator.' }}</div>
+        @else
         <div class="clinic-workspace-scope__selector" @click.outside="open = false">
             <button
                 type="button"
@@ -223,7 +226,7 @@
 
             <div class="clinic-workspace-scope__menu" role="listbox" x-cloak x-show="open" x-transition.opacity>
                 <button type="submit" name="clinic_id" value="" class="clinic-workspace-scope__option" role="option" aria-current="{{ $selectedClinicId ? 'false' : 'true' }}">
-                    All Clinics
+                    Select a clinic
                 </button>
 
                 @foreach ($clinicOptions as $clinicId => $clinicLabel)
@@ -237,5 +240,6 @@
         <div class="clinic-workspace-scope__status">
             Active: <strong>{{ $activeScopeName }}</strong>
         </div>
+        @endif
     </form>
 </div>
