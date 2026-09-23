@@ -32,6 +32,11 @@
             @else
                 <h2 class="text-base font-semibold">Select a clinic to view inbox settings</h2>
                 <p class="text-sm text-gray-600">Choose a clinic from the workspace selector. Reload this page if you changed clinics in another tab.</p>
+                @if (\Filament\Facades\Filament::getCurrentPanel()?->getId() === 'clinic')
+                    <x-filament::button tag="a" :href="\App\Filament\Clinic\Pages\VerificationSettings::getUrl(panel: 'clinic')" color="gray">
+                        Select clinic in Verification Settings
+                    </x-filament::button>
+                @endif
             @endif
         </div>
     </x-verification-management-shell>

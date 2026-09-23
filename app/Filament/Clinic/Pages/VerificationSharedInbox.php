@@ -11,6 +11,7 @@ use App\Support\ClinicPanelScope;
 use App\Support\SaasEntitlements;
 use App\Support\VerificationManagedServiceAccess;
 use BackedEnum;
+use Filament\Actions\Action;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
@@ -40,6 +41,18 @@ class VerificationSharedInbox extends VerificationInbox
         return [
             VerificationRequestResource::getUrl('index') => 'Verification',
             'Shared Inbox',
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            ...parent::getHeaderActions(),
+            Action::make('inboxSettings')
+                ->label('Shared Inbox Settings')
+                ->icon('heroicon-o-cog-6-tooth')
+                ->url(VerificationSharedInboxSettings::getUrl(panel: 'clinic'))
+                ->visible(fn (): bool => VerificationSharedInboxSettings::canAccess()),
         ];
     }
 

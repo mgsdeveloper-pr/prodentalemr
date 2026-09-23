@@ -18,6 +18,9 @@
             ['key' => 'template-management', 'label' => 'Template Management', 'description' => 'Manage templates, sections, questions, and preview.', 'active' => $activeSettingsSection === 'template-management', 'icon' => '02', 'url' => null],
             ['key' => 'pdf-settings', 'label' => 'PDF Settings', 'description' => 'Select the user PDF output and preset profile.', 'active' => $activeSettingsSection === 'pdf-settings', 'icon' => '03', 'url' => null],
         ];
+        if (\App\Filament\Clinic\Pages\VerificationSharedInboxSettings::canAccess()) {
+            $settingsItems[] = ['key' => 'shared-inbox', 'label' => 'Shared Inbox Settings', 'description' => 'Mailbox connection, sync, and retention.', 'active' => false, 'icon' => '04', 'url' => \App\Filament\Clinic\Pages\VerificationSharedInboxSettings::getUrl(panel: 'clinic')];
+        }
     @endphp
 
     <style>

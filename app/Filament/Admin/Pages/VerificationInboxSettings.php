@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
+use App\Models\Clinic;
 use App\Models\VerificationInboxAttachment;
 use App\Models\VerificationInboxMailbox;
 use App\Models\VerificationInboxMessage;
@@ -69,7 +70,7 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->settingsClinicId = AdminClinicScope::selectedClinic()?->id;
+        $this->settingsClinicId = $this->selectedClinic()?->id;
         if ($this->selectedClinicId()) {
             $this->settings = $this->getSettingsRecord();
             $state = $this->settings->only($this->settingKeys());
@@ -349,7 +350,12 @@ class VerificationInboxSettings extends Page implements HasForms
 
     public function getSelectedClinicLabel(): string
     {
-        return AdminClinicScope::selectedClinic()?->clinic_name ?? 'Select clinic in workspace';
+        return $this->selectedClinic()?->clinic_name ?? 'Select clinic in workspace';
+    }
+
+    protected function selectedClinic(): ?Clinic
+    {
+        return AdminClinicScope::selectedClinic();
     }
 
     protected function getSettingsRecord(): VerificationInboxMailbox
@@ -390,7 +396,7 @@ class VerificationInboxSettings extends Page implements HasForms
     public function hasClinicScope(): bool
     {
         return $this->settingsClinicId !== null
-            && $this->settingsClinicId === AdminClinicScope::selectedClinic()?->id;
+            && $this->settingsClinicId === $this->selectedClinic()?->id;
     }
 
     protected function ensureClinicSelected(): bool
