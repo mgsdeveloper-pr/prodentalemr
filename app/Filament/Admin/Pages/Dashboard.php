@@ -17,5 +17,5 @@ class Dashboard extends BaseDashboard
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $title = '';
+    protected static ?string $title = 'Dashboard';
 }

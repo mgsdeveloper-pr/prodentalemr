@@ -1,183 +1,77 @@
 <x-filament-widgets::widget>
-    <x-filament::section>
-        <style>
-            .ms-console {
-                display: flex;
-                flex-direction: column;
-                gap: 1.25rem;
-            }
-
-            .ms-console__heading {
-                display: flex;
-                flex-direction: column;
-                gap: 0.35rem;
-                padding-bottom: 0.15rem;
-            }
-
-            .ms-console__title {
-                margin: 0;
-                font-size: 1.08rem;
-                font-weight: 800;
-                color: #0f172a;
-            }
-
-            .ms-console__subtitle {
-                margin: 0;
-                font-size: 0.92rem;
-                color: #6b7280;
-                line-height: 1.5;
-            }
-
-            .ms-console__grid {
-                display: grid;
-                grid-template-columns: repeat(5, minmax(180px, 1fr));
-                gap: 1rem;
-            }
-
-            .ms-console__card {
-                display: block;
-                text-decoration: none;
-                border: 1px solid #e5e7eb;
-                border-radius: 1rem;
-                background: #ffffff;
-                padding: 1rem;
-                box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-                transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-            }
-
-            .ms-console__card:hover {
-                transform: translateY(-1px);
-                border-color: #f5c76c;
-                box-shadow: 0 16px 30px rgba(15, 23, 42, 0.08);
-            }
-
-            .ms-console__card--active {
-                border-color: #f5c76c;
-                background: linear-gradient(180deg, #fffdf7 0%, #ffffff 100%);
-                box-shadow: 0 18px 34px rgba(245, 158, 11, 0.12);
-            }
-
-            .ms-console__card-top {
-                display: flex;
-                align-items: flex-start;
-                justify-content: space-between;
-                gap: 0.75rem;
-            }
-
-            .ms-console__card-title {
-                margin: 0;
-                font-size: 0.98rem;
-                font-weight: 800;
-                color: #0f172a;
-            }
-
-            .ms-console__card-copy {
-                margin: 0.45rem 0 0;
-                font-size: 0.8rem;
-                line-height: 1.55;
-                color: #6b7280;
-            }
-
-            .ms-console__metric {
-                flex-shrink: 0;
-                min-width: 2.4rem;
-                padding: 0.3rem 0.65rem;
-                border-radius: 999px;
-                background: #fff7e6;
-                border: 1px solid #fde2a7;
-                color: #b45309;
-                font-size: 0.76rem;
-                font-weight: 800;
-                text-align: center;
-            }
-
-            html.dark .ms-console__title,
-            html.dark .ms-console__card-title {
-                color: #f9fafb;
-            }
-
-            html.dark .ms-console__subtitle,
-            html.dark .ms-console__card-copy {
-                color: #9ca3af;
-            }
-
-            html.dark .ms-console__card {
-                background: rgba(17, 24, 39, 0.75);
-                border-color: rgba(255, 255, 255, 0.08);
-            }
-
-            html.dark .ms-console__card:hover {
-                border-color: rgba(245, 199, 108, 0.45);
-            }
-
-            html.dark .ms-console__card--active {
-                background: rgba(17, 24, 39, 0.92);
-                border-color: rgba(245, 199, 108, 0.45);
-            }
-
-            html.dark .ms-console__metric {
-                background: rgba(180, 83, 9, 0.12);
-                border-color: rgba(245, 199, 108, 0.2);
-                color: #fcd34d;
-            }
-
-            @media (max-width: 1440px) {
-                .ms-console__grid {
-                    grid-template-columns: repeat(5, minmax(160px, 1fr));
-                }
-            }
-
-            @media (max-width: 1280px) {
-                .ms-console__grid {
-                    grid-template-columns: repeat(3, minmax(0, 1fr));
-                }
-            }
-
-            @media (max-width: 900px) {
-                .ms-console__grid {
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                }
-            }
-
-            @media (max-width: 768px) {
-                .ms-console__grid {
-                    grid-template-columns: minmax(0, 1fr);
-                }
-            }
-
-        </style>
-
-        <div class="ms-console">
-            <div class="ms-console__heading">
-                <h3 class="ms-console__title">Verification Operations Console</h3>
-                <p class="ms-console__subtitle">Jump straight into the queues and tools your insurance verification team uses most.</p>
-            </div>
-
-            <div class="ms-console__grid">
-                @foreach ($links as $link)
-                    @php
-                        $isActive = filled($link['filter']) && $activeFilter === $link['filter'];
-                    @endphp
-
-                    <button
-                        type="button"
-                        wire:click="applyFilter('{{ $link['filter'] }}')"
-                        class="ms-console__card {{ $isActive ? 'ms-console__card--active' : '' }}"
-                        style="text-align: left; width: 100%;"
-                    >
-                        <div class="ms-console__card-top">
-                            <div>
-                                <h4 class="ms-console__card-title">{{ $link['title'] }}</h4>
-                                <p class="ms-console__card-copy">{{ $link['description'] }}</p>
-                            </div>
-
-                            @if (! is_null($link['metric']))
-                                <span class="ms-console__metric">{{ number_format($link['metric']) }}</span>
-                            @endif
-                        </div>
-                    </button>
-                @endforeach
-            </div>
+    <style>
+        .vq-overview { container-type: inline-size; color: #0f172a; font-size: var(--pwdl-font-size-body, 0.875rem); line-height: 1.5; }
+        .vq-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+        .vq-title { margin: 0; font-size: var(--pwdl-font-size-body, 0.875rem); line-height: 1.5; font-weight: 700; letter-spacing: 0; }
+        .vq-reset { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 0; color: #0f766e; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .vq-icon { width: 18px; height: 18px; flex-shrink: 0; }
+        .vq-strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid #dbe4ee; border-radius: 8px; background: #fff; overflow: hidden; }
+        .vq-queue { position: relative; display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 90px; padding: 14px 17px; border: 0; border-right: 1px solid #dbe4ee; background: transparent; text-align: left; cursor: pointer; color: inherit; }
+        .vq-queue:last-child { border-right: 0; }
+        .vq-label { display: block; min-height: 36px; color: #64748b; font-size: var(--pwdl-font-size-caption, 0.75rem); line-height: 18px; font-weight: 400; overflow-wrap: anywhere; }
+        .vq-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .vq-number { font-size: 21px; line-height: 28px; font-weight: 850; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+        .vq-chevron { width: 16px; height: 16px; color: #8492a3; flex-shrink: 0; }
+        .vq-queue:hover { background: #f7fafb; }
+        .vq-queue[aria-pressed="true"] { background: #f0fdfa; box-shadow: inset 0 3px 0 #0f766e; }
+        .vq-queue[aria-pressed="true"] .vq-label, .vq-queue[aria-pressed="true"] .vq-chevron { color: #0f766e; }
+        .vq-queue:focus-visible { outline: 2px solid #0f766e; outline-offset: -4px; }
+        .vq-reset:focus-visible { outline: 2px solid #0f766e; outline-offset: 4px; }
+        .vq-queue--alert .vq-number { color: #b42318; }
+        .vq-queue--warning .vq-number { color: #9a6700; }
+        html.dark .vq-overview { color: #f4f4f5; }
+        html.dark .vq-strip { background: #18181b; border-color: #3f3f46; }
+        html.dark .vq-queue { border-color: #3f3f46; }
+        html.dark .vq-label { color: #c4cbd4; }
+        html.dark .vq-queue:hover { background: #27272a; }
+        html.dark .vq-queue[aria-pressed="true"] { background: #133c38; }
+        html.dark .vq-reset, html.dark .vq-queue[aria-pressed="true"] .vq-label { color: #5eead4; }
+        html.dark .vq-queue--alert .vq-number { color: #fca5a5; }
+        html.dark .vq-queue--warning .vq-number { color: #fcd34d; }
+        @container (max-width: 850px) {
+            .vq-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .vq-queue { border-bottom: 1px solid #e5ebf1; }
+            .vq-queue:nth-child(even) { border-right: 0; }
+            .vq-queue:last-child { grid-column: 1 / -1; border-bottom: 0; }
+        }
+        @container (max-width: 380px) {
+            .vq-strip { grid-template-columns: minmax(0, 1fr); }
+            .vq-queue { border-right: 0; min-height: 78px; }
+            .vq-label { min-height: 20px; }
+        }
+    </style>
+    <section class="vq-overview" aria-label="Verification work queues">
+        <div class="vq-heading">
+            <h2 class="vq-title">Work Queues</h2>
+            <button type="button" class="vq-reset" wire:click="applyFilter" aria-pressed="{{ blank($activeFilter) ? 'true' : 'false' }}">
+                <x-filament::icon icon="heroicon-o-list-bullet" class="vq-icon" />
+                All requests
+            </button>
         </div>
-    </x-filament::section>
+        <div class="vq-strip">
+            @foreach ($links as $link)
+                @php
+                    $isActive = filled($link['filter']) && $activeFilter === $link['filter'];
+                    $tone = $link['metric'] > 0 ? match ($link['filter']) {
+                        'urgent_requests', 'overdue' => 'alert',
+                        'returned_for_rework' => 'warning',
+                        default => 'neutral',
+                    } : 'neutral';
+                @endphp
+                <button type="button"
+                    wire:key="overview-{{ $link['filter'] }}"
+                    wire:click="applyFilter('{{ $link['filter'] }}')"
+                    aria-pressed="{{ $isActive ? 'true' : 'false' }}"
+                    class="vq-queue vq-queue--{{ $tone }}">
+                    <span class="vq-label">
+                        {{ $link['title'] }}
+                    </span>
+                    <span class="vq-total">
+                        <span class="vq-number">{{ number_format($link['metric']) }}</span>
+                        <x-filament::icon icon="heroicon-o-chevron-right" class="vq-chevron" />
+                    </span>
+                </button>
+            @endforeach
+        </div>
+    </section>
 </x-filament-widgets::widget>
