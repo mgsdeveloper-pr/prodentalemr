@@ -164,6 +164,63 @@ class VerificationResultPdf
         return array_key_exists($mode, self::OUTPUT_MODE_OPTIONS) ? $mode : 'standard';
     }
 
+    public static function templatePreview(\App\Models\VerificationTemplateVersion $version, string $formType, array $state, array $coverage, string $mode = 'standard'): string
+    {
+        abort_unless(in_array($formType, ['short_form', 'full_form'], true)
+            && in_array($version->form_type, ['both', $formType], true)
+            && array_key_exists($mode, self::OUTPUT_MODE_OPTIONS), 422);
+
+        // Preview uses an unsaved request and transient answers, never a patient record.
+        $request = new BillingWorkItem([
+            'reference_number' => 'TEMPLATE PREVIEW', 'title' => $version->name,
+            'status' => 'new', 'priority' => 'normal',
+            'verification_template_version_id' => $version->id,
+            'verification_template_snapshot' => app(VerificationTemplateVersionService::class)->snapshot($version),
+        ]);
+        $request->setRelation('verificationProfile', new \App\Models\VerificationProfile(['form_type' => $formType]));
+        foreach (['clinic', 'provider', 'assignedTo'] as $relation) $request->setRelation($relation, null);
+        $questions = app(VerificationAuditService::class)->applicableQuestions($request, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $formType);
+        $rows = $questions->where('input_type', 'frequency_row')->map(function ($question) use ($coverage) {
+            $values = array_intersect_key($coverage[$question->id] ?? [], array_flip([
+                'coverage_percent', 'frequency', 'coverage_status', 'age_limit', 'waiting_period', 'service_history',
+                'pre_auth_required', 'pre_auth_details', 'downgrade_applies', 'downgrade_to', 'payment_guideline', 'notes',
+            ]));
+            return new \App\Models\VerificationCoverageCode([...$values,
+                'code' => $question->code, 'description' => $question->prompt,
+                'category' => $question->frequencyCategory(), 'sort_order' => $question->sort_order,
+            ]);
+        });
+        $request->setRelation('verificationCoverageCodes', new \Illuminate\Database\Eloquent\Collection($rows->all()));
+        $state = array_replace(array_fill_keys([
+            'vf_patient_full_name', 'vf_patient_dob', 'vf_patient_identifier', 'vf_subscriber_id',
+            'vf_insurance_provider_name', 'vf_group_number',
+        ], ''), $state, ['vf_form_type' => $formType]);
+        $summary = [
+            'reference_number' => 'TEMPLATE PREVIEW', 'patient_name' => $state['vf_patient_full_name'] ?: '-',
+            'insurance_name' => $state['vf_insurance_provider_name'] ?: '-', 'clinic_name' => $version->name,
+            'clinic_logo' => null, 'report_footer' => 'Template preview only - not a patient verification.',
+            'status' => 'Preview', 'result' => 'Not submitted', 'priority' => '-', 'assigned_to' => '-',
+        ];
+        $view = match ($mode) {
+            'custom_landscape' => 'pdf.verifications.custom-landscape',
+            'custom_portrait' => 'pdf.verifications.custom-portrait',
+            default => 'pdf.verifications.standard',
+        };
+        $pdf = Pdf::loadView($view, [
+            'workItem' => $request, 'state' => $state, 'summary' => $summary,
+            'sections' => static::buildSections($request, $state, true, templatePreview: true),
+            'panels' => [], 'selectedSectionTitles' => [], 'selectedQuestionTitles' => [],
+        ])->setPaper('a4', $mode === 'custom_landscape' ? 'landscape' : 'portrait');
+        $pdf->render();
+        if ($mode === 'custom_landscape' && $pdf->getDomPDF()->getCanvas()->get_page_count() !== 1) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'pdf_layout' => 'This template exceeds one landscape page. Use Standard output or review its content. No answers have been removed.',
+            ]);
+        }
+
+        return $pdf->output();
+    }
+
     public static function isCustomOutputMode(?string $mode): bool
     {
         return in_array(static::normalizeOutputMode($mode), ['custom_landscape', 'custom_portrait'], true);
@@ -277,11 +334,12 @@ class VerificationResultPdf
         array $state,
         bool $showBlankRows = true,
         ?VerificationFormSubmission $submission = null,
+        bool $templatePreview = false,
     ): array {
         $formType = $state['vf_form_type'] ?? $workItem->verificationProfile?->form_type ?? 'full_form';
         $clinicId = $workItem->clinic_id;
 
-        if (! filled($clinicId)) {
+        if (! filled($clinicId) && ! $templatePreview) {
             return [];
         }
 
@@ -291,30 +349,23 @@ class VerificationResultPdf
             $formType,
         );
 
-        $hasLiveTemplateThreeSections = $questions->contains(
-            fn (VerificationFormQuestion $question): bool => in_array(
-                (string) $question->section_key,
-                VerificationFormQuestion::TEMPLATE_3_LIVE_SECTION_KEYS,
-                true
-            )
-        );
+        $definitions = collect(data_get($workItem->verification_template_snapshot, 'sections', []))->keyBy('section_key');
 
-        if ($hasLiveTemplateThreeSections) {
-            $questions = $questions
-                ->filter(fn (VerificationFormQuestion $question): bool => in_array(
-                    (string) $question->section_key,
-                    VerificationFormQuestion::TEMPLATE_3_LIVE_SECTION_KEYS,
-                    true
-                ))
-                ->values();
-        }
+        $questions = $questions->filter(fn ($question) => app(VerificationAuditService::class)->visibleInAnswerState($question, $questions, $state));
 
         $questions = $questions
             ->groupBy(fn (VerificationFormQuestion $question): string => static::normalizeSectionKey($question->section_key));
 
         $sections = [];
 
-        foreach (self::SECTION_ORDER as $sectionKey) {
+        $sectionOrder = collect(self::SECTION_ORDER)->merge($questions->keys())->unique()
+            ->sortBy(function ($key) use ($definitions) {
+                $section = $definitions->get($key);
+                $parent = $definitions->get(data_get($section, 'parent_section_key'));
+                $order = (int) data_get($section, 'sort_order', (array_search($key, self::SECTION_ORDER, true) === false ? 10000 : array_search($key, self::SECTION_ORDER, true) * 10));
+                return [(int) data_get($parent, 'sort_order', $order), $parent ? $order : -1];
+            });
+        foreach ($sectionOrder as $sectionKey) {
             $sectionQuestions = $questions->get($sectionKey, collect());
 
             if ($sectionQuestions->isEmpty()) {
@@ -326,7 +377,7 @@ class VerificationResultPdf
                 ->map(fn (VerificationFormQuestion $question): ?array => static::mapQuestionRow($question, $state))
                 ->filter()
                 ->toBase()
-                ->merge(static::mapCoverageCodeRowsForSection($workItem, $sectionKey, $submission))
+                ->merge(static::mapCoverageCodeRowsForSection($workItem, $sectionKey, $submission, $state))
                 ->when(! $showBlankRows, fn (Collection $rows): Collection => $rows->filter(
                     fn (array $row): bool => static::rowHasPrintableValue($row)
                 ))
@@ -340,7 +391,9 @@ class VerificationResultPdf
 
             $sections[] = [
                 'key' => $sectionKey,
-                'title' => VerificationFormQuestion::sectionLabel($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY),
+                'title' => (filled($parent = data_get($definitions->get($sectionKey), 'parent_section_key'))
+                    ? data_get($definitions->get($parent), 'label', $parent).' / ' : '')
+                    .data_get($definitions->get($sectionKey), 'label', VerificationFormQuestion::sectionLabel($sectionKey, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)),
                 'rows' => $rows,
             ];
         }
@@ -352,6 +405,7 @@ class VerificationResultPdf
         BillingWorkItem $workItem,
         string $sectionKey,
         ?VerificationFormSubmission $submission = null,
+        ?array $state = null,
     ): Collection {
         $category = match ($sectionKey) {
             'template_3_frequency_diagnostic_preventative' => 'Diagnostic & Preventative',
@@ -361,18 +415,16 @@ class VerificationResultPdf
             default => null,
         };
 
-        if (! filled($category)) {
-            return collect();
-        }
-
         $formType = $workItem->verificationProfile?->form_type ?: 'full_form';
-        $allowedSignatures = app(VerificationAuditService::class)
+        $applicableQuestions = app(VerificationAuditService::class)
             ->applicableQuestions(
                 $workItem,
                 VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
                 $formType,
-                frequencyRows: true,
-            )
+            );
+        $allowedSignatures = $applicableQuestions
+            ->where('input_type', 'frequency_row')
+            ->filter(fn ($question) => $state === null || app(VerificationAuditService::class)->visibleInAnswerState($question, $applicableQuestions, $state))
             ->where('section_key', $sectionKey)
             ->mapWithKeys(fn (VerificationFormQuestion $question): array => [
                 static::coverageRowSignature($question->code, $question->prompt) => $question->frequencyResponseConfiguration(),
@@ -384,7 +436,7 @@ class VerificationResultPdf
             : $workItem->verificationCoverageCodes->toBase();
 
         return $coverageRows
-            ->filter(fn ($row): bool => strcasecmp((string) data_get($row, 'category'), $category) === 0)
+            ->filter(fn ($row): bool => ! filled($category) || strcasecmp((string) data_get($row, 'category'), $category) === 0)
             ->filter(fn ($row): bool => $allowedSignatures->has(
                 static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')),
             ))
@@ -398,6 +450,18 @@ class VerificationResultPdf
                     static::coverageRowSignature(data_get($row, 'code'), data_get($row, 'description')),
                     [],
                 );
+                $printableFields = array_merge($configuration['primary_fields'] ?? [], $configuration['detail_fields'] ?? []);
+                foreach (['pre_auth_required' => 'pre_auth_details', 'downgrade_applies' => 'downgrade_to'] as $decision => $detail) {
+                    if (in_array($decision, $printableFields, true) && data_get($row, $decision) === 'Yes') {
+                        $printableFields[] = $detail;
+                    } else {
+                        $printableFields = array_diff($printableFields, [$detail]);
+                    }
+                }
+                // Historical values remain stored, but only configured responses belong in this output.
+                $row = array_intersect_key(is_array($row) ? $row : $row->toArray(), array_flip([
+                    'code', 'description', 'category', ...$printableFields,
+                ]));
                 if ($configuration['orthodontic_payment'] ?? false) {
                     $policy = trim((string) data_get($row, 'payment_guideline'));
                     $schedule = trim((string) data_get($row, 'frequency'));
@@ -446,7 +510,7 @@ class VerificationResultPdf
                         : null)->all(),
                 ])->filter()->implode(' | ');
 
-                if ($category === 'Orthodontics') {
+                if (($category ?: data_get($row, 'category')) === 'Orthodontics') {
                     $fields = array_merge($configuration['primary_fields'] ?? [], $configuration['detail_fields'] ?? []);
                     $parts = collect($fields)->map(function (string $field) use ($row, $configuration): ?string {
                         $value = data_get($row, $field);
@@ -482,9 +546,7 @@ class VerificationResultPdf
     {
         $code = strtolower(trim((string) $code));
 
-        return $code !== ''
-            ? 'code:'.$code
-            : 'description:'.strtolower(trim((string) $description));
+        return $code.'|'.strtolower(trim((string) $description));
     }
 
     protected static function normalizeSectionKey(?string $sectionKey): string
@@ -600,7 +662,7 @@ class VerificationResultPdf
         $field = static::resolveField($question);
         $value = static::extractValue($field, $state);
 
-        if (static::normalizeSectionKey($question->section_key) === 'template_3_coverage_category' && filled($question->secondary_field_key)) {
+        if (filled($question->secondary_field_key)) {
             $deductible = static::displayValue($value, $question->input_type);
             $percent = static::displayValue(static::extractValue($question->secondary_field_key, $state), $question->secondary_input_type ?: 'percent');
 
@@ -618,6 +680,8 @@ class VerificationResultPdf
             'question_id' => $question->id,
             'kind' => 'standard',
             'label' => $question->prompt,
+            'procedure_tags' => $question->procedure_tags ?? [],
+            'code_tag_text' => collect($question->procedure_tags ?? [])->map(fn ($tag) => $tag['system'].' '.$tag['code'].(($tag['status'] ?? '') === 'unverified' ? ' (Unverified)' : ''))->implode(', '),
             'value' => static::displayValue($value, static::resolveInputType($question)),
         ];
     }

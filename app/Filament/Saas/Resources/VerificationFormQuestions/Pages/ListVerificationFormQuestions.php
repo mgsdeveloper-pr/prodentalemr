@@ -29,6 +29,61 @@ class ListVerificationFormQuestions extends ListRecords
 
     public ?int $selectedTemplateVersionId = null;
 
+    public array $data = [];
+
+    public array $codeCoverageData = [];
+
+    public ?string $editorSectionKey = null;
+
+    public string $previewOutputMode = 'standard';
+
+    protected ?\Illuminate\Support\Collection $previewQuestions = null;
+
+    public function previewQuestionVisible(array $question): bool
+    {
+        $this->previewQuestions ??= $this->selectedTemplateVersion()?->questions()
+            ->where('is_active', true)->whereIn('form_type', ['both', $this->templatePreviewFormType])->get() ?? collect();
+        $model = $this->previewQuestions->firstWhere('id', $question['id']);
+
+        return $model && app(\App\Services\Verification\VerificationAuditService::class)
+            ->visibleInAnswerState($model, $this->previewQuestions, $this->data);
+    }
+
+    public function selectEditorSection(string $key): void
+    {
+        abort_unless($this->selectedTemplateVersion()?->sections()->where('section_key', $key)->exists(), 404);
+        $this->editorSectionKey = $key;
+    }
+
+    public function confirmEmptySection(string $key): void
+    {
+        $version = $this->selectedTemplateVersion();
+        abort_unless($version && $this->canAddQuestionToSelectedVersion() && $version->canEditDirectly(), 403);
+        $section = $version->sections()->where('section_key', $key)->firstOrFail();
+        abort_if($version->questions()->where('section_key', $key)->where('is_active', true)->exists(), 422);
+        abort_if($version->sections()->where('parent_section_key', $key)->exists(), 422);
+        $section->update(['allow_empty' => ! $section->allow_empty]);
+    }
+
+    public function downloadPreviewPdf()
+    {
+        $version = $this->selectedTemplateVersion();
+        abort_unless($version, 404);
+        abort_unless(in_array($version->form_type, ['both', $this->templatePreviewFormType], true), 422);
+        $pdf = \App\Support\VerificationResultPdf::templatePreview($version, $this->templatePreviewFormType, $this->data, $this->codeCoverageData, $this->previewOutputMode);
+        return response()->streamDownload(fn () => print($pdf), 'template-preview.pdf', ['Content-Type' => 'application/pdf']);
+    }
+
+    public function reviewSelectedTemplate(): void
+    {
+        abort_unless(auth()->user()?->canPublishVerificationTemplate() && $this->canManageVersions(), 403);
+        $version = $this->selectedTemplateVersion();
+        abort_unless($version && $version->status === VerificationTemplateVersion::STATUS_DRAFT, 422);
+        $this->resetErrorBag('template');
+        app(VerificationTemplateVersionService::class)->assertPublishable($version);
+        $this->mountAction('publishDraftVersion');
+    }
+
     public bool $showTemplatePreview = false;
 
     public string $templatePreviewFormType = 'full_form';
@@ -96,6 +151,10 @@ class ListVerificationFormQuestions extends ListRecords
 
         if ($requestedVersionId > 0) {
             $this->selectTemplateVersion($requestedVersionId);
+            $sectionKey = request()->string('section')->toString();
+            if ($sectionKey !== '' && $this->selectedTemplateVersion()?->sections()->where('section_key', $sectionKey)->exists()) {
+                $this->editorSectionKey = $sectionKey;
+            }
         }
     }
 
@@ -111,6 +170,11 @@ class ListVerificationFormQuestions extends ListRecords
         }
 
         $actions = [
+            Action::make('importTemplate')
+                ->label('Import Template')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->color('gray')
+                ->url(\App\Filament\Saas\Pages\ImportVerificationTemplate::getUrl(panel: 'saas')),
             Action::make('createDraftVersion')
                 ->label('Create Draft Template')
                 ->icon('heroicon-o-document-duplicate')
@@ -120,19 +184,21 @@ class ListVerificationFormQuestions extends ListRecords
                 ->form([
                     TextInput::make('template_name')
                         ->label('Template name')
-                        ->default('Master Template Draft')
+                        ->default('')
                         ->required()
                         ->maxLength(255),
                     Select::make('form_type')
                         ->label('Type of form')
                         ->options([
-                            'both' => 'Full + Short',
                             'full_form' => 'Full Form',
                             'short_form' => 'Short Form',
                         ])
-                        ->default('both')
+                        ->default('full_form')
                         ->required()
                         ->native(false),
+                    \Filament\Forms\Components\Toggle::make('structured_layout')
+                        ->label('Use section and subsection layout')
+                        ->default(false),
                     Select::make('starting_point')
                         ->label('Starting point')
                         ->options([
@@ -157,6 +223,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         if ($this->selectedTemplateVersion()?->status === VerificationTemplateVersion::STATUS_DRAFT) {
             $actions[] = Action::make('publishDraftVersion')
+                ->visible(fn (): bool => auth()->user()?->canPublishVerificationTemplate() ?? false)
                 ->label('Publish This Draft')
                 ->icon('heroicon-o-rocket-launch')
                 ->color('success')
@@ -178,11 +245,12 @@ class ListVerificationFormQuestions extends ListRecords
                     Select::make('release_mode')
                         ->label('Clinic release')
                         ->options([
-                            'release_to_clinics' => 'Publish & Release to Clinics',
+                            'publish_only' => 'Publish without activation',
+                            'release_to_clinics' => 'Publish & Activate for New Clinics',
                             'internal_only' => 'Publish Internally',
                         ])
-                        ->default('release_to_clinics')
-                        ->helperText('Released templates can be used for new clinic template copies. Internal templates remain available only in SaaS.')
+                        ->default('publish_only')
+                        ->helperText('Activation replaces the current master for this form type for new clinics only. Existing clinics keep their assigned forms.')
                         ->required()
                         ->native(false),
                 ])
@@ -233,6 +301,14 @@ class ListVerificationFormQuestions extends ListRecords
         return $this->getTemplateHeaderActions();
     }
 
+    public function getCachedHeaderActions(): array
+    {
+        return $this->selectedTemplateVersionId ? [] : array_values(array_filter(
+            parent::getCachedHeaderActions(),
+            fn ($action) => in_array($action->getName(), ['importTemplate', 'createDraftVersion'], true),
+        ));
+    }
+
     public function canManageTemplateVersions(): bool
     {
         return $this->canManageVersions();
@@ -270,6 +346,7 @@ class ListVerificationFormQuestions extends ListRecords
         $parentSection = null;
 
         if (filled($parentSectionKey)) {
+            abort_unless($this->canAddSubSectionToSection($parentSectionKey), 422);
             $parentSection = $this->findSelectedSection($parentSectionKey);
 
             if (! $parentSection) {
@@ -313,6 +390,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         $label = trim((string) $data['label']);
         $parentSectionKey = $this->templateSectionParentKey;
+        if (filled($parentSectionKey)) abort_unless($this->canAddSubSectionToSection($parentSectionKey), 422);
         $sectionKey = VerificationTemplateSection::makeSectionKey($label, $parentSectionKey);
         $baseKey = $sectionKey;
         $counter = 2;
@@ -378,11 +456,15 @@ class ListVerificationFormQuestions extends ListRecords
         }
 
         $startingPoint = $data['starting_point'] ?? 'current_master';
-        $formType = $data['form_type'] ?? VerificationTemplateVersion::FORM_TYPE_BOTH;
+        $formType = $data['form_type'] ?? VerificationTemplateVersion::FORM_TYPE_FULL;
+        if (($data['structured_layout'] ?? false) && $formType === 'both') {
+            Notification::make()->title('Choose Short Form or Full Form for this layout')->danger()->send();
+            return null;
+        }
         $clinicVisibility = VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN;
 
         if (! in_array($startingPoint, ['current_master', 'fresh', 'specific_version'], true)
-            || ! array_key_exists($formType, VerificationTemplateVersion::FORM_TYPE_OPTIONS)
+            || ! in_array($formType, ['full_form', 'short_form'], true)
             || blank(trim((string) ($data['template_name'] ?? '')))) {
             Notification::make()->title('Invalid draft configuration')->danger()->send();
 
@@ -396,8 +478,15 @@ class ListVerificationFormQuestions extends ListRecords
                 ->whereNull('clinic_id')
                 ->whereKey((int) ($data['source_version_id'] ?? 0))
                 ->first(),
-            default => $this->getActiveMasterVersion(),
+            default => VerificationTemplateVersion::where('scope', 'master')->whereNull('clinic_id')
+                ->where('template_key', VerificationFormQuestion::defaultTemplateKey())->where('status', 'published')
+                ->where('active_'.$formType, true)->first(),
         };
+
+        if (($startingPoint !== 'fresh' && ! $source) || ($source && ! in_array($source->form_type, ['both', $formType], true))) {
+            Notification::make()->title('Choose an existing source matching this form type, or start fresh')->danger()->send();
+            return null;
+        }
 
         if ($startingPoint === 'specific_version' && ! $source) {
             Notification::make()
@@ -417,6 +506,9 @@ class ListVerificationFormQuestions extends ListRecords
             'starting_point' => $startingPoint,
         ]);
 
+        if (($data['structured_layout'] ?? false) && ! $draft->uses_section_layout) {
+            app(\App\Support\VerificationTemplateHierarchy::class)->arrangeDraft($draft);
+        }
         $this->selectTemplateVersion($draft->getKey());
 
         Notification::make()
@@ -446,6 +538,7 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function publishDraftVersion(array $data = []): null
     {
+        abort_unless(auth()->user()?->canPublishVerificationTemplate(), 403);
         if (! $this->canManageVersions()) {
             Notification::make()->title('Permission denied')->danger()->send();
 
@@ -466,7 +559,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         $releaseMode = $data['release_mode'] ?? null;
 
-        if (! in_array($releaseMode, ['release_to_clinics', 'internal_only'], true)) {
+        if (! in_array($releaseMode, ['publish_only', 'release_to_clinics', 'internal_only'], true)) {
             Notification::make()
                 ->title('Choose how this template should be published')
                 ->body('Select clinic release or internal-only publication before continuing.')
@@ -476,7 +569,7 @@ class ListVerificationFormQuestions extends ListRecords
             return null;
         }
 
-        $clinicVisibility = $releaseMode === 'release_to_clinics'
+        $clinicVisibility = $releaseMode !== 'internal_only'
             ? VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE
             : VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN;
 
@@ -485,13 +578,14 @@ class ListVerificationFormQuestions extends ListRecords
             $data['version_name'] ?? null,
             $data['change_description'] ?? null,
             $clinicVisibility,
+            activate: $releaseMode === 'release_to_clinics',
         );
 
         Notification::make()
-            ->title($published->isAvailableToClinics() ? 'Master Template published and released' : 'Master Template published internally')
-            ->body($published->isAvailableToClinics()
-                ? 'Version '.$published->version_number.' is available for new clinic template copies.'
-                : 'Version '.$published->version_number.' remains available only inside SaaS.')
+            ->title('Master Template published')
+            ->body($releaseMode === 'release_to_clinics'
+                ? 'Version '.$published->version_number.' is active for new clinics. Existing clinics are unchanged.'
+                : 'Version '.$published->version_number.' was published without changing active master forms.')
             ->success()
             ->send();
 
@@ -587,6 +681,21 @@ class ListVerificationFormQuestions extends ListRecords
         }
 
         $this->selectedTemplateVersionId = $version->getKey();
+        $this->resetErrorBag();
+        $this->previewQuestions = null;
+        $this->data = [];
+        $this->codeCoverageData = [];
+        $this->editorSectionKey = null;
+        $this->templatePreviewFormType = $version->form_type === 'short_form' ? 'short_form' : 'full_form';
+        foreach ($version->questions()->where('input_type', 'frequency_row')->get() as $question) {
+            $this->codeCoverageData[$question->id] = [
+                'code' => $question->code, 'description' => $question->prompt,
+                'category' => $question->frequencyCategory(),
+                'frequency_response_mode' => $question->frequency_response_mode,
+                'frequency_response_fields' => $question->frequency_response_fields,
+                'response_configuration' => $question->frequencyResponseConfiguration(),
+            ];
+        }
         $this->showTemplatePreview = $showPreview;
 
         $this->expandedTemplateSectionKeys = collect($this->templateSectionRows($version))
@@ -715,26 +824,39 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function showTemplateVersionPreview(int $versionId, string $formType = 'full_form'): void
     {
+        $this->selectTemplateVersion($versionId, true);
         $this->templatePreviewFormType = in_array($formType, ['full_form', 'short_form'], true)
             ? $formType
             : 'full_form';
 
-        $this->selectTemplateVersion($versionId, true);
+        $version = $this->selectedTemplateVersion();
+        if ($version && $version->form_type !== 'both') {
+            $this->templatePreviewFormType = $version->form_type;
+        }
     }
 
     public function closeTemplateVersionPanel(): void
     {
         $this->selectedTemplateVersionId = null;
         $this->showTemplatePreview = false;
+        $this->resetErrorBag();
+        $this->data = [];
+        $this->codeCoverageData = [];
+        $this->previewQuestions = null;
     }
 
     public function setTemplatePreviewFormType(string $formType): void
     {
+        $version = $this->selectedTemplateVersion();
+        if (! $version || ! in_array($version->form_type, ['both', $formType], true)) {
+            return;
+        }
         if (! in_array($formType, ['full_form', 'short_form'], true)) {
             return;
         }
 
         $this->templatePreviewFormType = $formType;
+        $this->previewQuestions = null;
         $this->showTemplatePreview = true;
     }
 
@@ -897,7 +1019,9 @@ class ListVerificationFormQuestions extends ListRecords
     public function canAddSubSectionToSection(string $sectionKey): bool
     {
         return $this->canAddQuestionToSelectedVersion()
-            && $sectionKey === 'template_3_frequency_percentage';
+            && $sectionKey !== 'custom_layout_needs_mapping'
+            && $this->selectedTemplateVersion()->sections()->where('section_key', $sectionKey)
+                ->whereNull('parent_section_key')->where('is_active', true)->exists();
     }
 
     protected function selectedTemplateVersion(): ?VerificationTemplateVersion
@@ -963,6 +1087,7 @@ class ListVerificationFormQuestions extends ListRecords
             'version' => 'v'.$version->version_number,
             'status' => str($version->status)->headline()->toString(),
             'raw_status' => $version->status,
+            'uses_section_layout' => (bool) $version->uses_section_layout,
             'scope' => filled($version->clinic_id) ? 'Clinic' : 'Master',
             'form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$version->form_type] ?? 'Full + Short',
             'clinic_visibility' => $version->clinicAvailabilityLabel(),
@@ -985,11 +1110,14 @@ class ListVerificationFormQuestions extends ListRecords
             'question_count' => $questions->count(),
             'active_question_count' => $questions->where('is_active', true)->count(),
             'inactive_question_count' => $questions->where('is_active', false)->count(),
-            'full_question_count' => $questions->whereIn('form_type', ['full_form', 'both'])->count(),
-            'short_question_count' => $questions->whereIn('form_type', ['short_form', 'both'])->count(),
+            'supports_full' => in_array($version->form_type, ['both', 'full_form'], true),
+            'supports_short' => in_array($version->form_type, ['both', 'short_form'], true),
+            'full_question_count' => $version->form_type === 'short_form' ? null : $questions->whereIn('form_type', ['full_form', 'both'])->count(),
+            'short_question_count' => $version->form_type === 'full_form' ? null : $questions->whereIn('form_type', ['short_form', 'both'])->count(),
             'preview_sections' => $this->templatePreviewSections($version, $this->templatePreviewFormType),
             'question_rows' => $questions->map(fn (VerificationFormQuestion $question): array => [
                 'id' => $question->getKey(),
+                'section_key' => $question->section_key,
                 'prompt' => $question->prompt,
                 'section' => VerificationFormQuestion::sectionLabel($question->section_key, $question->template_key),
                 'form_type' => VerificationFormQuestion::FORM_TYPE_OPTIONS[$question->form_type] ?? str($question->form_type)->headline()->toString(),
@@ -1379,6 +1507,8 @@ class ListVerificationFormQuestions extends ListRecords
                 VerificationFormQuestion::defaultTemplateKey(),
             ),
             'parent' => $section?->parent_section_key,
+            'is_active' => (bool) ($section?->is_active ?? true),
+            'allow_empty' => (bool) ($section?->allow_empty ?? false),
             'sort_order' => $section?->sort_order ?? $sectionQuestions->min('sort_order') ?? 0,
             'count' => $sectionQuestions->count(),
             'active_count' => $activeCount,
@@ -1476,6 +1606,9 @@ class ListVerificationFormQuestions extends ListRecords
 
     protected function templatePreviewSections(VerificationTemplateVersion $version, string $formType): array
     {
+        if (! in_array($version->form_type, ['both', $formType], true)) {
+            return [];
+        }
         $allowedFormTypes = $formType === 'short_form'
             ? ['short_form', 'both']
             : ['full_form', 'both'];
@@ -1500,17 +1633,45 @@ class ListVerificationFormQuestions extends ListRecords
             ->get()
             ->keyBy('section_key');
 
-        return $questions
-            ->map(function ($sectionQuestions, string $sectionKey) use ($sections): array {
+        $ordered = collect();
+        foreach ($sections->whereNull('parent_section_key') as $section) {
+            $ordered->push($section);
+            foreach ($sections->where('parent_section_key', $section->section_key) as $child) {
+                $ordered->push($child);
+            }
+        }
+
+        return $ordered
+            ->map(function ($section) use ($questions): array {
+                $sectionKey = $section->section_key;
                 return [
                     'key' => $sectionKey,
-                    'title' => $sections->get($sectionKey)?->label ?: VerificationFormQuestion::sectionLabel(
-                        $sectionKey,
-                        VerificationFormQuestion::defaultTemplateKey(),
-                    ),
-                    'questions' => $sectionQuestions->map(fn (VerificationFormQuestion $question): array => [
+                    'title' => $section->label,
+                    'is_subsection' => filled($section->parent_section_key),
+                    'allow_empty' => (bool) $section->allow_empty,
+                    'parent_key' => $section->parent_section_key,
+                    'questions' => $questions->get($sectionKey, collect())->map(fn (VerificationFormQuestion $question): array => [
+                        'id' => $question->id,
+                        'type' => $question->input_type,
+                        'label' => $question->prompt,
+                        'field' => $question->is_builtin ? $question->field_key : 'custom_question_'.$question->id,
+                        'secondary_field' => $question->secondary_field_key,
+                        'secondary_type' => $question->secondary_input_type,
+                        'options' => $question->getSelectOptionValues(),
+                        'placeholder' => $question->placeholder,
+                        'required' => (bool) $question->is_required_for_audit,
+                        'has_note' => (bool) $question->has_note,
+                        'note_field' => 'custom_question_note_'.$question->id,
+                        'note_label' => $question->note_label ?: 'Note',
+                        'note_placeholder' => $question->note_placeholder ?: 'Add note',
+                        'parent_id' => $question->parent_question_id,
+                        'trigger' => $question->trigger_answer,
+                        'procedure_tags' => $question->procedure_tags ?? [],
                         'prompt' => filled($question->code) ? "{$question->code} {$question->prompt}" : $question->prompt,
                         'input_type' => VerificationFormQuestion::INPUT_TYPE_OPTIONS[$question->input_type] ?? str($question->input_type)->headline()->toString(),
+                        'secondary_input_type' => filled($question->secondary_field_key)
+                            ? (VerificationFormQuestion::INPUT_TYPE_OPTIONS[$question->secondary_input_type] ?? $question->secondary_input_type)
+                            : null,
                         'help_text' => $question->help_text,
                     ])->values()->all(),
                 ];

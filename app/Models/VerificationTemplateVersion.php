@@ -59,9 +59,12 @@ class VerificationTemplateVersion extends Model
         'version_number',
         'name',
         'form_type',
+        'uses_section_layout',
         'clinic_visibility',
         'status',
         'is_active',
+        'active_short_form',
+        'active_full_form',
         'is_working_draft',
         'published_at',
         'created_by',
@@ -71,7 +74,10 @@ class VerificationTemplateVersion extends Model
     protected function casts(): array
     {
         return [
+            'uses_section_layout' => 'boolean',
             'is_active' => 'boolean',
+            'active_short_form' => 'boolean',
+            'active_full_form' => 'boolean',
             'is_working_draft' => 'boolean',
             'version_number' => 'integer',
             'published_at' => 'datetime',
@@ -81,6 +87,24 @@ class VerificationTemplateVersion extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (self $version): void {
+            if (! $version->canDeletePermanently()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'template' => 'Published, used, and archived templates must be retained for history.',
+                ]);
+            }
+        });
+        static::saving(function (self $version): void {
+            if ($version->isDirty('is_active') && ! $version->isDirty('active_short_form') && ! $version->isDirty('active_full_form')) {
+                foreach (['short_form', 'full_form'] as $form) {
+                    $version->{'active_'.$form} = $version->is_active && in_array($version->form_type, ['both', $form], true);
+                }
+            }
+        });
     }
 
     public function clinic(): BelongsTo

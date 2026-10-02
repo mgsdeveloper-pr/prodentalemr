@@ -63,7 +63,7 @@ class SaasEntitlements
             return true;
         }
 
-        if ($module === 'template_management') {
+        if (in_array($module, ['template_management', 'template_publishing'], true)) {
             return self::clinicModuleAllowed($clinic, 'verification_requests');
         }
 

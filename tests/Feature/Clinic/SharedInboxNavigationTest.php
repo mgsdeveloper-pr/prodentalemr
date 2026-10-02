@@ -104,11 +104,11 @@ it('shows the clinic-scoped shared inbox in clinic navigation', function (): voi
     ]);
     $this->actingAs($admin)->withSession([ClinicPanelScope::SESSION_KEY => null]);
     $this->get('/clinic/verification-settings')
-        ->assertSuccessful()
-        ->assertSee('/clinic/shared-inbox-settings', false);
+        ->assertRedirect(route('clinic.choose-workspace'));
     $this->get('/clinic/shared-inbox-settings')
-        ->assertSuccessful()
-        ->assertSee('Select a clinic to view inbox settings')
+        ->assertRedirect(route('clinic.choose-workspace'));
+    $this->get(route('clinic.choose-workspace'))
+        ->assertSuccessful()->assertSee('Select Clinic')
         ->assertDontSee('Mailbox Connection');
     $count = VerificationInboxMailbox::count();
     Livewire::test(VerificationSharedInboxSettings::class)->call('save');

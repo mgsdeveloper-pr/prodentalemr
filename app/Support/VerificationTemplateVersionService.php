@@ -12,17 +12,54 @@ use Illuminate\Validation\ValidationException;
 
 class VerificationTemplateVersionService
 {
-    public function ensureMasterVersion(string $templateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY): VerificationTemplateVersion
+    public function provisionRegisteredClinic(Clinic $clinic): void
     {
-        return DB::transaction(function () use ($templateKey): VerificationTemplateVersion {
+        DB::transaction(function () use ($clinic): void {
+            Clinic::whereKey($clinic->id)->lockForUpdate()->firstOrFail();
+            foreach (['full_form', 'short_form'] as $form) {
+                if (VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+                    ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+                    ->where('status', 'published')->where('active_'.$form, true)->exists()) continue;
+                $master = VerificationTemplateVersion::where('scope', 'master')->whereNull('clinic_id')
+                    ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+                    ->where('status', 'published')->where('active_'.$form, true)
+                    ->whereIn('form_type', ['both', $form])
+                    ->whereIn('clinic_visibility', [VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE, VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT])
+                    ->orderByDesc('version_number')->lockForUpdate()->first();
+                if (! $master || ! $master->questions()->where('is_active', true)->whereIn('form_type', ['both', $form])->exists()) continue;
+                $version = VerificationTemplateVersion::create([
+                    'scope' => 'clinic', 'clinic_id' => $clinic->id, 'organization_id' => $clinic->organization_id,
+                    'template_key' => $master->template_key, 'parent_version_id' => $master->id, 'source_version_id' => $master->id,
+                    'version_number' => 1 + (int) VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+                        ->where('template_key', $master->template_key)->where('form_type', $form)->max('version_number'),
+                    'name' => $clinic->clinic_name.' - '.($form === 'full_form' ? 'Full Form' : 'Short Form'),
+                    'form_type' => $form, 'status' => 'published', 'published_at' => now(), 'is_active' => true,
+                    'active_full_form' => $form === 'full_form', 'active_short_form' => $form === 'short_form',
+                    'is_working_draft' => false, 'uses_section_layout' => $master->uses_section_layout,
+                    'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE, 'created_by' => auth()->id(),
+                ]);
+                $this->copySections($master, $version, $clinic);
+                $this->copyQuestions($master, $version, $clinic);
+                $this->filterDraftQuestionsForFormType($version, $form);
+            }
+        });
+    }
+
+    public function ensureMasterVersion(string $templateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, ?string $formType = null): VerificationTemplateVersion
+    {
+        return DB::transaction(function () use ($templateKey, $formType): VerificationTemplateVersion {
             $version = VerificationTemplateVersion::query()
                 ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
                 ->where('template_key', $templateKey)
                 ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
                 ->where('is_active', true)
+                ->when($formType, fn ($query) => $query->where('active_'.$formType, true))
                 ->first();
 
             if (! $version) {
+                if ($formType && VerificationTemplateVersion::where('scope', 'master')->where('template_key', $templateKey)->where('status', 'published')->exists()) {
+                    throw ValidationException::withMessages(['template' => 'No active master template is available for this form.']);
+                }
                 $version = VerificationTemplateVersion::query()->create([
                     'template_key' => $templateKey,
                     'scope' => VerificationTemplateVersion::SCOPE_MASTER,
@@ -55,22 +92,31 @@ class VerificationTemplateVersionService
         });
     }
 
-    public function ensureClinicPublishedVersion(Clinic $clinic, string $templateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY): VerificationTemplateVersion
+    public function ensureClinicPublishedVersion(Clinic $clinic, string $templateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, ?string $formType = null): VerificationTemplateVersion
     {
-        return DB::transaction(function () use ($clinic, $templateKey): VerificationTemplateVersion {
+        return DB::transaction(function () use ($clinic, $templateKey, $formType): VerificationTemplateVersion {
+            Clinic::whereKey($clinic->id)->lockForUpdate()->firstOrFail();
             $existing = VerificationTemplateVersion::query()
                 ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
                 ->where('clinic_id', $clinic->id)
                 ->where('template_key', $templateKey)
                 ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
                 ->where('is_active', true)
+                ->when($formType, fn ($query) => $query->where('active_'.$formType, true))
                 ->first();
 
             if ($existing) {
                 return $existing;
             }
 
-            $master = $this->ensureMasterVersion($templateKey);
+            $master = VerificationTemplateVersion::query()->where('scope', 'master')->whereNull('clinic_id')
+                ->where('template_key', $templateKey)->where('status', 'published')->where('is_active', true)
+                ->when($formType, fn ($query) => $query->where('active_'.$formType, true))
+                ->whereIn('clinic_visibility', [VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE, VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT])
+                ->latest('version_number')->first();
+            if (! $master) {
+                throw ValidationException::withMessages(['template' => 'Template setup pending: no current active master is available for this form.']);
+            }
 
             if (! in_array($master->clinic_visibility, [
                 VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
@@ -80,6 +126,7 @@ class VerificationTemplateVersionService
                     ->where('scope', VerificationTemplateVersion::SCOPE_MASTER)
                     ->where('template_key', $templateKey)
                     ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+                    ->when($formType, fn ($query) => $query->whereIn('form_type', ['both', $formType]))
                     ->whereIn('clinic_visibility', [
                         VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
                         VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT,
@@ -104,9 +151,9 @@ class VerificationTemplateVersionService
                 'clinic_id' => $clinic->id,
                 'parent_version_id' => $master->id,
                 'source_version_id' => $master->id,
-                'version_number' => 1,
+                'version_number' => 1 + (int) VerificationTemplateVersion::where('clinic_id', $clinic->id)->where('template_key', $templateKey)->max('version_number'),
                 'name' => $clinic->clinic_name.' Master Template',
-                'form_type' => $master->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
+                'form_type' => $formType ?? $master->form_type ?: VerificationTemplateVersion::FORM_TYPE_BOTH,
                 'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
                 'is_active' => true,
@@ -114,10 +161,14 @@ class VerificationTemplateVersionService
                 'published_at' => now(),
                 'created_by' => auth()->id(),
                 'notes' => 'Clinic working copy replicated from the active master template.',
+                'uses_section_layout' => $master->uses_section_layout,
+                'active_full_form' => in_array($formType ?? $master->form_type, ['both', 'full_form'], true),
+                'active_short_form' => in_array($formType ?? $master->form_type, ['both', 'short_form'], true),
             ]);
 
             $this->copySections($master, $version, $clinic);
             $this->copyQuestions($master, $version, $clinic);
+            if ($formType) $this->filterDraftQuestionsForFormType($version, $formType);
 
             return $version->refresh();
         });
@@ -194,6 +245,8 @@ class VerificationTemplateVersionService
 
             $lockedDraft->questions()->delete();
             $lockedDraft->sections()->delete();
+            \App\Models\VerificationTemplateImportReceipt::where('template_version_id', $lockedDraft->id)
+                ->update(['template_version_id' => null]);
             $lockedDraft->forceDelete();
 
             if ($wasWorkingDraft) {
@@ -250,10 +303,13 @@ class VerificationTemplateVersionService
         $startingPoint = $options['starting_point'] ?? (filled($source) ? 'current_master' : 'fresh');
 
         return DB::transaction(function () use ($source, $templateKey, $scope, $organizationId, $clinicId, $formType, $clinicVisibility, $name, $startingPoint): VerificationTemplateVersion {
+            if ($clinicId) Clinic::whereKey($clinicId)->lockForUpdate()->firstOrFail();
+            else VerificationTemplateVersion::where('scope', 'master')->where('template_key', $templateKey)->orderBy('id')->lockForUpdate()->get();
             VerificationTemplateVersion::query()
                 ->where('scope', $scope)
                 ->where('template_key', $templateKey)
                 ->where('status', VerificationTemplateVersion::STATUS_DRAFT)
+                ->whereIn('form_type', [$formType, 'both'])
                 ->when($clinicId, fn ($query) => $query->where('clinic_id', $clinicId))
                 ->when(! $clinicId, fn ($query) => $query->whereNull('clinic_id'))
                 ->update(['is_working_draft' => false]);
@@ -261,6 +317,7 @@ class VerificationTemplateVersionService
             $nextVersionNumber = ((int) VerificationTemplateVersion::query()
                 ->where('scope', $scope)
                 ->where('template_key', $templateKey)
+                ->whereIn('form_type', [$formType, 'both'])
                 ->when($clinicId, fn ($query) => $query->where('clinic_id', $clinicId))
                 ->when(! $clinicId, fn ($query) => $query->whereNull('clinic_id'))
                 ->max('version_number')) + 1;
@@ -281,6 +338,7 @@ class VerificationTemplateVersionService
                 'is_working_draft' => true,
                 'created_by' => auth()->id(),
                 'notes' => $this->draftCreationNotes($source, $formType, $startingPoint),
+                'uses_section_layout' => $source?->uses_section_layout ?? false,
             ]);
 
             if ($source) {
@@ -331,7 +389,7 @@ class VerificationTemplateVersionService
 
     public function normalizeTemplateThreeVersion(VerificationTemplateVersion $version): VerificationTemplateVersion
     {
-        if ($version->template_key !== VerificationFormQuestion::DEFAULT_TEMPLATE_KEY) {
+        if ($version->template_key !== VerificationFormQuestion::DEFAULT_TEMPLATE_KEY || $version->uses_section_layout) {
             return $version;
         }
 
@@ -352,7 +410,7 @@ class VerificationTemplateVersionService
             ];
 
             foreach ($sectionDefinitions as [$sectionKey, $parentSectionKey, $label, $sortOrder]) {
-                VerificationTemplateSection::query()->updateOrCreate(
+                VerificationTemplateSection::query()->firstOrCreate(
                     [
                         'template_version_id' => $version->id,
                         'template_key' => $version->template_key,
@@ -419,10 +477,11 @@ class VerificationTemplateVersionService
             VerificationTemplateSection::query()
                 ->where('template_version_id', $version->id)
                 ->where('template_key', $version->template_key)
+                ->where('is_builtin', true)
                 ->whereNotIn('section_key', collect($sectionDefinitions)->pluck(0)->all())
                 ->delete();
 
-            $this->removeDuplicateQuestions($version);
+            // Keep copied questions intact; publishing validates conflicting bindings.
 
             return $version->refresh();
         });
@@ -452,17 +511,27 @@ class VerificationTemplateVersionService
         ?string $name = null,
         ?string $notes = null,
         ?string $clinicVisibility = null,
+        bool $activate = false,
+        ?array $expectedActive = null,
     ): VerificationTemplateVersion {
+        abort_unless(auth()->user()?->canPublishVerificationTemplate($draft->clinic), 403);
         if ($clinicVisibility !== null && ! array_key_exists($clinicVisibility, VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS)) {
             throw ValidationException::withMessages([
                 'clinic_visibility' => 'Select a valid clinic release option.',
             ]);
         }
 
-        return DB::transaction(function () use ($draft, $name, $notes, $clinicVisibility): VerificationTemplateVersion {
-            $lockedDraft = VerificationTemplateVersion::query()
-                ->lockForUpdate()
-                ->findOrFail($draft->getKey());
+        return DB::transaction(function () use ($draft, $name, $notes, $clinicVisibility, $activate, $expectedActive): VerificationTemplateVersion {
+            if ($draft->clinic_id) {
+                Clinic::whereKey($draft->clinic_id)->lockForUpdate()->firstOrFail();
+                if ($activate && $expectedActive !== null) {
+                    $this->assertActiveClinicForms($draft->clinic_id, $expectedActive);
+                }
+            }
+            $lockedDraft = VerificationTemplateVersion::query()->where('scope', $draft->scope)
+                ->where('template_key', $draft->template_key)->where('clinic_id', $draft->clinic_id)
+                ->orderBy('id')->lockForUpdate()->get()->firstWhere('id', $draft->getKey());
+            abort_unless($lockedDraft, 404);
 
             if (! $lockedDraft->canEditDirectly()) {
                 throw ValidationException::withMessages([
@@ -473,24 +542,21 @@ class VerificationTemplateVersionService
 
             $this->assertPublishable($lockedDraft);
 
-            VerificationTemplateVersion::query()
-                ->where('scope', $lockedDraft->scope)
-                ->where('template_key', $lockedDraft->template_key)
-                ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
-                ->where('is_active', true)
-                ->when($lockedDraft->clinic_id, fn ($query) => $query->where('clinic_id', $lockedDraft->clinic_id))
-                ->when(! $lockedDraft->clinic_id, fn ($query) => $query->whereNull('clinic_id'))
-                ->update(['is_active' => false]);
-
             $lockedDraft->forceFill([
                 'name' => filled($name) ? trim((string) $name) : $lockedDraft->name,
                 'notes' => filled($notes) ? trim((string) $notes) : $lockedDraft->notes,
                 'clinic_visibility' => $clinicVisibility ?? $lockedDraft->clinic_visibility,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
-                'is_active' => true,
+                'is_active' => $activate,
+                'active_full_form' => false,
+                'active_short_form' => false,
                 'is_working_draft' => false,
                 'published_at' => now(),
             ])->save();
+
+            if ($activate) {
+                $this->activatePublishedVersion($lockedDraft);
+            }
 
             return $lockedDraft->refresh();
         });
@@ -549,7 +615,66 @@ class VerificationTemplateVersionService
         }
 
         $questions = $version->questions()->where('is_active', true)->get()->keyBy('id');
+        $sections = $version->sections()->get()->keyBy('section_key');
+        if ($questions->isEmpty()) {
+            throw ValidationException::withMessages(['template' => 'Add at least one active question before publishing this template.']);
+        }
+        if ($version->questions()->where('section_key', 'custom_layout_needs_mapping')->exists()) {
+            throw ValidationException::withMessages(['template' => 'Move every Needs Mapping question to its reviewed section before publishing.']);
+        }
+        if ($questions->contains(fn ($question) => $question->field_key === 'vf_coverage_orthodontics_deductible_applies' && $question->secondary_field_key === 'vf_ortho_lifetime_maximum')) {
+            throw ValidationException::withMessages(['template' => 'Orthodontic coverage percentage must not use the lifetime maximum answer. Create a corrected draft.']);
+        }
+        if ($version->uses_section_layout) {
+            $bound = []; $frequency = [];
+            foreach ($questions as $question) {
+                if ($question->is_builtin) {
+                    foreach (array_filter([$question->field_key, $question->secondary_field_key]) as $key) {
+                        if (isset($bound[$key])) throw ValidationException::withMessages(['template' => "The answer {$key} is mapped more than once."]);
+                        $bound[$key] = true;
+                    }
+                }
+                if ($question->input_type === 'frequency_row') {
+                    $signature = $question->frequencyCategory().'|'.mb_strtolower(trim($question->code.'|'.$question->prompt));
+                    if (isset($frequency[$signature])) throw ValidationException::withMessages(['template' => 'Repeated frequency questions would share an answer. Give them distinct wording.']);
+                    $frequency[$signature] = true;
+                    if (! array_key_exists($question->answer_layout ?? '', VerificationFormQuestion::ANSWER_LAYOUT_OPTIONS)) throw ValidationException::withMessages(['template' => 'Select an answer layout for every frequency question.']);
+                }
+            }
+        }
+        foreach ($sections as $section) {
+            $visited = [$section->section_key];
+            $parentKey = $section->parent_section_key;
+            if ($version->uses_section_layout && $section->is_active && ! $section->allow_empty
+                && $section->section_key !== 'custom_layout_needs_mapping'
+                && ! $sections->contains('parent_section_key', $section->section_key)
+                && ! $questions->contains('section_key', $section->section_key)) {
+                throw ValidationException::withMessages(['template' => "Review empty section: {$section->label}. Add questions or explicitly confirm it as intentionally empty."]);
+            }
+            if ($version->uses_section_layout && filled($parentKey) && filled($sections->get($parentKey)?->parent_section_key)) {
+                throw ValidationException::withMessages(['template' => 'Use Section > Subsection > Question. Nested subsections are not supported.']);
+            }
+            while (filled($parentKey)) {
+                if (! $sections->has($parentKey) || in_array($parentKey, $visited, true)) {
+                    throw ValidationException::withMessages(['template' => 'A section has a missing parent or a circular hierarchy. Correct the section structure before publishing.']);
+                }
+                $visited[] = $parentKey;
+                if ($section->is_active && ! $sections->get($parentKey)->is_active) {
+                    throw ValidationException::withMessages(['template' => 'An active subsection has an inactive parent. Correct its visibility before publishing.']);
+                }
+                $parentKey = $sections->get($parentKey)->parent_section_key;
+            }
+        }
         foreach ($questions as $question) {
+            foreach ($question->procedure_tags ?? [] as $tag) {
+                if (($tag['status'] ?? '') !== 'directory_match') {
+                    throw ValidationException::withMessages(['template' => 'This draft contains unverified procedure codes. Resolve their directory validation before publishing.']);
+                }
+            }
+            if (($sections->has($question->section_key) && ! $sections->get($question->section_key)->is_active)
+                || (! in_array($question->section_key, VerificationFormQuestion::TEMPLATE_3_LIVE_SECTION_KEYS, true) && ! $sections->has($question->section_key))) {
+                throw ValidationException::withMessages(['template' => 'A question belongs to a missing or inactive custom section. Correct its section before publishing.']);
+            }
             if (! array_key_exists($question->information_scope ?? 'unclassified', VerificationFormQuestion::INFORMATION_SCOPE_OPTIONS)
                 || ! array_key_exists($question->reuse_policy ?? 'fresh_verification', VerificationFormQuestion::REUSE_POLICY_OPTIONS)
                 || ($question->reuse_policy === 'review_required' && $question->information_scope !== 'plan')) {
@@ -574,6 +699,64 @@ class VerificationTemplateVersionService
                 $parent = $questions->get($parent->parent_question_id);
             }
         }
+    }
+
+    public function activatePublishedVersion(VerificationTemplateVersion $version, ?string $formType = null): void
+    {
+        abort_unless(auth()->user()?->canPublishVerificationTemplate($version->clinic), 403);
+        $forms = $formType ? [$formType] : ($version->form_type === 'both' ? ['short_form', 'full_form'] : [$version->form_type]);
+        foreach ($forms as $form) {
+            if (! in_array($form, ['short_form', 'full_form'], true) || ! in_array($version->form_type, ['both', $form], true)) {
+                throw ValidationException::withMessages(['template' => 'This template does not support the selected form.']);
+            }
+        }
+        DB::transaction(function () use ($version, $forms): void {
+            if ($version->clinic_id) Clinic::whereKey($version->clinic_id)->lockForUpdate()->firstOrFail();
+            $query = VerificationTemplateVersion::query()->where('scope', $version->scope)
+                ->where('template_key', $version->template_key)->where('clinic_id', $version->clinic_id);
+            $versions = (clone $query)->orderBy('id')->lockForUpdate()->get();
+            $selected = $versions->firstWhere('id', $version->id);
+            if (! $selected || $selected->status !== 'published' || $selected->clinic_visibility === 'retired') {
+                throw ValidationException::withMessages(['template' => 'Only a published, non-retired template can be activated.']);
+            }
+            foreach ($forms as $form) {
+                if (! in_array($selected->form_type, ['both', $form], true)) {
+                    throw ValidationException::withMessages(['template' => 'This template no longer supports the selected form. Review the selections again.']);
+                }
+                (clone $query)->update(['active_'.$form => false]);
+                VerificationTemplateVersion::whereKey($selected->id)->update(['active_'.$form => true]);
+            }
+            (clone $query)->update(['is_active' => DB::raw('(active_short_form OR active_full_form)')]);
+        });
+    }
+
+    public function activeClinicForms(int $clinicId): array
+    {
+        $versions = VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinicId)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)->where('status', 'published')->get();
+        return ['short_form' => $versions->firstWhere('active_short_form', true)?->id,
+            'full_form' => $versions->firstWhere('active_full_form', true)?->id];
+    }
+
+    protected function assertActiveClinicForms(int $clinicId, array $expected): void
+    {
+        if ($this->activeClinicForms($clinicId) !== $expected) {
+            throw ValidationException::withMessages(['activation' => 'Active forms changed after review. Close this review and review the selections again.']);
+        }
+    }
+
+    public function activateClinicForms(Clinic $clinic, array $selections, array $expected): void
+    {
+        abort_unless(auth()->user()?->canPublishVerificationTemplate($clinic), 403);
+        DB::transaction(function () use ($clinic, $selections, $expected): void {
+            Clinic::whereKey($clinic->id)->lockForUpdate()->firstOrFail();
+            $this->assertActiveClinicForms($clinic->id, $expected);
+            foreach ($selections as $form => $id) {
+                $version = VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+                    ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)->findOrFail($id);
+                $this->activatePublishedVersion($version, $form);
+            }
+        });
     }
 
     public function markWorkingDraft(VerificationTemplateVersion $draft): VerificationTemplateVersion
@@ -618,9 +801,25 @@ class VerificationTemplateVersionService
 
     public function latestPublishedVersionForWorkItem(BillingWorkItem $workItem): VerificationTemplateVersion
     {
+        $form = $workItem->verificationProfile?->form_type ?: 'full_form';
+        if (! in_array($form, ['short_form', 'full_form'], true)) {
+            throw ValidationException::withMessages(['template' => 'Choose Short Form or Full Form before selecting a template.']);
+        }
+        $active = VerificationTemplateVersion::query()
+            ->where('scope', $workItem->clinic_id ? 'clinic' : 'master')
+            ->where('clinic_id', $workItem->clinic_id)->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('status', 'published')->where('clinic_visibility', '!=', 'retired')
+            ->whereIn('form_type', ['both', $form])->where('active_'.$form, true)->latest('id')->first();
+        if ($active) return $active;
+        $hasOtherForm = VerificationTemplateVersion::query()->where('scope', $workItem->clinic_id ? 'clinic' : 'master')
+            ->where('clinic_id', $workItem->clinic_id)->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
+            ->where('status', 'published')->where('is_active', true)->exists();
+        if ($hasOtherForm) {
+            throw ValidationException::withMessages(['template' => 'No active template is configured for this form. Ask an administrator to activate it.']);
+        }
         return $workItem->clinic
-            ? $this->ensureClinicPublishedVersion($workItem->clinic)
-            : $this->ensureMasterVersion();
+            ? $this->ensureClinicPublishedVersion($workItem->clinic, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $form)
+            : $this->ensureMasterVersion(VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $form);
     }
 
     public function workItemUsesLatestPublishedVersion(BillingWorkItem $workItem): bool
@@ -660,6 +859,7 @@ class VerificationTemplateVersionService
                 'version_number' => $version->version_number,
                 'name' => $version->name,
                 'form_type' => $version->form_type,
+                'uses_section_layout' => $version->uses_section_layout,
                 'clinic_visibility' => $version->clinic_visibility,
                 'status' => $version->status,
                 'published_at' => optional($version->published_at)->toIso8601String(),
@@ -718,6 +918,14 @@ class VerificationTemplateVersionService
                 $copy->organization_id = $clinic?->organization_id ?? $target->organization_id;
                 $copy->clinic_id = $clinic?->id ?? $target->clinic_id;
                 $copy->parent_question_id = null;
+                if ($copy->field_key === 'vf_coverage_orthodontics_deductible_applies'
+                    && $copy->secondary_field_key === 'vf_ortho_lifetime_maximum') {
+                    $copy->secondary_field_key = 'vf_ortho_benefit';
+                }
+                if ($question->input_type === 'frequency_row') {
+                    $copy->answer_layout = $question->answer_layout ?: $question->inferredAnswerLayout();
+                    $copy->response_category = $question->frequencyCategory();
+                }
                 $copy->save();
 
                 $questionIdMap[$question->id] = $copy->id;

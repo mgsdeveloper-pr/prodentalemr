@@ -1,6 +1,7 @@
 <x-filament-panels::page>
     @php
         $isEditing = str_contains(strtolower($this->getSubmitButtonLabel()), 'save');
+        $mappedEdit = $isEditing && ($this->getRecord()?->is_builtin ?? false);
         $editorTitle = $isEditing ? 'Edit Question' : 'Add Question';
         $sectionContext = $this->getSectionContextLabels();
         $orderCards = $this->getSectionQuestionOrderCards();
@@ -53,15 +54,16 @@
         </section>
 
         <form wire:submit.prevent="{{ $this->getSubmitMethodName() }}" class="pd-question-editor" novalidate>
-            <div class="pd-question-editor__grid">
+            <div class="pd-question-editor__grid" @if ($mappedEdit) style="grid-template-columns:minmax(0,1fr)" @endif>
                 <main class="pd-question-editor__main">
                     <div style="margin-bottom: 14px;">
                         <h2 style="margin: 0; color: #0f172a; font-size: 22px; font-weight: 800;">{{ $editorTitle }}</h2>
-                        <p style="margin: 5px 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">Confirm the location, define the response, and choose where the question should appear.</p>
+                        @unless ($mappedEdit)<p style="margin: 5px 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">Confirm the location, define the response, and choose where the question should appear.</p>@endunless
                     </div>
                     {{ $this->form }}
                 </main>
 
+                @unless ($mappedEdit)
                 <aside class="pd-question-editor__aside" aria-label="Question placement">
                     <header style="padding: 16px 18px; border-bottom: 1px solid #edf2f7;">
                         <div style="color: #0f766e; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;">Question placement</div>
@@ -92,6 +94,7 @@
                         </div>
                     @endif
                 </aside>
+                @endunless
             </div>
 
             <footer class="pd-question-editor__actions">

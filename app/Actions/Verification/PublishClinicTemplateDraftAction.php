@@ -23,7 +23,7 @@ class PublishClinicTemplateDraftAction
      */
     public function execute(User $user, Clinic $clinic, VerificationTemplateVersion $draft, array $data = []): VerificationTemplateVersion
     {
-        if (! $user->canManageClinicTemplateSections($clinic)) {
+        if (! $user->canManageClinicTemplateSections($clinic) || ! $user->canPublishVerificationTemplate($clinic)) {
             throw new AuthorizationException('You do not have permission to publish clinic template drafts.');
         }
 
@@ -39,6 +39,7 @@ class PublishClinicTemplateDraftAction
             $draft,
             $data['version_name'] ?? null,
             $data['change_description'] ?? null,
+            activate: false,
         );
     }
 }

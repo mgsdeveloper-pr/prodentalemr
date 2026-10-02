@@ -257,6 +257,32 @@
         ->filter(fn ($value): bool => filled($value))
         ->count();
     $templateThreePlanProvisionTotal = count($templateThreePlanProvisionFields);
+    // Legacy layouts retain their controls, but progress comes from configured questions.
+    if (! $this->usesSectionLayout()) {
+        $configuredProgress = collect($this->getStructuredTemplateSections())
+            ->flatMap(fn ($section) => [$section, ...$section['children']])
+            ->mapWithKeys(fn ($group) => [$group['key'] => $this->templateGroupProgress($group)]);
+        foreach ([
+            'patient' => 'template_3_patient_subscriber',
+            'insurance' => 'template_3_insurance',
+            'maximums' => 'template_3_maximums_deductibles',
+            'service_history' => 'template_3_service_history',
+            'verification' => 'template_3_verification_information',
+        ] as $displayKey => $sectionKey) {
+            if ($configuredProgress->has($sectionKey)) {
+                $count = $configuredProgress->get($sectionKey);
+                $templateThreeSectionCounts[$displayKey] = ['completed' => $count['answered'], 'total' => $count['total']];
+            }
+        }
+        if ($configuredProgress->has('template_3_plan_provisions')) {
+            $templateThreePlanProvisionCompleted = $configuredProgress['template_3_plan_provisions']['answered'];
+            $templateThreePlanProvisionTotal = $configuredProgress['template_3_plan_provisions']['total'];
+        }
+        if ($configuredProgress->has('template_3_coverage_category')) {
+            $templateThreeCoverageCategoryCompleted = $configuredProgress['template_3_coverage_category']['answered'];
+            $templateThreeCoverageCategoryTotal = $configuredProgress['template_3_coverage_category']['total'];
+        }
+    }
     $templateThreeProgressSections = collect([
         [
             'label' => 'Patient & Subscriber',
@@ -1543,6 +1569,9 @@
     }
 </style>
 
+@if ($this->usesSectionLayout())
+    @include('filament.saas.resources.verifications.pages.partials.template-3-structured-content')
+@else
 <div class="uel2-page">
     <section class="uel2-shell">
         <div class="uel2-shell__inner">
@@ -2281,6 +2310,8 @@
         </div>
     </section>
 </div>
+
+@endif
 
 @if ($this->showAddInsuranceModal)
     <div

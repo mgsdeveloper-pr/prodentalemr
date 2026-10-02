@@ -1,4 +1,34 @@
 <x-filament-panels::page>
+    @if ($showTemplateRefresh)
+        <div x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.set('showTemplateRefresh', false)" role="dialog" aria-modal="true" aria-label="Review template refresh" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;">
+            <div style="background:#fff;color:#17212b;border-radius:8px;padding:24px;width:640px;max-width:100%;max-height:85vh;overflow:auto;">
+                <h2 style="font-size:18px;font-weight:700;">Refresh Template</h2>
+                @error('templateRefresh') <p role="alert" style="color:#b91c1c;">{{ $message }}</p> @enderror
+                @if ($templateRefreshReview === [])
+                    <p style="margin:16px 0;">Save current edits before reviewing the replacement, or discard them and use the last saved answers. Cancel keeps your current form.</p>
+                    <x-filament::button wire:click="prepareTemplateRefresh('save')" wire:loading.attr="disabled">Save &amp; Continue</x-filament::button>
+                    <x-filament::button color="gray" wire:click="prepareTemplateRefresh('discard')" wire:loading.attr="disabled">Discard &amp; Continue</x-filament::button>
+                @else
+                    <p style="margin:16px 0;"><strong>{{ $templateRefreshReview['from'] }}</strong><br>Replace with: <strong>{{ $templateRefreshReview['to'] }}</strong></p>
+                    <p>Compatible answers transfer. Removed answers remain in read-only submission history. Request status stays unchanged.</p>
+                    <ul style="margin:16px 0;padding-left:20px;list-style:disc;">
+                        @forelse ($templateRefreshReview['changes'] as $change)
+                            <li>{{ $change }}</li>
+                        @empty
+                            <li>No questions added, removed, or renamed.</li>
+                        @endforelse
+                    </ul>
+                    @if ($templateRefreshReview['blocked'])
+                        <p style="color:#b91c1c;">Refresh blocked: these questions have changed answer definitions and need mapping review.</p>
+                        <ul>@foreach ($templateRefreshReview['blocked'] as $prompt)<li>{{ $prompt }}</li>@endforeach</ul>
+                    @else
+                        <x-filament::button wire:click="confirmTemplateRefresh" wire:loading.attr="disabled">Confirm Refresh</x-filament::button>
+                    @endif
+                @endif
+                <x-filament::button color="gray" wire:click="$set('showTemplateRefresh', false)">Cancel</x-filament::button>
+            </div>
+        </div>
+    @endif
     @php
         $record = $this->getRecord();
         $isTemplateThreeVerificationForm = $this->formTemplate === 'template_3';
@@ -242,11 +272,6 @@
                         aria-hidden="true"
                     ></button>
                 @endif
-                @if ($this->auditReady)
-                    <button type="button" wire:click="auditVerification" style="display:inline-flex;align-items:center;justify-content:center;min-width:112px;padding:10px 15px;border-radius:12px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:900;cursor:pointer;">
-                        {{ $this->getSaveButtonLabel() }}
-                    </button>
-                @else
                     <button
                         type="button"
                         @if (($this->formTemplate ?? null) === 'template_3')
@@ -256,19 +281,23 @@
                         @endif
                         style="display:inline-flex;align-items:center;justify-content:center;min-width:112px;padding:10px 15px;border:0;border-radius:12px;background:#0f766e;color:#ffffff;font-size:12px;font-weight:900;cursor:pointer;box-shadow:0 8px 18px rgba(15,118,110,0.18);"
                     >
-                        {{ $this->getSaveButtonLabel() }}
+                        Save
                     </button>
-                        @endif
                 <div x-data="{ open: false }" style="position:relative;">
                     <button type="button" x-on:click="open = ! open" style="display:inline-flex;align-items:center;justify-content:center;min-width:74px;height:40px;border-radius:12px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:12px;font-weight:900;cursor:pointer;">More</button>
                     <div x-show="open" x-transition x-on:click.outside="open = false" style="position:absolute;right:0;top:46px;z-index:40;display:grid;gap:6px;min-width:190px;padding:8px;border:1px solid #dbe4ee;border-radius:14px;background:#ffffff;box-shadow:0 16px 34px rgba(15,23,42,0.14);">
+                        @if ($this->auditReady)
+                            <button type="button" x-on:click="open = false" wire:click="auditVerification" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:6px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
+                                Audit
+                            </button>
+                        @endif
                         @if ($canRequestClinicInfo)
                             <button type="button" x-on:click="open = false" wire:click="openInfoRequestModal" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
                                 Request Clinic Info
                             </button>
                         @endif
                         @if ($canRefreshVerificationTemplate)
-                            <button type="button" wire:click="refreshVerificationTemplate" wire:confirm="Refresh this request to the latest clinic template? Existing workflow status will remain unchanged." style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
+                            <button type="button" x-on:click="open = false; $wire.refreshVerificationTemplate()" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #c7d2fe;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
                                 Refresh Template
                             </button>
                         @endif
@@ -479,10 +508,12 @@
             gap: 0;
             min-width: 0;
             margin: 0;
+            overflow: hidden;
         }
 
         .vt3-header-context-item {
             display: inline-flex;
+            flex: 0 1 auto;
             align-items: center;
             min-width: 0;
             padding: 0 12px;
@@ -497,11 +528,29 @@
             margin-left: 4px;
             color: #0f172a;
             font-weight: 850;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .vt3-header-context-item:last-child {
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .vt3-header-context-item:nth-child(2),
+        .vt3-header-context-item:nth-child(6) { flex-shrink: 0; }
+
+        @media (min-width: 1281px) and (max-width: 1600px) {
+            .vt3-header-context-item { padding: 0 8px; }
+        }
+
+        @media (max-width: 1280px) {
+            .vt3-integrated-header .vt3-compact-workbar__title-row { flex-wrap: wrap; gap: 6px; }
+            .vt3-integrated-header .vt3-compact-workbar__context { flex-wrap: wrap; gap: 5px 0; overflow: visible; }
+            .vt3-integrated-header .vt3-header-context-item { flex: 0 1 auto; }
+            .vt3-header-context-item strong { max-width: 180px; }
         }
 
         .vt3-integrated-header .vt3-compact-workbar__actions,
@@ -1062,13 +1111,13 @@
                         <div class="vt3-compact-workbar__title-row">
                             <h1>{{ $this->getTitle() }}</h1>
                             <div class="vt3-compact-workbar__context">
-                                <span class="vt3-header-context-item">Patient: <strong>{{ $quickReference['patient'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">DOB: <strong>{{ $quickReference['dob'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">Member ID: <strong>{{ $quickReference['member_id'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">Insurance: <strong>{{ $quickReference['insurance_name'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">Subscriber: <strong>{{ $quickReference['subscriber_name'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">Subscriber DOB: <strong>{{ $quickReference['subscriber_dob'] ?? '-' }}</strong></span>
-                                <span class="vt3-header-context-item">Subscriber ID: <strong>{{ $quickReference['subscriber_id'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Patient: <strong title="{{ $quickReference['patient'] ?? '-' }}">{{ $quickReference['patient'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">DOB: <strong title="{{ $quickReference['dob'] ?? '-' }}">{{ $quickReference['dob'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Member ID: <strong title="{{ $quickReference['member_id'] ?? '-' }}">{{ $quickReference['member_id'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Insurance: <strong title="{{ $quickReference['insurance_name'] ?? '-' }}">{{ $quickReference['insurance_name'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber: <strong title="{{ $quickReference['subscriber_name'] ?? '-' }}">{{ $quickReference['subscriber_name'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber DOB: <strong title="{{ $quickReference['subscriber_dob'] ?? '-' }}">{{ $quickReference['subscriber_dob'] ?? '-' }}</strong></span>
+                                <span class="vt3-header-context-item">Subscriber ID: <strong title="{{ $quickReference['subscriber_id'] ?? '-' }}">{{ $quickReference['subscriber_id'] ?? '-' }}</strong></span>
                             </div>
                         </div>
                     </div>

@@ -32,6 +32,8 @@ beforeEach(function () {
         'status' => true,
     ]);
 
+    seedWorkflowMaster();
+
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
         'location_name' => 'Main Office',

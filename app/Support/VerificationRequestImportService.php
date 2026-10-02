@@ -232,9 +232,7 @@ class VerificationRequestImportService
             $planSnapshotData,
         );
 
-        $workItem = app(CreateVerificationRequestAction::class)->execute($workItemData);
-
-        $workItem->verificationProfile()->create([
+        $profileData = [
             'form_type' => $this->normalizeFormType($row['form_type'] ?? null),
             'requested_by_name' => $user->name,
             'requested_by_role_slug' => $user->getPrimaryRoleName(),
@@ -254,7 +252,8 @@ class VerificationRequestImportService
             'provider_name' => $row['provider_name'] ?? null,
             'location_name' => $row['location_name'] ?? null,
             'verification_notes' => $row['notes'] ?? null,
-        ]);
+        ];
+        $workItem = app(CreateVerificationRequestAction::class)->execute($workItemData, $profileData);
 
         $workItem->verificationPlanSnapshots()->createMany($planSnapshotData);
 

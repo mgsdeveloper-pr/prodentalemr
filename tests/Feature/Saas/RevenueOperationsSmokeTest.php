@@ -43,6 +43,19 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
+function publishRevenueTemplate(VerificationTemplateVersion $draft, ...$options): VerificationTemplateVersion
+{
+    $actor = auth()->user();
+    $publisher = User::factory()->create(['status' => true]);
+    $publisher->assignRole('saas_admin');
+    auth()->setUser($publisher);
+    try {
+        return app(VerificationTemplateVersionService::class)->publishDraft($draft, ...[...$options, 'activate' => true]);
+    } finally {
+        $actor ? auth()->setUser($actor) : auth()->forgetUser();
+    }
+}
+
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
     Storage::fake('local');
@@ -59,9 +72,12 @@ beforeEach(function () {
         'organization_id' => $this->organization->id,
         'clinic_name' => 'Revenue Downtown',
         'clinic_code' => 'CLN-REV',
+        'verification_services_enabled' => true,
         'timezone' => 'America/New_York',
         'status' => true,
     ]);
+
+    seedWorkflowMaster();
 
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
@@ -81,6 +97,12 @@ beforeEach(function () {
         'status' => true,
     ]);
     $this->saasUser->assignRole('saas_manager');
+    $this->saasUser->verificationClinics()->attach($this->clinic->id);
+    foreach (['saas', 'verification'] as $panel) {
+        foreach (['view', 'update'] as $action) {
+            $this->saasUser->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($panel.'.template_publishing.'.$action, 'web'));
+        }
+    }
 
     $providerUser = User::factory()->create([
         'name' => 'Dr. Revenue',
@@ -635,6 +657,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
     $this->actingAs($manager)
         ->get(route('admin.verifications.pdf.preview', [
             'billingWorkItem' => $request,
+            'raw' => true,
             'mode' => 'standard',
             'submission_id' => $originalCompletion->id,
         ]))
@@ -654,6 +677,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
     $this->actingAs($clinicUser)
         ->get(route('clinic.verification-requests.pdf.preview', [
             'billingWorkItem' => $request,
+            'raw' => true,
             'mode' => 'standard',
             'submission_id' => $originalCompletion->id,
         ]))
@@ -1006,6 +1030,73 @@ it('saves clinic verification pdf preset profiles without changing non-default o
         ->and($this->clinic->getVerificationPdfOutputMode())->toBe('standard');
 });
 
+it('reviews refresh safely and preserves custom answers and history', function (string $scenario) {
+    $manager = User::factory()->create(['status' => true]);
+    $manager->assignRole('verification_manager');
+    $this->actingAs($manager);
+    $versions = app(VerificationTemplateVersionService::class);
+    $refresh = app(RefreshVerificationTemplateAction::class);
+    $published = $versions->ensureClinicPublishedVersion($this->clinic);
+    $question = $published->questions()->whereNull('field_key')->first();
+    if (! $question) {
+        $question = $published->questions()->first();
+    }
+    $work = BillingWorkItem::create([
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id, 'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id, 'title' => 'Isolated refresh safety test',
+        'status' => BillingWorkItem::STATUS_PENDING, 'outcome_status' => 'pending', 'priority' => 'normal',
+    ]);
+    $work = $versions->attachSnapshotToWorkItem($work);
+    $answer = $work->verificationFormAnswers()->create(['verification_form_question_id' => $question->id, 'answer_value' => 'Test answer', 'note_value' => 'Retained note']);
+    $draft = $versions->createDraftFromPublished($published);
+    $copy = $draft->questions()->where('source_question_id', $question->id)->firstOrFail();
+    $target = publishRevenueTemplate($draft);
+    $review = $refresh->review($work->fresh());
+    if (in_array($scenario, ['ui-discard', 'ui-save'], true)) {
+        $manager->verificationClinics()->attach($this->clinic->id);
+        Filament::setCurrentPanel(Filament::getPanel('verification'));
+        Livewire::test(\App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest::class, ['record' => $work->getRouteKey()])
+            ->set('data.notes', 'Unsaved change to discard')
+            ->call('refreshVerificationTemplate')
+            ->assertSet('showTemplateRefresh', true)
+            ->assertSee('Save & Continue')
+            ->call('prepareTemplateRefresh', $scenario === 'ui-save' ? 'save' : 'discard')
+            ->assertHasNoErrors()
+            ->call('confirmTemplateRefresh')
+            ->assertHasNoErrors()
+            ->assertSet('showTemplateRefresh', false);
+        if ($scenario === 'ui-save') expect($work->fresh()->notes)->toBe('Unsaved change to discard');
+        else expect($work->fresh()->notes)->not->toBe('Unsaved change to discard');
+        expect($work->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_PENDING);
+        expect($work->fresh()->verification_template_version_id)->toBe($target->id);
+        return;
+    }
+    if ($scenario === 'stale') {
+        $answer->update(['answer_value' => 'Changed by another user']);
+    } elseif ($scenario === 'incompatible') {
+        // Simulate an incompatible historical published definition, bypassing builder protections.
+        DB::table('verification_form_questions')->where('id', $copy->id)->update(['input_type' => 'textarea']);
+        $review = $refresh->review($work->fresh());
+    }
+    if ($scenario !== 'compatible') {
+        try {
+            $refresh->execute($work, $review['token']);
+            $this->fail('Unsafe refresh was accepted.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            expect($work->fresh()->verification_template_version_id)->toBe($published->id);
+            expect($work->formSubmissions()->count())->toBe(0);
+        }
+        return;
+    }
+    $result = $refresh->execute($work, $review['token']);
+    expect($result->verification_template_version_id)->toBe($target->id)
+        ->and($result->normalized_status)->toBe(BillingWorkItem::STATUS_PENDING);
+    expect($result->verificationFormAnswers()->where('verification_form_question_id', $copy->id)->first()->answer_value)->toBe('Test answer');
+    expect($result->verificationFormAnswers()->whereKey($answer->id)->exists())->toBeTrue();
+    expect(data_get($result->formSubmissions()->latest('id')->first()->payload, 'template_snapshot.version.id'))->toBe($published->id);
+})->with(['compatible', 'stale', 'incompatible', 'ui-discard', 'ui-save']);
+
 it('refreshes a verification request to the latest clinic template without changing workflow status', function () {
     $this->actingAs($this->saasUser);
 
@@ -1033,7 +1124,7 @@ it('refreshes a verification request to the latest clinic template without chang
     $workItem = $service->attachSnapshotToWorkItem($workItem);
 
     $draft = $service->createDraftFromPublished($published);
-    $latest = $service->publishDraft($draft);
+    $latest = publishRevenueTemplate($draft);
 
     $refreshed = $service->refreshWorkItemSnapshot($workItem);
 
@@ -1081,7 +1172,7 @@ it('shows refresh only for editable requests using an older template version', f
 
     expect($refresh->canRefresh($workItem, $verificationManager))->toBeFalse();
 
-    $latest = $versions->publishDraft($versions->createDraftFromPublished($published));
+    $latest = publishRevenueTemplate($versions->createDraftFromPublished($published));
 
     expect($latest->id)->not->toBe($workItem->verification_template_version_id);
     expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeTrue();
@@ -1125,7 +1216,7 @@ it('lets the assigned verification user continue and refresh an incomplete reque
     ]);
     $workItem = $versions->attachSnapshotToWorkItem($workItem);
 
-    $versions->publishDraft($versions->createDraftFromPublished($published));
+    publishRevenueTemplate($versions->createDraftFromPublished($published));
     $workItem->refresh();
 
     expect($workItem->verificationUserCanEditVerification($specialist))->toBeTrue()
@@ -1175,7 +1266,7 @@ it('keeps completed verification template snapshots locked for audit history', f
     $originalVersionId = $workItem->verification_template_version_id;
     $originalSnapshot = $workItem->verification_template_snapshot;
 
-    $versions->publishDraft($versions->createDraftFromPublished($published));
+    publishRevenueTemplate($versions->createDraftFromPublished($published));
     $workItem->transitionStatus(BillingWorkItem::STATUS_DONE);
 
     expect($refresh->canRefresh($workItem->fresh(), $verificationManager))->toBeFalse();
@@ -1317,7 +1408,7 @@ it('publishes a template draft without deleting earlier published versions', fun
     $published = $versions->ensureClinicPublishedVersion($this->clinic);
     $draft = $versions->createDraftFromPublished($published);
 
-    $latest = $versions->publishDraft(
+    $latest = publishRevenueTemplate(
         $draft,
         'Revenue Downtown Template v2',
         'Adjusted clinic-specific template wording.'
@@ -1380,7 +1471,7 @@ it('allows multiple master template drafts while keeping one working draft', fun
         'starting_point' => 'current_master',
     ]);
 
-    expect($fullDraft->fresh()->is_working_draft)->toBeFalse()
+    expect($fullDraft->fresh()->is_working_draft)->toBeTrue()
         ->and($shortDraft->fresh()->is_working_draft)->toBeTrue()
         ->and($fullDraft->fresh()->form_type)->toBe(VerificationTemplateVersion::FORM_TYPE_FULL)
         ->and($shortDraft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE);
@@ -1648,7 +1739,7 @@ it('does not replicate a hidden master template into a new clinic', function () 
 
     $clinicVersion = $versions->ensureClinicPublishedVersion($newClinic);
 
-    expect($hiddenMaster->fresh()->is_active)->toBeTrue()
+    expect($hiddenMaster->fresh()->is_active)->toBeFalse()
         ->and($hiddenMaster->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
         ->and($clinicVersion->source_version_id)->toBe($visibleMaster->id)
         ->and($clinicVersion->source_version_id)->not->toBe($hiddenMaster->id);

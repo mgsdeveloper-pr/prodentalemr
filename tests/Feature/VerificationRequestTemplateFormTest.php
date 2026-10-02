@@ -51,6 +51,9 @@ beforeEach(function () {
         'status' => true,
     ]);
     $this->user->assignRole('verification_manager');
+    foreach (['view', 'update'] as $action) {
+        $this->user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('verification.template_publishing.'.$action, 'web'));
+    }
     $this->user->verificationClinics()->attach($this->clinic->id);
 
     $this->service = ManagedBillingService::create([
@@ -76,6 +79,44 @@ beforeEach(function () {
     ]);
 
     $this->actingAs($this->user);
+    // Request rendering tests require an explicitly available master, not implicit production provisioning.
+    app(VerificationTemplateVersionService::class)->ensureMasterVersion();
+});
+
+it('keeps structured progress scoped to active visible questions in the selected form', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    foreach (['progress_visible' => true, 'progress_hidden' => false] as $key => $active) {
+        VerificationTemplateSection::create([
+            'template_version_id' => $version->id, 'template_key' => 'template_3',
+            'section_key' => $key, 'label' => $key, 'is_active' => $active, 'sort_order' => 900,
+        ]);
+    }
+    $base = ['template_version_id' => $version->id, 'template_key' => 'template_3',
+        'section_key' => 'progress_visible', 'is_active' => true, 'is_builtin' => false,
+        'form_type' => 'full_form', 'input_type' => 'text', 'prompt' => 'Progress question'];
+    $parent = VerificationFormQuestion::create(array_replace($base, ['input_type' => 'yes_no']));
+    $child = VerificationFormQuestion::create(array_replace($base, [
+        'question_kind' => 'conditional', 'parent_question_id' => $parent->id, 'trigger_answer' => 'yes',
+    ]));
+    VerificationFormQuestion::create(array_replace($base, ['form_type' => 'short_form']));
+    VerificationFormQuestion::create(array_replace($base, ['is_active' => false]));
+    VerificationFormQuestion::create(array_replace($base, ['section_key' => 'progress_hidden']));
+    $page = new class extends EditVerificationRequest {
+        public function configureProgress($version): void {
+            $this->record = new BillingWorkItem(['verification_template_version_id' => $version->id]);
+            $this->data = ['vf_form_type' => 'full_form'];
+        }
+    };
+    $page->configureProgress($version);
+    $page->data['custom_question_'.$parent->id] = 'No';
+    $sections = collect($page->getStructuredTemplateSections())->keyBy('key');
+    expect($sections->has('progress_hidden'))->toBeFalse()
+        ->and($page->templateGroupProgress($sections['progress_visible']))->toBe(['answered' => 1, 'total' => 1]);
+    $page->data['custom_question_'.$parent->id] = 'Yes';
+    $section = collect($page->getStructuredTemplateSections())->firstWhere('key', 'progress_visible');
+    expect($page->templateGroupProgress($section))->toBe(['answered' => 1, 'total' => 2]);
+    $page->data['custom_question_'.$child->id] = 'Confirmed';
+    expect($page->templateGroupProgress($section))->toBe(['answered' => 2, 'total' => 2]);
 });
 
 it('serves an authenticated PDF viewer with matching download and raw PDF URLs', function () {
@@ -227,6 +268,39 @@ it('preserves question identity and reuse settings through clinic template versi
     expect(fn () => $service->publishDraft($copy->templateVersion))->toThrow(ValidationException::class);
 });
 
+it('archives an inactive used template without changing its request snapshot or answers', function () {
+    $this->user->assignRole('saas_admin');
+    $versions = app(VerificationTemplateVersionService::class);
+    $version = $versions->ensureClinicPublishedVersion($this->clinic);
+    $version->update(['uses_section_layout' => true]);
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Archive preservation test',
+        'status' => 'pending', 'outcome_status' => 'pending', 'priority' => 'normal', 'source' => 'manual',
+    ]);
+    $question = $version->questions()->firstOrFail();
+    $answer = $request->verificationFormAnswers()->create([
+        'verification_form_question_id' => $question->id, 'answer_value' => 'Preserve test answer',
+    ]);
+    $snapshot = $request->fresh()->getRawOriginal();
+    $questionRows = $version->questions()->get()->toArray();
+    $version->update(['is_active' => false, 'active_full_form' => false, 'active_short_form' => false]);
+    $archived = app(\App\Actions\Verification\ArchiveClinicTemplateVersionAction::class)
+        ->execute($this->user, $this->clinic, $version);
+    expect($archived->status)->toBe('archived')->and($archived->deleted_at)->toBeNull()
+        ->and($archived->canEditDirectly())->toBeFalse()->and($archived->canDeletePermanently())->toBeFalse()
+        ->and($request->fresh()->getRawOriginal())->toBe($snapshot)
+        ->and($answer->fresh()->answer_value)->toBe('Preserve test answer')
+        ->and($archived->questions()->get()->toArray())->toBe($questionRows);
+    expect(fn () => $archived->forceDelete())->toThrow(ValidationException::class);
+    expect(fn () => $versions->activatePublishedVersion($archived))->toThrow(ValidationException::class);
+    $log = \App\Models\AuditLog::where('module', 'verification_templates')->where('action', 'archive')->firstOrFail();
+    expect($log->user_id)->toBe($this->user->id)->and($log->created_at)->not->toBeNull();
+    $copy = $versions->createDraftFromPublished($archived);
+    expect($copy->status)->toBe('draft')->and($copy->questions()->count())->toBe(count($questionRows));
+});
+
 it('attaches the active clinic template snapshot when a verification request is created', function () {
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
@@ -317,6 +391,13 @@ it('renders and counts custom sections from the request template version', funct
     ]);
 
     expect(data_get($page->getTemplateThreeCustomSections(), '0.completed'))->toBe(1);
+    $pdf = new class extends VerificationResultPdf {
+        public static function sections($request, $state) {
+            return static::buildSections($request, $state, true);
+        }
+    };
+    $sections = collect($pdf::sections($request->fresh(), ['vf_form_type' => 'full_form', 'custom_question_'.$question->id => 'Answered']));
+    expect($sections->firstWhere('key', 'custom_testing')['rows'][0]['value'])->toBe('Answered');
 });
 
 it('renders verification information from the request template order and counts every configured question', function () {
@@ -461,6 +542,27 @@ it('builds form links for active requests and read-only links for completed requ
         ->and($request->fresh()->verificationUserCanEditVerification($this->user))->toBeFalse();
 });
 
+it('selects independent short and full templates for new requests', function () {
+    $versions = app(VerificationTemplateVersionService::class);
+    $full = $versions->ensureClinicPublishedVersion($this->clinic);
+    $short = $versions->createDraftFromSource($full, ['form_type' => 'short_form', 'name' => 'Short release']);
+    $short->questions()->create(['template_key' => 'template_3', 'section_key' => 'template_3_verification_information', 'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'short_form', 'is_active' => true]);
+    $versions->publishDraft($short, activate: true);
+    $data = [
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Form routing test', 'priority' => 'normal', 'source' => 'manual',
+    ];
+    $shortRequest = app(CreateVerificationRequestAction::class)->execute($data, ['form_type' => 'short_form']);
+    $fullRequest = app(CreateVerificationRequestAction::class)->execute($data, ['form_type' => 'full_form']);
+    expect($shortRequest->verification_template_version_id)->toBe($short->id)
+        ->and($fullRequest->verification_template_version_id)->toBe($full->id);
+    $versions->activatePublishedVersion($full, 'short_form');
+    expect($full->fresh()->active_short_form)->toBeTrue()->and($full->fresh()->active_full_form)->toBeTrue()
+        ->and($short->fresh()->is_active)->toBeFalse()
+        ->and($shortRequest->fresh()->verification_template_version_id)->toBe($short->id);
+});
+
 it('keeps an existing verification request on its original template after a newer template is published', function () {
     $versions = app(VerificationTemplateVersionService::class);
     $original = $versions->ensureClinicPublishedVersion($this->clinic);
@@ -478,7 +580,9 @@ it('keeps an existing verification request on its original template after a newe
         'source' => 'manual',
     ]);
 
-    $latest = $versions->publishDraft($versions->createDraftFromPublished($original));
+    $draft = $versions->createDraftFromPublished($original);
+    $draft->questions()->create(['template_key' => 'template_3', 'section_key' => 'template_3_verification_information', 'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'both', 'is_active' => true]);
+    $latest = $versions->publishDraft($draft, activate: true);
 
     expect($latest->id)->not->toBe($original->id)
         ->and($request->fresh()->verification_template_version_id)->toBe($original->id)
@@ -514,7 +618,7 @@ it('evaluates audit questions from the request template snapshot instead of the 
         'source' => 'manual',
     ]);
 
-    $latest = $versions->publishDraft($versions->createDraftFromPublished($original));
+    $latest = $versions->publishDraft($versions->createDraftFromPublished($original), activate: true);
 
     $latestQuestion = VerificationFormQuestion::create([
         'template_version_id' => $latest->id,
@@ -599,7 +703,7 @@ it('never mixes frequency rows from draft current or historical template version
         'source' => 'manual',
     ]);
 
-    $latest = $versions->publishDraft($versions->createDraftFromPublished($original));
+    $latest = $versions->publishDraft($versions->createDraftFromPublished($original), activate: true);
 
     VerificationFormQuestion::create([
         'template_version_id' => $latest->id,
@@ -780,6 +884,61 @@ it('keeps the exact optional response fields configured for each frequency row',
         ->and($rows->get('D9912')['frequency_response_fields'])->toBe([])
         ->and($resolvedRows->get('D9911')['required'])->toBeTrue()
         ->and($resolvedRows->get('D9912')['required'])->toBeFalse();
+});
+
+it('does not default authorization or downgrade responses or infer them from zero coverage', function () {
+    foreach (['current', 'advanced'] as $mode) {
+        expect(VerificationFormQuestion::defaultFrequencyResponseFields($mode))
+            ->not->toContain('pre_auth_required', 'downgrade_applies', 'pre_auth_details', 'downgrade_to');
+    }
+    $page = new class extends EditVerificationRequest {
+        public function normalizeForTest(array $rows): array { return $this->normalizeCodeCoverageRows($rows); }
+    };
+    foreach ([['coverage_percent' => 0], ['coverage_status' => 'Not Covered'], []] as $input) {
+        $row = $page->normalizeForTest([['description' => 'Test benefit', ...$input]])[0];
+        expect($row['pre_auth_required'])->toBeNull()->and($row['downgrade_applies'])->toBeNull();
+    }
+    $row = $page->normalizeForTest([['description' => 'Test benefit', 'coverage_percent' => 0, 'pre_auth_required' => 'Yes',
+        'pre_auth_details' => 'Explicit rule', 'downgrade_applies' => 'Yes', 'downgrade_to' => 'D2750']])[0];
+    expect($row['pre_auth_required'])->toBe('Yes')->and($row['pre_auth_details'])->toBe('Explicit rule')
+        ->and($row['downgrade_applies'])->toBe('Yes')->and($row['downgrade_to'])->toBe('D2750');
+    $question = new VerificationFormQuestion(['input_type' => 'frequency_row', 'answer_layout' => 'downgrade']);
+    expect($question->frequencyResponseConfiguration()['detail_fields'])->toBe(['downgrade_applies', 'downgrade_to']);
+});
+
+it('keeps different questions for the same procedure code in PDF output', function () {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    foreach (['Exam frequency', 'Exam benefit limitations'] as $prompt) {
+        $version->questions()->create([
+            'template_key' => $version->template_key,
+            'section_key' => 'template_3_frequency_diagnostic_preventative',
+            'prompt' => $prompt, 'code' => 'D0120', 'form_type' => 'both',
+            'input_type' => 'frequency_row', 'is_active' => true,
+        ]);
+    }
+    $request = app(CreateVerificationRequestAction::class)->execute([
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Repeated code regression',
+        'status' => BillingWorkItem::STATUS_IN_PROGRESS, 'priority' => 'normal', 'source' => 'manual',
+    ]);
+    foreach (['Exam frequency' => 'Twice per year', 'Exam benefit limitations' => 'Separate limitation'] as $description => $frequency) {
+        $request->verificationCoverageCodes()->create([
+            'code_system' => 'ada', 'category' => 'Diagnostic & Preventative',
+            'code' => 'D0120', 'description' => $description, 'frequency' => $frequency,
+            'pre_auth_required' => 'No', 'downgrade_applies' => 'No',
+        ]);
+    }
+    $pdf = new class extends VerificationResultPdf {
+        public static function rows($request) {
+            return static::mapCoverageCodeRowsForSection($request, 'template_3_frequency_diagnostic_preventative');
+        }
+    };
+    $rows = $pdf::rows($request->fresh());
+    expect($rows)->toHaveCount(2)
+        ->and($rows->pluck('value')->implode(' '))->toContain('Twice per year', 'Separate limitation')
+        ->not->toContain('Pre-auth:', 'Downgrade:');
+    expect($request->verificationCoverageCodes()->where('pre_auth_required', 'No')->count())->toBe(2);
 });
 
 it('uses and persists the correct responses for downgrade and orthodontic business questions', function () {
@@ -987,6 +1146,23 @@ it('counts configured frequency responses and conditional details accurately', f
         ->and($page->codeCoverageRowIsComplete($page->codeCoverageData[0]))->toBeTrue();
 });
 
+it('preserves structured select values and formats hydrated dates for native controls', function () {
+    $page = new class extends EditVerificationRequest {
+        public function getInsuranceCarrierOptions(): array { return ['Carrier A' => 'Carrier A']; }
+        public function displayDates(array $data): array { return $this->normalizeVerificationDateFieldsForDisplay($data); }
+    };
+    $page->data = ['vf_insured_relation' => 'self', 'vf_insurance_provider_name' => 'Historical Carrier'];
+    expect($page->managedAnswerOptions(['field' => 'vf_insured_relation', 'options' => ['Self', 'Dependent']]))
+        ->toBe(['self' => 'Self', 'dependent' => 'Dependent'])
+        ->and($page->managedAnswerOptions(['field' => 'vf_insurance_provider_name', 'options' => []]))
+        ->toBe(['Carrier A' => 'Carrier A', 'Historical Carrier' => 'Historical Carrier'])
+        ->and($page->displayDates(['vf_subscriber_dob' => '1990-01-15 00:00:00', 'vf_patient_dob' => '1990-01-15', 'vf_effective_date' => null]))
+        ->toBe(['vf_subscriber_dob' => '1990-01-15', 'vf_patient_dob' => '1990-01-15', 'vf_effective_date' => null]);
+    $page->data = ['custom_question_99' => 'Previously selected'];
+    expect($page->managedAnswerOptions(['field' => 'custom_question_99', 'options' => ['Yes', 'No']]))
+        ->toBe(['Yes' => 'Yes', 'No' => 'No', 'Previously selected' => 'Previously selected']);
+});
+
 it('does not pre-answer the waiting period question', function () {
     $page = new class extends EditVerificationRequest {};
 
@@ -1186,7 +1362,7 @@ it('saves a full template draft in bulk without creating an audit submission', f
         'source' => 'manual',
     ]);
 
-    $formData = ['vf_form_type' => 'full_form'];
+    $formData = ['vf_form_type' => 'full_form', 'vf_ortho_benefit' => 50, 'vf_ortho_lifetime_maximum' => 2000];
 
     foreach ($questions as $question) {
         $formData['custom_question_'.$question->id] = 'Answer '.$question->id;
@@ -1261,6 +1437,8 @@ it('saves a full template draft in bulk without creating an audit submission', f
     expect($request->verificationFormAnswers()->count())->toBe(45)
         ->and($request->verificationCoverageCodes()->count())->toBe(40)
         ->and($request->fresh()->verificationProfile?->waiting_periods)->toBe('No')
+        ->and((float) $request->fresh()->verificationProfile?->ortho_benefit)->toBe(50.0)
+        ->and((float) $request->fresh()->verificationProfile?->ortho_lifetime_maximum)->toBe(2000.0)
         ->and($request->formSubmissions()->count())->toBe(0)
         ->and($request->activities()->where('activity_type', 'form_submitted')->count())->toBe(0)
         ->and($queryCount)->toBeLessThan(30)

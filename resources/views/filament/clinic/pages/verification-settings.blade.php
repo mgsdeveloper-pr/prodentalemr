@@ -14,8 +14,8 @@
         $hasWorkingClinicDraft = collect($clinicTemplateRows)->contains(fn (array $row): bool => $row['is_working_draft']);
         $activeSettingsSection = $this->activeSettingsSection;
         $settingsItems = [
-            ['key' => 'template-selection', 'label' => 'Template Selection', 'description' => 'Choose the verification form this clinic will use.', 'active' => $activeSettingsSection === 'template-selection', 'icon' => '01', 'url' => null],
-            ['key' => 'template-management', 'label' => 'Template Management', 'description' => 'Manage templates, sections, questions, and preview.', 'active' => $activeSettingsSection === 'template-management', 'icon' => '02', 'url' => null],
+            ['key' => 'template-selection', 'label' => 'Active Forms', 'description' => 'Full and Short forms for new requests.', 'active' => $activeSettingsSection === 'template-selection', 'icon' => '01', 'url' => null],
+            ['key' => 'template-management', 'label' => 'Template Library', 'description' => 'Templates, drafts, and versions.', 'active' => $activeSettingsSection === 'template-management', 'icon' => '02', 'url' => null],
             ['key' => 'pdf-settings', 'label' => 'PDF Settings', 'description' => 'Select the user PDF output and preset profile.', 'active' => $activeSettingsSection === 'pdf-settings', 'icon' => '03', 'url' => null],
         ];
         if (\App\Filament\Clinic\Pages\VerificationSharedInboxSettings::canAccess()) {
@@ -784,15 +784,15 @@
                     <strong>Verification Settings</strong>
                 </nav>
             </div>
-            @if (in_array($activeSettingsSection, ['template-selection', 'pdf-settings'], true))
+            @if ($clinic && in_array($activeSettingsSection, ['template-selection', 'pdf-settings'], true))
                 <div>
                     <div class="vs-actions">
                         <button type="button" wire:click.prevent="save" class="vs-button vs-button--primary" wire:loading.attr="disabled" wire:target="save">
-                            <span wire:loading.remove wire:target="save">Save Settings</span>
+                            <span wire:loading.remove wire:target="save">{{ $activeSettingsSection === 'template-selection' ? 'Review Activation' : 'Save PDF Settings' }}</span>
                             <span wire:loading wire:target="save">Saving...</span>
                         </button>
                     </div>
-                    <div class="vs-save-note">Changes save when you click Save Settings</div>
+                    <div class="vs-save-note">{{ $activeSettingsSection === 'template-selection' ? 'Activation requires confirmation' : 'PDF settings save independently' }}</div>
                 </div>
             @endif
         </section>
@@ -860,38 +860,44 @@
             </aside>
 
             <main class="vs-card vs-form-card">
+                @if (! $clinic)
+                    <div class="vs-card-header"><h2 class="vs-card-title">Select a clinic</h2><p>Choose a clinic from the navigation before managing forms and settings.</p></div>
+                @else
                 <div id="template-selection" class="vs-card-header" style="{{ $activeSettingsSection === 'template-selection' ? '' : 'display:none;' }}">
-                    <h2 class="vs-card-title">Template Selection</h2>
+                    <h2 class="vs-card-title">Active Forms</h2>
                     <p class="vs-card-subtitle">Choose the verification form this clinic will use, then manage its template structure from the same workflow.</p>
                 </div>
 
                 <div class="vs-form-body vs-form-body--active">
                     <div class="vs-grid" style="{{ $activeSettingsSection === 'template-selection' ? '' : 'display:none;' }}">
-                        <div class="vs-field">
+                        <div class="vs-field" style="grid-column:1 / -1;">
                             <label>Clinic Scope</label>
                             <select class="vs-select" disabled>
                                 <option>{{ $clinic?->clinic_name ? $clinic->clinic_name . ' - ' . ($clinic->organization?->name ?? '') : 'Select clinic scope' }}</option>
                             </select>
                         </div>
 
+                        @foreach (['short_form' => 'Short Form', 'full_form' => 'Full Form'] as $form => $formLabel)
                         <div class="vs-field">
-                            <label>Verification Form</label>
-                            <select class="vs-select" wire:model.live="data.verification_template_version_id">
-                                @forelse ($this->getClinicTemplateOptions() as $templateVersionId => $templateName)
+                            <label for="template-{{ $form }}">{{ $formLabel }}</label>
+                            <select id="template-{{ $form }}" class="vs-select" wire:model.live="data.template_{{ $form }}_id" @disabled(! auth()->user()?->canPublishVerificationTemplate($clinic))>
+                                <option value="">No active selection</option>
+                                @foreach ($this->getFormTemplateOptions($form) as $templateVersionId => $templateName)
                                     <option value="{{ $templateVersionId }}">{{ $templateName }}</option>
-                                @empty
-                                    <option value="">No published clinic template found</option>
-                                @endforelse
+                                @endforeach
                             </select>
-                            <div class="vs-small">
-                                Save Settings after changing this selection. Only published clinic templates can be selected here.
-                            </div>
+                            @error('data.template_'.$form.'_id')<div role="alert">{{ $message }}</div>@enderror
                         </div>
+                        @endforeach
                     </div>
 
                     @if ($activeSettingsSection === 'template-selection')
                         <div class="vs-section-intro" style="margin-top:18px;">
-                            Template Selection controls which published clinic template is used for new verification requests. Draft templates stay in Template Management until published.
+                            @if ($clinic && ! $this->getClinicTemplateOptions())
+                                No published clinic template is available. Create or import a draft in Template Library, then publish it when ready. Contact your administrator if you need a master template.
+                            @else
+                            Active Forms controls which published clinic template is used for new verification requests. Draft templates stay in Template Library until published.
+                            @endif
                         </div>
                     @endif
 
@@ -899,13 +905,13 @@
                     <div id="template-management" class="vs-section-head">
                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;width:100%;">
                             <span>
-                                <h2 class="vs-card-title">Template Management</h2>
+                                <h2 class="vs-card-title">Template Library</h2>
                                 <p class="vs-card-subtitle">Create, update, organize, re-order, and preview the clinic verification template.</p>
                             </span>
                             @if ($canManageClinicTemplate)
                                 <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;">
-                                    @if ($hasWorkingClinicDraft)
-                                        <a href="{{ $templateUrl }}?draft=1" wire:navigate class="vs-button">Open Working Draft</a>
+                                    @if (\App\Filament\Clinic\Pages\ImportVerificationTemplate::canAccess())
+                                        <a class="vs-button" href="{{ \App\Filament\Clinic\Pages\ImportVerificationTemplate::getUrl(panel: 'clinic') }}">Import Template</a>
                                     @endif
                                     <button type="button" wire:click.prevent="createClinicTemplateDraft" wire:loading.attr="disabled" wire:target="createClinicTemplateDraft" class="vs-button">
                                         <span wire:loading.remove wire:target="createClinicTemplateDraft">Create Draft Template</span>
@@ -922,7 +928,17 @@
                             <div class="vs-small">Only unused drafts can be edited or deleted directly. Published, copied, or request-used templates are protected; create a new draft to change them.</div>
                         </span>
                     </div>
+                    <div style="display:flex;gap:24px;flex-wrap:wrap;padding:12px 0;margin-bottom:12px;border-bottom:1px solid #dfe7f1;">
+                        @foreach ($this->getActiveFormSlots() as $slot)<div><strong>{{ $slot['label'] }}</strong><div>{{ $slot['name'] ? $slot['name'].' · v'.$slot['version'] : 'Setup pending: no active form' }}</div></div>@endforeach
+                    </div>
 
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                        <input type="search" aria-label="Search templates" placeholder="Search templates" wire:model.live.debounce.250ms="templateListSearch" style="border:1px solid #dfe7f1;border-radius:6px;min-width:0;flex:1;padding:8px;">
+                        <select aria-label="Template form type" wire:model.live="templateListForm" style="border:1px solid #dfe7f1;border-radius:6px;padding:8px;">
+                            <option value="full_form">Full Form</option><option value="short_form">Short Form</option>
+                        </select>
+                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" wire:model.live="showTemplateHistory"> Historical versions</label>
+                    </div>
                     <div class="vs-table-wrap">
                         <table class="vs-table">
                             <thead>
@@ -942,10 +958,11 @@
                                     $templateGroupLabels = [
                                         'active' => 'Active Template',
                                         'draft' => 'Draft Templates',
+                                        'published' => 'Published Templates',
                                         'previous' => 'Template History',
                                     ];
                                 @endphp
-                                @forelse ($clinicTemplateRows as $row)
+                                @forelse (collect($clinicTemplateRows)->filter(fn ($row) => $showTemplateHistory || $row['row_group'] !== 'previous') as $row)
                                     @if ($currentTemplateGroup !== $row['row_group'])
                                         @php $currentTemplateGroup = $row['row_group']; @endphp
                                         <tr>
@@ -957,7 +974,7 @@
                                     <tr>
                                         <td>
                                             <div style="color:var(--vs-navy);font-size:14px;font-weight:900;">{{ $row['name'] }}</div>
-                                            <div class="vs-small">{{ $row['visibility'] }}</div>
+                                            <div class="vs-small">{{ $row['version'] }} · {{ $row['visibility'] }}</div>
                                         </td>
                                         <td>
                                             <span class="vs-pill vs-pill--muted">{{ $row['template_id'] }}</span>
@@ -968,6 +985,8 @@
                                                 <span class="vs-pill vs-pill--draft" style="margin-left:6px;">Working Draft</span>
                                             @elseif ($row['is_active'])
                                                 <span class="vs-pill vs-pill--published" style="margin-left:6px;">Active</span>
+                                            @elseif (! $row['is_draft'])
+                                                <span class="vs-pill vs-pill--muted" style="margin-left:6px;">Not active</span>
                                             @endif
                                         </td>
                                         <td>{{ $row['form_type'] }}</td>
@@ -977,9 +996,7 @@
                                             <strong style="color:var(--vs-navy);">{{ $row['sub_sections'] }}</strong> sub-sections
                                             <span style="color:var(--vs-muted);"> / </span>
                                             <strong style="color:var(--vs-navy);">{{ $row['active_questions'] }}/{{ $row['questions'] }}</strong> active questions
-                                            @if ($row['used_request_count'] > 0)
-                                                <div class="vs-small">{{ $row['used_request_count'] }} request(s) using this template</div>
-                                            @endif
+                                            <div class="vs-small">{{ $row['used_request_count'] }} request(s) using this template</div>
                                         </td>
                                         <td>
                                             <div>{{ $row['updated_at'] }}</div>
@@ -988,14 +1005,11 @@
                                         <td>
                                             <div class="vs-table-actions">
                                                 <a href="{{ $templateUrl }}?version={{ $row['id'] }}{{ $row['is_draft'] ? '&draft=1' : '' }}" wire:navigate class="vs-button">
-                                                    {{ $row['is_draft'] && $row['can_edit'] ? 'Open Builder' : 'View Structure' }}
+                                                    {{ $row['is_draft'] && $row['can_edit'] ? 'Edit Draft' : 'View' }}
                                                 </a>
+                                                <details><summary class="vs-button">Details &amp; History</summary>
                                                 @if ($row['is_draft'] && $row['can_edit'])
                                                     <button type="button" wire:click.prevent="openEditClinicTemplateDraftModal({{ $row['id'] }})" class="vs-button">Edit Details</button>
-                                                    <button type="button" wire:click.prevent="publishClinicTemplateDraft({{ $row['id'] }})" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled" wire:target="publishClinicTemplateDraft" class="vs-button vs-button--primary">
-                                                        <span wire:loading.remove wire:target="publishClinicTemplateDraft">Publish</span>
-                                                        <span wire:loading wire:target="publishClinicTemplateDraft">Publishing...</span>
-                                                    </button>
                                                 @endif
                                                 @if ($row['can_delete'])
                                                     <button
@@ -1012,7 +1026,7 @@
                                                     <button
                                                         type="button"
                                                         wire:click.prevent="archiveClinicTemplateVersion({{ $row['id'] }})"
-                                                        wire:confirm="Archive this clinic template? It will be removed from this active list."
+                                                        wire:confirm="Archive this template for future use? Existing requests, answers, and reports will be retained unchanged. The template remains read-only in Historical versions."
                                                         wire:loading.attr="disabled"
                                                         wire:target="archiveClinicTemplateVersion"
                                                         class="vs-button"
@@ -1023,6 +1037,8 @@
                                                 @elseif ($row['archive_block_reason'])
                                                     <span class="vs-small" style="max-width:190px;text-align:right;">{{ $row['archive_block_reason'] }}</span>
                                                 @endif
+                                                <div class="vs-small">Published: {{ $row['published_at'] }}</div>
+                                                </details>
                                             </div>
                                         </td>
                                     </tr>
@@ -1132,7 +1148,7 @@
                     <div class="vs-toggle-row">
                         <span>
                             <div style="color:var(--vs-navy);font-size:13px;font-weight:900;">Allow verification manager template edits</div>
-                            <div class="vs-small">Managers can draft and publish clinic-specific template changes.</div>
+                            <div class="vs-small">Managers can edit clinic drafts. Publishing requires a separate permission.</div>
                         </span>
                         <input class="vs-toggle" type="checkbox" wire:model.live="data.allow_verification_manager_template_edits">
                     </div>
@@ -1205,9 +1221,10 @@
                     </div>
 
                 </div>
+                @endif
             </main>
 
-            <aside class="vs-right" style="{{ $activeSettingsSection === 'pdf-settings' ? 'display:grid;gap:18px;' : 'display:none;' }}">
+            <aside class="vs-right" style="{{ $clinic && $activeSettingsSection === 'pdf-settings' ? 'display:grid;gap:18px;' : 'display:none;' }}">
                 <section class="vs-card">
                     <div class="vs-card-header">
                         <div class="vs-eyebrow">Preview Sample</div>
@@ -1256,6 +1273,25 @@
             </aside>
         </section>
 
+        @if ($showActivationReview)
+            <div class="vs-modal-backdrop">
+                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="activation-review-title">
+                    <header class="vs-modal-header"><h2 id="activation-review-title">Confirm Active Forms</h2></header>
+                    <div class="vs-modal-body">
+                        <strong>{{ $activationReview['clinic_name'] ?? '' }}</strong>
+                        @forelse ($activationReview['labels'] ?? [] as $form => $label)
+                            <p><strong>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }}</strong>: {{ $label }}</p>
+                        @empty
+                            <p>No active form changes.</p>
+                        @endforelse
+                        <p>Only new requests use these selections. Existing requests and PDF settings remain unchanged.</p>
+                        @error('activation')<p role="alert">{{ $message }}</p>@enderror
+                        @error('template')<p role="alert">{{ $message }}</p>@enderror
+                    </div>
+                    <footer class="vs-modal-footer"><button type="button" class="vs-button" wire:click="$set('showActivationReview', false)">Cancel</button><button type="button" class="vs-button vs-button--primary" wire:click="confirmActiveForms" wire:loading.attr="disabled">Confirm Activation</button></footer>
+                </section>
+            </div>
+        @endif
         @if ($this->showCreateTemplateDraftModal)
             <div class="vs-modal-backdrop" wire:key="clinic-create-template-draft-modal">
                 <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-create-template-draft-title">
@@ -1268,6 +1304,15 @@
                     </header>
 
                     <div class="vs-modal-body">
+                        @if ($this->existingNamedDrafts())
+                            <div class="vs-field">
+                                <strong>Continue Existing Draft</strong>
+                                @foreach ($this->existingNamedDrafts() as $existingDraft)
+                                    <a class="vs-button" href="{{ $templateUrl }}?version={{ $existingDraft['id'] }}&draft=1">{{ $existingDraft['name'] }} · v{{ $existingDraft['version'] }}</a>
+                                @endforeach
+                                <strong>Or Create Another Named Draft</strong>
+                            </div>
+                        @endif
                         <div class="vs-field">
                             <label>Template Name <span class="vs-required">*</span></label>
                             <input
@@ -1284,8 +1329,8 @@
                         <div class="vs-grid">
                             <div class="vs-field">
                                 <label>Form Type</label>
-                                <select class="vs-select" wire:model.defer="newClinicTemplateDraftData.form_type">
-                                    @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $formType => $formTypeLabel)
+                                <select class="vs-select" wire:model.live="newClinicTemplateDraftData.form_type">
+                                    @foreach (\Illuminate\Support\Arr::except(\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS, ['both']) as $formType => $formTypeLabel)
                                         <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
                                     @endforeach
                                 </select>
@@ -1334,7 +1379,7 @@
                     </div>
 
                     <footer class="vs-modal-footer">
-                        <span class="vs-small">This creates a draft only. The active clinic form does not change until the draft is published.</span>
+                        <span class="vs-small">This creates a draft only. Publishing does not change the active clinic form; activation requires a separate confirmation.</span>
                         <span style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
                             <button type="button" wire:click.prevent="closeCreateTemplateDraftModal" class="vs-button">Cancel</button>
                             <button type="button" wire:click.prevent="submitCreateClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitCreateClinicTemplateDraft" class="vs-button vs-button--primary">

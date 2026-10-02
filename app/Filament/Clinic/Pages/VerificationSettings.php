@@ -47,6 +47,14 @@ class VerificationSettings extends Page
     public ?array $data = [];
 
     public string $activeSettingsSection = 'template-selection';
+    #[\Livewire\Attributes\Session]
+    public string $templateListSearch = '';
+    #[\Livewire\Attributes\Session]
+    public string $templateListForm = 'full_form';
+    public bool $showActivationReview = false;
+    #[\Livewire\Attributes\Locked] public array $activationReview = [];
+    #[\Livewire\Attributes\Session]
+    public bool $showTemplateHistory = false;
 
     public bool $showCreateTemplateDraftModal = false;
 
@@ -55,8 +63,8 @@ class VerificationSettings extends Page
     public ?int $editingClinicTemplateDraftId = null;
 
     public array $newClinicTemplateDraftData = [
-        'template_name' => 'Clinic Template Draft',
-        'form_type' => 'both',
+        'template_name' => '',
+        'form_type' => 'full_form',
         'starting_point' => 'active',
         'source_version_id' => null,
     ];
@@ -95,6 +103,11 @@ class VerificationSettings extends Page
 
     public function mount(): void
     {
+        $this->activeSettingsSection = match ($this->activeSettingsSection) {
+            'active-forms' => 'template-selection', 'template-library' => 'template-management',
+            default => $this->activeSettingsSection,
+        };
+        if (! in_array($this->templateListForm, ['full_form', 'short_form'], true)) $this->templateListForm = 'full_form';
         $this->clinicRecord = $this->resolveClinic();
         if ($this->clinicRecord) {
             app(PdfPresetService::class)->seedDefaultsForClinic($this->clinicRecord);
@@ -187,9 +200,68 @@ class VerificationSettings extends Page
             return;
         }
 
-        $this->syncFlattenedQuestionIds();
+        if ($this->activeSettingsSection !== 'template-selection') {
+            $this->savePdfSettings();
+            return;
+        }
 
         $state = $this->data;
+        $this->resetValidation();
+        $expected = app(VerificationTemplateVersionService::class)->activeClinicForms($clinic->id);
+        $activationSelections = [];
+        foreach (['short_form', 'full_form'] as $form) {
+            $id = (int) ($state['template_'.$form.'_id'] ?? 0);
+            if (! $id) {
+                if (array_key_exists('template_'.$form.'_id', $state) && $this->activeFormVersionId($clinic, $form)) {
+                    $this->addError('data.template_'.$form.'_id', 'Select a replacement before changing the active form.');
+                    return;
+                }
+                continue;
+            }
+            $version = $this->findSelectableClinicTemplateVersion($id);
+            if (! $version || ! in_array($version->form_type, ['both', $form], true)) {
+                $this->addError('data.template_'.$form.'_id', 'Choose a published template supporting this form.');
+                return;
+            }
+            if ($expected[$form] !== $version->id) {
+                abort_unless(auth()->user()?->canPublishVerificationTemplate($clinic), 403);
+                $activationSelections[$form] = $version;
+            }
+        }
+        if ($this->activeSettingsSection === 'template-selection') {
+            $this->activationReview = ['clinic_id' => $clinic->id, 'clinic_name' => $clinic->clinic_name,
+                'expected' => $expected, 'selections' => [], 'labels' => []];
+            foreach ($activationSelections as $form => $version) {
+                $old = VerificationTemplateVersion::find($expected[$form]);
+                $this->activationReview['selections'][$form] = $version->id;
+                $this->activationReview['labels'][$form] = ($old ? $old->name.' · v'.$old->version_number : 'None')
+                    .' → '.$version->name.' · v'.$version->version_number;
+            }
+            $this->showActivationReview = true;
+            return;
+        }
+    }
+
+    public function confirmActiveForms(): void
+    {
+        $clinic = $this->resolveClinic();
+        abort_unless($this->showActivationReview && $clinic && $clinic->id === ($this->activationReview['clinic_id'] ?? null), 403);
+        app(VerificationTemplateVersionService::class)->activateClinicForms($clinic,
+            $this->activationReview['selections'], $this->activationReview['expected']);
+        $this->showActivationReview = false;
+        $this->activationReview = [];
+        $this->resetValidation();
+        $this->fillStateFromClinic($clinic);
+        Notification::make()->title('Active forms saved')->success()->send();
+    }
+
+    protected function savePdfSettings(): void
+    {
+        $clinic = $this->resolveClinic();
+        abort_unless($clinic && $this->activeSettingsSection === 'pdf-settings', 403);
+        $this->syncFlattenedQuestionIds();
+        $state = $this->data;
+
         $mode = $state['verification_pdf_output_mode'] ?? 'standard';
         $sections = is_array($state['verification_pdf_output_sections'] ?? null)
             ? $state['verification_pdf_output_sections']
@@ -228,29 +300,7 @@ class VerificationSettings extends Page
             'is_default' => (bool) ($state['verification_pdf_preset_is_default'] ?? true),
         ], $preset);
 
-        $selectedTemplateVersion = $this->findSelectableClinicTemplateVersion(
-            (int) ($state['verification_template_version_id'] ?? 0)
-        );
-
-        if (filled($state['verification_template_version_id'] ?? null) && ! $selectedTemplateVersion) {
-            Notification::make()
-                ->title('Template not available')
-                ->body('Choose a published clinic template from the list before saving.')
-                ->danger()
-                ->send();
-
-            return;
-        }
-
-        if ($selectedTemplateVersion) {
-            $this->activateClinicTemplateVersion($selectedTemplateVersion);
-        }
-
         $clinic->update([
-            'verification_default_form_template' => $selectedTemplateVersion?->template_key
-                ?? $state['verification_default_form_template']
-                ?? VerificationFormQuestion::defaultTemplateKey(),
-            'allow_verification_manager_template_edits' => (bool) ($state['allow_verification_manager_template_edits'] ?? false),
             'default_verification_pdf_preset_id' => ($state['verification_pdf_preset_is_default'] ?? true) ? $savedPreset->getKey() : $clinic->default_verification_pdf_preset_id,
         ]);
 
@@ -260,7 +310,7 @@ class VerificationSettings extends Page
 
         Notification::make()
             ->title('Verification settings saved')
-            ->body('The clinic template and PDF settings have been updated successfully.')
+            ->body('PDF settings saved. Active forms are unchanged.')
             ->success()
             ->send();
     }
@@ -306,6 +356,8 @@ class VerificationSettings extends Page
             'verification_pdf_preset_is_default' => (bool) ($preset?->is_default ?? true),
             'verification_default_form_template' => $clinic->getVerificationDefaultFormTemplate(),
             'verification_template_version_id' => $this->selectedClinicTemplateVersionId($clinic),
+            'template_short_form_id' => $this->activeFormVersionId($clinic, 'short_form'),
+            'template_full_form_id' => $this->activeFormVersionId($clinic, 'full_form'),
             'verification_pdf_output_mode' => $mode,
             'verification_pdf_output_sections' => $preset?->getSectionKeys() ?? $clinic->getVerificationPdfOutputSections(),
             'verification_pdf_output_question_ids' => $selectedQuestionIds,
@@ -370,6 +422,7 @@ class VerificationSettings extends Page
         }
 
         $this->resetNewClinicTemplateDraftData();
+        $this->newClinicTemplateDraftData['form_type'] = $this->templateListForm;
         $this->showCreateTemplateDraftModal = true;
     }
 
@@ -397,7 +450,7 @@ class VerificationSettings extends Page
 
         $validated = $this->validate([
             'newClinicTemplateDraftData.template_name' => ['required', 'string', 'max:255'],
-            'newClinicTemplateDraftData.form_type' => ['required', 'in:'.implode(',', array_keys(VerificationTemplateVersion::FORM_TYPE_OPTIONS))],
+            'newClinicTemplateDraftData.form_type' => ['required', 'in:full_form,short_form'],
             'newClinicTemplateDraftData.starting_point' => ['required', 'in:active,fresh,specific_version'],
             'newClinicTemplateDraftData.source_version_id' => ['nullable', 'integer'],
         ]);
@@ -407,8 +460,13 @@ class VerificationSettings extends Page
         $source = match ($startingPoint) {
             'fresh' => null,
             'specific_version' => $this->findSelectedClinicTemplateVersion((int) ($data['source_version_id'] ?? 0)),
-            default => $this->getActiveClinicTemplateVersion(),
+            default => VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+                ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)->where('status', 'published')
+                ->where('active_'.$data['form_type'], true)->first(),
         };
+        if ($source && ! in_array($source->form_type, ['both', $data['form_type']], true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['newClinicTemplateDraftData.source_version_id' => 'Choose a source matching the selected Full or Short form.']);
+        }
 
         if ($startingPoint === 'specific_version' && ! $source) {
             Notification::make()
@@ -487,15 +545,26 @@ class VerificationSettings extends Page
 
     protected function resetNewClinicTemplateDraftData(): void
     {
-        $clinic = $this->resolveClinic();
-        $defaultName = trim((string) ($clinic?->clinic_name ?: 'Clinic')).' Template Draft';
-
         $this->newClinicTemplateDraftData = [
-            'template_name' => $defaultName,
-            'form_type' => VerificationTemplateVersion::FORM_TYPE_BOTH,
+            'template_name' => '',
+            'form_type' => VerificationTemplateVersion::FORM_TYPE_FULL,
             'starting_point' => 'active',
             'source_version_id' => null,
         ];
+    }
+
+    public function existingNamedDrafts(): array
+    {
+        $clinic = $this->resolveClinic();
+        if (! $clinic || ! $this->canManageSelectedClinicTemplate()) {
+            return [];
+        }
+
+        return VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+            ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)->where('status', 'draft')
+            ->whereIn('form_type', ['both', $this->newClinicTemplateDraftData['form_type'] ?? 'full_form'])
+            ->orderByDesc('version_number')->get()->filter(fn ($draft) => $draft->canEditDirectly())
+            ->map(fn ($draft) => ['id' => $draft->id, 'name' => $draft->name, 'version' => $draft->version_number])->all();
     }
 
     public function openEditClinicTemplateDraftModal(int $versionId): void
@@ -589,6 +658,7 @@ class VerificationSettings extends Page
 
     public function publishClinicTemplateDraft(int $versionId): void
     {
+        abort_unless($this->resolveClinic() && auth()->user()?->canPublishVerificationTemplate($this->resolveClinic()), 403);
         if (! $this->canManageSelectedClinicTemplate()) {
             Notification::make()->title('Permission denied')->danger()->send();
 
@@ -636,7 +706,7 @@ class VerificationSettings extends Page
 
         Notification::make()
             ->title('Clinic template published')
-            ->body($this->clinicTemplateDisplayName($published).' is now active for this clinic.')
+            ->body($this->clinicTemplateDisplayName($published).' is published. Select it in Active Forms when ready.')
             ->success()
             ->send();
     }
@@ -649,7 +719,7 @@ class VerificationSettings extends Page
         if (! $version || ! $clinic || ! $this->canArchiveClinicTemplateVersion($version)) {
             Notification::make()
                 ->title('Template cannot be archived')
-                ->body('Only clinic-created templates that are not active and not used by verification requests can be archived.')
+                ->body('Replace this template in both active form slots before archiving. Historical requests will be retained.')
                 ->warning()
                 ->send();
 
@@ -691,9 +761,6 @@ class VerificationSettings extends Page
             return [];
         }
 
-        app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic);
-        $this->enforceSingleActiveClinicTemplate($clinic);
-
         return VerificationTemplateVersion::query()
             ->withCount([
                 'questions',
@@ -703,8 +770,12 @@ class VerificationSettings extends Page
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('clinic_id', $clinic->getKey())
-            ->where('status', '!=', VerificationTemplateVersion::STATUS_ARCHIVED)
+            ->when(! $this->showTemplateHistory, fn ($query) => $query->where('status', '!=', VerificationTemplateVersion::STATUS_ARCHIVED))
             ->orderByDesc('is_working_draft')
+            ->when(in_array($this->templateListForm, ['full_form', 'short_form'], true),
+                fn ($query) => $query->whereIn('form_type', ['both', $this->templateListForm]))
+            ->when(trim($this->templateListSearch) !== '',
+                fn ($query) => $query->where('name', 'like', '%'.trim($this->templateListSearch).'%'))
             ->orderByDesc('is_active')
             ->orderByDesc('version_number')
             ->orderByDesc('id')
@@ -752,34 +823,22 @@ class VerificationSettings extends Page
             ->all();
     }
 
-    protected function enforceSingleActiveClinicTemplate(Clinic $clinic): void
+    public function getActiveFormSlots(): array
     {
-        $activeVersions = VerificationTemplateVersion::query()
-            ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->where('clinic_id', $clinic->getKey())
-            ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
-            ->where('is_active', true)
-            ->orderByDesc('published_at')
-            ->orderByDesc('id')
-            ->get();
-
-        $activeVersions
-            ->skip(1)
-            ->each(fn (VerificationTemplateVersion $version): bool => $version->forceFill([
-                'is_active' => false,
-                'is_working_draft' => false,
-            ])->save());
+        $clinic = $this->resolveClinic();
+        $slots = [];
+        foreach (['full_form' => 'Full Form', 'short_form' => 'Short Form'] as $key => $label) {
+            $version = $clinic ? VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
+                ->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)->where('status', 'published')->where('active_'.$key, true)->first() : null;
+            $slots[] = ['label' => $label, 'name' => $version?->name, 'version' => $version?->version_number];
+        }
+        return $slots;
     }
 
     protected function clinicTemplateStatusLabel(VerificationTemplateVersion $version): string
     {
         if ($version->status === VerificationTemplateVersion::STATUS_DRAFT) {
             return 'Draft';
-        }
-
-        if ($version->status === VerificationTemplateVersion::STATUS_PUBLISHED && ! $version->is_active) {
-            return 'Not Active';
         }
 
         return str($version->status)->headline()->toString();
@@ -824,7 +883,8 @@ class VerificationSettings extends Page
             return 'draft';
         }
 
-        return $version->is_active ? 'active' : 'previous';
+        return $version->is_active ? 'active' : ($version->status === VerificationTemplateVersion::STATUS_PUBLISHED
+            && $version->clinic_visibility !== VerificationTemplateVersion::CLINIC_VISIBILITY_RETIRED ? 'published' : 'previous');
     }
 
     protected function clinicTemplateVisibilityLabel(VerificationTemplateVersion $version): string
@@ -838,6 +898,12 @@ class VerificationSettings extends Page
 
     protected function approvedTemplateThreeSectionCounts(VerificationTemplateVersion $version, int $questionCount): array
     {
+        if ($version->uses_section_layout) {
+            return [
+                'main' => $version->sections()->whereNull('parent_section_key')->count(),
+                'sub' => $version->sections()->whereNotNull('parent_section_key')->count(),
+            ];
+        }
         if ($questionCount === 0 && (int) $version->sections_count === 0) {
             return ['main' => 0, 'sub' => 0];
         }
@@ -909,24 +975,17 @@ class VerificationSettings extends Page
             ->first();
     }
 
-    protected function activateClinicTemplateVersion(VerificationTemplateVersion $version): void
+    protected function activeFormVersionId(Clinic $clinic, string $form): ?int
     {
-        DB::transaction(function () use ($version): void {
-            VerificationTemplateVersion::query()
-                ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
-                ->where('template_key', $version->template_key)
-                ->where('clinic_id', $version->clinic_id)
-                ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
-                ->update([
-                    'is_active' => false,
-                    'is_working_draft' => false,
-                ]);
+        return VerificationTemplateVersion::where('clinic_id', $clinic->id)->where('scope', 'clinic')
+            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())->where('status', 'published')
+            ->where('active_'.$form, true)->latest('id')->value('id');
+    }
 
-            $version->forceFill([
-                'is_active' => true,
-                'is_working_draft' => false,
-            ])->save();
-        });
+    public function getFormTemplateOptions(string $form): array
+    {
+        if (! in_array($form, ['short_form', 'full_form'], true)) return [];
+        return $this->getClinicTemplateOptions($form);
     }
 
     protected function canArchiveClinicTemplateVersion(VerificationTemplateVersion $version, ?int $usedRequestCount = null): bool
@@ -937,7 +996,8 @@ class VerificationSettings extends Page
             && $version->scope === VerificationTemplateVersion::SCOPE_CLINIC
             && $version->status === VerificationTemplateVersion::STATUS_PUBLISHED
             && ! $version->is_active
-            && $usedRequestCount === 0;
+            && ! $version->active_full_form
+            && ! $version->active_short_form;
     }
 
     protected function archiveBlockReason(VerificationTemplateVersion $version, int $usedRequestCount): ?string
@@ -946,12 +1006,12 @@ class VerificationSettings extends Page
             return 'SaaS master template cannot be archived from clinic settings.';
         }
 
-        if ($version->is_active) {
+        if ($version->is_active || $version->active_full_form || $version->active_short_form) {
             return 'Active clinic template cannot be archived.';
         }
 
-        if ($usedRequestCount > 0) {
-            return $usedRequestCount.' verification request(s) use this template.';
+        if ($version->status === VerificationTemplateVersion::STATUS_ARCHIVED) {
+            return 'Archived: retained read-only for history.';
         }
 
         if (! $this->canManageSelectedClinicTemplate()) {
@@ -970,24 +1030,25 @@ class VerificationSettings extends Page
     {
         $clinic = $this->resolveClinic();
 
-        return $clinic ? app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic) : null;
+        return $clinic ? $this->findActiveClinicTemplateVersion($clinic) : null;
     }
 
     protected function selectedClinicTemplateVersionId(Clinic $clinic): ?int
     {
-        $activeVersion = VerificationTemplateVersion::query()
+        return $this->findActiveClinicTemplateVersion($clinic)?->getKey();
+    }
+
+    protected function findActiveClinicTemplateVersion(Clinic $clinic): ?VerificationTemplateVersion
+    {
+        return VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
             ->where('clinic_id', $clinic->getKey())
             ->where('is_active', true)
+            ->where('clinic_visibility', '!=', VerificationTemplateVersion::CLINIC_VISIBILITY_RETIRED)
             ->latest('id')
             ->first();
-
-        $version = $activeVersion
-            ?? app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic);
-
-        return $version?->getKey();
     }
 
     public function getDraftClinicTemplateVersion(): ?VerificationTemplateVersion
@@ -1018,15 +1079,13 @@ class VerificationSettings extends Page
         return VerificationFormQuestion::ACTIVE_TEMPLATE_OPTIONS;
     }
 
-    public function getClinicTemplateOptions(): array
+    public function getClinicTemplateOptions(?string $form = null): array
     {
         $clinic = $this->resolveClinic();
 
         if (! $clinic) {
             return [];
         }
-
-        app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic);
 
         return VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -1037,12 +1096,13 @@ class VerificationSettings extends Page
             ->orderByDesc('is_active')
             ->orderByDesc('published_at')
             ->orderByDesc('id')
+            ->when($form, fn ($query) => $query->whereIn('form_type', ['both', $form]))
             ->get()
-            ->mapWithKeys(function (VerificationTemplateVersion $version): array {
+            ->mapWithKeys(function (VerificationTemplateVersion $version) use ($form): array {
                 $label = $this->clinicTemplateDisplayName($version)
                     .' ('.$this->clinicTemplateIdentifier($version).')';
 
-                if ($version->is_active) {
+                if ($form ? $version->{'active_'.$form} : $version->is_active) {
                     $label .= ' - Active';
                 }
 
@@ -1415,7 +1475,7 @@ class VerificationSettings extends Page
         if ($this->clinicRecord instanceof Clinic) {
             $selectedId = ClinicPanelScope::selectedClinicId();
 
-            if ($selectedId && $this->clinicRecord->getKey() !== $selectedId) {
+            if ($this->clinicRecord->getKey() !== $selectedId) {
                 $this->clinicRecord = null;
             }
         }
@@ -1432,16 +1492,6 @@ class VerificationSettings extends Page
             return $this->clinicRecord;
         }
 
-        $user = auth()->user();
-
-        if (! filled($user?->clinic_id)) {
-            return null;
-        }
-
-        $this->clinicRecord = Clinic::query()
-            ->with('organization')
-            ->find($user->clinic_id);
-
-        return $this->clinicRecord;
+        return null;
     }
 }

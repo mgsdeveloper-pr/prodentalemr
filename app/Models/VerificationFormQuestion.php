@@ -35,6 +35,15 @@ class VerificationFormQuestion extends Model
             $question->information_scope ??= 'unclassified';
             $question->reuse_policy ??= 'fresh_verification';
         });
+        static::saving(function (self $question): void {
+            if ($question->input_type !== 'frequency_row') return;
+            $original = $question->exists ? new self([
+                'prompt' => $question->getOriginal('prompt'),
+                'section_key' => $question->getOriginal('section_key'),
+            ]) : $question;
+            $question->answer_layout ??= $original->inferredAnswerLayout();
+            $question->response_category ??= $original->frequencyCategory();
+        });
     }
 
     public const TEMPLATE_OPTIONS = [
@@ -323,10 +332,13 @@ class VerificationFormQuestion extends Model
         'secondary_field_key',
         'secondary_input_type',
         'code',
+        'procedure_tags',
         'help_text',
         'placeholder',
         'select_options',
         'frequency_response_mode',
+        'answer_layout',
+        'response_category',
         'frequency_response_fields',
         'has_note',
         'note_label',
@@ -350,6 +362,7 @@ class VerificationFormQuestion extends Model
             'has_note' => 'boolean',
             'sort_order' => 'integer',
             'frequency_response_fields' => 'array',
+            'procedure_tags' => 'array',
         ];
     }
 
@@ -368,6 +381,7 @@ class VerificationFormQuestion extends Model
                 'question_kind', 'trigger_answer', 'field_key', 'secondary_field_key',
                 'secondary_input_type', 'select_options', 'frequency_response_mode',
                 'frequency_response_fields', 'has_note', 'note_label', 'note_placeholder',
+                'answer_layout', 'response_category',
                 'help_text', 'placeholder', 'is_required_for_audit', 'is_locked_by_admin',
                 'information_scope', 'reuse_policy',
             ]),
@@ -494,7 +508,7 @@ class VerificationFormQuestion extends Model
                 'vf_coverage_major_restorative' => 'Major Restorative Coverage %',
                 'vf_coverage_prosthodontics' => 'Prosthodontics Coverage %',
                 'vf_coverage_implant' => 'Implant Coverage %',
-                'vf_ortho_lifetime_maximum' => 'Orthodontics Lifetime Maximum',
+                'vf_ortho_benefit' => 'Orthodontics Coverage %',
             ],
             'Plan Provisions' => [
                 'vf_plan_provisions' => 'Plan Provisions',
@@ -697,6 +711,11 @@ class VerificationFormQuestion extends Model
     public static function topLevelSectionOptionsForTemplate(?string $templateKey, ?int $clinicId = null, ?int $templateVersionId = null): array
     {
         $templateKey = static::normalizeTemplateKey($templateKey);
+        if ($templateVersionId && VerificationTemplateVersion::find($templateVersionId)?->uses_section_layout) {
+            return VerificationTemplateSection::where('template_version_id', $templateVersionId)
+                ->visibleForClinic($clinicId)->whereNull('parent_section_key')->where('is_active', true)
+                ->orderBy('sort_order')->pluck('label', 'section_key')->all();
+        }
 
         $options = $templateKey === 'template_3'
             ? static::templateThreeBuilderSectionOptions($clinicId, $templateVersionId)
@@ -709,7 +728,8 @@ class VerificationFormQuestion extends Model
 
     public static function templateThreeBuilderSectionOptions(?int $clinicId = null, ?int $templateVersionId = null): array
     {
-        $builtInOptions = self::TEMPLATE_3_SECTION_OPTIONS;
+        $structured = $templateVersionId && VerificationTemplateVersion::find($templateVersionId)?->uses_section_layout;
+        $builtInOptions = $structured ? [] : self::TEMPLATE_3_SECTION_OPTIONS;
 
         $customSections = VerificationTemplateSection::query()
             ->visibleForClinic($clinicId)
@@ -748,7 +768,7 @@ class VerificationFormQuestion extends Model
             })
             ->all();
 
-        return $builtInOptions + $customSectionOptions;
+        return $structured ? $customSectionOptions : $builtInOptions + $customSectionOptions;
     }
 
     public static function childSectionOptionsForTemplate(?string $templateKey, ?int $clinicId, ?string $parentSectionKey, ?int $templateVersionId = null): array
@@ -793,7 +813,7 @@ class VerificationFormQuestion extends Model
         return $builtInChildren + $customChildren;
     }
 
-    public static function parentSectionKeyFor(?string $sectionKey, ?string $templateKey = null, ?int $clinicId = null): ?string
+    public static function parentSectionKeyFor(?string $sectionKey, ?string $templateKey = null, ?int $clinicId = null, ?int $templateVersionId = null): ?string
     {
         if (blank($sectionKey)) {
             return null;
@@ -816,11 +836,11 @@ class VerificationFormQuestion extends Model
             ->where('template_key', $templateKey ?: self::DEFAULT_TEMPLATE_KEY)
             ->when(
                 blank($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentMasterWorkingTemplateVersionId())
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentMasterWorkingTemplateVersionId())
             )
             ->when(
                 filled($clinicId),
-                fn (Builder $query) => $query->where('template_version_id', static::currentClinicWorkingTemplateVersionId($clinicId))
+                fn (Builder $query) => $query->where('template_version_id', $templateVersionId ?: static::currentClinicWorkingTemplateVersionId($clinicId))
             )
             ->where('section_key', $sectionKey)
             ->orderByRaw('clinic_id is null')
@@ -860,8 +880,8 @@ class VerificationFormQuestion extends Model
     public static function defaultFrequencyResponseFields(?string $mode): array
     {
         return $mode === 'advanced'
-            ? ['coverage_status', 'service_history', 'pre_auth_required', 'downgrade_applies', 'age_limit', 'waiting_period', 'pre_auth_details', 'downgrade_to', 'payment_guideline', 'notes']
-            : ['pre_auth_required', 'notes'];
+            ? ['coverage_status', 'service_history', 'age_limit', 'waiting_period', 'payment_guideline', 'notes']
+            : ['notes'];
     }
 
     public static function normalizeFrequencyResponseFields(mixed $fields, ?string $mode): array
@@ -885,7 +905,7 @@ class VerificationFormQuestion extends Model
             $this->frequency_response_fields,
             $this->frequency_response_mode ?: 'current',
         );
-        $prompt = Str::lower(trim((string) $this->prompt));
+        $layout = $this->answer_layout ?: $this->inferredAnswerLayout();
         $configuration = [
             'primary_fields' => ['coverage_percent', 'frequency'],
             'detail_fields' => $detailFields,
@@ -897,7 +917,7 @@ class VerificationFormQuestion extends Model
             'required_when' => [],
         ];
 
-        if (str_contains($prompt, 'downgrade')) {
+        if ($layout === 'downgrade') {
             return array_replace($configuration, [
                 'primary_fields' => [],
                 'detail_fields' => ['downgrade_applies', 'downgrade_to'],
@@ -918,27 +938,23 @@ class VerificationFormQuestion extends Model
             ]);
         }
 
-        if ($this->section_key !== 'template_3_frequency_orthodontics') {
-            return $configuration;
-        }
-
-        if (str_contains($prompt, 'lifetime') && str_contains($prompt, 'maximum')) {
+        if ($layout === 'ortho_lifetime') {
             return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Lifetime maximum', 'Enter lifetime maximum');
         }
 
-        if (str_contains($prompt, 'remaining') && str_contains($prompt, 'maximum')) {
+        if ($layout === 'ortho_remaining') {
             return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Remaining maximum', 'Enter remaining maximum');
         }
 
-        if (str_contains($prompt, 'deductible')) {
+        if ($layout === 'ortho_deductible') {
             return $this->singleResponseConfiguration($configuration, 'payment_guideline', 'Orthodontic deductible', 'Enter deductible');
         }
 
-        if (str_contains($prompt, 'age') && str_contains($prompt, 'limit')) {
+        if ($layout === 'age_limit') {
             return $this->singleResponseConfiguration($configuration, 'age_limit', 'Age limit', 'Enter age limit');
         }
 
-        if (str_contains($prompt, 'initial') && str_contains($prompt, 'payment')) {
+        if ($layout === 'initial_payment') {
             return array_replace($configuration, [
                 'primary_fields' => ['coverage_percent'],
                 'detail_fields' => [],
@@ -947,7 +963,7 @@ class VerificationFormQuestion extends Model
             ]);
         }
 
-        if (str_contains($prompt, 'how') && str_contains($prompt, 'paid')) {
+        if ($layout === 'ortho_payment') {
             return array_replace($configuration, [
                 'primary_fields' => [],
                 'detail_fields' => ['payment_guideline', 'frequency'],
@@ -963,7 +979,7 @@ class VerificationFormQuestion extends Model
             ]);
         }
 
-        if (str_contains($prompt, 'work in progress')) {
+        if ($layout === 'work_in_progress') {
             return array_replace($configuration, [
                 'primary_fields' => [],
                 'detail_fields' => ['coverage_status'],
@@ -974,6 +990,40 @@ class VerificationFormQuestion extends Model
         }
 
         return $configuration;
+    }
+
+    public const ANSWER_LAYOUT_OPTIONS = [
+        'frequency' => 'Percentage, frequency and details',
+        'downgrade' => 'Downgrade decision and code',
+        'ortho_lifetime' => 'Orthodontic lifetime maximum',
+        'ortho_remaining' => 'Orthodontic remaining maximum',
+        'ortho_deductible' => 'Orthodontic deductible',
+        'age_limit' => 'Age limit',
+        'initial_payment' => 'Initial payment percentage',
+        'ortho_payment' => 'Dental / Medical and payment schedule',
+        'work_in_progress' => 'Work in progress covered',
+    ];
+
+    public function inferredAnswerLayout(): string
+    {
+        $prompt = Str::lower(trim((string) $this->prompt));
+        if (str_contains($prompt, 'downgrade')) return 'downgrade';
+        if ($this->section_key !== 'template_3_frequency_orthodontics') return 'frequency';
+        return match (true) {
+            str_contains($prompt, 'lifetime') && str_contains($prompt, 'maximum') => 'ortho_lifetime',
+            str_contains($prompt, 'remaining') && str_contains($prompt, 'maximum') => 'ortho_remaining',
+            str_contains($prompt, 'deductible') => 'ortho_deductible',
+            str_contains($prompt, 'age') && str_contains($prompt, 'limit') => 'age_limit',
+            str_contains($prompt, 'initial') && str_contains($prompt, 'payment') => 'initial_payment',
+            str_contains($prompt, 'how') && str_contains($prompt, 'paid') => 'ortho_payment',
+            str_contains($prompt, 'work in progress') => 'work_in_progress',
+            default => 'frequency',
+        };
+    }
+
+    public function frequencyCategory(): string
+    {
+        return $this->response_category ?: self::templateThreeFrequencyCategory($this->section_key);
     }
 
     public function missingFrequencyResponseFields(mixed $row): array
@@ -1123,7 +1173,17 @@ class VerificationFormQuestion extends Model
 
     public function getSelectOptionValues(): array
     {
-        return collect(preg_split('/\r\n|\r|\n/', (string) $this->select_options) ?: [])
+        $options = (string) $this->select_options;
+        if ($this->is_builtin && in_array($this->input_type, ['select', 'multi_select'], true)) {
+            $default = collect(\App\Support\VerificationTemplateThreeDefaults::questions())
+                ->firstWhere('field_key', $this->field_key)['select_options'] ?? null;
+            // Older seeded choices used commas; never split arbitrary custom wording.
+            if ($default && trim($options) === str_replace("\n", ', ', $default)) {
+                $options = $default;
+            }
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', $options) ?: [])
             ->map(fn (string $option): string => trim($option))
             ->filter()
             ->unique()

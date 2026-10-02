@@ -72,7 +72,7 @@
                 <table class="rows" width="100%">
                     @foreach ($section['rows'] as $row)
                         <tr>
-                            <td class="label">{{ $row['label'] }}</td>
+                            <td class="label">{{ $row['label'] }}@if(filled($row['code_tag_text'] ?? null))<br><small>{{ $row['code_tag_text'] }}</small>@endif</td>
                             <td class="value">{{ $row['value'] }}</td>
                         </tr>
                     @endforeach

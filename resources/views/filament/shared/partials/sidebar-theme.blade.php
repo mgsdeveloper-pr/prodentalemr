@@ -1383,6 +1383,58 @@
         }
     }
 
+    @media (max-width: 600px) {
+        .fi-topbar:has(.pd-appshell-global-header) {
+            height: auto !important;
+            padding: 0.5rem 0.75rem !important;
+        }
+
+        .pd-appshell-global-header {
+            position: relative !important;
+            height: auto !important;
+            min-height: 0 !important;
+            grid-template-columns: minmax(0, 1fr) !important;
+            gap: 0.5rem !important;
+        }
+
+        .pd-appshell-global-header__left {
+            gap: 0.5rem !important;
+        }
+
+        .pd-appshell-workspace-switcher {
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
+        }
+
+        .pd-appshell-workspace-switcher__summary {
+            width: 100% !important;
+            min-width: 0 !important;
+            justify-content: space-between !important;
+        }
+
+        .pd-appshell-global-header__utilities {
+            justify-self: start !important;
+            gap: 0.5rem !important;
+        }
+
+        .pd-appshell-global-header__utilities > .pd-appshell-icon-button {
+            flex: 0 0 2.5rem !important;
+        }
+
+        .pd-appshell-user-menu {
+            position: static !important;
+            margin-left: 0 !important;
+            padding-left: 0.5rem !important;
+        }
+
+        .pd-appshell-user-menu__panel {
+            inset-inline: 0 !important;
+            top: 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+    }
+
     /*
      * Sidebar brand area.
      * Anchors the navigation at the top with only the product identity.

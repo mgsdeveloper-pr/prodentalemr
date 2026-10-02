@@ -52,6 +52,8 @@ beforeEach(function () {
         'status' => true,
     ]);
 
+    seedWorkflowMaster();
+
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
         'location_name' => 'Main Location',
@@ -407,12 +409,13 @@ it('renders the clinic template builder as one focused workspace', function () {
     $this->actingAs($this->clinicUser);
     Filament::setCurrentPanel(Filament::getPanel('clinic'));
 
-    $component = Livewire::test(ListVerificationQuestions::class)
+    $published = app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $component = Livewire::withQueryParams(['version' => $published->id])->test(ListVerificationQuestions::class)
         ->assertSee('Clinic Template Builder')
         ->assertSee('Template Structure')
         ->assertSee('Frequency & Percentage')
-        ->assertSee('Create Draft to Reorder')
-        ->assertSee('Create Draft to Add Question')
+        ->assertSee('Create Draft')
+        ->assertSee('Read-only')
         ->assertSee('Form Preview')
         ->call('beginTemplateChange', 'reorder')
         ->assertSet('pendingBuilderAction', 'reorder')
@@ -432,7 +435,8 @@ it('continues add question and reorder actions inside a clinic draft', function 
     $this->actingAs($this->clinicUser);
     Filament::setCurrentPanel(Filament::getPanel('clinic'));
 
-    $component = Livewire::test(ListVerificationQuestions::class);
+    $published = app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $component = Livewire::withQueryParams(['version' => $published->id])->test(ListVerificationQuestions::class);
     $sectionKey = $component->instance()->getSelectedBuilderSection()['key'];
 
     $component
@@ -440,6 +444,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->call('beginTemplateChange', 'questions')
         ->assertSet('showCreateDraftModal', true)
         ->assertSee('Continue to Add Question')
+        ->set('draftName', 'Named Add Question Draft')
         ->call('submitCreateDraftVersion')
         ->assertHasNoErrors();
 
@@ -453,6 +458,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
 
     $component->assertRedirect(VerificationQuestionResource::getUrl('create', [
         'section' => $sectionKey,
+        'form' => 'full_form',
         'template_version_id' => $draft->id,
     ]));
 
@@ -493,7 +499,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
         ->where('prompt', 'Clinic action test question')
         ->firstOrFail();
 
-    $editUrl = Livewire::test(ListVerificationQuestions::class)
+    $editUrl = Livewire::withQueryParams(['version' => $draft->id])->test(ListVerificationQuestions::class)
         ->instance()
         ->getEditUrl($createdQuestion->id);
     parse_str((string) parse_url($editUrl, PHP_URL_QUERY), $editQuery);
@@ -505,6 +511,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
 
     $builderReturnUrl = VerificationQuestionResource::getUrl('index', [
         'draft' => '1',
+        'form' => 'full_form',
         'version' => $draft->id,
         'section' => $sectionKey,
     ]);
@@ -609,7 +616,7 @@ it('continues add question and reorder actions inside a clinic draft', function 
 
     expect($questions)->toHaveCount(2);
 
-    Livewire::test(ListVerificationQuestions::class)
+    Livewire::withQueryParams(['version' => $draft->id])->test(ListVerificationQuestions::class)
         ->call('selectBuilderSection', $reorderSectionKey)
         ->call('beginTemplateChange', 'reorder')
         ->assertSet('showDraft', true)
@@ -631,12 +638,13 @@ it('continues add question and reorder actions inside a clinic draft', function 
 
 it('deletes only unused clinic drafts and protects the active template', function () {
     $this->actingAs($this->clinicUser);
+    app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
     Livewire::test(VerificationSettings::class)
         ->call('createClinicTemplateDraft')
         ->assertSet('showCreateTemplateDraftModal', true)
         ->set('newClinicTemplateDraftData.template_name', 'Archive Test Clinic Template Draft')
-        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_BOTH)
+        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_FULL)
         ->set('newClinicTemplateDraftData.starting_point', 'active')
         ->call('submitCreateClinicTemplateDraft')
         ->assertHasNoErrors();
@@ -669,11 +677,15 @@ it('deletes only unused clinic drafts and protects the active template', functio
 
 it('lets clinics select the active published template from settings', function () {
     $this->actingAs($this->clinicUser);
+    app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    foreach (['view', 'update'] as $action) {
+        $this->clinicUser->givePermissionTo(Permission::findOrCreate('clinic.template_publishing.'.$action, 'web'));
+    }
 
     $component = Livewire::test(VerificationSettings::class)
         ->call('createClinicTemplateDraft')
         ->set('newClinicTemplateDraftData.template_name', 'Selectable Clinic Template Draft')
-        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_BOTH)
+        ->set('newClinicTemplateDraftData.form_type', VerificationTemplateVersion::FORM_TYPE_FULL)
         ->set('newClinicTemplateDraftData.starting_point', 'active')
         ->call('submitCreateClinicTemplateDraft')
         ->assertHasNoErrors();
@@ -685,6 +697,7 @@ it('lets clinics select the active published template from settings', function (
         ->latest('id')
         ->firstOrFail();
 
+    $draft->questions()->create(['template_key' => 'template_3', 'section_key' => 'template_3_verification_information', 'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'both', 'is_active' => true]);
     $component
         ->call('publishClinicTemplateDraft', $draft->id)
         ->assertHasNoErrors();
@@ -701,18 +714,20 @@ it('lets clinics select the active published template from settings', function (
     expect($component->instance()->getClinicTemplateOptions())
         ->toHaveKey($previousTemplate->getKey());
 
+    $originalShortId = $component->get('data.template_short_form_id');
+    expect($previousTemplate->id)->toBe($draft->id)
+        ->and($previousTemplate->is_active)->toBeFalse();
     $component
-        ->set('data.verification_template_version_id', $previousTemplate->getKey())
+        ->set('data.template_full_form_id', $previousTemplate->getKey())
         ->call('save')
+        ->assertSet('showActivationReview', true)
         ->assertHasNoErrors();
 
-    expect($previousTemplate->fresh()->is_active)->toBeTrue();
-    expect(VerificationTemplateVersion::query()
-        ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
-        ->where('clinic_id', $this->clinic->id)
-        ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
-        ->where('is_active', true)
-        ->count())->toBe(1);
+    expect($previousTemplate->fresh()->is_active)->toBeFalse();
+    $component->call('confirmActiveForms')->assertHasNoErrors();
+    expect($previousTemplate->fresh()->active_full_form)->toBeTrue()
+        ->and($previousTemplate->fresh()->active_short_form)->toBeFalse()
+        ->and(VerificationTemplateVersion::findOrFail($originalShortId)->active_short_form)->toBeTrue();
 });
 
 it('maps only visible selected clinic portal credentials into verification settings', function () {

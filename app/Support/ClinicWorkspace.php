@@ -151,6 +151,7 @@ class ClinicWorkspace
         return [
             'verification_requests',
             'template_management',
+            'template_publishing',
             'appointments',
             'portal_credentials',
             'calling',

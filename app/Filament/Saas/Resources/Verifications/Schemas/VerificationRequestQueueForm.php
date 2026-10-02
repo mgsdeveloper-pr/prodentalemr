@@ -405,7 +405,7 @@ class VerificationRequestQueueForm
                                 TextInput::make('vf_coverage_major_restorative')->label('Major Restorative %')->numeric()->suffix('%')->columnSpan(2),
                                 TextInput::make('vf_coverage_prosthodontics')->label('Prosthodontics %')->numeric()->suffix('%')->columnSpan(2),
                                 TextInput::make('vf_coverage_implant')->label('Implant %')->numeric()->suffix('%')->columnSpan(2),
-                                TextInput::make('vf_ortho_lifetime_maximum')->label('Orthodontics % / lifetime max')->columnSpan(2),
+                                TextInput::make('vf_ortho_benefit')->label('Orthodontics coverage %')->numeric()->minValue(0)->maxValue(100)->columnSpan(2),
                             ]),
                     ]),
 

@@ -96,8 +96,9 @@ class CreateVerificationRequest extends CreateRecord
         if ($this->urgencyReason !== '') {
             $this->record->recordActivity('verification_escalated', 'Urgent request raised at creation.', ['reason' => $this->urgencyReason]);
         }
-        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
+        $this->record->unsetRelation('verificationProfile');
+        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
         $this->record->verificationPlanSnapshots()->delete();
         $this->record->verificationPlanSnapshots()->createMany($this->verificationPlanSnapshotData);
         $this->record->recordActivity('verification_profile_saved', 'Structured verification details captured.');

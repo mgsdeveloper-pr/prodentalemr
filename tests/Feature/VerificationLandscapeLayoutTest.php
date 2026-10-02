@@ -65,3 +65,34 @@ it('accounts for multiline answers when balancing and preserves empty and single
     expect(VerificationLandscapeLayout::columns([])[0])->toBeEmpty();
     expect(VerificationLandscapeLayout::columns($sections->take(1))[0]->all())->toBe($sections->take(1)->all());
 });
+
+it('keeps the populated full form and its preview footer on one landscape page', function () {
+    $sections = collect([9, 11, 2, 5, 7, 5, 5, 11, 9, 13, 8, 5, 1])->map(
+        fn (int $count, int $index): array => [
+            'title' => 'Frequency & Percentage / Reviewed subsection '.$index,
+            'rows' => collect(range(1, $count))->map(fn (int $row): array => [
+                'label' => $index === 8 && $row === 3
+                    ? 'Scaling in presence of gingival inflammation (D4346) Share frequency (Yes/No)?'
+                    : 'Reviewed question '.$index.'-'.$row,
+                'value' => '-',
+            ])->all(),
+        ]
+    );
+    $html = view('pdf.verifications.custom-landscape', [
+        'sections' => $sections,
+        'workItem' => new BillingWorkItem(),
+        'state' => [
+            'vf_patient_full_name' => '-', 'vf_patient_dob' => null,
+            'vf_insurance_provider_name' => '-', 'vf_patient_identifier' => '-', 'vf_group_number' => '-',
+        ],
+        'summary' => [
+            'reference_number' => 'TEMPLATE PREVIEW', 'clinic_name' => 'Full Form - Section Layout Review',
+            'clinic_logo' => null, 'report_footer' => 'Template preview only - not a patient verification.',
+        ],
+    ])->render();
+    expect($html)->toContain('Reviewed question 12-1')
+        ->toContain('Template preview only - not a patient verification.');
+    $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape');
+    $pdf->render();
+    expect($pdf->getDomPDF()->getCanvas()->get_page_count())->toBe(1);
+});

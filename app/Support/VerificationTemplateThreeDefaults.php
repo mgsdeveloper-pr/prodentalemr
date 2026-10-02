@@ -141,7 +141,7 @@ class VerificationTemplateThreeDefaults
             ['Periodontics', 'vf_coverage_periodontics_deductible_applies', 'vf_coverage_periodontics', 40],
             ['Oral Surgery', 'vf_coverage_oral_surgery_deductible_applies', 'vf_coverage_oral_surgery', 50],
             ['Major Restorative', 'vf_coverage_major_restorative_deductible_applies', 'vf_coverage_major_restorative', 60],
-            ['Orthodontics', 'vf_coverage_orthodontics_deductible_applies', 'vf_ortho_lifetime_maximum', 70],
+            ['Orthodontics', 'vf_coverage_orthodontics_deductible_applies', 'vf_ortho_benefit', 70],
         ];
 
         return array_map(fn (array $row): array => [
@@ -260,7 +260,7 @@ class VerificationTemplateThreeDefaults
                 'field_key' => $question[1],
                 'input_type' => $question[2],
                 'sort_order' => $question[3],
-                'select_options' => $question[4] ?? null,
+                'select_options' => isset($question[4]) ? implode("\n", array_map('trim', explode(',', $question[4]))) : null,
                 'is_active' => $question[5] ?? true,
             ];
         }, $questions);

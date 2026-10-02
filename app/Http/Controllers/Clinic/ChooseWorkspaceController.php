@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Clinic;
 
 use App\Http\Controllers\Controller;
 use App\Support\ClinicWorkspace;
+use App\Support\ClinicPanelScope;
+use App\Support\ClinicNavigation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -25,6 +27,7 @@ class ChooseWorkspaceController extends Controller
 
         return view('clinic.choose-workspace', [
             'clinic' => $clinic,
+            'clinicOptions' => ClinicPanelScope::clinicOptions(),
             'canUseVerification' => ClinicWorkspace::canUse(ClinicWorkspace::VERIFICATION, $clinic),
             'canUseClinicPms' => ClinicWorkspace::canUse(ClinicWorkspace::CLINIC_PMS, $clinic),
         ]);
@@ -38,6 +41,7 @@ class ChooseWorkspaceController extends Controller
 
         ClinicWorkspace::select($workspace);
 
-        return redirect(ClinicWorkspace::homeUrl($workspace));
+        $target = session()->pull(ClinicNavigation::RETURN_KEY);
+        return redirect($target ? ClinicNavigation::enter($clinic, ClinicNavigation::destination($target)) : ClinicWorkspace::homeUrl($workspace));
     }
 }

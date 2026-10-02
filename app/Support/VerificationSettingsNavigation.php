@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Filament\Admin\Pages\ImportVerificationTemplate;
 use App\Filament\Admin\Pages\UserMailboxSettingsPage;
 use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationGeneralSettings;
@@ -35,6 +36,15 @@ class VerificationSettingsNavigation
         }
 
         $items = [];
+
+        if (ImportVerificationTemplate::canAccess()) {
+            $items[] = [
+                'key' => 'import-template',
+                'label' => 'Import Template',
+                'icon' => 'heroicon-o-arrow-up-tray',
+                'url' => ImportVerificationTemplate::getUrl(panel: 'admin'),
+            ];
+        }
 
         if (VerificationGeneralSettings::canAccess()) {
             $items[] = [

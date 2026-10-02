@@ -69,8 +69,8 @@ it('keeps clinic template building in one focused workspace', function (): void 
     $builderView = file_get_contents(resource_path('views/filament/clinic/resources/verification-questions/pages/list-verification-questions.blade.php'));
 
     expect($settingsView)
-        ->toContain('Open Builder')
-        ->toContain('View Structure')
+        ->toContain('Template Library')
+        ->toContain("\$row['is_draft'] && \$row['can_edit'] ? 'Edit Draft' : 'View'")
         ->not->toContain('>Add Question</a>')
         ->not->toContain('>Re-order</a>')
         ->and($builderView)

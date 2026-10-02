@@ -27,6 +27,9 @@ class CreateVerificationQuestion extends CreateRecord
     #[Url(as: 'template_version_id')]
     public ?int $requestedTemplateVersionId = null;
 
+    #[Url(as: 'form')]
+    public string $builderFormType = 'full_form';
+
     public function mount(): void
     {
         parent::mount();
@@ -73,7 +76,7 @@ class CreateVerificationQuestion extends CreateRecord
 
     public function getSectionCards(): array
     {
-        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), ClinicPanelScope::selectedClinicId()))
+        return collect(VerificationFormQuestion::sectionOptionsForTemplate($this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey(), ClinicPanelScope::selectedClinicId(), $this->requestedTemplateVersionId))
             ->map(fn (string $label, string $key): array => [
                 'key' => $key,
                 'label' => str_replace(' Snapshot', '', $label),
@@ -150,7 +153,7 @@ class CreateVerificationQuestion extends CreateRecord
     {
         $sectionKey = trim((string) ($this->requestedSectionKey ?: request()->query('section', '')));
         $templateKey = VerificationFormQuestion::defaultTemplateKey();
-        $sectionOptions = VerificationFormQuestion::sectionOptionsForTemplate($templateKey, ClinicPanelScope::selectedClinicId());
+        $sectionOptions = VerificationFormQuestion::sectionOptionsForTemplate($templateKey, ClinicPanelScope::selectedClinicId(), $this->requestedTemplateVersionId);
 
         if ($sectionKey === '' || ! array_key_exists($sectionKey, $sectionOptions)) {
             return;
@@ -160,6 +163,7 @@ class CreateVerificationQuestion extends CreateRecord
             $sectionKey,
             $templateKey,
             ClinicPanelScope::selectedClinicId(),
+            $this->requestedTemplateVersionId,
         );
 
         $this->data['template_key'] = $templateKey;
@@ -188,14 +192,16 @@ class CreateVerificationQuestion extends CreateRecord
 
         abort_unless($version?->canEditDirectly(), 403, 'Only an unused clinic template draft can be changed.');
         $data['template_version_id'] = $version->getKey();
+        if ($version->form_type !== 'both') $data['form_type'] = $version->form_type;
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);
         $data['section_key'] = filled($data['sub_section_key'] ?? null)
             ? $data['sub_section_key']
             : $data['section_key'];
         unset($data['sub_section_key']);
 
-        if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
+        if (($data['input_type'] ?? null) === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
             $data['input_type'] = 'frequency_row';
+            $data['answer_layout'] = $data['answer_layout'] ?? (new VerificationFormQuestion($data))->inferredAnswerLayout();
             $data['code'] = filled($data['code'] ?? null) ? $data['code'] : null;
             $data['frequency_response_mode'] = $data['frequency_response_mode'] ?: 'current';
             $data['frequency_response_fields'] = VerificationFormQuestion::normalizeFrequencyResponseFields(
@@ -261,6 +267,7 @@ class CreateVerificationQuestion extends CreateRecord
         return VerificationQuestionResource::getUrl('index', array_filter([
             'draft' => $versionId ? '1' : null,
             'version' => $versionId,
+            'form' => in_array($this->builderFormType, ['full_form', 'short_form'], true) ? $this->builderFormType : 'full_form',
             'section' => $sectionKey,
         ]));
     }

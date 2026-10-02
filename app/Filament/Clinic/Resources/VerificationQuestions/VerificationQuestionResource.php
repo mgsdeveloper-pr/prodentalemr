@@ -158,8 +158,8 @@ class VerificationQuestionResource extends Resource
                                                     $set('code', null);
                                                 }
                                             })
-                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
-                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->visible(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
+                                            ->required(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->columnSpan(3),
                                         Select::make('code')
                                             ->label('ADA/CDT Code')
@@ -185,43 +185,49 @@ class VerificationQuestionResource extends Resource
                                                 ->pluck('procedure_code', 'procedure_code')
                                                 ->all())
                                             ->getOptionLabelUsing(fn ($value): ?string => $value)
-                                            ->afterStateUpdated(function ($state, Set $set): void {
+                                            ->afterStateUpdated(function ($state, Set $set, Get $get): void {
                                                 $description = AdaProcedureCode::query()
                                                     ->active()
                                                     ->where('procedure_code', $state)
                                                     ->value('description');
 
-                                                if (filled($description)) {
+                                                if (blank($get('prompt')) && filled($description)) {
                                                     $set('prompt', $description);
                                                 }
                                             })
-                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                            ->visible(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
                                                 && $get('frequency_row_mode') === 'code')
-                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                            ->required(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
                                                 && $get('frequency_row_mode') === 'code')
                                             ->columnSpan(3),
                                         TextInput::make('prompt')
-                                            ->label(fn (Get $get): string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                            ->label(fn (Get $get): string => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
                                                 ? ($get('frequency_row_mode') === 'code' ? 'Description' : 'Question')
                                                 : 'Question text')
-                                            ->placeholder(fn (Get $get): string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
+                                            ->placeholder(fn (Get $get): string => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
                                                 ? ($get('frequency_row_mode') === 'code' ? 'Example: Regular Checkup' : 'Example: Is this service covered?')
                                                 : 'Example: Is there any waiting period on this plan?')
                                             ->live(onBlur: true)
                                             ->required()
                                             ->maxLength(255)
-                                            ->columnSpan(fn (Get $get): int => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')) ? 5 : 8),
+                                            ->columnSpan(fn (Get $get): int => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))) ? 5 : 8),
                                         Select::make('input_type')
                                             ->label('Answer type')
                                             ->options(VerificationFormQuestion::INPUT_TYPE_OPTIONS)
                                             ->default('text')
                                             ->required()
                                             ->live()
-                                            ->helperText(fn (Get $get): ?string => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))
-                                                ? 'Frequency rows always answer through %, Frequency, Pre-Auth, and Notes in the verification form.'
+                                            ->helperText(fn (Get $get): ?string => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                                ? 'Compound answer'
                                                 : null)
                                             ->native(false)
                                             ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->columnSpan(4),
+                                        Select::make('answer_layout')
+                                            ->label('Answer layout')
+                                            ->options(VerificationFormQuestion::ANSWER_LAYOUT_OPTIONS)
+                                            ->visible(fn (Get $get): bool => $get('input_type') === 'frequency_row')
+                                            ->native(false)
                                             ->columnSpan(4),
                                         Select::make('frequency_response_mode')
                                             ->label('Response option')
@@ -230,8 +236,8 @@ class VerificationQuestionResource extends Resource
                                             ->live()
                                             ->native(false)
                                             ->afterStateUpdated(fn ($state, Set $set) => $set('frequency_response_fields', VerificationFormQuestion::defaultFrequencyResponseFields($state)))
-                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
-                                            ->required(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->visible(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
+                                            ->required(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->columnSpan(4),
                                         CheckboxList::make('frequency_response_fields')
                                             ->label('Optional response fields')
@@ -239,13 +245,13 @@ class VerificationQuestionResource extends Resource
                                             ->options(fn (Get $get): array => VerificationFormQuestion::frequencyResponseFieldOptions($get('frequency_response_mode')))
                                             ->default(fn (Get $get): array => VerificationFormQuestion::defaultFrequencyResponseFields($get('frequency_response_mode')))
                                             ->columns(3)
-                                            ->visible(fn (Get $get): bool => VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->visible(fn (Get $get): bool => ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->columnSpan(12),
                                         TextInput::make('placeholder')
                                             ->label('Answer placeholder')
                                             ->placeholder('Example: Add waiting period note')
                                             ->maxLength(255)
-                                            ->visible(fn (Get $get): bool => ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                            ->visible(fn (Get $get): bool => ! ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->columnSpan(12),
                                         Textarea::make('select_options')
                                             ->label('Dropdown options')
@@ -253,9 +259,9 @@ class VerificationQuestionResource extends Resource
                                             ->helperText('Only used when the response type is Dropdown or Multi Response.')
                                             ->rows(5)
                                             ->visible(fn (Get $get): bool => in_array($get('input_type'), ['select', 'multi_select'], true)
-                                                && ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                                && ! ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->required(fn (Get $get): bool => in_array($get('input_type'), ['select', 'multi_select'], true)
-                                                && ! VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key')))
+                                                && ! ($get('input_type') === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($get('sub_section_key') ?: $get('section_key'))))
                                             ->columnSpan(12),
                                     ]),
                             ]),
@@ -471,7 +477,6 @@ class VerificationQuestionResource extends Resource
         return filled($clinic?->getKey())
             && (int) $record->clinic_id === (int) $clinic->getKey()
             && (auth()->user()?->canManageClinicTemplateSections($clinic) ?? false)
-            && ! (bool) $record->is_builtin
             && static::isEditableClinicTemplateVersion($record->templateVersion);
     }
 

@@ -54,6 +54,7 @@
 
             return [
                 'label' => $row['label'] ?? '-',
+                'tags' => $row['code_tag_text'] ?? '',
                 'value' => $value,
             ];
     };
@@ -98,9 +99,9 @@
                     $second = isset($rowPair[1]) ? $renderRow($rowPair[1]) : ['label' => '', 'value' => ''];
                 @endphp
                 <tr>
-                    <td width="31%">{{ $first['label'] }}</td>
+                    <td width="31%">{{ $first['label'] }}@if(filled($first['tags'] ?? null))<br><small>{{ $first['tags'] }}</small>@endif</td>
                     <td width="19%">{{ $first['value'] }}</td>
-                    <td width="31%">{{ $second['label'] }}</td>
+                    <td width="31%">{{ $second['label'] }}@if(filled($second['tags'] ?? null))<br><small>{{ $second['tags'] }}</small>@endif</td>
                     <td width="19%">{{ $second['value'] }}</td>
                 </tr>
             @endforeach

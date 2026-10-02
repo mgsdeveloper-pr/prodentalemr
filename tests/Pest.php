@@ -48,3 +48,13 @@ function something()
 {
     // ..
 }
+
+// Explicit historical master fixture for workflows that require a configured template.
+function seedWorkflowMaster(): \App\Models\VerificationTemplateVersion
+{
+    \App\Support\VerificationTemplateThreeDefaults::syncMasterQuestions();
+    $service = app(\App\Support\VerificationTemplateVersionService::class);
+    $master = $service->ensureMasterVersion();
+    $service->normalizeTemplateThreeVersion($master);
+    return $master;
+}

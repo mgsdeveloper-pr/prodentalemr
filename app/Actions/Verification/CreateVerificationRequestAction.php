@@ -60,10 +60,12 @@ class CreateVerificationRequestAction
         return $data;
     }
 
-    public function execute(array $data): BillingWorkItem
+    public function execute(array $data, array $profile = []): BillingWorkItem
     {
-        $workItem = BillingWorkItem::query()->create($this->prepareData($data));
-
-        return $this->templates->attachSnapshotToWorkItem($workItem);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $profile): BillingWorkItem {
+            $workItem = BillingWorkItem::query()->create($this->prepareData($data));
+            if ($profile) $workItem->verificationProfile()->create($profile);
+            return $this->templates->attachSnapshotToWorkItem($workItem);
+        });
     }
 }

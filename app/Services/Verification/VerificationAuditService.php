@@ -9,6 +9,23 @@ use Illuminate\Support\Collection;
 
 class VerificationAuditService
 {
+    public function visibleInAnswerState(VerificationFormQuestion $question, Collection $questions, array $state): bool
+    {
+        $seen = [];
+        while ($question->isConditionalQuestion()) {
+            if (isset($seen[$question->id])) return false;
+            $seen[$question->id] = true;
+            $parent = $questions->firstWhere('id', $question->parent_question_id);
+            if (! $parent) return false;
+            $field = $parent->is_builtin ? $parent->field_key : 'custom_question_'.$parent->id;
+            $value = $state[$field] ?? null;
+            if (! is_scalar($value) || ! $question->matchesTrigger($value)) return false;
+            $question = $parent;
+        }
+
+        return true;
+    }
+
     public function missingRequiredAnswers(BillingWorkItem $request): array
     {
         $request->load([

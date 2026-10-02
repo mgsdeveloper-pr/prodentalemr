@@ -48,6 +48,8 @@ beforeEach(function () {
         'status' => true,
     ]);
 
+    seedWorkflowMaster();
+
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
         'location_name' => 'Main Office',
@@ -125,7 +127,7 @@ beforeEach(function () {
         'patient_id' => $this->patient->id,
         'patient_insurance_policy_id' => $this->policy->id,
         'provider_id' => $this->provider->id,
-        'appointment_date' => today()->addDay(),
+        'appointment_date' => today()->next('Wednesday'),
         'start_time' => '09:00:00',
         'end_time' => '09:30:00',
         'status' => 'scheduled',
@@ -217,7 +219,7 @@ it('normalizes the selected clinic service into appointment data', function () {
         'clinic_operatory_id' => $this->operatory->id,
         'patient_id' => $this->patient->id,
         'provider_id' => $this->provider->id,
-        'appointment_date' => today()->addDays(2)->toDateString(),
+        'appointment_date' => today()->next('Tuesday')->toDateString(),
         'start_time' => '10:00:00',
         'end_time' => '10:45:00',
         'duration_minutes' => 45,

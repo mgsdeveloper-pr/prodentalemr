@@ -34,7 +34,7 @@ it('initializes a clinic scope when a SaaS administrator opens the clinic panel'
 
     $this->actingAs($admin)
         ->get('/clinic')
-        ->assertRedirect(route('clinic.choose-workspace'));
+        ->assertRedirect(url('/clinic/verification-requests'));
 
     expect(session(ClinicPanelScope::SESSION_KEY))->toBe($clinic->getKey());
 

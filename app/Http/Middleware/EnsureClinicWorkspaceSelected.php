@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Support\ClinicPanelScope;
 use App\Support\ClinicWorkspace;
+use App\Support\ClinicNavigation;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,24 +24,13 @@ class EnsureClinicWorkspaceSelected
             ? ClinicPanelScope::initializeFor($user)
             : ClinicWorkspace::clinicForUser($user);
 
-        if (! ClinicWorkspace::needsChoice($clinic)) {
-            $workspace = ClinicWorkspace::defaultWorkspace($clinic);
-
-            if ($workspace) {
-                ClinicWorkspace::select($workspace);
-            }
-
-            return $next($request);
+        if (! $clinic) {
+            if ($request->isMethod('GET')) session([ClinicNavigation::RETURN_KEY => ClinicNavigation::destination($request->fullUrl(), true)]);
+            return new \Illuminate\Http\RedirectResponse(route('clinic.choose-workspace'));
         }
-
-        $selected = ClinicWorkspace::selected();
-
-        if (! $selected || ! ClinicWorkspace::canUse($selected, $clinic)) {
-            return redirect()->route('clinic.choose-workspace');
-        }
-
-        if ($request->is('clinic') && $selected === ClinicWorkspace::VERIFICATION) {
-            return redirect(ClinicWorkspace::homeUrl(ClinicWorkspace::VERIFICATION));
+        $target = ClinicNavigation::enter($clinic, ClinicNavigation::destination($request->fullUrl()));
+        if ($target !== $request->fullUrl() && $request->isMethod('GET')) {
+            return new \Illuminate\Http\RedirectResponse($target);
         }
 
         return $next($request);

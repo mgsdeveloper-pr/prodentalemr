@@ -10,6 +10,10 @@
     @endphp
 
     <style>
+        .tb-page,.tb-page * { letter-spacing:0 !important; }
+        .tb-version-picker { display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:end;padding:14px 0;border-bottom:1px solid #dfe7f1; }
+        .tb-version-picker label { display:block;margin-bottom:6px;font-size:12px;font-weight:700; }
+        @media(max-width:760px){.tb-version-picker{grid-template-columns:1fr}}
         .tb-page { --tb-teal:#0f8f86; --tb-teal-dark:#08756f; --tb-navy:#101936; --tb-text:#334155; --tb-muted:#64748b; --tb-line:#dfe7f1; --tb-soft:#f7f9fc; display:grid; gap:16px; color:var(--tb-text); }
         .tb-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding:20px 22px; border:1px solid var(--tb-line); border-radius:8px; background:#fff; }
         .tb-eyebrow { color:var(--tb-teal-dark); font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
@@ -81,42 +85,66 @@
         .tb-confirm-value { color:var(--tb-navy); font-size:13px; font-weight:800; }
         .tb-confirm-note { margin:0; color:#52627a; font-size:12px; line-height:1.55; }
         .tb-field { display:grid; gap:6px; }
+        .tb-page { background:#fff; padding:20px; }
+        .tb-header { padding:0 0 16px;border:0;border-bottom:1px solid var(--tb-line);border-radius:0;background:#fff; }
+        .tb-tree { background:#fff; }
+        .tb-main { background:#fff; }
+        .tb-toolbar,.tb-filters,.tb-table th { background:#fff; }
+        .fi-main:has(.tb-page),.fi-page:has(.tb-page) { background:#fff; }
+        .tb-title { font-size:21px;overflow-wrap:anywhere; }
+        .tb-details summary { font-size:12px;font-weight:700;cursor:pointer;padding:8px 0; }
+        .tb-toolbar { flex-wrap:wrap; }
+        .tb-preview { background:#fff; }
+        .tb-preview .uel2-managed-question { display:grid;grid-template-columns:minmax(140px,1fr) minmax(0,1.5fr);gap:16px;padding:14px 0;border-bottom:1px solid var(--tb-line); }
+        .tb-preview .uel2-question-label { font-weight:700;font-size:13px; }
+        .tb-preview .uel2-question-help { font-size:12px;color:var(--tb-muted); }
+        .tb-preview input:not([type=radio]):not([type=checkbox]),.tb-preview select,.tb-preview textarea { min-width:0;width:100%;border:1px solid #cfd9e7;border-radius:6px;padding:8px;font-size:13px; }
+        .tb-preview .uel2-segmented,.tb-preview .uel2-input-addon { display:flex;align-items:center;gap:10px; }
+        .tb-preview .uel2-segmented label { display:flex;align-items:center;gap:5px; }
+        .tb-preview .uel2-choice-grid { display:grid;gap:8px; }
+        .tb-preview .uel2-benefit-table { width:100%;min-width:720px;border-collapse:collapse;font-size:12px; }
+        .tb-preview .uel2-benefit-table td,.tb-preview .uel2-benefit-table th { padding:8px;text-align:left;border:1px solid var(--tb-line); }
+        .tb-preview .uel2-benefit-table textarea { min-height:60px; }
+        @media(max-width:760px){.tb-preview .uel2-managed-question{grid-template-columns:1fr}}
+        @media(max-width:760px){.tb-page{padding:12px}}
         @media(max-width:1050px){ .tb-strip{grid-template-columns:repeat(2,minmax(0,1fr));}.tb-stat{border-bottom:1px solid var(--tb-line)}.tb-workspace{grid-template-columns:220px minmax(0,1fr)}.tb-filters{grid-template-columns:1fr 1fr}.tb-filters .tb-search{grid-column:1/-1} }
         @media(max-width:760px){ .tb-header{display:grid}.tb-actions{justify-content:flex-start}.tb-strip{grid-template-columns:1fr}.tb-stat{border-right:0}.tb-workspace{grid-template-columns:1fr}.tb-tree{border-right:0;border-bottom:1px solid var(--tb-line)}.tb-tree-list{max-height:280px;overflow:auto}.tb-toolbar{align-items:flex-start;flex-direction:column}.tb-filters{grid-template-columns:1fr}.tb-filters .tb-search{grid-column:auto}.tb-history-row{display:grid} }
     </style>
 
-    <div class="tb-page">
+    <div class="tb-page" x-data x-on:beforeunload.window="if ($wire.editorOpen && JSON.stringify($wire.editor) !== JSON.stringify($wire.originalEditor)) { $event.preventDefault(); $event.returnValue = ''; }">
         <section class="tb-header">
             <div>
                 <div class="tb-eyebrow">Clinic Template Builder</div>
-                <h2 class="tb-title">{{ $versionSummary['showing_draft'] ? $versionSummary['working_name'] : $versionSummary['active_name'] }}</h2>
-                <p class="tb-subtitle">Build the clinic verification form by section, manage clinic questions, confirm ordering, and preview the form before publishing.</p>
+                <h2 class="tb-title">{{ $versionSummary['displayed_name'] }}</h2>
+                <p class="tb-subtitle">{{ $selectedClinicName }} · {{ $versionSummary['displayed_form_type'] }} · {{ $versionSummary['displayed_version'] }} · {{ $versionSummary['displayed_status'] }}</p>
+                @if ($versionSummary['source_master'])<p class="tb-toolbar-meta">Source master: {{ $versionSummary['source_master'] }}</p>@endif
             </div>
             <div class="tb-actions">
-                <a href="{{ \App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']) }}" wire:navigate class="tb-button">Back to Templates</a>
+                <button type="button" wire:click="returnToTemplates" class="tb-button">Back to Templates</button>
                 @if ($selectedClinicName && $versionSummary['can_manage'])
-                    @if (! $versionSummary['has_draft'])
-                        <button type="button" class="tb-button tb-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled">Create Draft</button>
+                    @if (! $versionSummary['can_open_draft'])
+                        <button type="button" class="tb-button tb-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled">Create Draft From This Version</button>
                     @elseif (! $versionSummary['showing_draft'])
                         <button type="button" class="tb-button tb-button--primary" wire:click="openDraftVersion" wire:loading.attr="disabled">Open Draft</button>
                     @else
-                        <button type="button" class="tb-button" wire:click="closeDraftVersion">View Published</button>
-                        <button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion" wire:confirm="Publish this clinic template draft?" wire:loading.attr="disabled">Publish Draft</button>
+                        @if ($this->canPublishSelectedTemplate())
+                            <button type="button" class="tb-button tb-button--primary" wire:click="reviewPublishing" wire:loading.attr="disabled">Review &amp; Publish</button>
+                        @endif
                     @endif
                 @endif
             </div>
         </section>
 
         @if ($selectedClinicName)
-            <section class="tb-strip">
+            <details class="tb-details"><summary>Version Details</summary><section class="tb-strip">
                 <div class="tb-stat"><div class="tb-label">Clinic</div><div class="tb-value">{{ $selectedClinicName }}</div></div>
                 <div class="tb-stat"><div class="tb-label">Template ID</div><div class="tb-value">{{ $versionSummary['template_id'] }}</div></div>
-                <div class="tb-stat"><div class="tb-label">Status</div><div class="tb-value"><span class="tb-pill {{ $versionSummary['showing_draft'] ? 'tb-pill--draft' : '' }}">{{ $versionSummary['showing_draft'] ? 'Draft' : 'Published & Active' }}</span></div></div>
-                <div class="tb-stat"><div class="tb-label">Form Type</div><div class="tb-value">{{ $versionSummary['showing_draft'] ? $versionSummary['working_form_type'] : $versionSummary['active_form_type'] }}</div></div>
+                <div class="tb-stat"><div class="tb-label">Status</div><div class="tb-value"><span class="tb-pill {{ $versionSummary['showing_draft'] ? 'tb-pill--draft' : '' }}">{{ $versionSummary['displayed_status'] }}</span></div></div>
+                <div class="tb-stat"><div class="tb-label">Form Type</div><div class="tb-value">{{ $versionSummary['displayed_form_type'] }}</div></div>
                 <div class="tb-stat"><div class="tb-label">Structure</div><div class="tb-value">{{ $builderCounts['main_sections'] }} main / {{ $builderCounts['sub_sections'] }} sub / {{ $builderCounts['active_questions'] }}/{{ $builderCounts['questions'] }} active</div></div>
-            </section>
+            </section></details>
 
-            <div class="tb-notice"><span class="tb-notice-dot"></span><span><strong>{{ $versionSummary['showing_draft'] ? 'Draft editing is active.' : 'Published template is protected.' }}</strong> {{ $versionSummary['showing_draft'] ? 'Clinic changes remain isolated until this draft is published.' : 'Create or open a draft to add, edit, or reorder clinic questions. Existing verification snapshots never change automatically.' }}</span></div>
+            @if ($versionSummary['lock_reason'])<div class="tb-notice"><span class="tb-notice-dot"></span><span>{{ $versionSummary['lock_reason'] }}</span></div>@endif
 
             <section class="tb-workspace">
                 <aside class="tb-tree">
@@ -140,25 +168,37 @@
 
                 <div class="tb-main">
                     <div class="tb-toolbar">
-                        <div><div class="tb-toolbar-title">{{ $selectedSection['title'] ?? 'Template Questions' }}</div><div class="tb-toolbar-meta">{{ $builderQuestions->count() }} matching questions · {{ $versionSummary['showing_draft'] ? 'Draft workspace' : 'Published review' }}</div></div>
+                        <div>
+                            <div class="tb-toolbar-title">{{ $builderView === 'preview' ? 'Complete Form Preview' : ($selectedSection['title'] ?? 'Template Questions') }}</div>
+                            <div class="tb-toolbar-meta">
+                                @if ($builderView === 'preview')
+                                    {{ $builderFormType === 'short_form' ? 'Short Form' : 'Full Form' }} · {{ count($this->getPreviewQuestions()) }} visible questions
+                                @else
+                                    {{ $builderQuestions->count() }} matching questions
+                                @endif
+                                · {{ $versionSummary['showing_draft'] ? 'Draft workspace' : 'Read-only' }}
+                            </div>
+                        </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button><button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">{{ $versionSummary['showing_draft'] ? 'Reorder' : 'Create Draft to Reorder' }}</button><button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
-                            @if ($selectedSection)
+                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button>@if ($versionSummary['showing_draft'])<button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">Reorder</button>@endif<button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
+                            @if ($selectedSection && $builderView !== 'preview')
                                 @if ($versionSummary['showing_draft'])
-                                    <a href="{{ $this->getCreateUrl($selectedSection['key']) }}" wire:navigate class="tb-button tb-button--primary">Add Question</a>
-                                @elseif ($versionSummary['can_manage'])
-                                    <button type="button" wire:click="beginTemplateChange('questions')" wire:loading.attr="disabled" class="tb-button tb-button--primary">Create Draft to Add Question</button>
+                                    <button type="button" wire:click="editInlineQuestion" class="tb-button tb-button--primary">Add Question</button>
+                                    <button type="button" wire:click="requestRemoval" class="tb-icon-button" title="Remove selected section" aria-label="Remove selected section"><x-filament::icon icon="heroicon-o-trash" class="h-4 w-4" /></button>
+                                    <button type="button" class="tb-button" wire:click="openSectionUpload"><x-filament::icon icon="heroicon-o-arrow-up-tray" class="h-4 w-4" /> Upload Questions</button>
                                 @endif
                             @endif
                         </div>
                     </div>
 
-                    <div class="tb-filters">
+                    @if ($builderView !== 'preview')
+                    <fieldset class="tb-filters" @disabled($editorOpen)>
                         <input type="search" wire:model.live.debounce.250ms="questionSearch" class="tb-input tb-search" placeholder="Search questions in this section">
                         <select wire:model.live="questionStatus" class="tb-select" aria-label="Question status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
                         <select wire:model.live="questionOwnership" class="tb-select" aria-label="Question ownership"><option value="all">All questions</option><option value="system">Inherited from Master</option><option value="clinic">Added by Clinic</option></select>
                         <button type="button" wire:click="clearQuestionFilters" class="tb-button">Clear</button>
-                    </div>
+                    </fieldset>
+                    @endif
 
                     @if ($builderView === 'reorder')
                         <div class="tb-reorder-note"><span><strong>Reorder {{ $selectedSection['title'] ?? 'questions' }}</strong><br>Use the arrow controls to move each question. Changes remain inside the draft until it is published.</span><button type="button" wire:click="setBuilderView('questions')" class="tb-button">Done</button></div>
@@ -172,6 +212,7 @@
                             @empty<tr><td colspan="3"><div class="tb-empty">No questions are available to reorder in this section.</div></td></tr>@endforelse
                         </tbody></table></div>
                     @elseif ($builderView === 'questions')
+                        @if ($editorOpen && ! $editingQuestionId) @include('filament.clinic.resources.verification-questions.pages.inline-question-editor') @endif
                         <div class="tb-table-wrap"><table class="tb-table"><thead><tr><th style="width:48%">Question</th><th style="width:14%">Form</th><th style="width:14%">Answer</th><th style="width:10%">Status</th><th style="width:14%;text-align:right">Actions</th></tr></thead><tbody>
                             @forelse ($builderQuestions as $question)
                                 <tr>
@@ -179,21 +220,33 @@
                                     <td>{{ $question['form_type'] }}</td><td>{{ $question['input_type'] }}</td><td><span class="tb-pill {{ $question['is_active'] ? '' : 'tb-pill--draft' }}">{{ $question['is_active'] ? 'Active' : 'Inactive' }}</span></td>
                                     <td><div class="tb-row-actions">
                                         @if ($versionSummary['showing_draft'])
-                                            @if (! $question['is_builtin'])<a href="{{ $this->getEditUrl($question['id']) }}" wire:navigate class="tb-icon-button" title="Edit question">Edit</a><button type="button" class="tb-icon-button" title="Delete question" wire:click="deleteQuestion({{ $question['id'] }})" wire:confirm="Delete this clinic question?">×</button>@else<span class="tb-mini tb-mini--system">Locked</span>@endif
+                                            <button type="button" wire:click="editInlineQuestion({{ $question['id'] }})" class="tb-icon-button" title="Edit question">Edit</button>
+                                            <button type="button" class="tb-icon-button" title="Remove question" aria-label="Remove {{ $question['prompt'] }}" wire:click="requestRemoval({{ $question['id'] }})"><x-filament::icon icon="heroicon-o-trash" class="h-4 w-4" /></button>
                                         @else<span class="tb-mini">Read-only</span>@endif
                                     </div></td>
                                 </tr>
-                            @empty<tr><td colspan="5"><div class="tb-empty">No questions match this section and filter.{{ $versionSummary['showing_draft'] ? ' Add a clinic question here or clear the filters.' : '' }}</div></td></tr>@endforelse
+                                @if ($editorOpen && $editingQuestionId === $question['id'])<tr><td colspan="5">@include('filament.clinic.resources.verification-questions.pages.inline-question-editor')</td></tr>@endif
+                            @empty<tr><td colspan="5"><div class="tb-empty">{{ count($selectedSection['children'] ?? []) ? 'Select a subsection to view its questions.' : 'No questions match this section and filter.' }}</div></td></tr>@endforelse
                         </tbody></table></div>
                     @else
                         <div class="tb-preview">
-                            @forelse ($builderQuestions->where('is_active', true) as $question)
-                                <div class="tb-preview-row"><div class="tb-preview-label">{{ $question['prompt'] }}</div>
-                                    @if (in_array($question['input_type'], ['Checkbox', 'Boolean', 'Toggle'], true))<label style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:11px;"><input type="checkbox" disabled> Yes</label>
-                                    @elseif ($question['input_type'] === 'Textarea')<div class="tb-preview-control" style="min-height:66px;">Response</div>
-                                    @elseif (in_array($question['input_type'], ['Dropdown', 'Select'], true))<div class="tb-preview-control">Select an option</div>
-                                    @else<div class="tb-preview-control">{{ $question['input_type'] }} response</div>@endif
-                                </div>
+                            <span class="tb-label">Form Preview</span>
+                            @php
+                                $templateThreeInput = 'width:100%;min-width:0;';
+                                $templateThreeReadonly = $templateThreeInput;
+                                $templateThreeFrequencyFieldLabels = array_merge(\App\Models\VerificationFormQuestion::FREQUENCY_BASE_RESPONSE_FIELDS, \App\Models\VerificationFormQuestion::FREQUENCY_CURRENT_OPTIONAL_FIELDS, \App\Models\VerificationFormQuestion::FREQUENCY_ADVANCED_OPTIONAL_FIELDS);
+                                $templateThreeFrequencySelectFields = ['coverage_status' => ['' => 'Select status', 'Covered' => 'Covered', 'Not Covered' => 'Not Covered', 'Conditional' => 'Conditional'], 'pre_auth_required' => ['' => 'Select pre-auth', 'Yes' => 'Yes', 'No' => 'No'], 'downgrade_applies' => ['' => 'Select downgrade', 'Yes' => 'Yes', 'No' => 'No']];
+                                $templateThreeFrequencyTextareaFields = ['payment_guideline', 'notes'];
+                                $templateThreeFrequencyPlaceholders = $templateThreeFrequencyFieldLabels;
+                            @endphp
+                            @php $previewSection = null; @endphp
+                            @forelse ($this->getPreviewQuestions() as $question)
+                                @if ($previewSection !== $question['section'])<h3 class="tb-toolbar-title">{{ $question['section'] }}</h3>@php $previewSection = $question['section']; @endphp @endif
+                                @if ($question['type'] === 'frequency_row')
+                                    <div style="overflow:auto">@include('filament.saas.resources.verifications.pages.partials.template-3-benefit-table', ['benefitRows' => [['index' => $question['id'], 'row' => $codeCoverageData[$question['id']] ?? []]]])</div>
+                                @else
+                                    @include('filament.saas.resources.verifications.pages.partials.template-3-managed-question-row')
+                                @endif
                             @empty<div class="tb-empty">No active questions are available for preview.</div>@endforelse
                         </div>
                     @endif
@@ -203,19 +256,78 @@
             <details class="tb-history"><summary><span>Previous Template Versions</span><span style="color:#64748b;font-size:11px;">{{ count($templateVersionHistory) }} records</span></summary><div class="tb-history-list">
                 @forelse ($templateVersionHistory as $version)<div class="tb-history-row"><span><strong style="color:var(--tb-navy)">{{ $version['name'] }}</strong> · {{ $version['status'] }} · {{ $version['form_type'] }}</span><span>{{ $version['published_at'] ? 'Published '.$version['published_at'] : 'Not published' }}</span></div>@empty<div class="tb-empty">No previous versions are available.</div>@endforelse
             </div></details>
+            <details class="tb-history"><summary>Import History</summary><div class="tb-history-list">
+                @forelse ($this->getImportHistory() as $receipt)
+                    <div class="tb-history-row"><span>{{ $receipt->question_count }} questions imported</span><span>{{ $receipt->created_at?->format('d M Y H:i') }}</span></div>
+                @empty<div class="tb-empty">No recorded imports for this version.</div>@endforelse
+            </div></details>
         @else
             <div class="tb-empty" style="border:1px dashed #cbd5e1;border-radius:8px;background:#fff;">Select a clinic from Clinic Scope to manage its template.</div>
         @endif
 
+        @if ($showUnsaved)
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-label="Unsaved question"><div class="tb-modal"><div class="tb-modal-head"><h3>Unsaved question changes</h3></div><div class="tb-modal-body">@foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="resolveUnsaved('stay')">Stay</button><button class="tb-button" wire:click="resolveUnsaved('discard')">Discard</button><button class="tb-button tb-button--primary" wire:click="resolveUnsaved('save')">Save &amp; Continue</button></div></div></div>
+        @endif
+        @if ($showRemoval)
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-label="Review removal"><div class="tb-modal"><div class="tb-modal-head"><h3>Remove from this draft?</h3></div><div class="tb-modal-body"><p>{{ count($removalSections) }} sections and {{ count($removalIds) }} questions affected. Existing requests and published versions remain unchanged.</p>@foreach ($removalLabels as $label)<div>{{ $label }}</div>@endforeach @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="$set('showRemoval', false)">Cancel</button><button class="tb-button" wire:click="confirmRemoval">Remove From Draft</button></div></div></div>
+        @endif
+        @if ($showPublishReview)
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="publish-review-title">
+                <div class="tb-modal">
+                    <div class="tb-modal-head"><h3 id="publish-review-title">Review publication</h3><button type="button" class="tb-icon-button" wire:click="$set('showPublishReview', false)" aria-label="Close publication review">×</button></div>
+                    <div class="tb-modal-body">
+                        <strong>{{ $versionSummary['displayed_name'] }}</strong>
+                        <span>{{ $selectedClinicName }} · {{ $versionSummary['displayed_form_type'] }} · {{ $versionSummary['displayed_version'] }}</span>
+                        <span>{{ $builderCounts['main_sections'] }} sections · {{ $builderCounts['sub_sections'] }} subsections · {{ $builderCounts['active_questions'] }} active questions</span>
+                        @foreach ($publishReview['labels'] ?? [] as $form => $label)
+                            <p>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }} currently active: {{ $label }}</p>
+                        @endforeach
+                        <p>Publish keeps the active forms unchanged. Publish &amp; Activate replaces the forms listed above for new requests only.</p>
+                        @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
+                    </div>
+                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="$set('showPublishReview', false)">Back to Builder</button><button type="button" class="tb-button" wire:click="publishDraftVersion" wire:loading.attr="disabled">Publish</button><button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion([], true)" wire:loading.attr="disabled">Publish &amp; Activate</button></div>
+                </div>
+            </div>
+        @endif
         @if ($showCreateDraftModal)
             <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="draft-confirm-title" x-on:keydown.escape.window="$wire.closeCreateDraftModal()"><form wire:submit.prevent="submitCreateDraftVersion" class="tb-modal" style="width:min(520px,100%);">
-                <div class="tb-modal-head"><div><div id="draft-confirm-title" class="tb-title" style="font-size:19px;">Create an editable copy?</div><div class="tb-subtitle">The published clinic template cannot be changed directly.</div></div><button type="button" class="tb-icon-button" wire:click="closeCreateDraftModal" aria-label="Close">×</button></div>
+                <div class="tb-modal-head"><div><div id="draft-confirm-title" class="tb-title" style="font-size:19px;">Create an editable copy?</div><div class="tb-subtitle">{{ $versionSummary['displayed_name'] }} · {{ $versionSummary['displayed_version'] }}</div></div><button type="button" class="tb-icon-button" wire:click="closeCreateDraftModal" aria-label="Close">×</button></div>
                 <div class="tb-modal-body">
+                    <div class="tb-field"><label for="draft-name" class="tb-label">Template name</label><input id="draft-name" class="tb-input" wire:model="draftName" maxlength="255" required>@error('draftName')<span>{{ $message }}</span>@enderror</div>
+                    @foreach ($this->getSourceDrafts() as $existingDraft)
+                        <button type="button" class="tb-button" wire:click="continueSourceDraft({{ $existingDraft->id }})">Continue Existing Draft: {{ $existingDraft->name }} · v{{ $existingDraft->version_number }}</button>
+                    @endforeach
                     <p class="tb-confirm-note">A protected working draft will be created automatically. Existing verification requests, completed forms, and historical snapshots will remain unchanged.</p>
+                    @if (! $versionSummary['uses_section_layout'])<label style="display:flex;gap:8px;align-items:center;margin-block:16px"><input type="checkbox" wire:model.live="structuredLayout"> Use section and subsection layout</label>@endif
+                    <div class="tb-label">{{ $builderFormType === 'short_form' ? 'Short Form' : 'Full Form' }}</div>
                     <div class="tb-confirm-box"><span class="tb-confirm-label">Continue with</span><span class="tb-confirm-value">{{ $pendingBuilderAction === 'reorder' ? 'Reorder questions' : ($pendingBuilderAction === 'questions' ? 'Add question to '.($selectedSection['title'] ?? 'selected section') : 'Edit clinic template') }}</span></div>
                 </div>
                 <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeCreateDraftModal" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion" autofocus><span wire:loading.remove wire:target="submitCreateDraftVersion">{{ $pendingBuilderAction === 'reorder' ? 'Continue to Reorder' : ($pendingBuilderAction === 'questions' ? 'Continue to Add Question' : 'Create Working Draft') }}</span><span wire:loading wire:target="submitCreateDraftVersion">Preparing draft...</span></button></div>
             </form></div>
+        @endif
+
+        @if ($showSectionUpload)
+            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="section-upload-title">
+                <div class="tb-modal">
+                    <div class="tb-modal-head"><h3 id="section-upload-title" class="tb-toolbar-title">Upload Questions</h3><button type="button" class="tb-icon-button" wire:click="$set('showSectionUpload', false)" aria-label="Close upload">×</button></div>
+                    <div class="tb-modal-body">
+                        <strong>{{ $selectedSection['title'] ?? '' }} · {{ $builderFormType === 'short_form' ? 'Short' : 'Full' }} · {{ $versionSummary['displayed_version'] }}</strong>
+                        <button type="button" class="tb-button" wire:click="downloadSectionSample"><x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-4 w-4" /> Download Section CSV</button>
+                        <label class="tb-field">XLSX / CSV<input type="file" wire:model="upload" accept=".xlsx,.csv"></label>
+                        @error('upload')<span role="alert" style="color:#b91c1c">{{ $message }}</span>@enderror
+                        <button type="button" class="tb-button" wire:click="reviewSectionUpload" wire:loading.attr="disabled">Review Upload</button>
+                        @foreach ($sectionUploadErrors as $error)<p role="alert" style="color:#b91c1c">{{ $error }}</p>@endforeach
+                        @if ($sectionUploadRows)
+                            <div style="max-height:260px;overflow:auto"><table class="tb-table" style="min-width:0"><thead><tr><th>Question</th><th>Answer Type</th></tr></thead><tbody>
+                                @foreach ($sectionUploadRows as $row)<tr><td>{{ $row['question'] }}</td><td>{{ \App\Models\VerificationFormQuestion::INPUT_TYPE_OPTIONS[$row['answer_type']] ?? $row['answer_type'] }}</td></tr>@endforeach
+                            </tbody></table></div>
+                            <label><input type="checkbox" wire:model="confirmSectionUpload"> Add these {{ count($sectionUploadRows) }} questions to this draft.</label>
+                            @error('confirmSectionUpload')<span role="alert">{{ $message }}</span>@enderror
+                        @endif
+                    </div>
+                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="$set('showSectionUpload', false)">Cancel</button><button type="button" class="tb-button tb-button--primary" wire:click="saveSectionUpload" wire:loading.attr="disabled" @disabled(! $sectionUploadRows)>Add to Draft</button></div>
+                </div>
+            </div>
         @endif
 
         @if ($showTemplateSectionModal)

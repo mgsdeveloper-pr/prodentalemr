@@ -25,7 +25,7 @@
         .pane-pad-right { padding-left: 3px; }
         .sheet { border: 1px solid #aebdca; }
         .sheet th { background: #dff3ee; color: #075f56; text-align: center; font-weight: 700; padding: 1.8px 3px; border-bottom: 1px solid #b8d8d2; }
-        .sheet td { padding: 1.5px 3px; border-right: 1px solid #e1e8ee; border-bottom: 1px solid #e1e8ee; vertical-align: top; }
+        .sheet td { padding: 1.2px 3px; border-right: 1px solid #e1e8ee; border-bottom: 1px solid #e1e8ee; vertical-align: top; }
         .sheet tr:last-child td { border-bottom: none; }
         .sheet td:last-child { border-right: none; }
         .label { width: 60%; font-weight: 700; color: #102033; }
@@ -62,7 +62,8 @@
             $value = $row['value'] ?? '-';
             $valueClass = in_array($value, ['-', '- | -'], true) ? 'value empty' : 'value';
 
-            return '<tr><td class="label">' . e($row['label'] ?? '-') . '</td><td' . ($hasCoverage ? ' colspan="2"' : '') . ' class="' . $valueClass . '">' . e($value) . '</td></tr>';
+            $tags = filled($row['code_tag_text'] ?? null) ? '<br><small>'.e($row['code_tag_text']).'</small>' : '';
+            return '<tr><td class="label">' . e($row['label'] ?? '-') . $tags . '</td><td' . ($hasCoverage ? ' colspan="2"' : '') . ' class="' . $valueClass . '">' . e($value) . '</td></tr>';
             })->implode('');
 
             if ($hasCoverage) {

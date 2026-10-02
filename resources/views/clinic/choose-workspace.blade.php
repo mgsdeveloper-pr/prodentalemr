@@ -14,11 +14,23 @@
                     {{ $clinic?->clinic_name ?: 'Clinic Workspace' }}
                 </div>
                 <h1 style="margin: 14px 0 0; font-size: clamp(32px, 5vw, 46px); line-height: 1.05; font-weight: 850; letter-spacing: 0; color: #0f172a;">
-                    Choose Workspace
+                    {{ $clinic ? 'Choose Workspace' : 'Select Clinic' }}
                 </h1>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;">
+            @if (! $clinic || (! $canUseVerification && ! $canUseClinicPms))
+                <form method="GET" action="{{ route('clinic.clinic-scope') }}" style="background:white;padding:24px;border:1px solid #dbe4e8;border-radius:8px;">
+                    <label for="entry-clinic">Clinic</label>
+                    <select id="entry-clinic" name="clinic_id" required style="display:block;width:100%;margin:12px 0;padding:12px;border:1px solid #cbd5e1;border-radius:6px;">
+                        <option value="">Select a clinic</option>
+                        @foreach ($clinicOptions as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach
+                    </select>
+                    <button type="submit" style="background:#087f79;color:white;padding:10px 20px;border:0;border-radius:6px;">Continue</button>
+                    @if (empty($clinicOptions))<p>No clinics are available for your account.</p>@endif
+                </form>
+                @if ($clinic)<p>No workspace is enabled for this clinic. Select another clinic or contact your administrator.</p>@endif
+            @endif
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 18px;">
                 @if ($canUseVerification)
                     <form method="POST" action="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::VERIFICATION]) }}">
                         @csrf

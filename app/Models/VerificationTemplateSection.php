@@ -26,6 +26,7 @@ class VerificationTemplateSection extends Model
         'is_builtin',
         'is_locked_by_admin',
         'is_active',
+        'allow_empty',
     ];
 
     protected function casts(): array
@@ -36,6 +37,7 @@ class VerificationTemplateSection extends Model
             'is_builtin' => 'boolean',
             'is_locked_by_admin' => 'boolean',
             'is_active' => 'boolean',
+            'allow_empty' => 'boolean',
             'sort_order' => 'integer',
         ];
     }

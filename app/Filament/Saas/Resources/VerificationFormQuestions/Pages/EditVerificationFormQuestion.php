@@ -90,18 +90,22 @@ class EditVerificationFormQuestion extends EditRecord
 
     public function getCancelUrl(): string
     {
-        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->record?->template_version_id]);
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->record?->template_version_id, 'section' => $this->record?->section_key]);
     }
 
     protected function afterFill(): void
     {
         $this->originalSectionKey = $this->record?->section_key;
+        if ($this->record?->input_type === 'frequency_row') {
+            $this->data['answer_layout'] = $this->record->answer_layout ?: $this->record->inferredAnswerLayout();
+        }
 
         $clinicId = filled($this->data['clinic_id'] ?? null) ? (int) $this->data['clinic_id'] : $this->record?->clinic_id;
         $parentSectionKey = VerificationFormQuestion::parentSectionKeyFor(
             $this->record?->section_key,
             $this->record?->template_key,
             $clinicId,
+            $this->record?->template_version_id,
         );
 
         if (filled($parentSectionKey)) {
@@ -109,7 +113,7 @@ class EditVerificationFormQuestion extends EditRecord
             $this->data['sub_section_key'] = $this->record?->section_key;
         }
 
-        if (VerificationFormQuestion::isFrequencyPercentageSection($this->record?->section_key)) {
+        if ($this->record?->input_type === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($this->record?->section_key)) {
             $this->data['frequency_row_mode'] = filled($this->record?->code) ? 'code' : 'question';
             $this->data['frequency_response_mode'] = $this->record?->frequency_response_mode ?: 'current';
             $this->data['frequency_response_fields'] = VerificationFormQuestion::normalizeFrequencyResponseFields(
@@ -136,8 +140,9 @@ class EditVerificationFormQuestion extends EditRecord
             : $data['section_key'];
         unset($data['sub_section_key']);
 
-        if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
+        if (($data['input_type'] ?? null) === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
             $data['input_type'] = 'frequency_row';
+            $data['answer_layout'] = $data['answer_layout'] ?? (new VerificationFormQuestion($data))->inferredAnswerLayout();
             $data['question_kind'] = VerificationFormQuestion::QUESTION_KIND_NORMAL;
             $data['parent_question_id'] = null;
             $data['trigger_answer'] = null;

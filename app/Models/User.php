@@ -1258,6 +1258,19 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             );
     }
 
+    public function canPublishVerificationTemplate(?Clinic $clinic = null): bool
+    {
+        if (! $this->status) return false;
+        if ($this->isSaasAdmin()) return true;
+        if (! $clinic) {
+            return $this->canPerformSaasModuleAction('template_publishing', 'update');
+        }
+        return ((int) $this->clinic_id === (int) $clinic->id
+                && $this->canPerformClinicModuleAction('template_publishing', 'update'))
+            || ($this->canAccessVerificationClinic($clinic->id)
+                && $this->canPerformVerificationModuleAction('template_publishing', 'update'));
+    }
+
     public function canManageVerificationNotifications(): bool
     {
         return $this->canManageVerificationSettings();

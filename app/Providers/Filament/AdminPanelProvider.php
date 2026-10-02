@@ -93,6 +93,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
+                \App\Filament\Admin\Pages\ImportVerificationTemplate::class,
                 Dashboard::class,
                 DocumentCenter::class,
                 UserMailboxPage::class,

@@ -15,6 +15,16 @@ class Clinic extends Model
 {
     use HasPublicId, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::created(function (self $clinic): void {
+            if (\Illuminate\Support\Facades\Schema::hasTable('verification_template_versions')
+                && \Illuminate\Support\Facades\Schema::hasColumn('verification_template_versions', 'active_full_form')) {
+                app(\App\Support\VerificationTemplateVersionService::class)->provisionRegisteredClinic($clinic);
+            }
+        });
+    }
+
     protected $fillable = [
         'organization_id',
         'clinic_name',

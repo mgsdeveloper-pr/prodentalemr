@@ -126,7 +126,7 @@ class CreateVerificationFormQuestion extends CreateRecord
 
     public function getCancelUrl(): string
     {
-        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->templateVersionId]);
+        return VerificationFormQuestionResource::getUrl(parameters: ['version' => $this->templateVersionId, 'section' => $this->record?->section_key]);
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array
@@ -145,8 +145,9 @@ class CreateVerificationFormQuestion extends CreateRecord
             : $data['section_key'];
         unset($data['sub_section_key']);
 
-        if (VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
+        if (($data['input_type'] ?? null) === 'frequency_row' || VerificationFormQuestion::isFrequencyPercentageSection($data['section_key'] ?? null)) {
             $data['input_type'] = 'frequency_row';
+            $data['answer_layout'] = $data['answer_layout'] ?? (new VerificationFormQuestion($data))->inferredAnswerLayout();
             $data['question_kind'] = VerificationFormQuestion::QUESTION_KIND_NORMAL;
             $data['parent_question_id'] = null;
             $data['trigger_answer'] = null;

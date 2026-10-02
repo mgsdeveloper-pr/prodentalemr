@@ -128,6 +128,7 @@ class SaasPanelProvider extends PanelProvider
                 TelephonyCallResource::class,
             ])
             ->pages([
+                \App\Filament\Saas\Pages\ImportVerificationTemplate::class,
                 Dashboard::class,
                 ClientManagement::class,
                 OrganizationWorkspace::class,
