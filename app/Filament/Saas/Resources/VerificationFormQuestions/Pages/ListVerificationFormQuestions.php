@@ -7,7 +7,6 @@ use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
-use App\Support\VerificationTemplateThreeDefaults;
 use App\Support\VerificationTemplateVersionService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -18,9 +17,15 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 
 class ListVerificationFormQuestions extends ListRecords
 {
+    private const HISTORY_PAGE_SIZE = 20;
+
     protected static string $resource = VerificationFormQuestionResource::class;
 
     protected string $view = 'filament.saas.resources.verification-form-questions.pages.list-verification-form-questions';
@@ -28,6 +33,9 @@ class ListVerificationFormQuestions extends ListRecords
     protected Width|string|null $maxContentWidth = Width::Full;
 
     public ?int $selectedTemplateVersionId = null;
+
+    #[Locked]
+    public array $draftReview = [];
 
     public array $data = [];
 
@@ -59,10 +67,7 @@ class ListVerificationFormQuestions extends ListRecords
     {
         $version = $this->selectedTemplateVersion();
         abort_unless($version && $this->canAddQuestionToSelectedVersion() && $version->canEditDirectly(), 403);
-        $section = $version->sections()->where('section_key', $key)->firstOrFail();
-        abort_if($version->questions()->where('section_key', $key)->where('is_active', true)->exists(), 422);
-        abort_if($version->sections()->where('parent_section_key', $key)->exists(), 422);
-        $section->update(['allow_empty' => ! $section->allow_empty]);
+        app(VerificationTemplateVersionService::class)->toggleEmptyMasterDraftSection($version->id, $key);
     }
 
     public function downloadPreviewPdf()
@@ -80,8 +85,44 @@ class ListVerificationFormQuestions extends ListRecords
         $version = $this->selectedTemplateVersion();
         abort_unless($version && $version->status === VerificationTemplateVersion::STATUS_DRAFT, 422);
         $this->resetErrorBag('template');
-        app(VerificationTemplateVersionService::class)->assertPublishable($version);
+        $versions = app(VerificationTemplateVersionService::class);
+        $versions->assertPublishable($version);
+        $this->draftReview = [
+            'action' => 'publish', 'id' => $version->id, 'revision' => $versions->draftRevision($version),
+            'label' => $version->name.' · v'.$version->version_number,
+        ];
         $this->mountAction('publishDraftVersion');
+    }
+
+    public function reviewDraftRemoval(): void
+    {
+        $version = $this->selectedTemplateVersion();
+        abort_unless($this->canManageVersions() && $version?->canDeletePermanently(), 403);
+        $this->resetErrorBag('template');
+        $this->draftReview = [
+            'action' => 'remove',
+            'id' => $version->id,
+            'revision' => app(VerificationTemplateVersionService::class)->draftRevision($version),
+            'label' => $version->name.' · v'.$version->version_number,
+        ];
+        $this->mountAction('deleteUnusedDraft');
+    }
+
+    protected function reviewedRevision(VerificationTemplateVersion $draft, string $action): string
+    {
+        if (($this->draftReview['action'] ?? null) !== $action || ($this->draftReview['id'] ?? null) !== $draft->id) {
+            throw ValidationException::withMessages(['template' => 'Open a new review for the selected draft.']);
+        }
+
+        return $this->draftReview['revision'];
+    }
+
+    protected function describeDraftReview(string $description): string
+    {
+        $error = $this->getErrorBag()->first('template');
+        $label = $this->draftReview['label'] ?? null;
+
+        return $error ?: ($label ? $label.'. '.$description : $description);
     }
 
     public bool $showTemplatePreview = false;
@@ -136,16 +177,6 @@ class ListVerificationFormQuestions extends ListRecords
     public function mount(): void
     {
         parent::mount();
-
-        $hasMasterQuestions = VerificationFormQuestion::query()
-            ->whereNull('organization_id')
-            ->whereNull('clinic_id')
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->exists();
-
-        if (! $hasMasterQuestions) {
-            VerificationTemplateThreeDefaults::syncMasterQuestions();
-        }
 
         $requestedVersionId = request()->integer('version');
 
@@ -229,7 +260,7 @@ class ListVerificationFormQuestions extends ListRecords
                 ->color('success')
                 ->requiresConfirmation()
                 ->modalHeading('Publish this template draft?')
-                ->modalDescription('Choose whether this published Master Template is released to clinics or retained for internal SaaS use. Existing verification requests keep their original snapshot until refreshed.')
+                ->modalDescription(fn (): string => $this->describeDraftReview('Choose how to release this Master Template. Existing verification requests keep their original snapshot until refreshed.'))
                 ->form([
                     TextInput::make('version_name')
                         ->label('Version name')
@@ -289,7 +320,7 @@ class ListVerificationFormQuestions extends ListRecords
                 ->color('danger')
                 ->requiresConfirmation()
                 ->modalHeading('Permanently delete this unused draft?')
-                ->modalDescription('The template, its sections, and its questions will be permanently removed. This action is available only because the draft has never been published, copied, or used by a verification request.')
+                ->modalDescription(fn (): string => $this->describeDraftReview('This permanently removes the draft, its sections, and its questions.'))
                 ->action(fn (): null => $this->deleteSelectedUnusedDraft());
         }
 
@@ -391,45 +422,7 @@ class ListVerificationFormQuestions extends ListRecords
         $label = trim((string) $data['label']);
         $parentSectionKey = $this->templateSectionParentKey;
         if (filled($parentSectionKey)) abort_unless($this->canAddSubSectionToSection($parentSectionKey), 422);
-        $sectionKey = VerificationTemplateSection::makeSectionKey($label, $parentSectionKey);
-        $baseKey = $sectionKey;
-        $counter = 2;
-
-        while (VerificationTemplateSection::query()
-            ->whereNull('organization_id')
-            ->whereNull('clinic_id')
-            ->where('template_version_id', $version->getKey())
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->where('section_key', $sectionKey)
-            ->exists()) {
-            $sectionKey = $baseKey.'_'.$counter++;
-        }
-
-        $sortOrder = ((int) VerificationTemplateSection::query()
-            ->whereNull('organization_id')
-            ->whereNull('clinic_id')
-            ->where('template_version_id', $version->getKey())
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->when(
-                filled($parentSectionKey),
-                fn (Builder $query) => $query->where('parent_section_key', $parentSectionKey),
-                fn (Builder $query) => $query->whereNull('parent_section_key'),
-            )
-            ->max('sort_order')) + 10;
-
-        VerificationTemplateSection::query()->create([
-            'organization_id' => null,
-            'clinic_id' => null,
-            'template_version_id' => $version->getKey(),
-            'template_key' => VerificationFormQuestion::defaultTemplateKey(),
-            'section_key' => $sectionKey,
-            'parent_section_key' => $parentSectionKey,
-            'label' => $label,
-            'sort_order' => $sortOrder,
-            'is_builtin' => false,
-            'is_locked_by_admin' => false,
-            'is_active' => true,
-        ]);
+        app(VerificationTemplateVersionService::class)->addMasterDraftSection($version->id, $label, $parentSectionKey);
 
         if (filled($parentSectionKey) && ! in_array($parentSectionKey, $this->expandedTemplateSectionKeys, true)) {
             $this->expandedTemplateSectionKeys[] = $parentSectionKey;
@@ -579,7 +572,9 @@ class ListVerificationFormQuestions extends ListRecords
             $data['change_description'] ?? null,
             $clinicVisibility,
             activate: $releaseMode === 'release_to_clinics',
+            expectedRevision: $this->reviewedRevision($draft, 'publish'),
         );
+        $this->draftReview = [];
 
         Notification::make()
             ->title('Master Template published')
@@ -637,7 +632,15 @@ class ListVerificationFormQuestions extends ListRecords
             return null;
         }
 
-        app(VerificationTemplateVersionService::class)->deleteUnusedDraft($draft);
+        app(VerificationTemplateVersionService::class)->deleteUnusedDraft($draft, $this->reviewedRevision($draft, 'remove'));
+        $historyPage = $this->getPage('historyPage');
+        if ($historyPage > 1) {
+            $lastPage = max(1, (int) ceil($this->masterVersionQuery()->count() / self::HISTORY_PAGE_SIZE));
+            if ($historyPage > $lastPage) {
+                $this->setPage($lastPage, 'historyPage');
+            }
+        }
+        $this->draftReview = [];
         $this->closeTemplateVersionPanel();
 
         Notification::make()
@@ -656,10 +659,10 @@ class ListVerificationFormQuestions extends ListRecords
         $working = $draft ?: $active;
 
         return [
-            'active_version' => 'v'.$active->version_number,
-            'active_published_at' => optional($active->published_at)->format('M d, Y h:i A') ?: 'Not published',
-            'working_version' => 'v'.$working->version_number,
-            'working_status' => str($working->status)->headline()->toString(),
+            'active_version' => $active ? 'v'.$active->version_number : 'No active version',
+            'active_published_at' => optional($active?->published_at)->format('M d, Y h:i A') ?: 'Not published',
+            'working_version' => $working ? 'v'.$working->version_number : null,
+            'working_status' => $working ? str($working->status)->headline()->toString() : 'No template',
             'has_draft' => (bool) $draft,
             'draft_version' => $draft ? 'v'.$draft->version_number : null,
         ];
@@ -667,6 +670,7 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function selectTemplateVersion(int $versionId, bool $showPreview = false): void
     {
+        $this->draftReview = [];
         $version = $this->masterVersionQuery()
             ->whereKey($versionId)
             ->first();
@@ -807,11 +811,7 @@ class ListVerificationFormQuestions extends ListRecords
             return;
         }
 
-        $version->forceFill([
-            'status' => VerificationTemplateVersion::STATUS_DRAFT,
-            'is_active' => false,
-            'is_working_draft' => false,
-        ])->save();
+        app(VerificationTemplateVersionService::class)->restoreArchivedDraft($version);
 
         $this->selectTemplateVersion($version->getKey());
 
@@ -837,6 +837,7 @@ class ListVerificationFormQuestions extends ListRecords
 
     public function closeTemplateVersionPanel(): void
     {
+        $this->draftReview = [];
         $this->selectedTemplateVersionId = null;
         $this->showTemplatePreview = false;
         $this->resetErrorBag();
@@ -963,37 +964,38 @@ class ListVerificationFormQuestions extends ListRecords
             return;
         }
 
-        $sortOrder = ((int) VerificationFormQuestion::query()
-            ->whereNull('organization_id')
-            ->whereNull('clinic_id')
-            ->where('template_version_id', $version->getKey())
-            ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
-            ->where('section_key', $this->questionSectionKey)
-            ->max('sort_order')) + 10;
+        DB::transaction(function () use ($version, $data): void {
+            $draft = app(VerificationTemplateVersionService::class)->lockEditableDraft($version->id, null);
+            $sortOrder = ((int) $draft->questions()
+                ->whereNull('organization_id')
+                ->whereNull('clinic_id')
+                ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
+                ->where('section_key', $this->questionSectionKey)
+                ->max('sort_order')) + 10;
 
-        VerificationFormQuestion::query()->create([
-            'organization_id' => null,
-            'clinic_id' => null,
-            'template_version_id' => $version->getKey(),
-            'template_key' => VerificationFormQuestion::defaultTemplateKey(),
-            'question_kind' => VerificationFormQuestion::QUESTION_KIND_NORMAL,
-            'prompt' => trim((string) $data['prompt']),
-            'section_key' => $this->questionSectionKey,
-            'form_type' => $data['form_type'],
-            'input_type' => $data['input_type'],
-            'placeholder' => filled($data['placeholder'] ?? null) ? trim((string) $data['placeholder']) : null,
-            'help_text' => filled($data['help_text'] ?? null) ? trim((string) $data['help_text']) : null,
-            'select_options' => filled($data['select_options'] ?? null) ? trim((string) $data['select_options']) : null,
-            'frequency_response_mode' => VerificationFormQuestion::isFrequencyPercentageSection($this->questionSectionKey) ? 'current' : null,
-            'frequency_response_fields' => VerificationFormQuestion::isFrequencyPercentageSection($this->questionSectionKey)
-                ? VerificationFormQuestion::defaultFrequencyResponseFields('current')
-                : null,
-            'sort_order' => $sortOrder,
-            'is_builtin' => false,
-            'is_locked_by_admin' => false,
-            'is_required_for_audit' => false,
-            'is_active' => true,
-        ]);
+            $draft->questions()->create([
+                'organization_id' => null,
+                'clinic_id' => null,
+                'template_key' => VerificationFormQuestion::defaultTemplateKey(),
+                'question_kind' => VerificationFormQuestion::QUESTION_KIND_NORMAL,
+                'prompt' => trim((string) $data['prompt']),
+                'section_key' => $this->questionSectionKey,
+                'form_type' => $data['form_type'],
+                'input_type' => $data['input_type'],
+                'placeholder' => filled($data['placeholder'] ?? null) ? trim((string) $data['placeholder']) : null,
+                'help_text' => filled($data['help_text'] ?? null) ? trim((string) $data['help_text']) : null,
+                'select_options' => filled($data['select_options'] ?? null) ? trim((string) $data['select_options']) : null,
+                'frequency_response_mode' => VerificationFormQuestion::isFrequencyPercentageSection($this->questionSectionKey) ? 'current' : null,
+                'frequency_response_fields' => VerificationFormQuestion::isFrequencyPercentageSection($this->questionSectionKey)
+                    ? VerificationFormQuestion::defaultFrequencyResponseFields('current')
+                    : null,
+                'sort_order' => $sortOrder,
+                'is_builtin' => false,
+                'is_locked_by_admin' => false,
+                'is_required_for_audit' => false,
+                'is_active' => true,
+            ]);
+        });
 
         $sectionLabel = $this->questionSectionLabel;
 
@@ -1141,14 +1143,14 @@ class ListVerificationFormQuestions extends ListRecords
         $questions = VerificationFormQuestion::query()
             ->whereNull('organization_id')
             ->whereNull('clinic_id')
-            ->when($working, fn (Builder $query) => $query->where('template_version_id', $working->getKey()))
+            ->where('template_version_id', $working?->getKey() ?? 0)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->get();
 
         $sections = VerificationTemplateSection::query()
             ->whereNull('organization_id')
             ->whereNull('clinic_id')
-            ->when($working, fn (Builder $query) => $query->where('template_version_id', $working->getKey()))
+            ->where('template_version_id', $working?->getKey() ?? 0)
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->where('is_active', true)
             ->get();
@@ -1283,7 +1285,7 @@ class ListVerificationFormQuestions extends ListRecords
 
         return [
             'published' => [
-                'version' => 'v'.$published->version_number,
+                'version' => $published ? 'v'.$published->version_number : 'No active version',
                 'sections' => count($publishedSnapshot['sections']),
                 'questions' => count($publishedSnapshot['questions']),
                 'active_questions' => collect($publishedSnapshot['questions'])->where('is_active', true)->count(),
@@ -1327,8 +1329,12 @@ class ListVerificationFormQuestions extends ListRecords
             ->all();
     }
 
-    protected function versionReviewSnapshot(VerificationTemplateVersion $version): array
+    protected function versionReviewSnapshot(?VerificationTemplateVersion $version): array
     {
+        if (! $version) {
+            return ['sections' => [], 'questions' => []];
+        }
+
         $questions = $version->questions()
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->orderBy('section_key')
@@ -1397,10 +1403,10 @@ class ListVerificationFormQuestions extends ListRecords
         ];
     }
 
-    public function getActiveMasterVersion(): VerificationTemplateVersion
+    public function getActiveMasterVersion(): ?VerificationTemplateVersion
     {
-        return app(VerificationTemplateVersionService::class)->ensureMasterVersion(
-            VerificationFormQuestion::defaultTemplateKey(),
+        return app(VerificationTemplateVersionService::class)->findActivePublishedVersion(
+            templateKey: VerificationFormQuestion::defaultTemplateKey(),
         );
     }
 
@@ -1439,10 +1445,14 @@ class ListVerificationFormQuestions extends ListRecords
 
     protected function templateSectionRows(?VerificationTemplateVersion $version): array
     {
+        if (! $version) {
+            return [];
+        }
+
         $questions = VerificationFormQuestion::query()
             ->whereNull('organization_id')
             ->whereNull('clinic_id')
-            ->when($version, fn (Builder $query) => $query->where('template_version_id', $version->getKey()))
+            ->where('template_version_id', $version->getKey())
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -1452,7 +1462,7 @@ class ListVerificationFormQuestions extends ListRecords
         $sections = VerificationTemplateSection::query()
             ->whereNull('organization_id')
             ->whereNull('clinic_id')
-            ->when($version, fn (Builder $query) => $query->where('template_version_id', $version->getKey()))
+            ->where('template_version_id', $version->getKey())
             ->where('template_key', VerificationFormQuestion::defaultTemplateKey())
             ->orderBy('sort_order')
             ->orderBy('id')
@@ -1550,16 +1560,57 @@ class ListVerificationFormQuestions extends ListRecords
         return Clinic::query()->whereKey($clinicId)->value('clinic_name');
     }
 
-    public function getTemplateVersionHistory(): array
+    public function getTemplateHistorySummary(): array
     {
+        $counts = $this->masterVersionQuery()->selectRaw(
+            'COUNT(CASE WHEN status = ? THEN 1 END) AS drafts,
+             COUNT(CASE WHEN status = ? THEN 1 END) AS archived,
+             COUNT(CASE WHEN status = ? AND active_full_form = 0 AND active_short_form = 0 THEN 1 END) AS previous',
+            [
+                VerificationTemplateVersion::STATUS_DRAFT,
+                VerificationTemplateVersion::STATUS_ARCHIVED,
+                VerificationTemplateVersion::STATUS_PUBLISHED,
+            ],
+        )->first();
+
+        $active = $this->masterVersionQuery()
+            ->where('status', VerificationTemplateVersion::STATUS_PUBLISHED)
+            ->where(fn (Builder $query) => $query->where('active_full_form', true)->orWhere('active_short_form', true))
+            ->get();
+
+        return [
+            'drafts' => (int) $counts->drafts,
+            'archived' => (int) $counts->archived,
+            'previous' => (int) $counts->previous,
+            'active_forms' => [
+                'Full Form' => $active->firstWhere('active_full_form', true),
+                'Short Form' => $active->firstWhere('active_short_form', true),
+            ],
+        ];
+    }
+
+    public function getTemplateVersionHistory(): LengthAwarePaginator
+    {
+        $canManage = $this->canManageVersions();
+        $otherVersions = fn (Builder $query) => $query->withTrashed()
+            ->whereColumn($query->qualifyColumn('id'), '!=', 'verification_template_versions.id');
+
         return $this->masterVersionQuery()
-            ->with('clinic.organization')
+            ->withExists([
+                'verificationRequests as has_requests' => fn (Builder $query) => $query->withTrashed(),
+                'derivedVersions as has_derived_versions' => $otherVersions,
+                'sourcedVersions as has_sourced_versions' => $otherVersions,
+            ])
             ->orderByDesc('version_number')
             ->orderByDesc('id')
-            ->get()
-            ->map(function (VerificationTemplateVersion $version): array {
+            ->paginate(self::HISTORY_PAGE_SIZE, pageName: 'historyPage')
+            ->through(function (VerificationTemplateVersion $version) use ($canManage): array {
                 $isDraft = $version->status === VerificationTemplateVersion::STATUS_DRAFT;
                 $isAvailableToClinics = $version->isAvailableToClinics();
+                $lockReason = $version->lifecycleLockReason(
+                    $version->has_requests,
+                    $version->has_derived_versions || $version->has_sourced_versions,
+                );
 
                 return [
                     'id' => $version->getKey(),
@@ -1575,8 +1626,6 @@ class ListVerificationFormQuestions extends ListRecords
                             ? 'Current working draft for new Master Template questions.'
                             : 'Editable draft. Open the builder or set it as the working draft.')
                         : ((bool) $version->is_active ? 'Current active Master Template' : 'Previous Master Template version'),
-                    'scope' => filled($version->clinic_id) ? 'Clinic' : 'Master',
-                    'clinic' => $version->clinic?->clinic_name,
                     'form_type' => VerificationTemplateVersion::FORM_TYPE_OPTIONS[$version->form_type] ?? 'Full + Short',
                     'clinic_visibility' => $version->clinicAvailabilityLabel(),
                     'status' => str($version->status)->headline()->toString(),
@@ -1591,17 +1640,13 @@ class ListVerificationFormQuestions extends ListRecords
                     'is_active' => (bool) $version->is_active,
                     'is_working_draft' => (bool) $version->is_working_draft,
                     'is_draft' => $isDraft,
-                    'can_edit_directly' => $this->canManageVersions() && $version->canEditDirectly(),
-                    'can_delete_permanently' => $this->canManageVersions() && $version->canDeletePermanently(),
-                    'lock_reason' => $version->lifecycleLockReason(),
+                    'can_edit_directly' => $canManage && $lockReason === null,
                     'can_restore' => $version->status === VerificationTemplateVersion::STATUS_ARCHIVED
                         && blank($version->published_at),
                     'updated_at' => optional($version->updated_at)->format('M d, Y h:i A') ?: '-',
                     'published_at' => optional($version->published_at)->format('M d, Y h:i A'),
-                    'notes' => $version->notes,
                 ];
-            })
-            ->all();
+            });
     }
 
     protected function templatePreviewSections(VerificationTemplateVersion $version, string $formType): array

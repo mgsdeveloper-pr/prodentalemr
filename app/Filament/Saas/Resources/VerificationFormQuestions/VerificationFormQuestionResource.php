@@ -426,10 +426,7 @@ class VerificationFormQuestionResource extends Resource
                 return $query
                     ->whereNull('organization_id')
                     ->whereNull('clinic_id')
-                    ->when(
-                        $version,
-                        fn (Builder $query) => $query->where('template_version_id', $version->getKey())
-                    )
+                    ->where('template_version_id', $version?->getKey() ?? 0)
                     ->orderBy('section_key')
                     ->orderBy('sort_order');
             })
@@ -497,8 +494,7 @@ class VerificationFormQuestionResource extends Resource
             ->recordActions([
                 EditAction::make()
                     ->visible(fn (VerificationFormQuestion $record): bool => static::canEdit($record)),
-                DeleteAction::make()
-                    ->visible(fn (VerificationFormQuestion $record): bool => static::canDelete($record)),
+                static::deleteQuestionAction(),
             ]);
     }
 
@@ -523,6 +519,14 @@ class VerificationFormQuestionResource extends Resource
             && blank($record->organization_id)
             && blank($record->clinic_id)
             && ($record->templateVersion?->canEditDirectly() ?? false);
+    }
+
+    public static function deleteQuestionAction(): DeleteAction
+    {
+        return DeleteAction::make()
+            ->visible(fn (VerificationFormQuestion $record): bool => static::canDelete($record))
+            ->using(fn (VerificationFormQuestion $record): ?bool => app(VerificationTemplateVersionService::class)
+                ->deleteMasterDraftQuestion($record));
     }
 
     public static function canDelete(Model $record): bool
@@ -580,6 +584,6 @@ class VerificationFormQuestionResource extends Resource
             return $draft;
         }
 
-        return app(VerificationTemplateVersionService::class)->ensureMasterVersion($templateKey);
+        return app(VerificationTemplateVersionService::class)->findActivePublishedVersion(templateKey: $templateKey);
     }
 }

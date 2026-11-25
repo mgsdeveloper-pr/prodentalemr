@@ -18,7 +18,7 @@
         <table class="grid">
             <tr>
                 <td style="width: 55%; padding-right: 18px;">
-                    <div style="font-size: 28px; font-weight: 700;">{{ $settings->platform_name ?: 'ProDental EMR' }}</div>
+                    <div style="font-size: 28px; font-weight: 700;">{{ $settings->brandName() }}</div>
                     <div class="muted" style="margin-top: 6px;">Patient Payment Receipt</div>
                     <div style="margin-top: 22px;">
                         <div style="font-size: 17px; font-weight: 700;">{{ $entry->patient?->full_name }}</div>

@@ -125,6 +125,8 @@ class VerificationRequestImportService
             }
         }
 
+        $formType = $this->normalizeFormType($row['form_type'] ?? null);
+
         $location = $this->resolveLocation($clinic, (string) $row['location_name']);
         $provider = $this->resolveProvider($clinic, $location, (string) $row['provider_name']);
         $patient = $this->resolvePatient($clinic, $location, $row);
@@ -152,7 +154,7 @@ class VerificationRequestImportService
             'patient_dob' => $this->normalizeDate($row['patient_dob'] ?? null),
             'appointment_date' => $this->normalizeDate($row['appointment_date'] ?? null),
             'insurance_provider_name' => $row['payer_name'] ?? null,
-            'patient_identifier' => $row['patient_identifier'] ?: ($row['member_id'] ?? null),
+            'patient_identifier' => ($row['patient_identifier'] ?? null) ?: ($row['member_id'] ?? null),
         ];
 
         $workItemData = [
@@ -221,31 +223,31 @@ class VerificationRequestImportService
             'payer_name' => $row['payer_name'],
             'member_id' => $row['member_id'] ?? ($policy?->member_id ?? null),
             'group_number' => $row['group_number'] ?? ($policy?->group_number ?? null),
-            'subscriber_name' => $row['subscriber_name'] ?: ($policy?->subscriber_name ?? null),
+            'subscriber_name' => ($row['subscriber_name'] ?? null) ?: $policy?->subscriber_name,
             'subscriber_dob' => $this->normalizeDate($row['subscriber_dob'] ?? null),
             'notes' => $row['notes'] ?? null,
         ]];
 
         $workItemData = app(VerificationIntakeService::class)->normalizeAndValidate(
             $workItemData,
-            $verificationProfileData + ['form_type' => $this->normalizeFormType($row['form_type'] ?? null)],
+            $verificationProfileData + ['form_type' => $formType],
             $planSnapshotData,
         );
 
         $profileData = [
-            'form_type' => $this->normalizeFormType($row['form_type'] ?? null),
+            'form_type' => $formType,
             'requested_by_name' => $user->name,
             'requested_by_role_slug' => $user->getPrimaryRoleName(),
             'requested_from_panel' => $channel === 'admin' ? 'admin' : 'clinic',
             'patient_full_name' => $patientName,
             'patient_dob' => $this->normalizeDate($row['patient_dob'] ?? null),
-            'patient_identifier' => $row['patient_identifier'] ?: ($row['member_id'] ?? null),
+            'patient_identifier' => ($row['patient_identifier'] ?? null) ?: ($row['member_id'] ?? null),
             'patient_zip' => $row['patient_zip'] ?? null,
             'appointment_date' => $this->normalizeDate($row['appointment_date'] ?? null),
             'appointment_time' => $this->normalizeTime($row['appointment_time'] ?? null),
             'pms_id' => $row['pms_id'] ?? null,
             'is_pre_registered' => $this->normalizeBoolean($row['is_pre_registered'] ?? null),
-            'subscriber_name' => $row['subscriber_name'] ?: ($policy?->subscriber_name ?? null),
+            'subscriber_name' => ($row['subscriber_name'] ?? null) ?: $policy?->subscriber_name,
             'subscriber_dob' => $this->normalizeDate($row['subscriber_dob'] ?? null),
             'insurance_provider_name' => $row['payer_name'],
             'group_number' => $row['group_number'] ?? null,
@@ -512,7 +514,7 @@ class VerificationRequestImportService
 
             if ($cells !== []) {
                 ksort($cells);
-                $rows[] = array_values($cells);
+                $rows[] = $cells;
             }
         }
 
@@ -528,8 +530,11 @@ class VerificationRequestImportService
                 continue;
             }
 
-            $row = array_pad($row, count($headers), null);
-            $dataRows[] = array_combine($headers, $row);
+            $data = [];
+            foreach ($headers as $columnIndex => $header) {
+                $data[$header] = $row[$columnIndex] ?? null;
+            }
+            $dataRows[] = $data;
         }
 
         return $dataRows;
@@ -581,9 +586,11 @@ class VerificationRequestImportService
 
     protected function normalizeFormType(mixed $value): string
     {
-        return str((string) $value)->lower()->contains('short')
-            ? 'short_form'
-            : 'full_form';
+        return match (strtolower(trim((string) $value))) {
+            '', 'full form', 'full_form' => 'full_form',
+            'short form', 'short_form' => 'short_form',
+            default => throw new RuntimeException('Invalid form_type. Use Full Form or Short Form, or leave it blank for Full Form.'),
+        };
     }
 
     protected function normalizePlanPriority(mixed $value): string

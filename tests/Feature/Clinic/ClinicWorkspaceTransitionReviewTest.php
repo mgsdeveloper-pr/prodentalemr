@@ -32,7 +32,7 @@ it('opens the requested workspace without a detour after selecting a dual-servic
         ->assertRedirect($target);
     expect(session(ClinicWorkspace::SESSION_KEY))->toBe('verification');
     $this->get($target)->assertOk();
-    $this->get(route('clinic.choose-workspace'))->assertOk();
+    $this->get(route('clinic.choose-workspace'))->assertRedirect(url('/clinic/verification-requests'));
     $this->post(route('clinic.switch-workspace', ['workspace' => 'verification']))
         ->assertRedirect(url('/clinic/verification-requests'));
 });
@@ -53,7 +53,6 @@ it('automatically selects the only available workspace after a clinic switch', f
     expect(session(ClinicWorkspace::SESSION_KEY))->toBe($expected);
 })->with([
     ['verification', 'clinic_pms', 'verification'],
-    ['pms', 'verification', 'clinic_pms'],
 ]);
 
 it('drops a previous clinics record identifiers when changing clinic', function () {
@@ -80,15 +79,15 @@ it('returns from the clinic picker to the original settings page', function () {
     $this->get('/clinic/verification-settings')->assertOk();
 });
 
-it('falls back to a supported workspace when the destination module is unavailable', function () {
+it('keeps a PMS-only clinic out of Verification', function () {
     $this->withSession([ClinicWorkspace::SESSION_KEY => 'verification']);
     $this->get(route('clinic.clinic-scope', ['clinic_id' => $this->clinics['pms']->id,
-        'redirect' => url('/clinic/verification-settings')]))->assertRedirect(url('/clinic'));
-    expect(session(ClinicWorkspace::SESSION_KEY))->toBe('clinic_pms');
+        'redirect' => url('/clinic/verification-settings')]))->assertRedirect(route('clinic.choose-workspace'));
+    expect(session(ClinicWorkspace::SESSION_KEY))->toBeNull();
 });
 
 it('removes a record path when changing clinic and preserves it when staying in the same clinic', function () {
-    $clinic = $this->clinics['pms'];
+    $clinic = $this->clinics['dual'];
     $target = url('/clinic/patients/123/edit');
     $this->get(route('clinic.clinic-scope', ['clinic_id' => $clinic->id, 'redirect' => $target]))
         ->assertRedirect(url('/clinic/patients'));
@@ -101,4 +100,18 @@ it('does not allow a clinic admin to switch into another clinic', function () {
     $user = User::factory()->create(['organization_id' => $clinic->organization_id, 'clinic_id' => $clinic->id, 'status' => true]);
     $user->assignRole('clinic_admin');
     $this->actingAs($user)->get(route('clinic.clinic-scope', ['clinic_id' => $this->clinics['pms']->id]))->assertForbidden();
+});
+
+it('opens an explicit template version on clinic switch and rejects a version from the previous clinic', function () {
+    $clinic = $this->clinics['verification'];
+    $draft = \App\Models\VerificationTemplateVersion::create([
+        'scope' => 'clinic', 'clinic_id' => $clinic->id, 'organization_id' => $clinic->organization_id,
+        'template_key' => 'template_3', 'name' => 'Imported Short Draft', 'form_type' => 'short_form', 'status' => 'draft',
+    ]);
+    $this->withSession([ClinicPanelScope::SESSION_KEY => $this->clinics['dual']->id]);
+    $this->get(route('clinic.clinic-scope', ['clinic_id' => $this->clinics['dual']->id, 'template_version_id' => $draft->id]))
+        ->assertNotFound();
+    $this->get(route('clinic.clinic-scope', ['clinic_id' => $clinic->id, 'template_version_id' => $draft->id]))
+        ->assertRedirect(route('filament.clinic.resources.verification-questions.index', ['version' => $draft->id, 'form' => 'short_form']));
+    expect(session(ClinicPanelScope::SESSION_KEY))->toBe($clinic->id);
 });

@@ -50,9 +50,9 @@
     x-on:livewire:navigating.window="forceClose()"
 >
     <div class="pd-appshell-global-header__left">
-        <a class="pd-appshell-global-header__brand" href="{{ url('/') }}" aria-label="ProDental home">
-            <span class="pd-appshell-global-header__logo" aria-hidden="true">PD</span>
-            <span class="pd-appshell-global-header__brand-name">ProDental</span>
+        <a class="pd-appshell-global-header__brand" href="{{ url('/') }}" aria-label="Denentiq home">
+            <img class="pd-appshell-global-header__logo" src="{{ asset('images/brand/denentiq-icon-primary.svg') }}" alt="" style="object-fit: contain; background: transparent !important; border-radius: 0 !important;">
+            <span class="pd-appshell-global-header__brand-name">Denentiq</span>
         </a>
 
         <details class="pd-appshell-workspace-switcher"
@@ -278,7 +278,7 @@
         .pd-global-search-dialog__footer strong { margin-left: auto; color: #0f766e; font-size: 10px; }
         .pd-appshell-global-header__mobile-search { display: none !important; }
         body.pd-global-search-open { overflow: hidden; }
-        @media (max-width: 860px) {
+        @media (max-width: 1023px) {
             .pd-appshell-global-header__mobile-search { display: inline-flex !important; }
             .pd-global-search-backdrop { align-items: stretch; padding: 0; }
             .pd-global-search-dialog { width: 100%; max-height: 100%; border: 0; border-radius: 0; }

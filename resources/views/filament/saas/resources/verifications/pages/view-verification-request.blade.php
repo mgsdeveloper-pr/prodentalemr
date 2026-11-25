@@ -165,6 +165,17 @@
                         <span class="request-chip request-chip--active">{{ $eligibilityStatus }}</span>
                     </div>
                     <div>
+                        @if (!empty($resultSummary['coverage_assessment']))
+                            <div class="request-result-band request-result-band--three">
+                                @foreach (\App\Services\Verification\CoverageAssessmentService::FIELDS as $key => $label)
+                                    <div><div class="request-field__label">{{ $label }}</div><div class="request-field__value">{{ $resultSummary['coverage_assessment'][$key] ?? 'Not recorded' }}</div></div>
+                                @endforeach
+                            </div>
+                            @if (data_get($resultSummary, 'coverage_assessment.outcome') === 'inactive')
+                                <p style="padding:14px">Benefit questions not assessed: coverage inactive for the checked date of service. Saved benefit answers are retained in history.</p>
+                            @endif
+                        @endif
+                        @if (data_get($resultSummary, 'coverage_assessment.outcome') !== 'inactive')
                         <div class="request-result-band request-result-band--three">
                             @foreach (['Eligibility status' => $eligibilityStatus, 'Effective date' => $resultSummary['effective_date'], 'Network status' => $resultSummary['network_status']] as $label => $value)
                                 <div class="request-result__item"><div class="request-field__label">{{ $label }}</div><div class="request-result__value">{{ $value }}</div></div>
@@ -180,6 +191,7 @@
                                 <div class="request-result__item"><div class="request-field__label">{{ $label }} coverage</div><div class="request-result__value">{{ $value }}</div></div>
                             @endforeach
                         </div>
+                        @endif
                     </div>
                 </section>
 

@@ -10,6 +10,11 @@ class AppShell
     public static function register(Panel $panel, string $workspace): Panel
     {
         return $panel
+            ->brandName('Denentiq')
+            ->brandLogo(asset('images/brand/denentiq-horizontal-primary.svg'))
+            ->darkModeBrandLogo(asset('images/brand/denentiq-horizontal-white.svg'))
+            ->favicon(asset('images/brand/favicon.svg'))
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('partials.brand-icons')->render())
             ->renderHook(
                 PanelsRenderHook::STYLES_AFTER,
                 fn (): string => view('filament.appshell.styles')->render(),

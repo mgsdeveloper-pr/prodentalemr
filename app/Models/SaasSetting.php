@@ -297,7 +297,7 @@ class SaasSetting extends Model
 
         if (! Schema::hasTable('saas_settings')) {
             return static::rememberCurrentRequestInstance(new static([
-                'platform_name' => 'ProDental EMR',
+                'platform_name' => 'Denentiq',
                 'default_country' => 'USA',
                 'default_timezone' => 'America/New_York',
             'default_currency' => 'USD',
@@ -419,7 +419,7 @@ class SaasSetting extends Model
             fn (): self => static::query()->firstOrCreate(
                 ['id' => 1],
                 [
-                    'platform_name' => 'ProDental EMR',
+                    'platform_name' => 'Denentiq',
                     'default_country' => 'USA',
                     'default_timezone' => 'America/New_York',
                     'default_currency' => 'USD',
@@ -552,16 +552,12 @@ class SaasSetting extends Model
 
     public function brandName(): string
     {
-        return $this->platform_name ?: 'ProDental EMR';
+        return 'Denentiq';
     }
 
     public function brandLogoUrl(): ?string
     {
-        if (blank($this->logo_path)) {
-            return null;
-        }
-
-        return Storage::disk('branding')->url($this->logo_path);
+        return asset('images/brand/denentiq-horizontal-primary.svg');
     }
 
     public function brandLogo(): ?HtmlString

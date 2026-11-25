@@ -39,7 +39,7 @@ it('renders the enterprise appshell foundation partials', function (): void {
         ->toContain('@click.self="closeSearch()"')
         ->toContain("event.key === 'Escape'")
         ->toContain("endpoint: '\\/global-search'")
-        ->toContain('ProDental')
+        ->toContain('Denentiq')
         ->toContain('Verification')
         ->not->toContain('ProDental EMR');
 
@@ -61,7 +61,7 @@ it('renders the enterprise appshell foundation partials', function (): void {
 
     expect(view('filament.appshell.compact-footer', ['workspace' => 'verification'])->render())
         ->toContain('pd-appshell-footer')
-        ->toContain('ProDental')
+        ->toContain('Denentiq')
         ->toContain('&copy; '.now()->year)
         ->not->toContain('Verification')
         ->not->toContain('Development')

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\VerificationResultPdf;
+use App\Support\VerificationTemplateVersionService;
 use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,18 +11,34 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 class Clinic extends Model
 {
     use HasPublicId, SoftDeletes;
 
+    private bool $requireVerificationTemplates = false;
+
     protected static function booted(): void
     {
         static::created(function (self $clinic): void {
-            if (\Illuminate\Support\Facades\Schema::hasTable('verification_template_versions')
-                && \Illuminate\Support\Facades\Schema::hasColumn('verification_template_versions', 'active_full_form')) {
-                app(\App\Support\VerificationTemplateVersionService::class)->provisionRegisteredClinic($clinic);
+            $requireBoth = $clinic->requireVerificationTemplates && $clinic->hasVerificationServices();
+            if ($requireBoth || (Schema::hasTable('verification_template_versions')
+                && Schema::hasColumn('verification_template_versions', 'active_full_form'))) {
+                app(VerificationTemplateVersionService::class)->provisionRegisteredClinic($clinic, requireBoth: $requireBoth);
             }
+        });
+    }
+
+    public static function createWithRequiredVerificationTemplates(array $attributes): self
+    {
+        $clinic = new self($attributes);
+        $clinic->requireVerificationTemplates = true;
+
+        return $clinic->getConnection()->transaction(function () use ($clinic): self {
+            $clinic->save();
+
+            return $clinic;
         });
     }
 

@@ -6,6 +6,7 @@ use App\Models\SubscriptionPlan;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Schemas\Components\Section;
@@ -26,7 +27,7 @@ class SubscriptionPlanForm
                         TextInput::make('price')
                             ->required()
                             ->numeric()
-                            ->prefix('$')
+                            ->label('Price (in selected currency)')
                             ->minValue(0)
                             ->step('0.01'),
                         TextInput::make('plan_code')
@@ -36,13 +37,13 @@ class SubscriptionPlanForm
                         Select::make('plan_type')
                             ->label('Plan type')
                             ->options(SubscriptionPlan::planTypeOptions())
-                            ->default(SubscriptionPlan::PLAN_TYPE_PMS_VERIFICATION)
+                            ->default(SubscriptionPlan::PLAN_TYPE_VERIFICATION)
                             ->required()
                             ->native(false),
                         Select::make('workspace_mode')
                             ->label('Workspace routing')
                             ->options(SubscriptionPlan::workspaceModeOptions())
-                            ->default(SubscriptionPlan::WORKSPACE_CHOOSE)
+                            ->default(SubscriptionPlan::WORKSPACE_VERIFICATION)
                             ->required()
                             ->native(false),
                         TextInput::make('max_clinics')
@@ -63,6 +64,24 @@ class SubscriptionPlanForm
                     ])
                     ->columns(2)
                     ->columnSpanFull(),
+                Section::make('Website Plan Options')
+                    ->description('Only active Verification plans with Verification workspace routing and no trial appear on the website. Checkout collects the first billing period when configured; renewals are handled separately. Custom quotes require an agreed price before payment.')
+                    ->schema([
+                        Select::make('verification_model')->label('Offering')->options(fn (?SubscriptionPlan $record) => $record?->verification_model === 'hybrid'
+                            ? ['self_service' => 'Verification Platform', 'hybrid' => 'Managed Verification — Platform Included']
+                            : SubscriptionPlan::verificationModelOptions(false))->default('self_service')->required(),
+                        Select::make('billing_interval')->options(['monthly' => 'Monthly', 'yearly' => 'Yearly', 'one_time' => 'One time', 'custom' => 'Custom agreement'])->default('monthly')->required(),
+                        Select::make('currency')->options(['USD' => 'USD', 'INR' => 'INR', 'GBP' => 'GBP', 'EUR' => 'EUR', 'CAD' => 'CAD', 'AUD' => 'AUD'])->default('USD')->required(),
+                        Toggle::make('quote_required')->label('Request a quote instead of displaying a price')->default(false),
+                        Textarea::make('website_description')->label('Public description')->maxLength(1200)->columnSpanFull(),
+                        TextInput::make('website_sort_order')->label('Website display order')->numeric()->integer()->minValue(0)->default(0),
+                        Toggle::make('website_published')->label('Publish on website')->default(false)
+                            ->rules([fn (\Filament\Schemas\Components\Utilities\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                if ($value && ($get('plan_type') !== 'verification' || $get('workspace_mode') !== 'verification' || (int) $get('trial_days') > 0 || ! $get('status'))) {
+                                    $fail('Published website plans must be active Verification plans, use Verification workspace routing, and have zero trial days.');
+                                }
+                            }]),
+                    ])->columns(2)->columnSpanFull(),
                 Section::make('Plan Features & Limits')
                     ->description('Control optional feature access, managed services eligibility, trial availability, and usage limits.')
                     ->schema([
@@ -83,6 +102,7 @@ class SubscriptionPlanForm
                             ->inline(false),
                         TextInput::make('trial_days')
                             ->label('Trial days')
+                            ->default(0)
                             ->numeric()
                             ->minValue(0),
                         TextInput::make('plan_limits.storage_mb')

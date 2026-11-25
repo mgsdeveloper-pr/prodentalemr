@@ -33,6 +33,7 @@ beforeEach(function () {
     ]);
 
     seedWorkflowMaster();
+    app(\App\Support\VerificationTemplateVersionService::class)->provisionRegisteredClinic($this->clinic);
 
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
@@ -406,10 +407,12 @@ it('notifies the clinic queue manager when automatic assignment falls back', fun
         ->where('billing_work_item_id', $record->id)->where('activity_type', 'auto_assignment_unavailable')->exists())->toBeTrue();
 });
 
-it('creates an existing-patient request with an entered date and no appointment', function (string $panel, string $page) {
+it('creates an existing-patient request with an entered date and no appointment', function (string $panel, string $page, string $formType) {
     $admin = User::factory()->create(['status' => true]);
     $admin->assignRole('saas_admin');
     $this->actingAs($admin);
+    $this->clinic->update(['verification_services_enabled' => true]);
+    app(\App\Support\VerificationTemplateVersionService::class)->provisionRegisteredClinic($this->clinic, requireBoth: true);
     session([\App\Support\AdminClinicScope::SESSION_KEY => $this->clinic->id,
         \App\Support\ClinicPanelScope::SESSION_KEY => $this->clinic->id]);
     \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel($panel));
@@ -419,20 +422,75 @@ it('creates an existing-patient request with an entered date and no appointment'
         ->assertSet('data.vf_pms_id', 'CLINIC-123')
         ->assertDontSee('Patient ID in Clinic System')
         ->assertSet('data.patient_id', $this->patient->id)->assertSet('data.appointment_id', null)
+        ->set('data.vf_form_type', $formType)
         ->set('data.provider_id', $this->provider->id)
         ->set('data.vf_appointment_date', today()->addDays(3)->toDateString())
         ->set('data.vf_insured_relation', 'self')
         ->set('data.verification_plan_snapshots', [['plan_priority' => 'primary', 'payer_name' => 'Test Payer']])
         ->call('create')->assertHasNoFormErrors();
     $record = \App\Models\BillingWorkItem::where('patient_id', $this->patient->id)->firstOrFail();
+    $version = app(\App\Support\VerificationTemplateVersionService::class)->activeClinicForms($this->clinic->id)[$formType];
     expect($record->appointment_id)->toBeNull()
+        ->and($record->verificationProfile->form_type)->toBe($formType)
+        ->and($record->verification_template_version_id)->toBe($version)
+        ->and($record->verification_template_snapshot['version']['id'])->toBe($version)
+        ->and($record->verification_template_snapshot['version']['form_type'])->toBe($formType)
+        ->and($record->verification_template_snapshot['questions'])->not->toBeEmpty()
         ->and($record->verificationProfile->pms_id)->toBe('CLINIC-123')
         ->and($record->verificationProfile->patient_full_name)->toBe('Intake Patient')
         ->and($record->verificationProfile->appointment_date->toDateString())->toBe(today()->addDays(3)->toDateString());
 })->with([
     ['admin', \App\Filament\Saas\Resources\Verifications\Pages\CreateVerificationRequest::class],
     ['clinic', \App\Filament\Clinic\Resources\VerificationRequests\Pages\CreateVerificationRequest::class],
-]);
+])->with(['full_form', 'short_form']);
+
+it('imports Full and Short spreadsheet rows with the exact active clinic snapshots', function (string $channel) {
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+    $this->actingAs($admin);
+    $this->clinic->update(['verification_services_enabled' => true]);
+    $templates = app(\App\Support\VerificationTemplateVersionService::class);
+    $templates->provisionRegisteredClinic($this->clinic, requireBoth: true);
+    $active = $templates->activeClinicForms($this->clinic->id);
+    $labels = [' Full Form ', 'Not Short Form', 'SHORT_FORM', ''];
+    $expectedForms = [0 => 'full_form', 2 => 'short_form', 3 => 'full_form'];
+    $file = tempnam(sys_get_temp_dir(), 'request-import-');
+
+    try {
+        $writer = new \OpenSpout\Writer\XLSX\Writer;
+        $writer->openToFile($file);
+        $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
+            'location_name', 'provider_name', 'appointment_date', 'appointment_time', 'patient_full_name',
+            'patient_dob', 'payer_name', 'form_type', 'member_id',
+        ]));
+        foreach ($labels as $index => $label) {
+            $writer->addRow(\OpenSpout\Common\Entity\Row::fromValues([
+                $this->location->location_name, $this->provider->display_name, today()->addDays($index + 1)->toDateString(),
+                '09:00', $this->patient->full_name, $this->patient->dob->toDateString(), 'Test Payer', $label, 'TEST-100',
+            ]));
+        }
+        $writer->close();
+        $result = app(\App\Support\VerificationRequestImportService::class)
+            ->importFromAbsolutePath($file, $this->clinic, $admin, 'requests.xlsx', $channel);
+    } finally {
+        unlink($file);
+    }
+
+    expect($result['errors'])->toBe(['Row 3: Invalid form_type. Use Full Form or Short Form, or leave it blank for Full Form.'])
+        ->and($result['imported'])->toBe(3)
+        ->and($result['failed'])->toBe(1)
+        ->and($result['row_results'][1]['reference'])->toBeNull()
+        ->and(\App\Models\BillingWorkItem::where('clinic_id', $this->clinic->id)->count())->toBe(3);
+    foreach ($expectedForms as $index => $formType) {
+        $request = \App\Models\BillingWorkItem::where('reference_number', $result['row_results'][$index]['reference'])->sole();
+        expect($request->verificationProfile->form_type)->toBe($formType)
+            ->and($request->verification_template_version_id)->toBe($active[$formType])
+            ->and($request->verification_template_snapshot['version']['id'])->toBe($active[$formType])
+            ->and($request->verification_template_snapshot['version']['form_type'])->toBe($formType)
+            ->and($request->verification_template_snapshot['version']['clinic_id'])->toBe($this->clinic->id)
+            ->and($request->verification_template_snapshot['questions'])->not->toBeEmpty();
+    }
+})->with(['clinic', 'admin']);
 
 it('keeps patient policy selection when selecting and clearing an appointment', function (string $panel, string $page) {
     $admin = User::factory()->create(['status' => true]);

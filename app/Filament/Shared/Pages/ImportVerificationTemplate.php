@@ -55,6 +55,11 @@ abstract class ImportVerificationTemplate extends Page
 
     abstract public function builderUrl(): string;
 
+    public function builderLinkLabel(): string
+    {
+        return 'Open Template Builder';
+    }
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -89,7 +94,7 @@ abstract class ImportVerificationTemplate extends Page
 
     public function getBreadcrumbs(): array
     {
-        return [$this->builderUrl() => 'Template Builder', 'Import'];
+        return [$this->builderUrl() => $this->builderLinkLabel(), 'Import'];
     }
 
     public function updatedUpload(): void

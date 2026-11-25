@@ -47,7 +47,8 @@ class SaasMailSettings
         Config::set('mail.mailers.smtp.username', $state['email_username'] ?? null);
         Config::set('mail.mailers.smtp.password', $state['email_password'] ?? null);
         Config::set('mail.from.address', $state['email_from_address'] ?? ($state['support_email'] ?? config('mail.from.address')));
-        Config::set('mail.from.name', $state['email_from_name'] ?? ($state['platform_name'] ?? config('mail.from.name')));
+        $senderName = $state['email_from_name'] ?? ($state['platform_name'] ?? config('mail.from.name'));
+        Config::set('mail.from.name', in_array($senderName, ['ProDental', 'ProDental EMR'], true) ? 'Denentiq' : $senderName);
     }
 
     public static function applyFromSettings(?SaasSetting $settings = null): void
@@ -87,7 +88,7 @@ class SaasMailSettings
     {
         static::apply($state);
 
-        $brandName = $state['platform_name'] ?? 'ProDental EMR';
+        $brandName = SaasSetting::current()->brandName();
 
         Mail::mailer($state['email_mailer'] ?? 'smtp')
             ->raw(

@@ -30,6 +30,7 @@
     </style>
 </head>
 <body>
+    @include('pdf.verifications.coverage-assessment')
     <div class="header">
         @if ($summary['clinic_logo'])<img src="{{ $summary['clinic_logo'] }}" class="clinic-logo" alt="">@endif
         <div class="eyebrow">Verification Result</div>

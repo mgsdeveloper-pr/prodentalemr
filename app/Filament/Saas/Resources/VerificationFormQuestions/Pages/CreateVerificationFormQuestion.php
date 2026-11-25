@@ -11,6 +11,8 @@ use Filament\Support\Enums\Width;
 
 class CreateVerificationFormQuestion extends CreateRecord
 {
+    protected ?bool $hasDatabaseTransactions = true;
+
     use InteractsWithVerificationFormQuestionOrdering;
 
     protected static string $resource = VerificationFormQuestionResource::class;
@@ -135,6 +137,7 @@ class CreateVerificationFormQuestion extends CreateRecord
 
         abort_unless($version, 404, 'Master Template draft not found.');
 
+        app(\App\Support\VerificationTemplateVersionService::class)->lockEditableDraft($version->id, null);
         $data['template_version_id'] = $version->getKey();
         $data['organization_id'] = null;
         $data['clinic_id'] = null;

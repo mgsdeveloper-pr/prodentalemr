@@ -50,7 +50,7 @@ it('renders the operational platform user workspace', function (): void {
         ->assertSee('MGS Admin')
         ->assertSee('All organizations')
         ->assertSee('Enabled')
-        ->assertSee('Last active')
+        ->assertSee('Last sign-in')
         ->assertDontSee('Open Users')
         ->assertDontSee('saas-user-hero');
 });

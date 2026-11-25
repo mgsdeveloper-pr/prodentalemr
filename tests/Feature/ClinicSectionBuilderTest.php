@@ -183,6 +183,32 @@ it('counts the actual hierarchy in settings', function () {
     expect($page->counts($this->version))->toBe(['main' => 1, 'sub' => 0]);
 });
 
+it('counts legacy questions without section records in publication review without changing them', function () {
+    $draft = app(\App\Support\VerificationTemplateVersionService::class)->createDraftFromPublished($this->version);
+    foreach (['custom_existing', 'template_3_patient_subscriber'] as $key) {
+        $draft->questions()->create([
+            'template_key' => 'template_3', 'clinic_id' => $this->clinic->id,
+            'organization_id' => $this->clinic->organization_id, 'section_key' => $key,
+            'field_key' => 'qa_'.$key, 'prompt' => 'Question '.$key,
+            'input_type' => 'text', 'is_active' => true, 'form_type' => 'full_form',
+        ]);
+    }
+    $before = $draft->questions()->get()->toArray();
+    $page = Livewire::withQueryParams(['version' => $draft->id, 'draft' => 1])
+        ->test(ListVerificationQuestions::class)
+        ->call('setBuilderView', 'preview')->assertSee('2 visible questions')
+        ->call('reviewPublishing')->assertHasNoErrors()->assertSee('2 active questions');
+    expect($page->instance()->getBuilderCounts())->toBe([
+        'main_sections' => 1, 'sub_sections' => 0, 'questions' => 2, 'active_questions' => 2,
+    ])->and($draft->questions()->get()->toArray())->toBe($before)
+        ->and($draft->fresh()->status)->toBe('draft');
+
+    $draft->questions()->where('section_key', 'template_3_patient_subscriber')->update(['is_active' => false]);
+    $page = Livewire::withQueryParams(['version' => $draft->id, 'draft' => 1])->test(ListVerificationQuestions::class);
+    expect($page->instance()->getBuilderCounts()['questions'])->toBe(2)
+        ->and($page->instance()->getBuilderCounts()['active_questions'])->toBe(1);
+});
+
 it('renders frequency rows in the clinic full-form preview', function () {
     $q = $this->version->questions()->create([
         'template_key' => 'template_3', 'clinic_id' => $this->clinic->id,
@@ -417,4 +443,158 @@ it('rejects a stale publish and activate review without publishing the draft', f
     $this->version->update(['active_full_form' => false, 'is_active' => false]);
     $page->call('publishDraftVersion', [], true)->assertHasErrors('activation');
     expect($draft->fresh()->status)->toBe('draft');
+});
+
+it('requires a new clinic publish or removal review after draft content changes', function (string $action, string $error) {
+    $this->version->questions()->create([
+        'template_key' => 'template_3', 'clinic_id' => $this->clinic->id, 'section_key' => 'custom_existing',
+        'field_key' => 'revision_check', 'prompt' => 'Reviewed wording', 'input_type' => 'text',
+        'form_type' => 'full_form', 'is_active' => true,
+    ]);
+    $draft = app(\App\Support\VerificationTemplateVersionService::class)->createDraftFromPublished($this->version);
+    $question = $draft->questions()->sole();
+    $page = Livewire::withQueryParams(['version' => $draft->id])->test(ListVerificationQuestions::class);
+    if ($action === 'publishDraftVersion') {
+        $page->call('reviewPublishing');
+    } else {
+        $page->call('requestRemoval', $question->id);
+    }
+    $question->update(['prompt' => 'Changed after review']);
+    $page->call($action)->assertHasErrors($error);
+    expect($draft->fresh()->status)->toBe('draft')->and($question->fresh()->prompt)->toBe('Changed after review');
+})->with([['publishDraftVersion', 'template'], ['confirmRemoval', 'removal']]);
+
+it('shows the complete section when reordering and disables edge controls', function () {
+    $draft = app(\App\Support\VerificationTemplateVersionService::class)->createDraftFromPublished($this->version);
+    foreach (['First question', 'Second question'] as $index => $prompt) {
+        $draft->questions()->create([
+            'template_key' => 'template_3', 'clinic_id' => $this->clinic->id, 'section_key' => 'custom_existing',
+            'prompt' => $prompt, 'input_type' => 'text', 'form_type' => 'full_form', 'sort_order' => ($index + 1) * 10,
+            'is_active' => $index === 0,
+        ]);
+    }
+    $page = Livewire::withQueryParams(['version' => $draft->id])->test(ListVerificationQuestions::class)
+        ->set('questionStatus', 'active')->set('questionSearch', 'First')
+        ->call('setBuilderView', 'reorder')->assertSeeInOrder(['First question', 'Second question']);
+    $html = $page->html();
+    expect($html)->toContain('title="Move question up" disabled', 'title="Move question down" disabled');
+    $question = $draft->questions()->where('prompt', 'Second question')->sole();
+    $page->call('repositionQuestion', $question->id, 'up')
+        ->assertSeeInOrder(['Second question', 'First question'])
+        ->assertDispatched('builder-question-reordered', questionId: $question->id, direction: 'up');
+    $page->call('repositionQuestion', $question->id, 'up')->assertNotDispatched('builder-question-reordered');
+    $page->call('repositionQuestion', $question->id, 'down')
+        ->assertSeeInOrder(['First question', 'Second question'])
+        ->assertDispatched('builder-question-reordered', questionId: $question->id, direction: 'down');
+});
+
+it('paginates Clinic template history and resets to page one when filtered', function () {
+    $this->version->update(['is_active' => false, 'active_full_form' => false, 'status' => 'archived']);
+    foreach (range(2, 25) as $number) {
+        $version = $this->version->replicate();
+        $version->forceFill([
+            'name' => 'History QA '.$number,
+            'version_number' => $number,
+            'form_type' => $number === 25 ? 'short_form' : 'full_form',
+        ])->save();
+    }
+
+    $page = Livewire::test(\App\Filament\Clinic\Pages\VerificationSettings::class)
+        ->call('showSettingsSection', 'template-management')
+        ->set('showTemplateHistory', true);
+    $first = $page->instance()->getClinicTemplateVersionRows();
+    expect($first->total())->toBe(24)->and($first->count())->toBe(20);
+
+    $page->call('setPage', 2, $first->getPageName());
+    $second = $page->instance()->getClinicTemplateVersionRows();
+    expect($second->currentPage())->toBe(2)->and($second->count())->toBe(4);
+
+    $page->set('templateListForm', 'short_form')->assertSee('History QA 25');
+    $filtered = $page->instance()->getClinicTemplateVersionRows();
+    expect($filtered->currentPage())->toBe(1)->and($filtered->total())->toBe(1);
+});
+
+it('reorders a clinic draft atomically without changing question mappings', function () {
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($this->version);
+    $questions = collect([10, 20])->map(fn (int $order) => $draft->questions()->create([
+        'template_key' => $draft->template_key,
+        'clinic_id' => $this->clinic->id,
+        'section_key' => 'custom_existing',
+        'field_key' => 'qa_mapping_'.$order,
+        'prompt' => 'QA question '.$order,
+        'form_type' => 'full_form',
+        'input_type' => 'text',
+        'sort_order' => $order,
+        'is_active' => true,
+    ]));
+    $first = $questions->first();
+    $second = $questions->last();
+    $reorder = fn () => $versions->reorderDraftQuestions($draft->id, $this->clinic->id, [$second->id, $first->id], ['custom_existing']);
+
+    \Illuminate\Support\Facades\DB::unprepared("CREATE TEMP TRIGGER fail_second_reorder BEFORE UPDATE OF sort_order ON verification_form_questions
+        WHEN NEW.id = {$first->id} BEGIN SELECT RAISE(ABORT, 'synthetic reorder rollback'); END");
+    try {
+        expect($reorder)->toThrow(\Illuminate\Database\QueryException::class);
+        expect($first->fresh()->sort_order)->toBe(10)->and($second->fresh()->sort_order)->toBe(20);
+    } finally {
+        \Illuminate\Support\Facades\DB::unprepared('DROP TRIGGER fail_second_reorder');
+    }
+
+    $reorder();
+    expect($first->fresh()->sort_order)->toBe(20)
+        ->and($second->fresh()->sort_order)->toBe(10)
+        ->and($first->fresh()->field_key)->toBe('qa_mapping_10')
+        ->and($second->fresh()->field_key)->toBe('qa_mapping_20');
+
+    $draft->update(['status' => 'archived']);
+    expect($reorder)->toThrow(ValidationException::class);
+});
+
+it('allows a clinic draft action on page two and moves back when the last row is deleted', function () {
+    foreach (range(2, 21) as $number) {
+        $version = $this->version->replicate();
+        $version->forceFill([
+            'name' => 'Page two action QA '.$number,
+            'version_number' => $number + 100,
+            'status' => 'draft',
+            'is_active' => false,
+            'active_full_form' => false,
+        ])->save();
+    }
+
+    $page = Livewire::test(\App\Filament\Clinic\Pages\VerificationSettings::class)
+        ->call('showSettingsSection', 'template-management')->call('setPage', 2, 'clinicHistoryPage');
+    $rows = $page->instance()->getClinicTemplateVersionRows();
+    expect($rows->count())->toBe(1);
+    $row = $rows->first();
+    $page->call('reviewDraftLifecycle', $row['id'], 'delete')
+        ->call('confirmDraftLifecycle')->assertHasNoErrors();
+    expect($page->instance()->getClinicTemplateVersionRows()->currentPage())->toBe(1)
+        ->and(VerificationTemplateVersion::find($row['id']))->toBeNull();
+});
+
+it('uses the guarded draft writer from the SaaS question editor', function () {
+    $this->user->assignRole('saas_admin');
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $draft = VerificationTemplateVersion::create([
+        'scope' => 'master', 'template_key' => 'template_3', 'version_number' => 1,
+        'name' => 'SaaS reorder QA', 'form_type' => 'full_form', 'status' => 'draft',
+    ]);
+    $section = 'template_3_verification_information';
+    $questions = collect([10, 20, 30])->map(fn (int $order) => $draft->questions()->create([
+        'template_key' => $draft->template_key, 'section_key' => $section, 'prompt' => 'SaaS reorder '.$order,
+        'field_key' => 'saas_order_'.$order, 'input_type' => 'text', 'form_type' => 'full_form',
+        'sort_order' => $order, 'is_active' => true,
+    ]));
+    [$first, $second, $editing] = $questions->all();
+
+    Livewire::test(\App\Filament\Saas\Resources\VerificationFormQuestions\Pages\EditVerificationFormQuestion::class, ['record' => $editing->getRouteKey()])
+        ->set('data.section_key', $section)
+        ->call('reorderExistingSectionQuestions', [$second->id, $first->id])->assertHasNoErrors();
+
+    expect($first->fresh()->sort_order)->toBe(20)
+        ->and($second->fresh()->sort_order)->toBe(10)
+        ->and($editing->fresh()->sort_order)->toBe(30);
 });

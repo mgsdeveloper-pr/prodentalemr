@@ -1,11 +1,5 @@
 <x-filament-panels::page>
     @php
-        $templateVersionHistory = collect($this->getTemplateVersionHistory());
-        $publishedCount = $templateVersionHistory->where('status', 'Published')->count();
-        $draftCount = $templateVersionHistory->where('status', 'Draft')->count();
-        $archivedCount = max(0, $templateVersionHistory->count() - $publishedCount - $draftCount);
-        $activeTemplate = $templateVersionHistory->first(fn (array $version): bool => (bool) ($version['is_active'] ?? false));
-        $previousPublishedCount = max(0, $publishedCount - ($activeTemplate ? 1 : 0));
         $selectedTemplateVersion = $this->getSelectedTemplateVersionDetail();
     @endphp
 
@@ -104,6 +98,14 @@
 
         .df-summary__item:last-child {
             border-right: 0;
+        }
+
+        .df-summary__forms {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 5px;
+            overflow-wrap: anywhere;
         }
 
         .df-summary__value {
@@ -561,27 +563,38 @@
         x-on:master-template-version-opened.window="$nextTick(() => setTimeout(() => document.getElementById('master-template-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 75))"
     >
         @if (! $selectedTemplateVersion)
+        @php
+            $historySummary = $this->getTemplateHistorySummary();
+            $templateVersionHistory = $this->getTemplateVersionHistory();
+        @endphp
         <section class="df-panel df-summary" aria-label="Master Template summary">
             <div class="df-summary__item">
                 <div class="df-label">Current Master Template</div>
-                <div class="df-summary__value">{{ $activeTemplate['version'] ?? 'Not published' }}</div>
-                <div class="df-summary__note">
-                    {{ $activeTemplate ? ($activeTemplate['form_type'] . ' · ' . $activeTemplate['clinic_visibility']) : 'Publish & Activate a reviewed draft for new clinics.' }}
+                <div class="df-summary__forms">
+                    @foreach ($historySummary['active_forms'] as $formLabel => $version)
+                        <div>
+                            <div class="df-summary__note">{{ $formLabel }}</div>
+                            <div class="df-summary__value">{{ $version ? 'v'.$version->version_number : 'No active version' }}</div>
+                            @if ($version)
+                                <div class="df-summary__note">{{ $version->name }} · {{ $version->clinicAvailabilityLabel() }}</div>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Draft Templates</div>
-                <div class="df-summary__value">{{ $draftCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['drafts'] }}</div>
                 <div class="df-summary__note">Editable working copies</div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Previous Published</div>
-                <div class="df-summary__value">{{ $previousPublishedCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['previous'] }}</div>
                 <div class="df-summary__note">Retained for history</div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Archived</div>
-                <div class="df-summary__value">{{ $archivedCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['archived'] }}</div>
                 <div class="df-summary__note">No longer in use</div>
             </div>
         </section>
@@ -689,6 +702,11 @@
                     </tbody>
                 </table>
             </div>
+            @if ($templateVersionHistory->hasPages())
+                <div class="df-panel-header">
+                    {{ $templateVersionHistory->links() }}
+                </div>
+            @endif
         </section>
 
         @endif

@@ -70,8 +70,15 @@ class PaymentCredentials extends Page implements HasForms
         return $schema
             ->statePath('data')
             ->components([
+                Section::make('Website checkout')
+                    ->description('Initial registration payments use the API credentials below. Configure separate website webhook secrets in the app environment; existing invoice webhooks stay separate.')
+                    ->schema([
+                        Placeholder::make('website_checkout_status')->label('Website checkout')->content(fn () => config('website_checkout.enabled') ? 'Enabled — first billing period only' : 'Disabled until hosting setup is complete'),
+                        Placeholder::make('website_stripe_webhook')->label('Website Stripe webhook')->content(fn () => route('website-payments.webhook', ['gateway' => 'stripe'])),
+                        Placeholder::make('website_paypal_webhook')->label('Website PayPal webhook')->content(fn () => route('website-payments.webhook', ['gateway' => 'paypal'])),
+                    ]),
                 Section::make('Stripe')
-                    ->description('Connect Stripe first for hosted checkout, invoice payment links, and webhook-based payment confirmation.')
+                    ->description('Configure Stripe for hosted checkout and invoice payment links. Website checkout can use Stripe or another configured gateway.')
                     ->visible(fn (): bool => $this->activeProvider === 'stripe')
                     ->schema([
                         Toggle::make('stripe_enabled')

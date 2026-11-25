@@ -29,7 +29,6 @@ class ChooseWorkspaceController extends Controller
             'clinic' => $clinic,
             'clinicOptions' => ClinicPanelScope::clinicOptions(),
             'canUseVerification' => ClinicWorkspace::canUse(ClinicWorkspace::VERIFICATION, $clinic),
-            'canUseClinicPms' => ClinicWorkspace::canUse(ClinicWorkspace::CLINIC_PMS, $clinic),
         ]);
     }
 

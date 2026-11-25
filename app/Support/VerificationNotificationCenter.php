@@ -506,7 +506,7 @@ class VerificationNotificationCenter
 
         $payload['external_title'] = 'Verification update requires attention';
         $payload['external_message'] = implode("\n", array_filter([
-            'A verification notification requires your attention in ProDental.',
+            'A verification notification requires your attention in Denentiq.',
             filled($workItem->reference_number) ? 'Reference: ' . $workItem->reference_number : null,
             'Sign in to review the details securely.',
         ]));

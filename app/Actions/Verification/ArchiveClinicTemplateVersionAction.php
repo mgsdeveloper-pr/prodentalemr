@@ -2,10 +2,10 @@
 
 namespace App\Actions\Verification;
 
-use App\Models\AuditLog;
 use App\Models\Clinic;
 use App\Models\User;
 use App\Models\VerificationTemplateVersion;
+use App\Support\VerificationTemplateLifecycleAudit;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
@@ -35,14 +35,10 @@ class ArchiveClinicTemplateVersionAction
                 ]);
             }
 
+            $before = VerificationTemplateLifecycleAudit::state($locked);
             $locked->forceFill(['status' => VerificationTemplateVersion::STATUS_ARCHIVED,
                 'is_working_draft' => false])->save();
-            (new AuditLog)->forceFill([
-                'user_id' => $user->id, 'organization_id' => $clinic->organization_id, 'clinic_id' => $clinic->id,
-                'module' => 'verification_templates', 'action' => 'archive',
-                'old_values' => json_encode(['template_version_id' => $locked->id, 'status' => 'published']),
-                'new_values' => json_encode(['template_version_id' => $locked->id, 'name' => $locked->name, 'status' => 'archived']),
-            ])->save();
+            VerificationTemplateLifecycleAudit::record($user, $locked, 'archive', $before, VerificationTemplateLifecycleAudit::state($locked));
 
             return $locked;
         });

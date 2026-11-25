@@ -24,7 +24,7 @@
             <x-filament::section heading="Draft Created">
                 <p>{{ $templateName }} is saved as a new draft. Published templates and existing verification answers are unchanged.</p>
                 <div class="ti-actions" style="margin-top:16px">
-                    <x-filament::button tag="a" :href="$this->builderUrl()" icon="heroicon-o-pencil-square">Open Template Builder</x-filament::button>
+                    <x-filament::button tag="a" :href="$this->builderUrl()" icon="heroicon-o-pencil-square">{{ $this->builderLinkLabel() }}</x-filament::button>
                     <x-filament::button color="gray" wire:click="exportReviewed" icon="heroicon-o-arrow-down-tray">Export Imported Template</x-filament::button>
                 </div>
             </x-filament::section>

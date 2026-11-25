@@ -56,7 +56,7 @@
             @if ($selectedTemplateVersion['is_draft'] && auth()->user()?->canPublishVerificationTemplate())<button type="button" class="df-button df-button--primary" wire:click="reviewSelectedTemplate">Review & Publish</button>@endif
         </div>
     </div>
-    <details><summary class="df-small" style="cursor:pointer;padding-bottom:12px;">Version details · {{ $selectedTemplateVersion['section_count'] }} sections · {{ $selectedTemplateVersion['question_count'] }} questions</summary><p class="df-small">{{ $selectedTemplateVersion['notes'] }} · Created by {{ $selectedTemplateVersion['created_by'] }} · {{ $selectedTemplateVersion['clinic_visibility'] }}</p>@if ($selectedTemplateVersion['can_edit_directly'])<button type="button" class="df-button" style="margin:12px 0;color:#b91c1c;" wire:click="mountAction('deleteUnusedDraft')">Delete unused draft</button>@endif</details>
+    <details><summary class="df-small" style="cursor:pointer;padding-bottom:12px;">Version details · {{ $selectedTemplateVersion['section_count'] }} sections · {{ $selectedTemplateVersion['question_count'] }} questions</summary><p class="df-small">{{ $selectedTemplateVersion['notes'] }} · Created by {{ $selectedTemplateVersion['created_by'] }} · {{ $selectedTemplateVersion['clinic_visibility'] }}</p>@if ($selectedTemplateVersion['can_edit_directly'])<button type="button" class="df-button" style="margin:12px 0;color:#b91c1c;" wire:click="reviewDraftRemoval">Delete unused draft</button>@endif</details>
     <div class="te-layout">
         <nav class="te-nav" aria-label="Template sections">
             @foreach ($selectedTemplateVersion['sections'] as $section)

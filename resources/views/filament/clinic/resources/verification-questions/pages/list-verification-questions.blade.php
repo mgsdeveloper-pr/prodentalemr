@@ -111,7 +111,16 @@
         @media(max-width:760px){ .tb-header{display:grid}.tb-actions{justify-content:flex-start}.tb-strip{grid-template-columns:1fr}.tb-stat{border-right:0}.tb-workspace{grid-template-columns:1fr}.tb-tree{border-right:0;border-bottom:1px solid var(--tb-line)}.tb-tree-list{max-height:280px;overflow:auto}.tb-toolbar{align-items:flex-start;flex-direction:column}.tb-filters{grid-template-columns:1fr}.tb-filters .tb-search{grid-column:auto}.tb-history-row{display:grid} }
     </style>
 
-    <div class="tb-page" x-data x-on:beforeunload.window="if ($wire.editorOpen && JSON.stringify($wire.editor) !== JSON.stringify($wire.originalEditor)) { $event.preventDefault(); $event.returnValue = ''; }">
+    <div class="tb-page"
+        x-data="{ dialogOpener: null, dialogWasOpen: false }"
+        x-on:click.capture="if (!dialogWasOpen) dialogOpener = $event.target.closest('button')"
+        x-effect="
+            const dialogOpen = $wire.showUnsaved || $wire.showRemoval || $wire.showPublishReview
+                || $wire.showCreateDraftModal || $wire.showSectionUpload || $wire.showTemplateSectionModal;
+            if (dialogWasOpen && !dialogOpen) $nextTick(() => dialogOpener?.focus());
+            dialogWasOpen = dialogOpen;
+        "
+        x-on:beforeunload.window="if ($wire.editorOpen && JSON.stringify($wire.editor) !== JSON.stringify($wire.originalEditor)) { $event.preventDefault(); $event.returnValue = ''; }">
         <section class="tb-header">
             <div>
                 <div class="tb-eyebrow">Clinic Template Builder</div>
@@ -180,7 +189,7 @@
                             </div>
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button>@if ($versionSummary['showing_draft'])<button type="button" wire:click="setBuilderView('reorder')" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">Reorder</button>@endif<button type="button" wire:click="setBuilderView('preview')" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
+                            <div class="tb-segment" aria-label="Builder view"><button type="button" wire:click="setBuilderView('questions')" aria-pressed="{{ $builderView === 'questions' ? 'true' : 'false' }}" class="{{ $builderView === 'questions' ? 'is-active' : '' }}">Questions</button>@if ($versionSummary['showing_draft'])<button type="button" wire:click="setBuilderView('reorder')" aria-pressed="{{ $builderView === 'reorder' ? 'true' : 'false' }}" class="{{ $builderView === 'reorder' ? 'is-active' : '' }}">Reorder</button>@endif<button type="button" wire:click="setBuilderView('preview')" aria-pressed="{{ $builderView === 'preview' ? 'true' : 'false' }}" class="{{ $builderView === 'preview' ? 'is-active' : '' }}">Form Preview</button></div>
                             @if ($selectedSection && $builderView !== 'preview')
                                 @if ($versionSummary['showing_draft'])
                                     <button type="button" wire:click="editInlineQuestion" class="tb-button tb-button--primary">Add Question</button>
@@ -191,9 +200,9 @@
                         </div>
                     </div>
 
-                    @if ($builderView !== 'preview')
+                    @if ($builderView === 'questions')
                     <fieldset class="tb-filters" @disabled($editorOpen)>
-                        <input type="search" wire:model.live.debounce.250ms="questionSearch" class="tb-input tb-search" placeholder="Search questions in this section">
+                        <input type="search" wire:model.live.debounce.250ms="questionSearch" class="tb-input tb-search" placeholder="Search questions in this section" aria-label="Search questions in this section">
                         <select wire:model.live="questionStatus" class="tb-select" aria-label="Question status"><option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
                         <select wire:model.live="questionOwnership" class="tb-select" aria-label="Question ownership"><option value="all">All questions</option><option value="system">Inherited from Master</option><option value="clinic">Added by Clinic</option></select>
                         <button type="button" wire:click="clearQuestionFilters" class="tb-button">Clear</button>
@@ -202,12 +211,24 @@
 
                     @if ($builderView === 'reorder')
                         <div class="tb-reorder-note"><span><strong>Reorder {{ $selectedSection['title'] ?? 'questions' }}</strong><br>Use the arrow controls to move each question. Changes remain inside the draft until it is published.</span><button type="button" wire:click="setBuilderView('questions')" class="tb-button">Done</button></div>
-                        <div class="tb-table-wrap"><table class="tb-table" style="min-width:640px"><thead><tr><th style="width:13%">Position</th><th>Question</th><th style="width:22%;text-align:right">Move</th></tr></thead><tbody>
+                        <div class="tb-table-wrap" x-data
+                            x-on:builder-question-reordered.window="
+                                const { questionId, direction } = $event.detail;
+                                const table = $el;
+                                $nextTick(() => {
+                                    if (document.activeElement !== document.body && !table.contains(document.activeElement)) return;
+                                    const row = table.querySelector('[data-reorder-question=&quot;' + questionId + '&quot;]');
+                                    if (!row) return;
+                                    const sameDirection = row.querySelector('[data-move=&quot;' + direction + '&quot;]:not(:disabled)');
+                                    (sameDirection ?? row.querySelector('[data-move]:not(:disabled)'))?.focus();
+                                });
+                            ">
+                            <table class="tb-table" style="min-width:640px"><thead><tr><th style="width:13%">Position</th><th>Question</th><th style="width:22%;text-align:right">Move</th></tr></thead><tbody>
                             @forelse ($builderQuestions as $question)
-                                <tr>
+                                <tr wire:key="builder-reorder-{{ $question['id'] }}" data-reorder-question="{{ $question['id'] }}">
                                     <td><span class="tb-order-number">{{ $question['sort_order'] }}</span></td>
                                     <td><div class="tb-question">{{ $question['prompt'] }}</div><div class="tb-question-meta"><span class="tb-mini">{{ $question['section_title'] }}</span><span class="tb-mini {{ $question['is_builtin'] ? 'tb-mini--system' : '' }}">{{ $question['is_builtin'] ? 'Inherited from Master' : 'Added by Clinic' }}</span></div></td>
-                                    <td><div class="tb-row-actions"><button type="button" class="tb-icon-button" title="Move question up" aria-label="Move {{ $question['prompt'] }} up" wire:click="repositionQuestion({{ $question['id'] }}, 'up')">↑</button><button type="button" class="tb-icon-button" title="Move question down" aria-label="Move {{ $question['prompt'] }} down" wire:click="repositionQuestion({{ $question['id'] }}, 'down')">↓</button></div></td>
+                                    <td><div class="tb-row-actions"><button type="button" class="tb-icon-button" title="Move question up" @disabled($loop->first) data-move="up" aria-label="Move {{ $question['prompt'] }} up" wire:click="repositionQuestion({{ $question['id'] }}, 'up')">↑</button><button type="button" class="tb-icon-button" title="Move question down" @disabled($loop->last) data-move="down" aria-label="Move {{ $question['prompt'] }} down" wire:click="repositionQuestion({{ $question['id'] }}, 'down')">↓</button></div></td>
                                 </tr>
                             @empty<tr><td colspan="3"><div class="tb-empty">No questions are available to reorder in this section.</div></td></tr>@endforelse
                         </tbody></table></div>
@@ -266,15 +287,15 @@
         @endif
 
         @if ($showUnsaved)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-label="Unsaved question"><div class="tb-modal"><div class="tb-modal-head"><h3>Unsaved question changes</h3></div><div class="tb-modal-body">@foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="resolveUnsaved('stay')">Stay</button><button class="tb-button" wire:click="resolveUnsaved('discard')">Discard</button><button class="tb-button tb-button--primary" wire:click="resolveUnsaved('save')">Save &amp; Continue</button></div></div></div>
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.resolveUnsaved('stay')" role="dialog" aria-modal="true" aria-label="Unsaved question"><div class="tb-modal"><div class="tb-modal-head"><h3>Unsaved question changes</h3></div><div class="tb-modal-body">@foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="resolveUnsaved('stay')">Stay</button><button class="tb-button" wire:click="resolveUnsaved('discard')">Discard</button><button class="tb-button tb-button--primary" wire:click="resolveUnsaved('save')">Save &amp; Continue</button></div></div></div>
         @endif
         @if ($showRemoval)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-label="Review removal"><div class="tb-modal"><div class="tb-modal-head"><h3>Remove from this draft?</h3></div><div class="tb-modal-body"><p>{{ count($removalSections) }} sections and {{ count($removalIds) }} questions affected. Existing requests and published versions remain unchanged.</p>@foreach ($removalLabels as $label)<div>{{ $label }}</div>@endforeach @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="$set('showRemoval', false)">Cancel</button><button class="tb-button" wire:click="confirmRemoval">Remove From Draft</button></div></div></div>
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelRemoval()" role="dialog" aria-modal="true" aria-label="Review removal"><div class="tb-modal"><div class="tb-modal-head"><h3>Remove from this draft?</h3></div><div class="tb-modal-body"><p>{{ count($removalSections) }} sections and {{ count($removalIds) }} questions affected. Existing requests and published versions remain unchanged.</p>@foreach ($removalLabels as $label)<div>{{ $label }}</div>@endforeach @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="cancelRemoval">Cancel</button><button class="tb-button" wire:click="confirmRemoval">Remove From Draft</button></div></div></div>
         @endif
         @if ($showPublishReview)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="publish-review-title">
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelPublishing()" role="dialog" aria-modal="true" aria-labelledby="publish-review-title">
                 <div class="tb-modal">
-                    <div class="tb-modal-head"><h3 id="publish-review-title">Review publication</h3><button type="button" class="tb-icon-button" wire:click="$set('showPublishReview', false)" aria-label="Close publication review">×</button></div>
+                    <div class="tb-modal-head"><h3 id="publish-review-title">Review publication</h3><button type="button" class="tb-icon-button" wire:click="cancelPublishing" aria-label="Close publication review">×</button></div>
                     <div class="tb-modal-body">
                         <strong>{{ $versionSummary['displayed_name'] }}</strong>
                         <span>{{ $selectedClinicName }} · {{ $versionSummary['displayed_form_type'] }} · {{ $versionSummary['displayed_version'] }}</span>
@@ -285,12 +306,12 @@
                         <p>Publish keeps the active forms unchanged. Publish &amp; Activate replaces the forms listed above for new requests only.</p>
                         @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
                     </div>
-                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="$set('showPublishReview', false)">Back to Builder</button><button type="button" class="tb-button" wire:click="publishDraftVersion" wire:loading.attr="disabled">Publish</button><button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion([], true)" wire:loading.attr="disabled">Publish &amp; Activate</button></div>
+                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="cancelPublishing">Back to Builder</button><button type="button" class="tb-button" wire:click="publishDraftVersion" wire:loading.attr="disabled">Publish</button><button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion([], true)" wire:loading.attr="disabled">Publish &amp; Activate</button></div>
                 </div>
             </div>
         @endif
         @if ($showCreateDraftModal)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="draft-confirm-title" x-on:keydown.escape.window="$wire.closeCreateDraftModal()"><form wire:submit.prevent="submitCreateDraftVersion" class="tb-modal" style="width:min(520px,100%);">
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.closeCreateDraftModal()" role="dialog" aria-modal="true" aria-labelledby="draft-confirm-title"><form wire:submit.prevent="submitCreateDraftVersion" class="tb-modal" style="width:min(520px,100%);">
                 <div class="tb-modal-head"><div><div id="draft-confirm-title" class="tb-title" style="font-size:19px;">Create an editable copy?</div><div class="tb-subtitle">{{ $versionSummary['displayed_name'] }} · {{ $versionSummary['displayed_version'] }}</div></div><button type="button" class="tb-icon-button" wire:click="closeCreateDraftModal" aria-label="Close">×</button></div>
                 <div class="tb-modal-body">
                     <div class="tb-field"><label for="draft-name" class="tb-label">Template name</label><input id="draft-name" class="tb-input" wire:model="draftName" maxlength="255" required>@error('draftName')<span>{{ $message }}</span>@enderror</div>
@@ -307,7 +328,7 @@
         @endif
 
         @if ($showSectionUpload)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="section-upload-title">
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.set('showSectionUpload', false)" role="dialog" aria-modal="true" aria-labelledby="section-upload-title">
                 <div class="tb-modal">
                     <div class="tb-modal-head"><h3 id="section-upload-title" class="tb-toolbar-title">Upload Questions</h3><button type="button" class="tb-icon-button" wire:click="$set('showSectionUpload', false)" aria-label="Close upload">×</button></div>
                     <div class="tb-modal-body">
@@ -331,8 +352,8 @@
         @endif
 
         @if ($showTemplateSectionModal)
-            <div class="tb-modal-backdrop" role="dialog" aria-modal="true"><form wire:submit.prevent="submitTemplateSection" class="tb-modal">
-                <div class="tb-modal-head"><div><div class="tb-title" style="font-size:19px;">{{ $templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section' }}</div><div class="tb-subtitle">This structure change applies only to the open clinic draft.</div></div><button type="button" class="tb-icon-button" wire:click="closeTemplateSectionModal">×</button></div>
+            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.closeTemplateSectionModal()" role="dialog" aria-modal="true" aria-labelledby="section-create-title"><form wire:submit.prevent="submitTemplateSection" class="tb-modal">
+                <div class="tb-modal-head"><div><div id="section-create-title" class="tb-title" style="font-size:19px;">{{ $templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section' }}</div><div class="tb-subtitle">This structure change applies only to the open clinic draft.</div></div><button type="button" class="tb-icon-button" wire:click="closeTemplateSectionModal" aria-label="Close section dialog">×</button></div>
                 <div class="tb-modal-body">@if ($templateSectionMode === 'sub_section')<div class="tb-field"><label class="tb-label" for="parent-section">Parent section</label><select id="parent-section" class="tb-select" wire:model.defer="newTemplateSectionData.parent_section_key"><option value="">Select a main section</option>@foreach ($builderSections as $section)<option value="{{ $section['key'] }}">{{ $section['title'] }}</option>@endforeach</select>@error('newTemplateSectionData.parent_section_key')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div>@endif<div class="tb-field"><label class="tb-label" for="section-name">{{ $templateSectionMode === 'sub_section' ? 'Sub-section name' : 'Section name' }}</label><input id="section-name" class="tb-input" wire:model.defer="newTemplateSectionData.label">@error('newTemplateSectionData.label')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div></div>
                 <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeTemplateSectionModal">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled">Add to Draft</button></div>
             </form></div>

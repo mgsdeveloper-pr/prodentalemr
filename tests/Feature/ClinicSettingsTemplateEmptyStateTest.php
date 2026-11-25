@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\VerificationTemplateVersion;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -183,3 +184,145 @@ it('accepts both old and renamed settings URLs', function ($section, $expected) 
     ['active-forms', 'template-selection'], ['template-selection', 'template-selection'],
     ['template-library', 'template-management'], ['template-management', 'template-management'],
 ]);
+
+it('does not copy a released master from the clinic Builder lookup', function () {
+    $master = seedWorkflowMaster();
+    $before = VerificationTemplateVersion::count();
+
+    expect(\App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::currentClinicWorkingVersion($this->clinic))
+        ->toBeNull()
+        ->and(VerificationTemplateVersion::count())->toBe($before);
+
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $versions->provisionRegisteredClinic($this->clinic, requireBoth: true);
+
+    foreach (['full_form', 'short_form'] as $form) {
+        expect($versions->findActivePublishedVersion($this->clinic->id, formType: $form)?->source_version_id)->toBe($master->id);
+    }
+});
+
+it('opens the SaaS Builder with no active master without seeding any definitions', function () {
+    $user = User::factory()->create(['status' => true]);
+    $user->assignRole('saas_admin');
+    $this->actingAs($user);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $before = [
+        VerificationTemplateVersion::count(),
+        \App\Models\VerificationTemplateSection::count(),
+        \App\Models\VerificationFormQuestion::count(),
+    ];
+
+    Livewire::test(\App\Filament\Saas\Resources\VerificationFormQuestions\Pages\ListVerificationFormQuestions::class)
+        ->assertOk()->assertSee('No templates found. Create a draft to begin.');
+
+    expect([
+        VerificationTemplateVersion::count(),
+        \App\Models\VerificationTemplateSection::count(),
+        \App\Models\VerificationFormQuestion::count(),
+    ])->toBe($before);
+});
+
+it('shows actionable template validation and keeps unexpected draft errors in server reports', function (bool $unexpected) {
+    Illuminate\Support\Facades\Exceptions::fake();
+
+    $hint = 'Choose a released Full Form template before creating the draft.';
+    $internal = 'TB08_INTERNAL_ONLY database query and server path fixture';
+    $failure = $unexpected
+        ? new RuntimeException($internal)
+        : Illuminate\Validation\ValidationException::withMessages(['template' => $hint]);
+
+    $this->mock(App\Actions\Verification\CreateClinicTemplateDraftAction::class)
+        ->shouldReceive('execute')->once()->andThrow($failure);
+
+    $notification = Notification::make()->title('Draft could not be created');
+    if ($unexpected) {
+        $notification->body('Try again. If the problem persists, contact your administrator.')->danger();
+    } else {
+        $notification->body($hint)->warning();
+    }
+
+    Livewire::test(VerificationSettings::class)
+        ->call('openCreateClinicTemplateDraftModal')
+        ->set('newClinicTemplateDraftData.template_name', 'Safe error QA')
+        ->set('newClinicTemplateDraftData.starting_point', 'fresh')
+        ->call('submitCreateClinicTemplateDraft')
+        ->assertSet('showCreateTemplateDraftModal', true)
+        ->assertNotified($notification)
+        ->assertDontSee($internal);
+
+    expect(VerificationTemplateVersion::where('clinic_id', $this->clinic->id)->exists())->toBeFalse();
+    if ($unexpected) {
+        Illuminate\Support\Facades\Exceptions::assertReported(fn (RuntimeException $reported) => $reported === $failure);
+        Illuminate\Support\Facades\Exceptions::assertReportedCount(1);
+    } else {
+        Illuminate\Support\Facades\Exceptions::assertNothingReported();
+    }
+})->with(['actionable validation' => [false], 'unexpected exception' => [true]]);
+
+it('rolls back a failed PDF settings save and reports only a safe notification to the clinic', function () {
+    Illuminate\Support\Facades\Exceptions::fake();
+    $failure = new RuntimeException('TB08_INTERNAL_ONLY PDF write details');
+    $component = Livewire::test(VerificationSettings::class)
+        ->call('showSettingsSection', 'pdf-settings')
+        ->call('createNewPreset');
+    $presetCount = App\Models\VerificationPdfPreset::where('clinic_id', $this->clinic->id)->count();
+    $originalDefault = $this->clinic->fresh()->default_verification_pdf_preset_id;
+
+    $this->partialMock(App\Services\Verification\PdfPresetService::class)
+        ->shouldReceive('saveForClinic')->once()->andReturnUsing(function (...$arguments) use ($failure) {
+            (new App\Services\Verification\PdfPresetService)->saveForClinic(...$arguments);
+
+            throw $failure;
+        });
+
+    $component->set('data.verification_pdf_preset_name', 'Rollback QA')
+        ->call('save')
+        ->assertNotified(Notification::make()
+            ->title('PDF settings could not be saved')
+            ->body('Try again. If the problem persists, contact your administrator.')
+            ->danger())
+        ->assertDontSee($failure->getMessage());
+
+    expect(App\Models\VerificationPdfPreset::where('clinic_id', $this->clinic->id)->count())->toBe($presetCount)
+        ->and($this->clinic->fresh()->default_verification_pdf_preset_id)->toBe($originalDefault);
+    Illuminate\Support\Facades\Exceptions::assertReported(fn (RuntimeException $reported) => $reported === $failure);
+});
+
+it('opens Clinic Settings without creating PDF presets and saves the first default only once', function () {
+    $presets = App\Models\VerificationPdfPreset::where('clinic_id', $this->clinic->id);
+    $first = Livewire::test(VerificationSettings::class)->call('showSettingsSection', 'pdf-settings');
+    $second = Livewire::test(VerificationSettings::class)->call('showSettingsSection', 'pdf-settings');
+    expect((clone $presets)->count())->toBe(0);
+    $first->assertSet('data.verification_pdf_preset_name', 'Full Verification Report')->call('save')->assertHasNoErrors();
+    $second->call('save')->assertHasNoErrors();
+    expect((clone $presets)->count())->toBe(1)
+        ->and((clone $presets)->sole()->is_default)->toBeTrue();
+});
+
+it('rejects a PDF settings save after clinic settings access is revoked', function () {
+    $page = Livewire::test(VerificationSettings::class)->call('showSettingsSection', 'pdf-settings');
+    auth()->user()->syncRoles(['staff']);
+
+    $page->call('save')->assertForbidden();
+    expect(App\Models\VerificationPdfPreset::where('clinic_id', $this->clinic->id)->count())->toBe(0);
+});
+
+it('renders a clinic PDF preview with no preset persisted', function () {
+    $service = App\Models\ManagedBillingService::create([
+        'name' => 'QA Verification', 'slug' => 'qa-verification-pdf-preview',
+        'category' => 'verification', 'status' => true,
+    ]);
+    $request = App\Models\BillingWorkItem::create([
+        'clinic_id' => $this->clinic->id,
+        'organization_id' => $this->clinic->organization_id,
+        'managed_billing_service_id' => $service->id,
+        'title' => 'QA PDF preview', 'status' => 'pending',
+    ]);
+    $url = route('clinic.verification-requests.pdf.preview', $request);
+    Livewire::test(VerificationSettings::class)->call('showSettingsSection', 'pdf-settings')
+        ->assertSee('Preview Full PDF')->assertSee($url, escape: false);
+    $response = $this->get($url.'?raw=1')->assertOk()->assertHeader('Content-Type', 'application/pdf');
+    expect($response->getContent())->toStartWith('%PDF-')
+        ->and(App\Models\VerificationPdfPreset::where('clinic_id', $this->clinic->id)->count())->toBe(0);
+});

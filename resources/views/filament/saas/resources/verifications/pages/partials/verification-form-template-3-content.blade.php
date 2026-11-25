@@ -1579,6 +1579,7 @@
                 @include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-strip')
             @endif
 
+            @if (data_get($this->data, 'coverage_assessment.outcome') !== 'inactive')
             <details class="uel2-progress-disclosure">
                 <summary>
                     <span class="uel2-progress-disclosure__summary">Verification Progress</span>
@@ -1615,6 +1616,7 @@
                 </div>
             </details>
 
+            @endif
             <div class="uel2-layout">
                 <div class="uel2-content">
     <section class="uel2-section">

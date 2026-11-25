@@ -11,7 +11,6 @@
         $templateUrl = $this->getManageQuestionsUrl();
         $clinicTemplateRows = $this->getClinicTemplateVersionRows();
         $canManageClinicTemplate = $this->canManageSelectedClinicTemplate();
-        $hasWorkingClinicDraft = collect($clinicTemplateRows)->contains(fn (array $row): bool => $row['is_working_draft']);
         $activeSettingsSection = $this->activeSettingsSection;
         $settingsItems = [
             ['key' => 'template-selection', 'label' => 'Active Forms', 'description' => 'Full and Short forms for new requests.', 'active' => $activeSettingsSection === 'template-selection', 'icon' => '01', 'url' => null],
@@ -877,15 +876,18 @@
                             </select>
                         </div>
 
-                        @foreach (['short_form' => 'Short Form', 'full_form' => 'Full Form'] as $form => $formLabel)
+                        @foreach ($this->getActiveFormSlots() as $form => $slot)
                         <div class="vs-field">
-                            <label for="template-{{ $form }}">{{ $formLabel }}</label>
+                            <label for="template-{{ $form }}">{{ $slot['label'] }}</label>
                             <select id="template-{{ $form }}" class="vs-select" wire:model.live="data.template_{{ $form }}_id" @disabled(! auth()->user()?->canPublishVerificationTemplate($clinic))>
                                 <option value="">No active selection</option>
                                 @foreach ($this->getFormTemplateOptions($form) as $templateVersionId => $templateName)
                                     <option value="{{ $templateVersionId }}">{{ $templateName }}</option>
                                 @endforeach
                             </select>
+                            @if ($slot['id'] && \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::canAccess())
+                                <a class="vs-button" href="{{ \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::getUrl('index', ['version' => $slot['id'], 'form' => $form], panel: 'clinic') }}" wire:navigate>View active {{ $slot['label'] }}</a>
+                            @endif
                             @error('data.template_'.$form.'_id')<div role="alert">{{ $message }}</div>@enderror
                         </div>
                         @endforeach
@@ -962,7 +964,7 @@
                                         'previous' => 'Template History',
                                     ];
                                 @endphp
-                                @forelse (collect($clinicTemplateRows)->filter(fn ($row) => $showTemplateHistory || $row['row_group'] !== 'previous') as $row)
+                                @forelse ($clinicTemplateRows as $row)
                                     @if ($currentTemplateGroup !== $row['row_group'])
                                         @php $currentTemplateGroup = $row['row_group']; @endphp
                                         <tr>
@@ -1011,11 +1013,15 @@
                                                 @if ($row['is_draft'] && $row['can_edit'])
                                                     <button type="button" wire:click.prevent="openEditClinicTemplateDraftModal({{ $row['id'] }})" class="vs-button">Edit Details</button>
                                                 @endif
+                                                @if ($row['can_publish'])
+                                                    <button type="button" wire:click="reviewDraftLifecycle({{ $row['id'] }}, 'publish')" class="vs-button">
+                                                        Review Publication
+                                                    </button>
+                                                @endif
                                                 @if ($row['can_delete'])
                                                     <button
                                                         type="button"
-                                                        wire:click.prevent="deleteUnusedClinicTemplateDraft({{ $row['id'] }})"
-                                                        wire:confirm="Permanently delete this unused draft? This cannot be undone."
+                                                        wire:click="reviewDraftLifecycle({{ $row['id'] }}, 'delete')"
                                                         class="vs-button"
                                                         style="border-color:#fecdd3;color:#be123c;background:#fff1f2;"
                                                     >Delete Draft</button>
@@ -1051,6 +1057,7 @@
                                 @endforelse
                             </tbody>
                         </table>
+                        {{ $clinicTemplateRows->links() }}
                     </div>
                     </div>
 
@@ -1234,7 +1241,7 @@
                         <div class="vs-preview-paper">
                             <div class="vs-preview-logo">
                                 <span class="vs-preview-mark"></span>
-                                ProDental
+                                Denentiq
                             </div>
                             <div style="margin-top:22px;color:var(--vs-teal-dark);font-size:12px;font-weight:900;">Verification Report</div>
                             <div class="vs-preview-line" style="width:70%;"></div>
@@ -1272,6 +1279,30 @@
                 </section>
             </aside>
         </section>
+
+        @if ($draftLifecycleReview)
+            <div class="vs-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelDraftLifecycleReview()">
+                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="draft-lifecycle-review-title">
+                    <header class="vs-modal-header">
+                        <h2 id="draft-lifecycle-review-title">{{ $draftLifecycleReview['action'] === 'publish' ? 'Review publication' : 'Review draft deletion' }}</h2>
+                    </header>
+                    <div class="vs-modal-body">
+                        <p><strong>{{ $draftLifecycleReview['label'] }}</strong></p>
+                        @if ($draftLifecycleReview['action'] === 'publish')
+                            <p>Publish this draft so it can be selected in Active Forms.</p>
+                        @else
+                            <p>Permanently delete this unused draft, including its sections and questions.</p>
+                        @endif
+                    </div>
+                    <footer class="vs-modal-footer">
+                        <button type="button" class="vs-button" wire:click="cancelDraftLifecycleReview" wire:loading.attr="disabled" wire:target="confirmDraftLifecycle">Cancel</button>
+                        <button type="button" class="vs-button vs-button--primary" wire:click="confirmDraftLifecycle" wire:loading.attr="disabled" wire:target="confirmDraftLifecycle">
+                            {{ $draftLifecycleReview['action'] === 'publish' ? 'Publish Draft' : 'Delete Draft' }}
+                        </button>
+                    </footer>
+                </section>
+            </div>
+        @endif
 
         @if ($showActivationReview)
             <div class="vs-modal-backdrop">

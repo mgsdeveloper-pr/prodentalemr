@@ -186,7 +186,7 @@ class SaasNotifications
                 $user,
                 'account_access_updated',
                 'Account access updated',
-                'An administrator updated your ProDental account or access permissions.',
+                'An administrator updated your Denentiq account or access permissions.',
                 'security.account-updated.' . $user->getKey() . '.' . now()->timestamp,
             );
         }

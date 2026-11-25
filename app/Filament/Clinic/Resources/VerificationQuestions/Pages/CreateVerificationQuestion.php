@@ -13,6 +13,8 @@ use Livewire\Attributes\Url;
 
 class CreateVerificationQuestion extends CreateRecord
 {
+    protected ?bool $hasDatabaseTransactions = true;
+
     use InteractsWithVerificationQuestionOrdering;
 
     protected static string $resource = VerificationQuestionResource::class;
@@ -191,6 +193,7 @@ class CreateVerificationQuestion extends CreateRecord
         );
 
         abort_unless($version?->canEditDirectly(), 403, 'Only an unused clinic template draft can be changed.');
+        app(\App\Support\VerificationTemplateVersionService::class)->lockEditableDraft($version->id, ClinicPanelScope::selectedClinicId());
         $data['template_version_id'] = $version->getKey();
         if ($version->form_type !== 'both') $data['form_type'] = $version->form_type;
         $data['sort_order'] = (int) ($data['sort_order'] ?? 9990);

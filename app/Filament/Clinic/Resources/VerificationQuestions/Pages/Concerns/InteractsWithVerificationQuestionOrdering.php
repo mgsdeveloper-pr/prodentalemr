@@ -97,7 +97,6 @@ trait InteractsWithVerificationQuestionOrdering
         }
 
         $clinicId = ClinicPanelScope::selectedClinicId();
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
         $version = $this->getEditorTemplateVersion();
         $sectionKey = $this->data['sub_section_key'] ?? $this->data['section_key'] ?? null;
         $templateKey = $this->data['template_key'] ?? VerificationFormQuestion::defaultTemplateKey();
@@ -116,27 +115,9 @@ trait InteractsWithVerificationQuestionOrdering
             $sectionKeys = array_values(array_unique([...$sectionKeys, ...$childSectionKeys]));
         }
 
-        $questions = VerificationFormQuestion::query()
-            ->visibleForClinic($clinicId, $organizationId)
-            ->where('template_key', $templateKey)
-            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
-            ->whereIn('section_key', $sectionKeys)
-            ->where('is_active', true)
-            ->whereIn('id', $orderedIds)
-            ->get()
-            ->keyBy('id');
-
-        foreach ($orderedIds as $index => $questionId) {
-            $question = $questions->get($questionId);
-
-            if (! $question) {
-                continue;
-            }
-
-            $question->forceFill([
-                'sort_order' => ($index + 1) * 10,
-            ])->saveQuietly();
-        }
+        app(\App\Support\VerificationTemplateVersionService::class)->reorderDraftQuestions(
+            $version?->id, $clinicId, $orderedIds->all(), $sectionKeys, activeOnly: true,
+        );
     }
 
     public function getPlacementSummaryLabel(): string
@@ -211,11 +192,9 @@ trait InteractsWithVerificationQuestionOrdering
             $ordered[] = $record;
         }
 
-        foreach (array_values($ordered) as $index => $question) {
-            $question->forceFill([
-                'sort_order' => ($index + 1) * 10,
-            ])->saveQuietly();
-        }
+        app(\App\Support\VerificationTemplateVersionService::class)->reorderDraftQuestions(
+            $record->template_version_id, $clinicId, collect($ordered)->pluck('id')->values()->all(), [$sectionKey],
+        );
     }
 
     protected function normalizeSectionQuestionOrder(?string $sectionKey, ?int $excludeRecordId = null): void
@@ -240,11 +219,9 @@ trait InteractsWithVerificationQuestionOrdering
             ->get()
             ->values();
 
-        foreach ($questions as $index => $question) {
-            $question->forceFill([
-                'sort_order' => ($index + 1) * 10,
-            ])->saveQuietly();
-        }
+        app(\App\Support\VerificationTemplateVersionService::class)->reorderDraftQuestions(
+            $version?->id, $clinicId, $questions->pluck('id')->all(), [$sectionKey], activeOnly: true,
+        );
     }
 
     protected function getEditorTemplateVersion(): ?VerificationTemplateVersion

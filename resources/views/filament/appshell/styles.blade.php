@@ -1371,6 +1371,8 @@
 
     .pd-appshell-global-header__search {
         display: inline-flex !important;
+        grid-column: 2 !important;
+        grid-row: 1 !important;
         justify-self: center !important;
         width: min(100%, 36rem) !important;
         min-width: 18rem !important;
@@ -1533,10 +1535,7 @@
         }
 
         .pd-appshell-global-header__search {
-            grid-column: 1 / -1 !important;
-            grid-row: 2 !important;
-            width: 100% !important;
-            min-width: 0 !important;
+            display: none !important;
         }
 
         .pd-appshell-user-menu__summary-text,

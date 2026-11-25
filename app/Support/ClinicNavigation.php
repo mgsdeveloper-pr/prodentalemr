@@ -36,13 +36,14 @@ class ClinicNavigation
         $requested = null;
         if (str_starts_with($slug, 'verification') || in_array($slug, ['shared-inbox', 'shared-inbox-settings', 'portal-credentials', 'import-verification-template', 'request-response'], true)) {
             $requested = ClinicWorkspace::VERIFICATION;
-        } elseif (in_array($slug, array_map(fn ($module) => str_replace('_', '-', $module), ClinicWorkspace::clinicPmsModules()), true)
-            && $slug !== 'appointments') {
-            $requested = ClinicWorkspace::CLINIC_PMS;
         }
         $selected = ClinicWorkspace::selectedOrDefault($clinic);
         if ($requested && ClinicWorkspace::canUse($requested, $clinic)) $selected = $requested;
-        if (! $selected) return route('clinic.choose-workspace');
+        if (! $selected) {
+            ClinicWorkspace::clear();
+
+            return route('clinic.choose-workspace');
+        }
         ClinicWorkspace::select($selected);
         if (($requested && $requested !== $selected) || $slug === '') return ClinicWorkspace::homeUrl($selected);
         return $target;

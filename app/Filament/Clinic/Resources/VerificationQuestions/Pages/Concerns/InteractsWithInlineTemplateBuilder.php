@@ -5,6 +5,7 @@ namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages\Concerns;
 use App\Models\VerificationFormQuestion;
 use App\Support\ClinicTemplateBuilder;
 use App\Support\VerificationTemplateImport;
+use App\Support\VerificationTemplateVersionService;
 use Livewire\Attributes\Locked;
 
 trait InteractsWithInlineTemplateBuilder
@@ -18,6 +19,7 @@ trait InteractsWithInlineTemplateBuilder
     #[Locked] public array $removalIds = [];
     #[Locked] public array $removalSections = [];
     #[Locked] public array $removalLabels = [];
+    #[Locked] public array $removalReview = [];
     public bool $showRemoval = false;
 
     public function editorDirty(): bool
@@ -91,7 +93,7 @@ trait InteractsWithInlineTemplateBuilder
     public function saveInlineQuestion(): void
     {
         abort_unless($this->editorOpen && $this->isDraftEditingOpen(), 403);
-        $question = app(ClinicTemplateBuilder::class)->save($this->getDisplayedClinicVersion()->id, $this->editingQuestionId, $this->editor);
+        $question = app(ClinicTemplateBuilder::class)->save($this->getDisplayedClinicVersion()->id, $this->editingQuestionId, $this->editor, $this->builderClinic()?->id);
         $this->selectedSectionKey = $question->section_key;
         $this->resetInlineEditor();
         $this->resetBuilderCaches();
@@ -117,6 +119,11 @@ trait InteractsWithInlineTemplateBuilder
         abort_unless($this->getSourceDrafts()->contains('id', $id), 404);
         $this->closeCreateDraftModal();
         $this->selectBuilderVersion($id);
+        if ($this->pendingBuilderAction === 'reorder') {
+            $this->setBuilderView('reorder');
+        } elseif ($this->pendingBuilderAction === 'questions') {
+            $this->redirectToQuestionCreate();
+        }
     }
 
     public function getInlineParents()
@@ -130,6 +137,8 @@ trait InteractsWithInlineTemplateBuilder
         if ($this->guardEditor('requestRemoval', [$questionId])) return;
         abort_unless($this->isDraftEditingOpen(), 403);
         $version = $this->getDisplayedClinicVersion();
+        $versions = app(VerificationTemplateVersionService::class);
+        $revision = $versions->draftRevision($version);
         $this->removalSections = [];
         if ($questionId) $questions = collect([$version->questions()->findOrFail($questionId)]);
         else {
@@ -140,21 +149,38 @@ trait InteractsWithInlineTemplateBuilder
         }
         $this->removalIds = $questions->pluck('id')->all();
         $this->removalLabels = $questions->pluck('prompt')->all();
+        $this->removalReview = [
+            'version_id' => $version->id,
+            'revision' => $revision,
+        ];
         $this->showRemoval = true;
     }
 
     public function confirmRemoval(): void
     {
-        abort_unless($this->showRemoval, 403);
-        app(ClinicTemplateBuilder::class)->remove($this->getDisplayedClinicVersion()->id, $this->removalIds, $this->removalSections);
-        $this->showRemoval = false;
+        $version = $this->getDisplayedClinicVersion();
+        abort_unless($this->showRemoval && $version && ($this->removalReview['version_id'] ?? null) === $version->id, 403);
+        app(ClinicTemplateBuilder::class)->remove($version->id, $this->removalIds, $this->removalSections, $this->removalReview['revision'], $this->builderClinic()?->id);
+        $this->cancelRemoval();
         $this->resetInlineEditor();
         $this->resetBuilderCaches();
+    }
+
+    public function cancelRemoval(): void
+    {
+        $this->showRemoval = false;
+        $this->removalReview = [];
+    }
+
+    protected function invalidateDraftReviews(): void
+    {
+        $this->cancelPublishing();
+        $this->cancelRemoval();
     }
 
     public function returnToTemplates(): void
     {
         if ($this->guardEditor('returnToTemplates')) return;
-        $this->redirect(\App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']), navigate: true);
+        $this->redirect($this->templateLibraryUrl(), navigate: true);
     }
 }

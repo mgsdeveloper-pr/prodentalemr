@@ -2,14 +2,16 @@
 
 ## Active Product
 
-ProDental currently provides four shared-shell workspaces outside the deferred PMS area:
+ProDental provides four shared-shell workspaces:
 
 - **SaaS:** clients, DSO/organization/clinic structure, plans, subscriptions, billing, platform users, master data, support controls, and platform settings.
 - **Verification:** queues, assignments, form work, clinic requests and responses, audit, SLA, reports, documents, portal credentials, and notifications.
 - **Clinic:** appointments, calendar, patients as request context, verification requests/results, clinic responses, providers, portal credentials, documents, users, and clinic settings.
 - **DSO:** network overview, clinic visibility, cross-clinic reporting, users, roles, and permissions.
 
-Appointments and Calendar are core Clinic modules on every plan. Insurance policies are maintained in the Patient record and are consumed by appointment and verification workflows.
+Clinic access requires active Verification services. Appointments, Calendar, patient records, insurance policies, and the carrier directory support that workflow. Access to each module still requires the user's role permissions.
+
+The Clinic PMS workspace and its clinical and patient-billing screens are retired. Existing records and historical subscription plan data are retained. A clinic with a PMS-only entitlement needs Verification enrollment before its staff can enter the Clinic workspace.
 
 ## Verification Service Models
 

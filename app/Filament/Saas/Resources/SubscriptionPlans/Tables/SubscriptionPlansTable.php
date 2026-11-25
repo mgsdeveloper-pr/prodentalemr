@@ -47,8 +47,11 @@ class SubscriptionPlansTable
                     ->badge()
                     ->toggleable(),
                 TextColumn::make('price')
-                    ->money('USD')
+                    ->money(fn ($record) => $record->currency ?: 'USD')
                     ->sortable(),
+                TextColumn::make('verification_model')->label('Offering')->formatStateUsing(fn ($state) => \App\Models\SubscriptionPlan::verificationModelOptions()[$state] ?? $state)->badge(),
+                TextColumn::make('billing_interval')->label('Billing')->badge(),
+                IconColumn::make('website_published')->label('Website')->boolean(),
                 TextColumn::make('max_clinics')
                     ->numeric()
                     ->sortable(),

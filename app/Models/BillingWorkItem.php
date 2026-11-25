@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\Verification\SLAService;
 use App\Services\Verification\TimelineService;
+use App\Services\Verification\VerificationAuditService;
 use App\Traits\HasPublicId;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Validation\ValidationException;
 
 class BillingWorkItem extends Model
 {
@@ -63,6 +65,7 @@ class BillingWorkItem extends Model
     public const OUTCOME_STATUS_OPTIONS = [
         'pending' => 'Pending',
         'verified' => 'Verified',
+        'inactive_coverage' => 'Inactive Coverage',
         'unable_to_verify' => 'Unable to Verify',
         'info_requested' => 'Info Requested',
         'audit_required' => 'Audit Required',
@@ -71,6 +74,7 @@ class BillingWorkItem extends Model
 
     public const FINAL_OUTCOME_STATUSES = [
         'verified',
+        'inactive_coverage',
         'unable_to_verify',
     ];
 
@@ -109,6 +113,7 @@ class BillingWorkItem extends Model
     ];
 
     protected $fillable = [
+        'coverage_assessment',
         'organization_id',
         'clinic_id',
         'location_id',
@@ -158,6 +163,7 @@ class BillingWorkItem extends Model
     protected function casts(): array
     {
         return [
+            'coverage_assessment' => 'array',
             'due_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
@@ -740,6 +746,15 @@ class BillingWorkItem extends Model
     {
         $currentStatus = $this->normalized_status;
         $normalizedTarget = self::normalizeStatus($status);
+        if ($this->coverage_assessment !== null && in_array($normalizedTarget, [self::STATUS_REVIEW, self::STATUS_DONE], true)) {
+            $missing = app(VerificationAuditService::class)->missingRequiredAnswers($this);
+            if ($missing !== []) {
+                throw ValidationException::withMessages(['audit' => implode(' ', array_values($missing))]);
+            }
+            if ($normalizedTarget === self::STATUS_DONE && $currentStatus !== self::STATUS_REVIEW) {
+                throw ValidationException::withMessages(['audit' => 'Submit the coverage finding for review before completion.']);
+            }
+        }
         $actorRole = static::resolveActorRole();
         $activityEvents = [];
 

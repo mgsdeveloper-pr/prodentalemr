@@ -49,6 +49,7 @@ beforeEach(function () {
     ]);
 
     seedWorkflowMaster();
+    app(\App\Support\VerificationTemplateVersionService::class)->provisionRegisteredClinic($this->clinic);
 
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
@@ -198,12 +199,20 @@ it('offers both managed and clinic team routing for hybrid clinics', function ()
 });
 
 it('creates one linked verification request from an appointment', function () {
+    $this->clinic->update(['verification_services_enabled' => true]);
+    $templates = app(\App\Support\VerificationTemplateVersionService::class);
+    $templates->provisionRegisteredClinic($this->clinic, requireBoth: true);
+    $fullVersionId = $templates->activeClinicForms($this->clinic->id)['full_form'];
     $sender = app(AppointmentVerificationSender::class);
     $first = $sender->send($this->appointment, BillingWorkItem::PROCESSING_MODE_SELF_MANAGED);
     $second = $sender->send($this->appointment->fresh(), BillingWorkItem::PROCESSING_MODE_SELF_MANAGED);
 
     expect($second->is($first))->toBeTrue()
         ->and($first->appointment_id)->toBe($this->appointment->id)
+        ->and($first->patient_insurance_policy_id)->toBe($this->policy->id)
+        ->and($first->verificationProfile->form_type)->toBe('full_form')
+        ->and($first->verification_template_version_id)->toBe($fullVersionId)
+        ->and($first->verification_template_snapshot['version']['id'])->toBe($fullVersionId)
         ->and($first->processing_mode)->toBe(BillingWorkItem::PROCESSING_MODE_SELF_MANAGED)
         ->and($this->appointment->fresh()->verification_work_item_id)->toBe($first->id)
         ->and($this->appointment->fresh()->verification_status)->toBe(Appointment::VERIFICATION_STATUS_SENT)
@@ -520,6 +529,7 @@ it('renders the connected appointment editor and modal actions', function () {
         ->assertSee('+ Add Patient')
         ->assertSee('Select a doctor to view appointment availability.')
         ->assertSee('Insurance verification required')
+        ->assertSee('Verification requests created from this appointment use Full Form.')
         ->assertSee('Save Appointment')
         ->assertSee('wire:submit="create"', false)
         ->assertSee('type="submit"', false)

@@ -55,7 +55,7 @@
                                 <th>Access scope</th>
                                 <th>Calling</th>
                                 <th>Status</th>
-                                <th>Last active</th>
+                                <th>Last sign-in</th>
                                 <th><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
@@ -73,7 +73,7 @@
                                     <td>{{ $this->accessScope($user) }}</td>
                                     <td><span class="saas-users__calling {{ $user->active_calling_assignments_count > 0 ? 'is-enabled' : '' }}">{{ $user->active_calling_assignments_count > 0 ? 'Enabled' : 'Not enabled' }}</span></td>
                                     <td><span class="saas-users__status is-{{ $this->statusTone($user) }}"><i aria-hidden="true"></i>{{ $this->statusLabel($user) }}</span></td>
-                                    <td>{{ $user->last_login_at?->diffForHumans() ?? 'Never' }}</td>
+                                    <td>{{ $user->last_login_at?->diffForHumans() ?? 'Never signed in' }}</td>
                                     <td>
                                         @if ($actionUrl)
                                             <a class="saas-users__icon-button" href="{{ $actionUrl }}" wire:navigate aria-label="{{ $this->canEditUser($user) ? 'Edit' : 'View' }} {{ $user->name }}">

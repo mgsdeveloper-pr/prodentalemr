@@ -238,7 +238,7 @@ class ProductNotificationService
             'target_url' => $targetUrl,
             'payload' => [
                 'external_title' => $title,
-                'external_message' => $message . "\n\nSign in to ProDental for details.",
+                'external_message' => $message . "\n\nSign in to Denentiq for details.",
             ],
             'idempotency_key' => $idempotencyKey,
             'occurred_at' => now(),

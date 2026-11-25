@@ -2,8 +2,8 @@
 
 namespace App\Filament\Saas\Resources\Verifications\Pages;
 
-use App\Actions\Verification\RefreshVerificationTemplateAction;
 use App\Actions\Verification\EscalateVerificationRequestAction;
+use App\Actions\Verification\RefreshVerificationTemplateAction;
 use App\Actions\Verification\SaveVerificationAnswerAction;
 use App\Actions\Verification\TakeVerificationOwnershipAction;
 use App\Filament\Saas\Resources\Verifications\Pages\Concerns\InteractsWithVerificationWorkbench;
@@ -17,6 +17,8 @@ use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationFormSubmission;
 use App\Models\VerificationTemplateSection;
+use App\Models\VerificationTemplateVersion;
+use App\Services\Verification\CoverageAssessmentService;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\WorkflowService;
@@ -33,12 +35,14 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
@@ -71,7 +75,7 @@ class EditVerificationRequest extends EditRecord
 
     public bool $hasUnsavedVerificationChanges = false;
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public array $templateRefreshReview = [];
 
     public bool $showTemplateRefresh = false;
@@ -84,7 +88,7 @@ class EditVerificationRequest extends EditRecord
             $this->shouldCaptureSubmissionOnSave = false;
             try {
                 $this->persistTemplateThreeWithoutResourceValidation(
-                    \Illuminate\Support\Arr::only($this->data ?? [], ['notes', 'internal_summary'])
+                    Arr::only($this->data ?? [], ['notes', 'internal_summary'])
                 );
             } finally {
                 $this->shouldSkipWorkflowSyncOnSave = false;
@@ -174,7 +178,6 @@ class EditVerificationRequest extends EditRecord
         parent::mount($record);
         $this->data = $this->normalizeVerificationDateFieldsForDisplay($this->data ?? []);
 
-        $this->record = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($this->record);
         $this->returnToQueue = $this->resolveReturnToQueueUrl(request()->query('return'));
 
         $this->record->recordActivity('verification_console_opened', 'Verification console opened.', [
@@ -525,6 +528,14 @@ class EditVerificationRequest extends EditRecord
 
     public function updated($name, $value): void
     {
+        if ($name === 'data.coverage_assessment.outcome') {
+            foreach (['patient_name' => 'vf_patient_full_name', 'insurance_name' => 'vf_insurance_provider_name',
+                'member_id' => 'vf_patient_identifier', 'service_date' => 'vf_appointment_date'] as $target => $source) {
+                if (blank(data_get($this->data, 'coverage_assessment.'.$target)) && filled($this->data[$source] ?? null)) {
+                    $this->data['coverage_assessment'][$target] = $this->data[$source];
+                }
+            }
+        }
         if (
             str_starts_with((string) $name, 'data.')
             || str_starts_with((string) $name, 'codeCoverageData.')
@@ -1007,6 +1018,15 @@ class EditVerificationRequest extends EditRecord
         $this->refreshVerificationFormStateFromRecord();
         $missingFields = $this->missingRequiredVerificationFields();
 
+        if ($this->record->coverage_assessment !== null) {
+            $this->auditReady = $missingFields === [];
+            Notification::make()->title('Verification saved')
+                ->body($this->auditReady ? 'Ready for review. Approval is still required.' : 'Draft saved. Coverage or required answers still need attention.')
+                ->success()->send();
+
+            return;
+        }
+
         if ($missingFields !== [] && $this->record->normalized_status !== BillingWorkItem::STATUS_INCOMPLETE) {
             $this->record = app(WorkflowService::class)->transition($this->record, BillingWorkItem::STATUS_INCOMPLETE);
         } elseif ($missingFields === [] && $this->record->normalized_status === BillingWorkItem::STATUS_INCOMPLETE) {
@@ -1366,9 +1386,19 @@ class EditVerificationRequest extends EditRecord
             ->all();
     }
 
+    public function getReviewTemplateVersion(): ?VerificationTemplateVersion
+    {
+        $versionId = app(VerificationAuditService::class)->templateVersionId($this->record);
+
+        return $this->record->verificationTemplateVersion
+            ?? ($versionId ? VerificationTemplateVersion::find($versionId) : null);
+    }
+
     public function usesSectionLayout(): bool
     {
-        return (bool) data_get($this->record->verification_template_snapshot, 'version.uses_section_layout', false);
+        $usesSectionLayout = data_get($this->record->verification_template_snapshot, 'version.uses_section_layout');
+
+        return (bool) ($usesSectionLayout ?? $this->getReviewTemplateVersion()?->uses_section_layout);
     }
 
     public function getStructuredTemplateSections(): array
@@ -1381,14 +1411,21 @@ class EditVerificationRequest extends EditRecord
         );
         $coverage = collect($this->codeCoverageData)->mapWithKeys(fn ($row, $index) => [$this->codeCoverageRowSignature($row) => ['index' => $index, 'row' => $row]]);
         $group = function ($section) use ($questions, $coverage): array {
-            $rows = []; $benefits = [];
+            $rows = [];
+            $benefits = [];
             foreach ($questions->where('section_key', $section->section_key) as $question) {
-                if (! app(VerificationAuditService::class)->visibleInAnswerState($question, $questions, $this->data ?? [])) continue;
+                if (! app(VerificationAuditService::class)->visibleInAnswerState($question, $questions, $this->data ?? [])) {
+                    continue;
+                }
                 if ($question->input_type === 'frequency_row') {
                     $signature = $this->codeCoverageRowSignature(['category' => $question->frequencyCategory(), 'code' => $question->code ?: '', 'description' => $question->prompt]);
-                    if ($coverage->has($signature)) $benefits[] = [...$coverage->get($signature), 'question_id' => $question->id];
+                    if ($coverage->has($signature)) {
+                        $benefits[] = [...$coverage->get($signature), 'question_id' => $question->id];
+                    }
                 } else {
-                    if ($question->field_key === 'vf_verified_by' && ! $this->canViewVerifiedByField()) continue;
+                    if ($question->field_key === 'vf_verified_by' && ! $this->canViewVerifiedByField()) {
+                        continue;
+                    }
                     $row = $this->mapManagedTemplateQuestionToRow($question);
                     $row['secondary_field'] = $question->secondary_field_key;
                     $row['secondary_type'] = $question->secondary_input_type;
@@ -1396,8 +1433,10 @@ class EditVerificationRequest extends EditRecord
                     $rows[] = $row;
                 }
             }
+
             return ['key' => $section->section_key, 'label' => $section->label, 'questions' => $rows, 'benefits' => $benefits];
         };
+
         return $definitions->whereNull('parent_section_key')->map(function ($section) use ($definitions, $group) {
             return [...$group($section), 'children' => $definitions->where('parent_section_key', $section->section_key)->map($group)->values()->all()];
         })->all();
@@ -1773,6 +1812,7 @@ class EditVerificationRequest extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $data['coverage_assessment'] = $this->record->coverage_assessment ?? [];
         $this->record->load([
             'organization',
             'clinic',
@@ -1888,6 +1928,8 @@ class EditVerificationRequest extends EditRecord
 
         [$answerData, $answerNoteData] = $this->extractTemplateThreeCustomAnswerPayloads($formData);
         [$workItemData, $profileData] = static::splitVerificationProfileData($workItemData);
+        // Assessment writes go through validation in afterSave, never raw form mass assignment.
+        unset($workItemData['coverage_assessment']);
 
         foreach (array_keys($workItemData) as $key) {
             if (str_starts_with((string) $key, 'custom_question_') || str_starts_with((string) $key, 'context_')) {
@@ -2104,6 +2146,14 @@ class EditVerificationRequest extends EditRecord
 
     protected function afterSave(): void
     {
+        if (! empty($this->data['coverage_assessment']) && is_array($this->data['coverage_assessment'])) {
+            $assessment = app(CoverageAssessmentService::class)->normalize($this->data['coverage_assessment']);
+            $old = $this->record->coverage_assessment ?? [];
+            $changed = Arr::except($old, ['verified_at', 'verified_by']) !== $assessment;
+            $assessment['verified_at'] = $changed ? now()->toIso8601String() : ($old['verified_at'] ?? now()->toIso8601String());
+            $assessment['verified_by'] = $changed ? auth()->id() : ($old['verified_by'] ?? auth()->id());
+            $this->record->forceFill(['coverage_assessment' => $assessment])->save();
+        }
         $this->record->verificationProfile()->updateOrCreate([], $this->verificationProfileData);
         $this->syncVerificationFormAnswers();
         $this->syncVerificationCoverageCodes();
@@ -2113,6 +2163,7 @@ class EditVerificationRequest extends EditRecord
         }
         if (! $this->shouldCaptureSubmissionOnSave) {
             $this->hasUnsavedVerificationChanges = false;
+
             return;
         }
 
@@ -2161,6 +2212,10 @@ class EditVerificationRequest extends EditRecord
 
     protected function deriveWorkflowStatusFromForm(): string
     {
+        // A saved coverage finding never acts as reviewer approval.
+        if ($this->record->coverage_assessment !== null) {
+            return $this->record->normalized_status;
+        }
         $outcomeStatus = (string) ($this->record->outcome_status ?? 'pending');
 
         if ($this->shouldForceAwaitingClinicResponse($outcomeStatus)) {
@@ -2202,6 +2257,15 @@ class EditVerificationRequest extends EditRecord
 
     protected function missingRequiredVerificationFields(): array
     {
+        $assessment = $this->data['coverage_assessment'] ?? $this->record->coverage_assessment ?? [];
+        $assessmentMissing = app(CoverageAssessmentService::class)->missing($assessment,
+            filled(data_get($this->data, 'vf_appointment_date')) ? Carbon::parse($this->data['vf_appointment_date'])->toDateString() : null);
+        if (! app(VerificationAuditService::class)->templateVersionId($this->record)) {
+            $assessmentMissing['template'] = 'No active template is configured for this form. Ask an administrator to activate it.';
+        }
+        if (($assessment['outcome'] ?? null) === 'inactive') {
+            return $assessmentMissing;
+        }
         $clinicId = $this->record->clinic_id;
         $organizationId = $this->record->organization_id;
 
@@ -2217,7 +2281,7 @@ class EditVerificationRequest extends EditRecord
             'vf_quick_reference',
         ];
 
-        $missingFields = [];
+        $missingFields = $assessmentMissing;
 
         $questions = app(VerificationAuditService::class)->requiredApplicableQuestions(
             $this->record,
@@ -3205,6 +3269,7 @@ class EditVerificationRequest extends EditRecord
                     'answered_coverage_codes' => $answeredCoverageCodes,
                 ],
                 'work_item' => [
+                    'coverage_assessment' => $this->record->coverage_assessment,
                     'status' => $this->record->normalized_status,
                     'outcome_status' => $this->record->outcome_status,
                     'priority' => $this->record->priority,

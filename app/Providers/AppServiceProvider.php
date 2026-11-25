@@ -74,6 +74,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Change display branding after config loads; retain existing session/cache identifiers.
+        config(['app.name' => 'Denentiq']);
+
         Gate::policy(AuditLog::class, AuditLogPolicy::class);
         Gate::policy(AdaProcedureCode::class, AdaProcedureCodePolicy::class);
         Gate::policy(BillingWorkItem::class, BillingWorkItemPolicy::class);
@@ -115,6 +118,12 @@ class AppServiceProvider extends ServiceProvider
 
     protected function registerSecurityNotificationListeners(): void
     {
+        Event::listen(\Illuminate\Auth\Events\Login::class, function (\Illuminate\Auth\Events\Login $event): void {
+            if ($event->user instanceof User && $event->user->status) {
+                $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            }
+        });
+
         Event::listen(Lockout::class, function (Lockout $event): void {
             $email = $event->request?->string('email')->toString();
             $user = filled($email) ? User::query()->where('email', $email)->first() : null;
@@ -138,7 +147,7 @@ class AppServiceProvider extends ServiceProvider
                     $event->user,
                     'password_reset',
                     'Password changed',
-                    'Your ProDental password was successfully changed.',
+                    'Your Denentiq password was successfully changed.',
                     'security.password-reset.'.$event->user->getKey().'.'.now()->timestamp,
                 );
             }
@@ -150,7 +159,7 @@ class AppServiceProvider extends ServiceProvider
                     $event->user,
                     'account_verified',
                     'Account verified',
-                    'Your ProDental account email was successfully verified.',
+                    'Your Denentiq account email was successfully verified.',
                     'security.verified.'.$event->user->getKey(),
                 );
             }

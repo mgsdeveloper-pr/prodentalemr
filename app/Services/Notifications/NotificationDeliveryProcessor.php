@@ -76,7 +76,7 @@ class NotificationDeliveryProcessor
         $message = data_get(
             $event->payload,
             'external_message',
-            'A ProDental notification requires your attention. Sign in to review the details securely.',
+            'A Denentiq notification requires your attention. Sign in to review the details securely.',
         );
 
         Mail::mailer($state['email_mailer'] ?? 'smtp')->raw($message, function ($mail) use ($delivery, $subject): void {

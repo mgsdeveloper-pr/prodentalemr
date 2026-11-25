@@ -31,6 +31,7 @@ class VerificationResultService
             'submission' => $submission,
             'profile' => is_array($profile) ? $profile : ($request->verificationProfile?->getAttributes() ?? []),
             'work_item' => is_array($workItem) ? $workItem : [
+                'coverage_assessment' => $request->coverage_assessment,
                 'status' => $request->normalized_status,
                 'outcome_status' => $request->outcome_status,
                 'notes' => $request->notes,
@@ -44,6 +45,11 @@ class VerificationResultService
     {
         $data = $this->recordedData($request, $submission);
         $profile = $data['profile'];
+        $assessment = data_get($data, 'work_item.coverage_assessment', []);
+        $inactive = data_get($assessment, 'outcome') === 'inactive';
+        if ($inactive) {
+            $profile = [];
+        }
         $outcome = (string) data_get($data, 'work_item.outcome_status', $request->outcome_status);
 
         if (($submission?->status === BillingWorkItem::STATUS_DONE || $request->normalized_status === BillingWorkItem::STATUS_DONE)
@@ -54,10 +60,13 @@ class VerificationResultService
         $preventive = $profile['coverage_preventive'] ?? $profile['coverage_diagnostic'] ?? null;
 
         return [
+            'coverage_assessment' => $assessment,
             'outcome_status' => $outcome ?: null,
-            'eligibility_status' => $outcome !== ''
+            'eligibility_status' => isset(CoverageAssessmentService::OUTCOMES[$assessment['outcome'] ?? ''])
+                ? CoverageAssessmentService::OUTCOMES[$assessment['outcome']]
+                : ($outcome !== ''
                 ? (BillingWorkItem::OUTCOME_STATUS_OPTIONS[$outcome] ?? str($outcome)->headline()->toString())
-                : 'Not recorded',
+                : 'Not recorded'),
             'effective_date' => $this->date($profile['effective_date'] ?? null),
             'network_status' => $this->networkStatus($profile),
             'annual_maximum' => $this->money($profile['annual_maximum'] ?? null),
@@ -80,14 +89,14 @@ class VerificationResultService
         $data = $this->recordedData($request, $submission);
 
         foreach ($data['profile'] as $key => $value) {
-            $state['vf_' . $key] = $value;
+            $state['vf_'.$key] = $value;
         }
 
         foreach ($data['answers'] as $answer) {
             $questionId = (int) ($answer['question_id'] ?? 0);
 
             if ($questionId > 0) {
-                $state['custom_question_' . $questionId] = $answer['answer_value'] ?? null;
+                $state['custom_question_'.$questionId] = $answer['answer_value'] ?? null;
             }
         }
 
@@ -117,7 +126,7 @@ class VerificationResultService
 
     protected function money(mixed $value): string
     {
-        return filled($value) ? '$' . number_format((float) $value, 2) : 'Not recorded';
+        return filled($value) ? '$'.number_format((float) $value, 2) : 'Not recorded';
     }
 
     protected function percentage(mixed $value): string
@@ -132,7 +141,7 @@ class VerificationResultService
             return $display;
         }
 
-        return rtrim(rtrim(number_format((float) $display, 2), '0'), '.') . '%';
+        return rtrim(rtrim(number_format((float) $display, 2), '0'), '.').'%';
     }
 
     protected function networkStatus(array $profile): string

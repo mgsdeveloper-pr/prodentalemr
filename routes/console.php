@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
+Artisan::command('website-payments:reconcile {--limit=5}', function (\App\Services\WebsiteCheckout\CheckoutService $checkout) {
+    $attempts = \App\Models\WebsitePaymentAttempt::whereIn('status', ['creating', 'pending', 'paid', 'partially_refunded', 'disputed'])
+        ->where(fn ($q) => $q->whereNull('last_checked_at')->orWhere('last_checked_at', '<', now()->subMinutes(15)))
+        ->orderBy('last_checked_at')->limit(min(25, max(1, (int) $this->option('limit'))))->get();
+    foreach ($attempts as $attempt) {
+        try { $checkout->synchronize($attempt); $this->info($attempt->public_id.': checked'); }
+        catch (\Throwable $e) { $this->warn($attempt->public_id.': retained for reconciliation'); }
+    }
+})->purpose('Reconcile initial website payments with their original gateway.');
+
+Schedule::command('website-payments:reconcile --limit=5')->everyFifteenMinutes()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

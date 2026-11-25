@@ -69,6 +69,20 @@ class TenantOnboarding extends Page implements HasForms
 
     protected ?OnboardingDraft $draft = null;
 
+    #[\Livewire\Attributes\Locked]
+    public ?string $draftReference = null;
+
+    public function hydrate(): void
+    {
+        $this->draft = app(ClientOnboardingService::class)->findForUser($this->draftReference, auth()->user(), 'organization_onboarding');
+        abort_if($this->draft?->activated_at !== null || $this->draft?->status === OnboardingDraft::STATUS_ACTIVATED, 409, 'This onboarding is complete. Open the existing account instead.');
+    }
+
+    public function dehydrate(): void
+    {
+        $this->draftReference = $this->draft?->public_id;
+    }
+
     public static function canAccess(): bool
     {
         return auth()->user()?->canAccessSaasModule('organizations') ?? false;
@@ -84,6 +98,11 @@ class TenantOnboarding extends Page implements HasForms
         );
 
         if ($this->draft) {
+            if ($this->draft->activated_at !== null || $this->draft->status === OnboardingDraft::STATUS_ACTIVATED) {
+                abort_unless($this->draft->organization_id, 409, 'This onboarding is already complete.');
+                $this->redirect(OrganizationResource::getUrl('view', ['record' => $this->draft->organization_id]));
+                return;
+            }
             $this->clientType = $this->draft->account_structure;
             $this->verificationModel = $this->draft->verification_model;
         }
@@ -119,6 +138,7 @@ class TenantOnboarding extends Page implements HasForms
             ...$defaults,
             ...($this->draft?->data ?? []),
             ...$requestDefaults,
+            ...($this->draft?->entry_point === 'website' ? ['workspace_mode' => 'verification'] : []),
         ]);
     }
 
@@ -233,8 +253,7 @@ class TenantOnboarding extends Page implements HasForms
                             Select::make('location_city')
                                 ->label('City')
                                 ->options(fn (Get $get): array => UsLocationOptions::cityOptions($get('location_state')))
-                                ->searchable()
-                                ->preload()
+                                ->native()
                                 ->live()
                                 ->afterStateUpdated(fn (Get $get, Set $set, ?string $state) => $set('location_zip_code', UsLocationOptions::zipFor($get('location_state'), $state)))
                                 ->required(),
@@ -418,6 +437,14 @@ class TenantOnboarding extends Page implements HasForms
 
         try {
             $result = DB::transaction(function () use ($state): array {
+                if ($this->draft) {
+                    $this->draft = app(ClientOnboardingService::class)->lockEditable($this->draft);
+                }
+                if ($this->draft?->entry_point === 'website') {
+                    $this->draft = OnboardingDraft::whereKey($this->draft->id)->lockForUpdate()->firstOrFail();
+                    abort_unless($this->draft->status === OnboardingDraft::STATUS_UNDER_REVIEW, 409, 'This registration is no longer awaiting activation.');
+                    \App\Services\WebsiteCheckout\CheckoutService::assertReadyForActivation($this->draft, $state);
+                }
                 if (($state['client_type'] ?? null) === 'single_clinic') {
                     $state['dso_id'] = null;
                 }
@@ -442,7 +469,7 @@ class TenantOnboarding extends Page implements HasForms
                     'account_manager_user_id' => auth()->id(),
                 ]);
 
-                $clinic = Clinic::create([
+                $clinic = Clinic::createWithRequiredVerificationTemplates([
                     'organization_id' => $organization->id,
                     'clinic_name' => $state['clinic_name'],
                     'clinic_code' => $clinicCode,
@@ -512,7 +539,9 @@ class TenantOnboarding extends Page implements HasForms
                     ]);
                 }
 
-                return compact('organization', 'clinic', 'location', 'owner', 'subscription');
+                $result = compact('organization', 'clinic', 'location', 'owner', 'subscription');
+                $this->completeDraft($result);
+                return $result;
             });
         } catch (Throwable $exception) {
             Notification::make()
@@ -531,14 +560,13 @@ class TenantOnboarding extends Page implements HasForms
             ->send();
 
         SaasNotifications::organizationOnboarded($result['organization'], $result['owner']);
-        $this->completeDraft($result);
 
         return redirect(OrganizationResource::getUrl('view', ['record' => $result['organization']]));
     }
 
     protected function syncDraft(): void
     {
-        $state = $this->form->getState();
+        $state = $this->data ?? [];
 
         if (! $this->hasMeaningfulDraftData($state)) {
             $this->deleteDraft();
@@ -565,7 +593,7 @@ class TenantOnboarding extends Page implements HasForms
 
     protected function deleteDraft(): void
     {
-        if (! $this->draft) {
+        if (! $this->draft || $this->draft->entry_point === 'website') {
             return;
         }
 

@@ -33,6 +33,11 @@ class PatientDocumentResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'display_title';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['title', 'original_name'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PatientDocumentForm::configure($schema);

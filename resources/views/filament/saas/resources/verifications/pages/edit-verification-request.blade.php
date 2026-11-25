@@ -168,13 +168,13 @@
             default => 'Save progress',
         };
         $latestActivity = $activityTimeline->first();
-        $templateVersionRecord = $record->verificationTemplateVersion;
+        $templateVersionRecord = $this->getReviewTemplateVersion();
         $templateSnapshotVersion = data_get($record->verification_template_snapshot, 'version', []);
         $templateVersionNumber = data_get($templateSnapshotVersion, 'version_number') ?? $templateVersionRecord?->version_number;
         $templateScope = data_get($templateSnapshotVersion, 'scope') ?? $templateVersionRecord?->scope;
         $templateName = data_get($templateSnapshotVersion, 'name') ?? $templateVersionRecord?->name;
         $templateFormType = data_get($templateSnapshotVersion, 'form_type') ?? $templateVersionRecord?->form_type;
-        $templateFormTypeLabel = \App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS[$templateFormType] ?? 'Full + Short';
+        $templateFormTypeLabel = \App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS[$templateFormType] ?? null;
         $templateChipLabel = trim(collect([
             $templateScope ? str($templateScope)->headline()->toString() : null,
             $templateVersionNumber ? 'v' . $templateVersionNumber : null,
@@ -1174,7 +1174,7 @@
             <section class="vt3-status-rail" aria-label="Verification request summary">
                 <span class="vt3-status-chip vt3-status-chip--primary">Status <strong>{{ $requestStatusLabel }}</strong></span>
                 <span class="vt3-status-chip">Next <strong>{{ $requestNextAction }}</strong></span>
-                <span class="vt3-status-chip" title="{{ $templateName ?: 'Template snapshot' }}">Template <strong>{{ $templateChipLabel ?: 'Attached' }}</strong></span>
+                <span class="vt3-status-chip" title="{{ $templateName ?: 'Template snapshot' }}">Template <strong>{{ $templateChipLabel ?: 'Setup required' }}</strong></span>
                 <span class="vt3-status-chip">SLA <strong>{{ $slaSnapshot['label'] ?? 'Not Set' }}</strong></span>
                 <span class="vt3-status-chip">Activity <strong>{{ $activityTimeline->count() }}</strong></span>
             </section>
@@ -1191,7 +1191,17 @@
 
         <form wire:submit="save">
             <section class="vt3-form-stage" style="display: flex; flex-direction: column; gap: 18px;">
+                @include('filament.saas.resources.verifications.pages.partials.coverage-assessment')
+                @if (data_get($this->data, 'coverage_assessment.outcome') === 'inactive')
+                    <details class="coverage-assessment">
+                        <summary>Retained form answers (not assessed)</summary>
+                        <fieldset disabled style="border:0;padding:0;min-width:0">
+                            @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
+                        </fieldset>
+                    </details>
+                @else
                 @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
+                @endif
             </section>
         </form>
 

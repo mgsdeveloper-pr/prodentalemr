@@ -526,9 +526,13 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return false;
         }
 
-        if ($this->isSaasAdmin()
-            || $this->canPerformClinicModuleAction('template_management', 'add')
-            || $this->canPerformClinicModuleAction('template_management', 'update')) {
+        if ($this->isSaasAdmin()) {
+            return true;
+        }
+
+        if (($clinic === null || (int) $this->clinic_id === (int) $clinic->getKey())
+            && ($this->canPerformClinicModuleAction('template_management', 'add')
+                || $this->canPerformClinicModuleAction('template_management', 'update'))) {
             return true;
         }
 
@@ -569,32 +573,18 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
 
     protected function clinicServiceModuleEnabled(string $module): bool
     {
+        if (! in_array($module, [...ClinicWorkspace::verificationModules(), ...ClinicWorkspace::sharedModules()], true)) {
+            return false;
+        }
+
         $clinic = $this->serviceGateClinic();
 
         if (! $clinic instanceof Clinic) {
             return $this->shouldBypassClinicScope();
         }
 
-        if (! SaasEntitlements::clinicModuleAllowed($clinic, $module)) {
-            return false;
-        }
-
-        if (in_array($module, self::verificationClinicModules(), true)) {
-            return $clinic->hasActiveVerificationServices()
-                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
-        }
-
-        if (in_array($module, self::clinicOperationsModules(), true)) {
-            return $clinic->hasActiveClinicOperations()
-                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
-        }
-
-        if (in_array($module, self::sharedClinicModules(), true)) {
-            return ($clinic->hasActiveVerificationServices() || $clinic->hasActiveClinicOperations())
-                && ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
-        }
-
-        return ClinicWorkspace::moduleMatchesSelectedWorkspace($module, $clinic);
+        return $clinic->hasActiveVerificationServices()
+            && SaasEntitlements::clinicModuleAllowed($clinic, $module);
     }
 
     protected function hasAnyEnabledClinicService(): bool
@@ -605,7 +595,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
             return $this->shouldBypassClinicScope();
         }
 
-        return $clinic->hasActiveVerificationServices() || $clinic->hasActiveClinicOperations();
+        return $clinic->hasActiveVerificationServices();
     }
 
     protected function serviceGateClinic(): ?Clinic
@@ -615,27 +605,6 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
         }
 
         return $this->clinic;
-    }
-
-    protected static function verificationClinicModules(): array
-    {
-        return [
-            ...ClinicWorkspace::verificationModules(),
-        ];
-    }
-
-    protected static function clinicOperationsModules(): array
-    {
-        return [
-            ...ClinicWorkspace::clinicPmsModules(),
-        ];
-    }
-
-    protected static function sharedClinicModules(): array
-    {
-        return [
-            ...ClinicWorkspace::sharedModules(),
-        ];
     }
 
     public function shouldBypassClinicScope(): bool

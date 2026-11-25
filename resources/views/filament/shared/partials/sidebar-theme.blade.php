@@ -1333,6 +1333,20 @@
         }
     }
 
+    @media (max-width: 1180px) {
+        section.pd-appshell-global-header {
+            grid-template-columns: minmax(0, 1fr) max-content !important;
+        }
+
+        .pd-appshell-global-header > .pd-appshell-global-header__search {
+            display: none !important;
+        }
+
+        .pd-appshell-global-header .pd-appshell-global-header__mobile-search {
+            display: inline-flex !important;
+        }
+    }
+
     /*
      * Workspace-frame alignment.
      * The sidebar owns the left navigation column. The global header starts
