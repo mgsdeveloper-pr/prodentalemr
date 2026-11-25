@@ -17,6 +17,8 @@ trait InteractsWithVerificationWorkbench
 
     public ?array $selectedSubmissionSnapshot = null;
 
+    public ?int $snapshotReturnActivityId = null;
+
     public function getWorkflowLifecycle(): array
     {
         /** @var BillingWorkItem $record */
@@ -562,6 +564,7 @@ trait InteractsWithVerificationWorkbench
                 };
 
                 return [
+                    'id' => $activity->getKey(),
                     'type' => match ($activity->activity_type) {
                         'info_requested_from_clinic' => 'Information Requested',
                         'clinic_response_received' => 'Clinic Responded',
@@ -623,7 +626,7 @@ trait InteractsWithVerificationWorkbench
         return (bool) ($user?->canAccessSaasRevenueOperations() || $user?->isSaasAdmin());
     }
 
-    public function openSubmissionSnapshot(int $submissionId): void
+    public function openSubmissionSnapshot(int $submissionId, ?int $activityId = null): void
     {
         abort_unless($this->canViewSubmissionSnapshots(), 403);
 
@@ -642,6 +645,7 @@ trait InteractsWithVerificationWorkbench
         ]);
 
         $this->selectedSubmissionSnapshot = $this->formatSubmissionSnapshot($submission);
+        $this->snapshotReturnActivityId = $activityId;
         $this->showSubmissionSnapshotModal = true;
     }
 
@@ -649,6 +653,7 @@ trait InteractsWithVerificationWorkbench
     {
         $this->showSubmissionSnapshotModal = false;
         $this->selectedSubmissionSnapshot = null;
+        $this->snapshotReturnActivityId = null;
     }
 
     protected function buildDeliveryDetails(BillingWorkItemActivity $activity): ?string

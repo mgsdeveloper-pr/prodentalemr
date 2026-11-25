@@ -50,67 +50,65 @@
         @endunless
 
         @if ($this->showCreateRoleModal && $canCreateRole)
-            <div style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,0.36);">
-                <div style="width:min(100%,560px);border:1px solid #dbe4ee;border-radius:26px;background:#ffffff;box-shadow:0 28px 70px rgba(15,23,42,0.18);overflow:hidden;">
-                    <div style="padding:22px 24px;border-bottom:1px solid #edf2f7;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-                        <div style="display:flex;flex-direction:column;gap:8px;">
-                            <span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;width:fit-content;">
-                                New Role
-                            </span>
-                            <div>
-                                <h3 style="margin:0;font-size:30px;font-weight:800;color:#0f172a;">Create Role</h3>
-                                <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color:#64748b;">
-                                    Add a new {{ str($this->getPanelLabel())->lower() }} role, then assign its module permissions from the matrix.
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            wire:click="closeCreateRoleModal"
-                            style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:999px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:20px;cursor:pointer;"
-                        >
-                            &times;
-                        </button>
-                    </div>
-
-                    <div style="padding:22px 24px;display:flex;flex-direction:column;gap:18px;">
-                        <label style="display:flex;flex-direction:column;gap:8px;">
-                            <span style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#475569;">Role name</span>
-                            <input
-                                type="text"
-                                wire:model.live.debounce.250ms="newRoleName"
-                                placeholder="Example: Senior Verifier"
-                                style="width:100%;min-height:46px;padding:11px 12px;border:1px solid #d6dde8;border-radius:12px;background:#ffffff;color:#0f172a;font-size:14px;"
-                            />
-                            @error('newRoleName')
-                                <span style="font-size:12px;color:#dc2626;font-weight:600;">{{ $message }}</span>
-                            @enderror
-                        </label>
-
-                        <div style="padding:14px 16px;border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;">
-                            <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;">System role key</div>
-                            <div style="margin-top:6px;font-size:14px;font-weight:700;color:#0f172a;">{{ $this->newRoleKeyPreview }}</div>
+            <x-pds.workflow-dialog labelled-by="create-role-title" dismiss="$wire.closeCreateRoleModal()" width="35rem" wire:key="create-role-dialog">
+                <div style="padding:22px 24px;border-bottom:1px solid  var(--pd-border);display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <span style="display:inline-flex;align-items:center;padding:6px 11px;border-radius:999px;background: var(--pwdl-status-info-soft);border:1px solid  var(--pd-border);color: var(--pwdl-status-info-text);font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;width:fit-content;">
+                            New Role
+                        </span>
+                        <div>
+                            <h3 id="create-role-title" style="margin:0;font-size:24px;font-weight:800;color: var(--pd-text);">Create Role</h3>
+                            <p style="margin:8px 0 0;font-size:14px;line-height:1.7;color: var(--pd-muted);">
+                                Add a new {{ str($this->getPanelLabel())->lower() }} role, then assign its module permissions from the matrix.
+                            </p>
                         </div>
                     </div>
+                    <button
+                        type="button"
+                        wire:click="closeCreateRoleModal" aria-label="Close role creation"
+                        style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:999px;border:1px solid  var(--pd-border);background: var(--pd-card);color: var(--pwdl-text-secondary);font-size:20px;cursor:pointer;"
+                    >
+                        &times;
+                    </button>
+                </div>
 
-                    <div style="padding:18px 24px;border-top:1px solid #edf2f7;display:flex;align-items:center;justify-content:flex-end;gap:10px;">
-                        <button
-                            type="button"
-                            wire:click="closeCreateRoleModal"
-                            style="display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:14px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:13px;font-weight:700;cursor:pointer;"
-                        >
-                            Close
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="createRole"
-                            style="display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border:0;border-radius:14px;background:linear-gradient(135deg,#0f766e 0%,#0ea5a4 100%);color:#ffffff;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px rgba(15,118,110,0.22);"
-                        >
-                            Create role
-                        </button>
+                <div style="padding:22px 24px;display:flex;flex-direction:column;gap:18px;">
+                    <label style="display:flex;flex-direction:column;gap:8px;">
+                        <span style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color: var(--pwdl-text-secondary);">Role name</span>
+                        <input
+                            type="text"
+                            wire:model.live.debounce.250ms="newRoleName" autofocus aria-required="true"
+                            placeholder="Example: Senior Verifier"
+                            style="width:100%;min-height:46px;padding:11px 12px;border:1px solid  var(--pd-border);border-radius:12px;background: var(--pd-card);color: var(--pd-text);font-size:14px;"
+                        />
+                        @error('newRoleName')
+                            <span role="alert" style="font-size:12px;color: var(--pwdl-status-danger-text);font-weight:600;">{{ $message }}</span>
+                        @enderror
+                    </label>
+
+                    <div style="padding:14px 16px;border:1px solid  var(--pd-border);border-radius:16px;background: var(--pwdl-surface-muted);">
+                        <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color: var(--pd-muted);">System role key</div>
+                        <div style="margin-top:6px;font-size:14px;font-weight:700;color: var(--pd-text);">{{ $this->newRoleKeyPreview }}</div>
                     </div>
                 </div>
-            </div>
+
+                <div data-dialog-actions style="padding:18px 24px;border-top:1px solid  var(--pd-border);display:flex;align-items:center;justify-content:flex-end;gap:10px;">
+                    <button
+                        type="button"
+                        wire:click="closeCreateRoleModal"
+                        style="display:inline-flex;align-items:center;justify-content:center;padding:11px 16px;border-radius:14px;border:1px solid  var(--pd-border);background: var(--pd-card);color: var(--pwdl-text-secondary);font-size:13px;font-weight:700;cursor:pointer;"
+                    >
+                        Close
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="createRole"
+                        style="display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border:0;border-radius:14px;background:linear-gradient(135deg,#0f766e 0%,#0ea5a4 100%);color: #ffffff;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px rgba(15,118,110,0.22);"
+                    >
+                        Create role
+                    </button>
+                </div>
+            </x-pds.workflow-dialog>
         @endif
 
         <section style="border:1px solid #e5e7eb;border-radius:24px;background:#ffffff;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.06);">

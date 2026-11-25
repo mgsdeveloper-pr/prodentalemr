@@ -416,7 +416,22 @@ class SaasSetting extends Model
         return static::rememberCurrentRequestInstance(Cache::remember(
             'saas_settings.current',
             now()->addMinutes(5),
-            fn (): self => static::query()->firstOrCreate(
+            fn (): self => static::loadCurrent(),
+        ));
+    }
+
+    private static function loadCurrent(): self
+    {
+        // Existing installations can have a settings row with an auto-generated ID.
+        $existing = static::query()->orderBy('id')->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        // Use the fixed key only for this trusted insert of application defaults.
+        return static::unguarded(
+            fn (): self => static::query()->createOrFirst(
                 ['id' => 1],
                 [
                     'platform_name' => 'Denentiq',
@@ -520,7 +535,7 @@ class SaasSetting extends Model
                     'verification_round_robin_last_user_id' => null,
                 ],
             ),
-        ));
+        );
     }
 
     protected static function currentRequestInstance(): ?self

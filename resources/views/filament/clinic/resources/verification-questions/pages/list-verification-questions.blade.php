@@ -75,15 +75,24 @@
         .tb-history summary { display:flex; justify-content:space-between; gap:12px; padding:14px 16px; color:var(--tb-navy); font-size:13px; font-weight:800; cursor:pointer; list-style:none; }
         .tb-history-list { display:grid; gap:8px; padding:0 16px 16px; }
         .tb-history-row { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid #e3eaf2; border-radius:6px; color:#475569; font-size:11px; }
-        .tb-modal-backdrop { position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(15,23,42,.45); }
-        .tb-modal { width:min(600px,100%); max-height:calc(100vh - 40px); overflow:auto; border:1px solid var(--tb-line); border-radius:8px; background:#fff; box-shadow:0 24px 70px rgba(15,23,42,.24); }
-        .tb-modal-head,.tb-modal-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px; border-bottom:1px solid var(--tb-line); }
-        .tb-modal-foot { justify-content:flex-end; border-top:1px solid var(--tb-line); border-bottom:0; }
-        .tb-modal-body { display:grid; gap:14px; padding:18px; }
         .tb-confirm-box { display:grid; gap:7px; padding:13px 14px; border:1px solid #dbe5ef; border-radius:7px; background:#f8fafc; }
         .tb-confirm-label { color:var(--tb-muted); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
         .tb-confirm-value { color:var(--tb-navy); font-size:13px; font-weight:800; }
-        .tb-confirm-note { margin:0; color:#52627a; font-size:12px; line-height:1.55; }
+
+        .pds-confirmation-dialog :is(.tb-input, .tb-select, .tb-button, .tb-confirm-box) {
+            border-color: var(--pd-border);
+            background: var(--pd-card);
+            color: var(--pd-text);
+        }
+        .pds-confirmation-dialog :is(.tb-button:hover, .tb-table th) {
+            border-color: var(--pd-border);
+            background: var(--pwdl-surface-muted);
+            color: var(--pd-text);
+        }
+        .pds-confirmation-dialog :is(.tb-label, .tb-confirm-label) { color: var(--pwdl-text-secondary); }
+        .pds-confirmation-dialog :is(.tb-confirm-value, .tb-table td) { color: var(--pd-text); }
+        .pds-confirmation-dialog .tb-table td { border-color: var(--pd-border); }
+        .pds-confirmation-dialog [role="alert"] { color: var(--pwdl-status-danger-text); }
         .tb-field { display:grid; gap:6px; }
         .tb-page { background:#fff; padding:20px; }
         .tb-header { padding:0 0 16px;border:0;border-bottom:1px solid var(--tb-line);border-radius:0;background:#fff; }
@@ -132,12 +141,12 @@
                 <button type="button" wire:click="returnToTemplates" class="tb-button">Back to Templates</button>
                 @if ($selectedClinicName && $versionSummary['can_manage'])
                     @if (! $versionSummary['can_open_draft'])
-                        <button type="button" class="tb-button tb-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled">Create Draft From This Version</button>
+                        <button id="builder-create-draft" type="button" class="tb-button tb-button--primary" wire:click="openCreateDraftModal" wire:loading.attr="disabled" wire:target="openCreateDraftModal">Create Draft From This Version</button>
                     @elseif (! $versionSummary['showing_draft'])
                         <button type="button" class="tb-button tb-button--primary" wire:click="openDraftVersion" wire:loading.attr="disabled">Open Draft</button>
                     @else
                         @if ($this->canPublishSelectedTemplate())
-                            <button type="button" class="tb-button tb-button--primary" wire:click="reviewPublishing" wire:loading.attr="disabled">Review &amp; Publish</button>
+                            <button id="builder-publication-review" type="button" class="tb-button tb-button--primary" wire:click="reviewPublishing" wire:loading.attr="disabled">Review &amp; Publish</button>
                         @endif
                     @endif
                 @endif
@@ -287,76 +296,142 @@
         @endif
 
         @if ($showUnsaved)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.resolveUnsaved('stay')" role="dialog" aria-modal="true" aria-label="Unsaved question"><div class="tb-modal"><div class="tb-modal-head"><h3>Unsaved question changes</h3></div><div class="tb-modal-body">@foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="resolveUnsaved('stay')">Stay</button><button class="tb-button" wire:click="resolveUnsaved('discard')">Discard</button><button class="tb-button tb-button--primary" wire:click="resolveUnsaved('save')">Save &amp; Continue</button></div></div></div>
+            <x-pds.confirmation-dialog title="Unsaved question changes" :open="true" dismiss="$wire.resolveUnsaved('stay')" wire:key="builder-unsaved-question">
+                <p>Save or discard your changes before continuing.</p>
+                @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="resolveUnsaved('stay')">Stay</x-filament::button>
+                    <x-filament::button color="gray" wire:click="resolveUnsaved('discard')">Discard</x-filament::button>
+                    <x-filament::button wire:click="resolveUnsaved('save')">Save &amp; Continue</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
         @if ($showRemoval)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelRemoval()" role="dialog" aria-modal="true" aria-label="Review removal"><div class="tb-modal"><div class="tb-modal-head"><h3>Remove from this draft?</h3></div><div class="tb-modal-body"><p>{{ count($removalSections) }} sections and {{ count($removalIds) }} questions affected. Existing requests and published versions remain unchanged.</p>@foreach ($removalLabels as $label)<div>{{ $label }}</div>@endforeach @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach</div><div class="tb-modal-foot"><button class="tb-button" wire:click="cancelRemoval">Cancel</button><button class="tb-button" wire:click="confirmRemoval">Remove From Draft</button></div></div></div>
+            <x-pds.confirmation-dialog title="Remove from this draft?" :open="true" dismiss="$wire.cancelRemoval()" wire:key="builder-removal-review">
+                <p>{{ count($removalSections) }} sections and {{ count($removalIds) }} questions affected. Existing requests and published versions remain unchanged.</p>
+                @foreach ($removalLabels as $label)<div>{{ $label }}</div>@endforeach
+                @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="cancelRemoval">Cancel</x-filament::button>
+                    <x-filament::button color="danger" wire:click="confirmRemoval">Remove From Draft</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
         @if ($showPublishReview)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelPublishing()" role="dialog" aria-modal="true" aria-labelledby="publish-review-title">
-                <div class="tb-modal">
-                    <div class="tb-modal-head"><h3 id="publish-review-title">Review publication</h3><button type="button" class="tb-icon-button" wire:click="cancelPublishing" aria-label="Close publication review">×</button></div>
-                    <div class="tb-modal-body">
-                        <strong>{{ $versionSummary['displayed_name'] }}</strong>
-                        <span>{{ $selectedClinicName }} · {{ $versionSummary['displayed_form_type'] }} · {{ $versionSummary['displayed_version'] }}</span>
-                        <span>{{ $builderCounts['main_sections'] }} sections · {{ $builderCounts['sub_sections'] }} subsections · {{ $builderCounts['active_questions'] }} active questions</span>
-                        @foreach ($publishReview['labels'] ?? [] as $form => $label)
-                            <p>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }} currently active: {{ $label }}</p>
-                        @endforeach
-                        <p>Publish keeps the active forms unchanged. Publish &amp; Activate replaces the forms listed above for new requests only.</p>
-                        @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
-                    </div>
-                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="cancelPublishing">Back to Builder</button><button type="button" class="tb-button" wire:click="publishDraftVersion" wire:loading.attr="disabled">Publish</button><button type="button" class="tb-button tb-button--primary" wire:click="publishDraftVersion([], true)" wire:loading.attr="disabled">Publish &amp; Activate</button></div>
-                </div>
-            </div>
+            <x-pds.confirmation-dialog
+                title="Review publication"
+                :open="true"
+                dismiss="$wire.cancelPublishing()"
+                return-focus="builder-publication-review"
+                wire:key="builder-publication-confirmation"
+            >
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-o-x-mark" color="gray" wire:click="cancelPublishing" label="Close publication review" />
+                </x-slot:headerAction>
+
+                <strong>{{ $versionSummary['displayed_name'] }}</strong>
+                <span>{{ $selectedClinicName }} · {{ $versionSummary['displayed_form_type'] }} · {{ $versionSummary['displayed_version'] }}</span>
+                <span>{{ $builderCounts['main_sections'] }} sections · {{ $builderCounts['sub_sections'] }} subsections · {{ $builderCounts['active_questions'] }} active questions</span>
+                @foreach ($publishReview['labels'] ?? [] as $form => $label)
+                    <p>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }} currently active: {{ $label }}</p>
+                @endforeach
+                <p>Publish keeps the active forms unchanged. Publish &amp; Activate replaces the forms listed above for new requests only.</p>
+                @foreach ($errors->all() as $error)<p role="alert">{{ $error }}</p>@endforeach
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="cancelPublishing">Back to Builder</x-filament::button>
+                    <x-filament::button color="gray" wire:click="publishDraftVersion" wire:loading.attr="disabled">Publish</x-filament::button>
+                    <x-filament::button wire:click="publishDraftVersion([], true)" wire:loading.attr="disabled">Publish &amp; Activate</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
         @if ($showCreateDraftModal)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.closeCreateDraftModal()" role="dialog" aria-modal="true" aria-labelledby="draft-confirm-title"><form wire:submit.prevent="submitCreateDraftVersion" class="tb-modal" style="width:min(520px,100%);">
-                <div class="tb-modal-head"><div><div id="draft-confirm-title" class="tb-title" style="font-size:19px;">Create an editable copy?</div><div class="tb-subtitle">{{ $versionSummary['displayed_name'] }} · {{ $versionSummary['displayed_version'] }}</div></div><button type="button" class="tb-icon-button" wire:click="closeCreateDraftModal" aria-label="Close">×</button></div>
-                <div class="tb-modal-body">
-                    <div class="tb-field"><label for="draft-name" class="tb-label">Template name</label><input id="draft-name" class="tb-input" wire:model="draftName" maxlength="255" required>@error('draftName')<span>{{ $message }}</span>@enderror</div>
+            <x-pds.confirmation-dialog title="Create an editable copy?" :open="true" dismiss="$wire.closeCreateDraftModal()" :return-focus="$pendingBuilderAction === 'draft' ? 'builder-create-draft' : null" wire:key="builder-copy-template">
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeCreateDraftModal" label="Close editable copy" />
+                </x-slot:headerAction>
+                <p>{{ $versionSummary['displayed_name'] }} · {{ $versionSummary['displayed_version'] }}</p>
+                <form id="builder-copy-form" class="grid gap-3" wire:submit.prevent="submitCreateDraftVersion">
+                    <div class="tb-field"><label for="draft-name" class="tb-label">Template name</label><input id="draft-name" class="tb-input" wire:model="draftName" maxlength="255" required autofocus @error('draftName') aria-invalid="true" aria-describedby="draft-name-error" @enderror>@error('draftName')<p id="draft-name-error" role="alert" x-data x-init="$nextTick(() => document.getElementById('draft-name')?.focus())">{{ $message }}</p>@enderror</div>
                     @foreach ($this->getSourceDrafts() as $existingDraft)
                         <button type="button" class="tb-button" wire:click="continueSourceDraft({{ $existingDraft->id }})">Continue Existing Draft: {{ $existingDraft->name }} · v{{ $existingDraft->version_number }}</button>
                     @endforeach
-                    <p class="tb-confirm-note">A protected working draft will be created automatically. Existing verification requests, completed forms, and historical snapshots will remain unchanged.</p>
+                    <p>A protected working draft will be created automatically. Existing verification requests, completed forms, and historical snapshots will remain unchanged.</p>
                     @if (! $versionSummary['uses_section_layout'])<label style="display:flex;gap:8px;align-items:center;margin-block:16px"><input type="checkbox" wire:model.live="structuredLayout"> Use section and subsection layout</label>@endif
                     <div class="tb-label">{{ $builderFormType === 'short_form' ? 'Short Form' : 'Full Form' }}</div>
                     <div class="tb-confirm-box"><span class="tb-confirm-label">Continue with</span><span class="tb-confirm-value">{{ $pendingBuilderAction === 'reorder' ? 'Reorder questions' : ($pendingBuilderAction === 'questions' ? 'Add question to '.($selectedSection['title'] ?? 'selected section') : 'Edit clinic template') }}</span></div>
-                </div>
-                <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeCreateDraftModal" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion" autofocus><span wire:loading.remove wire:target="submitCreateDraftVersion">{{ $pendingBuilderAction === 'reorder' ? 'Continue to Reorder' : ($pendingBuilderAction === 'questions' ? 'Continue to Add Question' : 'Create Working Draft') }}</span><span wire:loading wire:target="submitCreateDraftVersion">Preparing draft...</span></button></div>
-            </form></div>
+                </form>
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeCreateDraftModal" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">Cancel</x-filament::button>
+                    <x-filament::button type="submit" form-id="builder-copy-form" wire:loading.attr="disabled" wire:target="submitCreateDraftVersion">
+                        <span wire:loading.remove wire:target="submitCreateDraftVersion">{{ $pendingBuilderAction === 'reorder' ? 'Continue to Reorder' : ($pendingBuilderAction === 'questions' ? 'Continue to Add Question' : 'Create Working Draft') }}</span>
+                        <span wire:loading wire:target="submitCreateDraftVersion">Preparing draft...</span>
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
 
         @if ($showSectionUpload)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.set('showSectionUpload', false)" role="dialog" aria-modal="true" aria-labelledby="section-upload-title">
-                <div class="tb-modal">
-                    <div class="tb-modal-head"><h3 id="section-upload-title" class="tb-toolbar-title">Upload Questions</h3><button type="button" class="tb-icon-button" wire:click="$set('showSectionUpload', false)" aria-label="Close upload">×</button></div>
-                    <div class="tb-modal-body">
-                        <strong>{{ $selectedSection['title'] ?? '' }} · {{ $builderFormType === 'short_form' ? 'Short' : 'Full' }} · {{ $versionSummary['displayed_version'] }}</strong>
-                        <button type="button" class="tb-button" wire:click="downloadSectionSample"><x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-4 w-4" /> Download Section CSV</button>
-                        <label class="tb-field">XLSX / CSV<input type="file" wire:model="upload" accept=".xlsx,.csv"></label>
-                        @error('upload')<span role="alert" style="color:#b91c1c">{{ $message }}</span>@enderror
-                        <button type="button" class="tb-button" wire:click="reviewSectionUpload" wire:loading.attr="disabled">Review Upload</button>
-                        @foreach ($sectionUploadErrors as $error)<p role="alert" style="color:#b91c1c">{{ $error }}</p>@endforeach
-                        @if ($sectionUploadRows)
-                            <div style="max-height:260px;overflow:auto"><table class="tb-table" style="min-width:0"><thead><tr><th>Question</th><th>Answer Type</th></tr></thead><tbody>
-                                @foreach ($sectionUploadRows as $row)<tr><td>{{ $row['question'] }}</td><td>{{ \App\Models\VerificationFormQuestion::INPUT_TYPE_OPTIONS[$row['answer_type']] ?? $row['answer_type'] }}</td></tr>@endforeach
-                            </tbody></table></div>
-                            <label><input type="checkbox" wire:model="confirmSectionUpload"> Add these {{ count($sectionUploadRows) }} questions to this draft.</label>
-                            @error('confirmSectionUpload')<span role="alert">{{ $message }}</span>@enderror
-                        @endif
-                    </div>
-                    <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="$set('showSectionUpload', false)">Cancel</button><button type="button" class="tb-button tb-button--primary" wire:click="saveSectionUpload" wire:loading.attr="disabled" @disabled(! $sectionUploadRows)>Add to Draft</button></div>
-                </div>
-            </div>
+            <x-pds.confirmation-dialog title="Upload Questions" :open="true" dismiss="$wire.set('showSectionUpload', false)" wire:key="builder-upload-questions">
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="$set('showSectionUpload', false)" label="Close upload" />
+                </x-slot:headerAction>
+
+                <strong>{{ $selectedSection['title'] ?? '' }} · {{ $builderFormType === 'short_form' ? 'Short' : 'Full' }} · {{ $versionSummary['displayed_version'] }}</strong>
+                <button type="button" class="tb-button" wire:click="downloadSectionSample"><x-filament::icon icon="heroicon-o-arrow-down-tray" class="h-4 w-4" /> Download Section CSV</button>
+                <label class="tb-field">XLSX / CSV<input type="file" wire:model="upload" accept=".xlsx,.csv"></label>
+                @error('upload')<span role="alert">{{ $message }}</span>@enderror
+                <button type="button" class="tb-button" wire:click="reviewSectionUpload" wire:loading.attr="disabled">Review Upload</button>
+                @foreach ($sectionUploadErrors as $error)<p role="alert">{{ $error }}</p>@endforeach
+                @if ($sectionUploadRows)
+                    <div style="max-height:260px;overflow:auto"><table class="tb-table" style="min-width:0"><thead><tr><th>Question</th><th>Answer Type</th></tr></thead><tbody>
+                        @foreach ($sectionUploadRows as $row)<tr><td>{{ $row['question'] }}</td><td>{{ \App\Models\VerificationFormQuestion::INPUT_TYPE_OPTIONS[$row['answer_type']] ?? $row['answer_type'] }}</td></tr>@endforeach
+                    </tbody></table></div>
+                    <label><input type="checkbox" wire:model="confirmSectionUpload"> Add these {{ count($sectionUploadRows) }} questions to this draft.</label>
+                    @error('confirmSectionUpload')<span role="alert">{{ $message }}</span>@enderror
+                @endif
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="$set('showSectionUpload', false)">Cancel</x-filament::button>
+                    <x-filament::button wire:click="saveSectionUpload" wire:loading.attr="disabled" :disabled="! $sectionUploadRows">Add to Draft</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
 
         @if ($showTemplateSectionModal)
-            <div class="tb-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.closeTemplateSectionModal()" role="dialog" aria-modal="true" aria-labelledby="section-create-title"><form wire:submit.prevent="submitTemplateSection" class="tb-modal">
-                <div class="tb-modal-head"><div><div id="section-create-title" class="tb-title" style="font-size:19px;">{{ $templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section' }}</div><div class="tb-subtitle">This structure change applies only to the open clinic draft.</div></div><button type="button" class="tb-icon-button" wire:click="closeTemplateSectionModal" aria-label="Close section dialog">×</button></div>
-                <div class="tb-modal-body">@if ($templateSectionMode === 'sub_section')<div class="tb-field"><label class="tb-label" for="parent-section">Parent section</label><select id="parent-section" class="tb-select" wire:model.defer="newTemplateSectionData.parent_section_key"><option value="">Select a main section</option>@foreach ($builderSections as $section)<option value="{{ $section['key'] }}">{{ $section['title'] }}</option>@endforeach</select>@error('newTemplateSectionData.parent_section_key')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div>@endif<div class="tb-field"><label class="tb-label" for="section-name">{{ $templateSectionMode === 'sub_section' ? 'Sub-section name' : 'Section name' }}</label><input id="section-name" class="tb-input" wire:model.defer="newTemplateSectionData.label">@error('newTemplateSectionData.label')<span style="color:#b91c1c;font-size:11px;">{{ $message }}</span>@enderror</div></div>
-                <div class="tb-modal-foot"><button type="button" class="tb-button" wire:click="closeTemplateSectionModal">Cancel</button><button type="submit" class="tb-button tb-button--primary" wire:loading.attr="disabled">Add to Draft</button></div>
-            </form></div>
+            <x-pds.confirmation-dialog :title="$templateSectionMode === 'sub_section' ? 'Add Sub-section' : 'Add Section'" :open="true" dismiss="$wire.closeTemplateSectionModal()" wire:key="builder-add-section">
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeTemplateSectionModal" label="Close section dialog" />
+                </x-slot:headerAction>
+                <p>This structure change applies only to the open clinic draft.</p>
+                <form id="builder-section-form" class="grid gap-3" wire:submit.prevent="submitTemplateSection">
+                    @if ($templateSectionMode === 'sub_section')
+                        <div class="tb-field">
+                            <label class="tb-label" for="parent-section">Parent section</label>
+                            <select id="parent-section" class="tb-select" wire:model.defer="newTemplateSectionData.parent_section_key" autofocus @error('newTemplateSectionData.parent_section_key') aria-invalid="true" aria-describedby="parent-section-error" @enderror>
+                                <option value="">Select a main section</option>
+                                @foreach ($builderSections as $section)<option value="{{ $section['key'] }}">{{ $section['title'] }}</option>@endforeach
+                            </select>
+                            @error('newTemplateSectionData.parent_section_key')
+                                <p id="parent-section-error" role="alert" x-data x-init="$nextTick(() => document.getElementById('parent-section')?.focus())">{{ $message }}</p>@enderror
+                        </div>
+                    @endif
+                    <div class="tb-field">
+                        <label class="tb-label" for="section-name">{{ $templateSectionMode === 'sub_section' ? 'Sub-section name' : 'Section name' }}</label>
+                        <input id="section-name" class="tb-input" aria-required="true" wire:model.defer="newTemplateSectionData.label" @if ($templateSectionMode !== 'sub_section') autofocus @endif @error('newTemplateSectionData.label') aria-invalid="true" aria-describedby="section-name-error" @enderror>
+                        @error('newTemplateSectionData.label')
+                            <p id="section-name-error" role="alert" @unless($errors->has('newTemplateSectionData.parent_section_key')) x-data x-init="$nextTick(() => document.getElementById('section-name')?.focus())" @endunless>{{ $message }}</p>
+                        @enderror
+                    </div>
+                </form>
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeTemplateSectionModal">Cancel</x-filament::button>
+                    <x-filament::button type="submit" form-id="builder-section-form" wire:loading.attr="disabled">Add to Draft</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
     </div>
 </x-filament-panels::page>

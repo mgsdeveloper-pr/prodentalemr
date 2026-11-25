@@ -544,11 +544,7 @@ class TenantOnboarding extends Page implements HasForms
                 return $result;
             });
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('Organization onboarding failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::onboardingFailed('Organization onboarding failed', $exception, $this->draft?->entry_point === 'website');
 
             return null;
         }

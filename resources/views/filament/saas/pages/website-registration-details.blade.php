@@ -15,7 +15,7 @@
 <div class="space-y-4">
     <p>Payment: {{ str($registration->checkout?->status ?? 'not_started')->replace('_', ' ')->headline() }}. Payment attempts and references are available in Billing → Website Payments.</p>
     <p>{{ $registration->email }} · {{ $registration->email_verified_at ? 'Email verified' : 'Email not yet verified' }}</p>
-    <p>Reference: {{ $draft->public_id }} · Status: {{ str($draft->status)->replace('_', ' ')->headline() }}</p>
+    <p>Reference: {{ $draft->public_id }} · Status: {{ \App\Models\WebsiteRegistration::statusLabel($draft->status) }}</p>
     <p>Offering: {{ \App\Models\SubscriptionPlan::verificationModelOptions()[$draft->verification_model] ?? $draft->verification_model }}</p>
     <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         @foreach ($labels as $key => $label)

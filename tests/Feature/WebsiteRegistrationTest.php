@@ -1,10 +1,13 @@
 <?php
 
+use App\Filament\Saas\Pages\WebsiteRegistrations;
 use App\Models\OnboardingDraft;
 use App\Models\SubscriptionPlan;
 use App\Models\WebsiteRegistration;
 use App\Services\ClientOnboardingService;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Livewire;
 
 beforeEach(function () {
     config(['website_registration.enabled' => true, 'website_registration.bridge_secret' => str_repeat('s', 40), 'mail.default' => 'smtp']);
@@ -26,6 +29,36 @@ it('requires an enabled gateway and private shared secret', function () {
     $this->withHeader('X-Website-Key', 'wrong')->getJson('/website-api/plans')->assertUnauthorized();
     config(['website_registration.enabled' => false]);
     $this->getJson('/website-api/plans')->assertStatus(503);
+});
+
+it('uses the same registration status label in the badge, filter, and details', function (): void {
+    $incomplete = websiteApplicant();
+    $draft = $incomplete->draft->replicate(['public_id']);
+    $draft->status = OnboardingDraft::STATUS_UNDER_REVIEW;
+    $draft->save();
+    $reviewing = WebsiteRegistration::create([
+        'onboarding_draft_id' => $draft->id,
+        'email' => 'reviewing@example.test',
+    ]);
+    $this->actingAs(websiteStaff());
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $this->get('/saas/client-management')->assertOk();
+    $this->get('/saas/website-registrations')->assertOk()->assertSee('Website Registrations');
+    $this->get('/saas/website-payments')->assertOk()->assertSee('Website Payments');
+
+    $page = Livewire::test(WebsiteRegistrations::class)
+        ->assertTableColumnFormattedStateSet('draft.status', 'Incomplete', $incomplete)
+        ->assertTableColumnFormattedStateSet('draft.status', 'Under review', $reviewing)
+        ->filterTable('status', OnboardingDraft::STATUS_DRAFT)
+        ->assertCanSeeTableRecords([$incomplete])
+        ->assertCanNotSeeTableRecords([$reviewing])
+        ->mountTableAction('details', $incomplete)
+        ->assertSee('Status: Incomplete');
+
+    expect($page->instance()->getTable()->getFilter('status')->getOptions())
+        ->toMatchArray(['draft' => 'Incomplete', 'under_review' => 'Under review']);
+    expect($incomplete->draft->fresh()->status)->toBe(OnboardingDraft::STATUS_DRAFT);
 });
 
 it('only exposes published active verification plans without trials', function () {

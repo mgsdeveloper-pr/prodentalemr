@@ -126,47 +126,42 @@
         </section>
 
         @if ($showPreviewModal && $selectedDocument)
-            <div
-                wire:click.self="closePreview"
-                style="position:fixed;inset:0;z-index:60;background:rgba(15,23,42,0.52);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:28px;"
-            >
-                <section style="width:min(1120px,96vw);height:min(820px,92vh);border-radius:26px;background:#ffffff;box-shadow:0 28px 80px rgba(15,23,42,0.28);overflow:hidden;display:flex;flex-direction:column;">
-                    <div style="padding:18px 22px;border-bottom:1px solid #edf2f7;display:flex;align-items:center;justify-content:space-between;gap:16px;">
-                        <div style="min-width:0;">
-                            <div style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
-                                {{ $selectedDocument['type_label'] }}
-                            </div>
-                            <h3 style="margin:10px 0 0;font-size:24px;font-weight:900;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $selectedDocument['title'] }}</h3>
-                            <p style="margin:6px 0 0;font-size:13px;color:#64748b;">
-                                {{ $selectedDocument['patient'] }} · {{ $selectedDocument['clinic'] }} · {{ $selectedDocument['uploaded_at'] }}
-                            </p>
+            <x-pds.workflow-dialog labelled-by="document-preview-title" dismiss="$wire.closePreview()" width="70rem" wire:key="document-preview" x-on:click.self="$wire.closePreview()">
+                <div style="padding:18px 22px;border-bottom:1px solid  var(--pd-border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <div style="min-width:0;">
+                        <div style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background: var(--pwdl-status-info-soft);border:1px solid  var(--pd-border);color: var(--pwdl-status-info-text);font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
+                            {{ $selectedDocument['type_label'] }}
                         </div>
-                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
-                            @if ($selectedDocument['preview_url'] ?? null)
-                                <a href="{{ $selectedDocument['preview_url'] }}" target="_blank" style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:13px;font-weight:900;text-decoration:none;">Open New Tab</a>
-                            @endif
-                            @if ($selectedDocument['download_url'])
-                                <a href="{{ $selectedDocument['download_url'] }}" style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:13px;font-weight:900;text-decoration:none;">Download</a>
-                            @endif
-                            <button type="button" wire:click="closePreview" style="width:42px;height:42px;border-radius:999px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:22px;line-height:1;cursor:pointer;">&times;</button>
-                        </div>
+                        <h3 id="document-preview-title" style="margin:10px 0 0;font-size:24px;font-weight:900;color: var(--pd-text);overflow-wrap:anywhere;">{{ $selectedDocument['title'] }}</h3>
+                        <p style="margin:6px 0 0;font-size:13px;color: var(--pd-muted);">
+                            {{ $selectedDocument['patient'] }} · {{ $selectedDocument['clinic'] }} · {{ $selectedDocument['uploaded_at'] }}
+                        </p>
                     </div>
-
-                    <div style="flex:1;background:#f8fafc;padding:18px;min-height:0;">
-                        @if (($selectedDocument['preview_url'] ?? null) && $selectedDocument['is_available'])
-                            <iframe
-                                src="{{ $selectedDocument['preview_url'] }}"
-                                title="{{ $selectedDocument['title'] }}"
-                                style="width:100%;height:100%;border:1px solid #dbe4ee;border-radius:18px;background:#ffffff;"
-                            ></iframe>
-                        @else
-                            <div style="height:100%;display:flex;align-items:center;justify-content:center;border:1px dashed #cbd5e1;border-radius:18px;background:#ffffff;color:#64748b;font-size:14px;">
-                                Preview is not available because the file is missing or inaccessible.
-                            </div>
+                    <div data-dialog-actions style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                        @if ($selectedDocument['preview_url'] ?? null)
+                            <a href="{{ $selectedDocument['preview_url'] }}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid  var(--pd-border);background: var(--pwdl-status-info-soft);color: var(--pwdl-status-info-text);font-size:13px;font-weight:900;text-decoration:none;">Open New Tab</a>
                         @endif
+                        @if ($selectedDocument['download_url'])
+                            <a href="{{ $selectedDocument['download_url'] }}" style="display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:14px;border:1px solid  var(--pd-border);background: var(--pd-card);color: var(--pwdl-text-secondary);font-size:13px;font-weight:900;text-decoration:none;">Download</a>
+                        @endif
+                        <button type="button" wire:click="closePreview" aria-label="Close document preview" autofocus style="width:42px;height:42px;border-radius:999px;border:1px solid  var(--pd-border);background: var(--pd-card);color: var(--pwdl-text-secondary);font-size:22px;line-height:1;cursor:pointer;">&times;</button>
                     </div>
-                </section>
-            </div>
+                </div>
+
+                <div style="height:min(68dvh, 44rem);background:var(--pwdl-surface-muted);padding:clamp(.5rem, 2vw, 1rem);">
+                    @if (($selectedDocument['preview_url'] ?? null) && $selectedDocument['is_available'])
+                        <iframe
+                            src="{{ $selectedDocument['preview_url'] }}"
+                            title="{{ $selectedDocument['title'] }}" tabindex="-1"
+                            style="width:100%;height:100%;border:1px solid  var(--pd-border);border-radius:18px;background: var(--pd-card);"
+                        ></iframe>
+                    @else
+                        <div style="height:100%;display:flex;align-items:center;justify-content:center;border:1px dashed  var(--pd-border);border-radius:18px;background: var(--pd-card);color: var(--pd-muted);font-size:14px;">
+                            Preview is not available because the file is missing or inaccessible.
+                        </div>
+                    @endif
+                </div>
+            </x-pds.workflow-dialog>
         @endif
     </div>
 </x-filament-panels::page>

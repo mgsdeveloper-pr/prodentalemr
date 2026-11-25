@@ -545,7 +545,9 @@ class VerificationReport
                 fn (Builder $query) => $query->whereIn('clinic_id', auth()->user()->verificationAccessibleClinicIds())
             )
             ->when($clinicId, fn (Builder $query, $id) => $query->where('clinic_id', $id))
-            ->orderBy('display_name')
+            ->with('user:id,name')
+            ->get(['id', 'user_id'])
+            ->sortBy('display_name', SORT_NATURAL | SORT_FLAG_CASE)
             ->pluck('display_name', 'id')
             ->all();
     }

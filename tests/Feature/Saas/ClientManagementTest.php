@@ -15,6 +15,8 @@ use App\Services\ClientOnboardingService;
 use App\Support\PanelPermissionMatrix;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Exceptions;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 
@@ -40,39 +42,78 @@ it('keeps completed onboarding immutable even when a stale draft is saved or act
     }
 });
 
-it('commits internal onboarding and completion together', function (bool $failCompletion): void {
+it('commits internal onboarding and completion together or rolls it back with a safe error', function (bool $failCompletion, bool $isDso): void {
     $this->seed(RoleSeeder::class);
     seedWorkflowMaster();
     $user = User::factory()->create();
     $user->assignRole('saas_admin');
     $this->actingAs($user);
     Filament::setCurrentPanel(Filament::getPanel('saas'));
+
     $service = app(ClientOnboardingService::class);
-    $draft = $service->start($user, 'single_clinic', 'managed_service');
-    $service->save($draft, [
+    $draft = $service->start($user, $isDso ? 'dso' : 'single_clinic', 'managed_service');
+    $email = 'atomic-owner@example.test';
+    $details = [
         'organization_name' => 'Atomic QA', 'organization_owner_name' => 'QA Owner',
-        'owner_name' => 'QA Owner', 'owner_email' => 'atomic-owner@example.test',
-        'owner_phone' => '2025550146',
         'clinic_name' => 'Atomic Clinic', 'location_name' => 'Main',
         'location_country' => 'USA', 'location_state' => 'Texas', 'location_city' => 'Austin',
         'clinic_timezone' => 'America/Chicago',
-    ], 4);
+    ];
+    $details += $isDso
+        ? [
+            'dso_name' => 'Atomic QA DSO', 'dso_primary_contact_name' => 'QA Owner',
+            'dso_email' => 'atomic-dso@example.test', 'dso_admin_name' => 'QA Owner', 'dso_admin_email' => $email,
+        ]
+        : ['owner_name' => 'QA Owner', 'owner_email' => $email, 'owner_phone' => '2025550146'];
+    $service->save($draft, $details, 4);
+
+    $failure = new RuntimeException('UX02_INTERNAL_ONLY onboarding database failure /srv/private/qa.php');
     if ($failCompletion) {
-        $this->partialMock(ClientOnboardingService::class, function ($mock): void {
-            $mock->shouldReceive('activate')->once()->andThrow(new \RuntimeException('Completion failed for QA'));
-        });
+        Exceptions::fake();
+        $this->partialMock(ClientOnboardingService::class)
+            ->shouldReceive('activate')->once()->andThrow($failure);
     }
-    $browser = Livewire::withQueryParams(['onboarding' => $draft->public_id])->test(TenantOnboarding::class)
-        ->fillForm(['attach_subscription' => false, 'owner_password' => 'SyntheticOnly!123', 'owner_password_confirmation' => 'SyntheticOnly!123'])
+
+    $passwordField = $isDso ? 'dso_admin_password' : 'owner_password';
+    $browser = Livewire::withQueryParams(['onboarding' => $draft->public_id])->test($isDso ? DsoOnboarding::class : TenantOnboarding::class)
+        ->fillForm([
+            'attach_subscription' => false,
+            $passwordField => 'SyntheticOnly!123',
+            $passwordField.'_confirmation' => 'SyntheticOnly!123',
+        ])
         ->call('create')->assertHasNoFormErrors();
-    if (! $failCompletion) {
+
+    if ($failCompletion) {
+        $browser->assertNotified(Notification::make()
+            ->title($isDso ? 'DSO onboarding failed' : 'Organization onboarding failed')
+            ->body('Review the onboarding details and try again. If the problem persists, ask your administrator to check the server logs.')
+            ->danger())
+            ->assertDontSee('UX02_INTERNAL_ONLY');
+        Exceptions::assertReported(fn (RuntimeException $reported): bool => $reported === $failure);
+    } else {
         $browser->assertRedirect();
     }
+
     expect(Organization::count())->toBe($failCompletion ? 0 : 1)
+        ->and(Dso::count())->toBe(! $failCompletion && $isDso ? 1 : 0)
         ->and(Clinic::count())->toBe($failCompletion ? 0 : 1)
-        ->and(User::where('email', 'atomic-owner@example.test')->count())->toBe($failCompletion ? 0 : 1)
+        ->and(User::where('email', $email)->count())->toBe($failCompletion ? 0 : 1)
         ->and($draft->fresh()->status)->toBe($failCompletion ? 'draft' : 'activated');
-})->with([false, true]);
+})->with([false, true])->with([false, true]);
+
+it('keeps onboarding field validation actionable', function (string $page, string $requiredField): void {
+    $this->seed(RoleSeeder::class);
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+    $this->actingAs($admin);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    Livewire::test($page)->call('create')->assertHasFormErrors([$requiredField => 'required']);
+    $this->assertDatabaseCount('clinics', 0);
+})->with([
+    [TenantOnboarding::class, 'organization_name'],
+    [DsoOnboarding::class, 'dso_name'],
+]);
 
 it('requires both released forms when creating a verification clinic', function (string $entry, bool $missingShort): void {
     $this->seed(RoleSeeder::class);
@@ -118,7 +159,10 @@ it('requires both released forms when creating a verification clinic', function 
         $browser = Livewire::test($dso ? DsoOnboarding::class : TenantOnboarding::class)
             ->fillForm($data)->call('create')->assertHasNoFormErrors();
         if ($missingShort) {
-            $browser->assertNotified($dso ? 'DSO onboarding failed' : 'Organization onboarding failed');
+            $browser->assertNotified(Notification::make()
+                ->title($dso ? 'DSO onboarding failed' : 'Organization onboarding failed')
+                ->body('Release an active SaaS Master Template with questions for Short Form before creating this clinic.')
+                ->warning());
             expect(Organization::count())->toBe(0)->and(Dso::count())->toBe(0);
         }
     }

@@ -2,13 +2,16 @@
 
 namespace App\Filament\Saas\Pages;
 
+use App\Services\SystemUpdateBlocked;
 use App\Services\SystemUpdateManager;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 use UnitEnum;
 
@@ -39,16 +42,18 @@ class SystemUpdates extends Page
         return auth()->user()?->isSaasAdmin() ?? false;
     }
 
-    public function getUpdateSummary(): array
+    protected function getViewData(): array
     {
         $manager = app(SystemUpdateManager::class);
 
         return [
-            'pending' => $manager->pendingMigrations(),
-            'checks' => $manager->preflightChecks(),
-            'run' => $manager->currentRun(),
-            'history' => $manager->history(),
-            'production_gates_pass' => $manager->productionGatesPass(),
+            'summary' => [
+                'pending' => $manager->pendingMigrations(),
+                'checks' => $manager->preflightChecks(),
+                'run' => $manager->currentRun(),
+                'history' => $manager->history(),
+                'production_gates_pass' => $manager->productionGatesPass(),
+            ],
         ];
     }
 
@@ -82,12 +87,11 @@ class SystemUpdates extends Page
                 ->success()
                 ->send();
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('System update could not start')
-                ->body($exception->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
+            $this->notifyUpdateFailure(
+                $exception,
+                'System update could not start',
+                'Refresh this page and review the update status before retrying. If it still fails, ask your server administrator to check the logs.',
+            );
         }
     }
 
@@ -112,12 +116,13 @@ class SystemUpdates extends Page
                     ->send();
             }
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('System update stopped')
-                ->body($exception->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
+            $this->notifyUpdateFailure(
+                $exception,
+                'System update stopped',
+                'Ask your server administrator to check the logs before retrying the update.',
+                releaseId: $run['id'] ?? null,
+                logLevel: 'critical',
+            );
         }
     }
 
@@ -146,14 +151,11 @@ class SystemUpdates extends Page
 
             $this->redirect(Dashboard::getUrl(), navigate: false);
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('Latest code could not be activated')
-                ->body(filled($exception->getMessage())
-                    ? $exception->getMessage()
-                    : 'The server could not refresh generated application files. Check application write permissions.')
-                ->danger()
-                ->persistent()
-                ->send();
+            $this->notifyUpdateFailure(
+                $exception,
+                'Latest code could not be activated',
+                'Ask your server administrator to check the logs and verify the deployed release before trying again.',
+            );
         }
     }
 
@@ -181,12 +183,37 @@ class SystemUpdates extends Page
                 ->persistent()
                 ->send();
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('Recovery could not complete')
-                ->body($exception->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
+            $this->notifyUpdateFailure(
+                $exception,
+                'Recovery could not complete',
+                'Ask your server administrator to check the logs and restore application access from the server.',
+            );
         }
+    }
+
+    private function notifyUpdateFailure(
+        Throwable $exception,
+        string $title,
+        string $nextStep,
+        ?string $releaseId = null,
+        string $logLevel = 'error',
+    ): void {
+        $notification = Notification::make()->title($title)->persistent();
+
+        if ($exception instanceof SystemUpdateBlocked || $exception instanceof LockTimeoutException) {
+            $message = $exception instanceof SystemUpdateBlocked
+                ? $exception->staffMessage
+                : 'An update or recovery action is in progress. Wait for it to finish, then refresh this page.';
+            $notification->body($message)->warning()->send();
+
+            return;
+        }
+
+        Log::log($logLevel, $title, [
+            'release_id' => $releaseId,
+            'initiated_by' => auth()->id(),
+            'exception' => $exception,
+        ]);
+        $notification->body($nextStep)->danger()->send();
     }
 }

@@ -46,7 +46,7 @@ it('keeps the shared request detail workspace clean across verification and clin
         ->toContain('Completed Form Snapshot')
         ->toContain('PDF Outputs')
         ->toContain('Documents &amp; Notes')
-        ->toContain('<details class="request-card request-timeline">')
+        ->toContain('<details class="request-card request-timeline" wire:ignore.self wire:key="saved-request-timeline">')
         ->toContain('Question / Field')
         ->toContain('Previous Answer')
         ->toContain('Current Answer')

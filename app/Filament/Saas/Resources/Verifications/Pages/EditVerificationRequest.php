@@ -2509,6 +2509,8 @@ class EditVerificationRequest extends EditRecord
         if ($normalizedTargetStatus === BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE) {
             $this->data['info_request_reason'] = '';
             $this->showInfoRequestModal = false;
+        } elseif ($normalizedTargetStatus === BillingWorkItem::STATUS_RETURNED_FOR_REWORK) {
+            $this->dispatch('close-workflow-modal', modalId: 'rework-reason-modal');
         }
     }
 

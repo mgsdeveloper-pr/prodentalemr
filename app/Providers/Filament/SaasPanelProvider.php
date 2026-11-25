@@ -18,6 +18,8 @@ use App\Filament\Saas\Pages\SetupChecks;
 use App\Filament\Saas\Pages\SystemUpdates;
 use App\Filament\Saas\Pages\TenantOnboarding;
 use App\Filament\Saas\Pages\UserManagement;
+use App\Filament\Saas\Pages\WebsitePayments;
+use App\Filament\Saas\Pages\WebsiteRegistrations;
 use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\Clinics\ClinicResource;
 use App\Filament\Saas\Resources\Dsos\DsoResource;
@@ -129,11 +131,13 @@ class SaasPanelProvider extends PanelProvider
                 \App\Filament\Saas\Pages\ImportVerificationTemplate::class,
                 Dashboard::class,
                 ClientManagement::class,
+                WebsiteRegistrations::class,
                 OrganizationWorkspace::class,
                 TenantOnboarding::class,
                 DsoOnboarding::class,
                 NotificationCentre::class,
                 PaymentCredentials::class,
+                WebsitePayments::class,
                 CallingProviders::class,
                 BillingSettings::class,
                 AdaProcedureCodeImport::class,

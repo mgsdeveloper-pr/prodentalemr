@@ -4,6 +4,7 @@ namespace App\Filament\Saas\Pages;
 
 use App\Models\SaasSetting;
 use App\Support\PayPalGateway;
+use App\Support\SaasNotifications;
 use App\Support\StripeGateway;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -44,8 +45,6 @@ class PaymentCredentials extends Page implements HasForms
 
     public string $activeProvider = 'stripe';
 
-    protected SaasSetting $settings;
-
     public static function canAccess(): bool
     {
         return auth()->user()?->canAccessSaasModule('settings') ?? false;
@@ -53,10 +52,8 @@ class PaymentCredentials extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->settings = SaasSetting::current();
-
         $this->form->fill([
-            ...$this->settings->toArray(),
+            ...SaasSetting::current()->toArray(),
             'stripe_secret_key' => null,
             'stripe_webhook_secret' => null,
             'stripe_webhook_url' => StripeGateway::webhookUrl(),
@@ -191,12 +188,13 @@ class PaymentCredentials extends Page implements HasForms
     public function save(): void
     {
         $data = $this->form->getState();
+        $settings = SaasSetting::current();
 
-        $persistedSecret = $this->settings->stripe_secret_key;
-        $persistedWebhookSecret = $this->settings->stripe_webhook_secret;
+        $persistedSecret = $settings->stripe_secret_key;
+        $persistedWebhookSecret = $settings->stripe_webhook_secret;
         $newSecret = $data['stripe_secret_key'] ?? null;
         $newWebhookSecret = $data['stripe_webhook_secret'] ?? null;
-        $persistedPayPalSecret = $this->settings->paypal_client_secret;
+        $persistedPayPalSecret = $settings->paypal_client_secret;
         $newPayPalSecret = $data['paypal_client_secret'] ?? null;
 
         unset(
@@ -225,7 +223,7 @@ class PaymentCredentials extends Page implements HasForms
             $data['paypal_client_secret'] = $persistedPayPalSecret;
         }
 
-        $this->settings->update($data);
+        $settings->update($data);
 
         Notification::make()
             ->title('Payment credentials saved')
@@ -237,18 +235,29 @@ class PaymentCredentials extends Page implements HasForms
     public function testStripeConnection(): void
     {
         $state = $this->form->getState();
+        $settings = SaasSetting::current();
         $state['stripe_secret_key'] = filled($state['stripe_secret_key'] ?? null)
             ? $state['stripe_secret_key']
-            : $this->settings->stripe_secret_key;
+            : $settings->stripe_secret_key;
+
+        if (blank($state['stripe_secret_key']) || blank($state['stripe_publishable_key'] ?? $settings->stripe_publishable_key)) {
+            Notification::make()
+                ->title('Stripe test failed')
+                ->body('Enter a Stripe publishable key and secret key before testing the connection.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         try {
             $result = StripeGateway::testConnection($state);
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('Stripe test failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::actionFailed(
+                'Stripe test failed',
+                $exception,
+                'Check that the Stripe keys match the selected environment, then try again. If the problem persists, ask your administrator to check the server logs.',
+            );
 
             return;
         }
@@ -265,16 +274,26 @@ class PaymentCredentials extends Page implements HasForms
         $state = $this->form->getState();
         $state['paypal_client_secret'] = filled($state['paypal_client_secret'] ?? null)
             ? $state['paypal_client_secret']
-            : $this->settings->paypal_client_secret;
+            : SaasSetting::current()->paypal_client_secret;
+
+        if (blank($state['paypal_client_id'] ?? null) || blank($state['paypal_client_secret'])) {
+            Notification::make()
+                ->title('PayPal test failed')
+                ->body('Enter a PayPal client ID and client secret before testing the connection.')
+                ->warning()
+                ->send();
+
+            return;
+        }
 
         try {
             $result = PayPalGateway::testConnection($state);
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('PayPal test failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::actionFailed(
+                'PayPal test failed',
+                $exception,
+                'Check that the PayPal client ID and secret match the selected environment, then try again. If the problem persists, ask your administrator to check the server logs.',
+            );
 
             return;
         }

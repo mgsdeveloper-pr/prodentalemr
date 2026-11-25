@@ -81,10 +81,17 @@ it('saves the short selection without changing the full selection', function () 
         ->set('data.verification_pdf_output_mode', 'custom_landscape')
         ->set('data.verification_pdf_output_sections', [])
         ->set('data.template_short_form_id', $short->id)->call('save')->assertHasNoErrors()
-        ->assertSet('showActivationReview', true);
+        ->assertSet('showActivationReview', true)
+        ->assertSeeHtml('aria-label="Confirm Active Forms"')
+        ->assertSeeHtml('x-trap.inert.noscroll.noreturn="true"')
+        ->assertSeeHtml('data-return-focus="clinic-active-forms-review"')
+        ->assertSee('Combined · v1 → Short · v2');
+    $page->set('showActivationReview', false)
+        ->assertDontSeeHtml('aria-label="Confirm Active Forms"');
     expect($short->fresh()->active_short_form)->toBeFalse()
         ->and($combined->fresh()->active_short_form)->toBeTrue();
-    $page->call('confirmActiveForms')->assertHasNoErrors();
+    $page->call('save')->assertSet('showActivationReview', true)
+        ->call('confirmActiveForms')->assertHasNoErrors();
     expect($short->fresh()->active_short_form)->toBeTrue()
         ->and($combined->fresh()->active_full_form)->toBeTrue()->and($combined->fresh()->active_short_form)->toBeFalse();
     Livewire::test(VerificationSettings::class)->set('data.template_full_form_id', $short->id)
@@ -244,6 +251,9 @@ it('shows actionable template validation and keeps unexpected draft errors in se
 
     Livewire::test(VerificationSettings::class)
         ->call('openCreateClinicTemplateDraftModal')
+        ->assertSeeHtml('aria-label="Create Template Draft"')
+        ->assertSeeHtml('for="clinic-create-draft-template-name"')
+        ->assertSeeHtml('data-return-focus="clinic-create-template-draft"')
         ->set('newClinicTemplateDraftData.template_name', 'Safe error QA')
         ->set('newClinicTemplateDraftData.starting_point', 'fresh')
         ->call('submitCreateClinicTemplateDraft')

@@ -2,6 +2,7 @@
 
 use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
 use App\Filament\Clinic\Resources\Appointments\Pages\CreateAppointment;
+use App\Filament\Clinic\Resources\Appointments\Pages\EditAppointment;
 use App\Filament\Clinic\Resources\Locations\Pages\EditLocation;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
@@ -563,6 +564,48 @@ it('renders appointment details with insurance member information', function () 
         ->assertOk()
         ->assertSee('Insurance policy')
         ->assertSee('Aetna Dental | Member MEM-100');
+});
+
+it('opens a saved appointment with the stored clinic date and time', function () {
+    $date = $this->appointment->appointment_date;
+
+    $this->actingAs($this->clinicUser)
+        ->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION])
+        ->get('/clinic/appointments/'.$this->appointment->id.'/edit')
+        ->assertOk()
+        ->assertSee($date->format('M d, Y').' • 9:00 AM - 9:30 AM')
+        ->assertSee('Aetna Dental')
+        ->assertSee('Verification requests created from this appointment use Full Form.');
+
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    Livewire::test(EditAppointment::class, ['record' => $this->appointment->getRouteKey()])
+        ->assertSet('data.appointment_date', $date->toDateString());
+});
+
+it('counts existing appointments on the last day of the booking calendar month', function () {
+    $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-06 12:00:00'));
+    $date = '2026-04-30';
+    $this->appointment->update(['appointment_date' => $date]);
+    $this->actingAs($this->clinicUser);
+    $this->withSession([ClinicWorkspace::SESSION_KEY => ClinicWorkspace::VERIFICATION]);
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+
+    $day = function () use ($date): array {
+        $editor = Livewire::test(CreateAppointment::class)
+            ->set('data.provider_id', $this->provider->id)
+            ->call('selectCalendarDate', $date)
+            ->instance();
+
+        return collect($editor->getCalendarWeeks())->collapse()->firstWhere('date', $date);
+    };
+
+    $before = $day();
+    $this->appointment->update(['status' => 'cancelled']);
+    $after = $day();
+
+    expect($after['availability_tone'])->toBe('open')
+        ->and((int) $before['availability_label'])->toBeLessThan((int) $after['availability_label']);
 });
 
 it('creates a patient and insurance policy together from the appointment form', function () {

@@ -185,11 +185,6 @@ class VerificationRequestsTable
                     ->badge()
                     ->alignCenter()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('pms_sync_status')
-                    ->label('PMS sync')
-                    ->badge()
-                    ->alignCenter()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('ownership_display')
                     ->label('Ownership')
                     ->getStateUsing(fn (BillingWorkItem $record): string => static::ownershipLabel($record))
@@ -285,7 +280,6 @@ class VerificationRequestsTable
                         'due_today' => 'Due Today',
                         'overdue' => 'Overdue',
                         'verified' => 'Verified',
-                        'not_synced' => 'Not Synced',
                     ])
                     ->query(function ($query, array $data) {
                         return match ($data['value'] ?? null) {
@@ -293,7 +287,6 @@ class VerificationRequestsTable
                             'due_today' => $query->whereDate('due_at', today())->where('status', '!=', BillingWorkItem::STATUS_DONE)->where('status', '!=', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
                             'overdue' => $query->where('due_at', '<', now())->where('status', '!=', BillingWorkItem::STATUS_DONE)->where('status', '!=', BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE),
                             'verified' => $query->where('outcome_status', 'verified'),
-                            'not_synced' => $query->where('pms_sync_status', '!=', 'synced'),
                             default => $query,
                         };
                     }),

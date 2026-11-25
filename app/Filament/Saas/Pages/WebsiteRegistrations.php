@@ -38,13 +38,18 @@ class WebsiteRegistrations extends Page implements HasTable
             TextColumn::make('draft.data.clinic_name')->label('Clinic'),
             TextColumn::make('draft.account_structure')->label('Structure')->badge(),
             TextColumn::make('draft.verification_model')->label('Offering')->formatStateUsing(fn ($state) => \App\Models\SubscriptionPlan::verificationModelOptions()[$state] ?? $state),
-            TextColumn::make('draft.status')->badge(),
+            TextColumn::make('draft.status')
+                ->label('Status')
+                ->badge()
+                ->formatStateUsing(fn (string $state): string => WebsiteRegistration::statusLabel($state)),
             TextColumn::make('checkout.status')->label('Payment')->badge()->placeholder('Not started'),
             TextColumn::make('draft.last_completed_step')->label('Saved progress')->formatStateUsing(fn ($state) => [1 => 'Contact / partial details', 2 => 'Practice details', 3 => 'Plan selected', 4 => 'Submitted'][$state] ?? 'Started'),
             TextColumn::make('email_verified_at')->label('Email verified')->dateTime()->placeholder('Not verified'),
             TextColumn::make('draft.updated_at')->label('Last saved')->since(),
         ])->filters([
-            SelectFilter::make('status')->options(['draft' => 'Incomplete', 'submitted' => 'Submitted', 'under_review' => 'Under review', 'changes_requested' => 'Changes requested', 'activated' => 'Activated'])->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $status) => $q->whereHas('draft', fn ($d) => $d->where('status', $status)))),
+            SelectFilter::make('status')
+                ->options(WebsiteRegistration::STATUS_LABELS)
+                ->query(fn ($query, array $data) => $query->when($data['value'] ?? null, fn ($q, $status) => $q->whereHas('draft', fn ($d) => $d->where('status', $status)))),
         ])->recordActions([
             Action::make('details')->label('Saved details')
                 ->modalHeading('Saved website registration')

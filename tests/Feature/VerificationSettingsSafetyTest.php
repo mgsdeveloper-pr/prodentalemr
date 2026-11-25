@@ -5,17 +5,23 @@ use App\Filament\Admin\Pages\VerificationAssignmentManagement;
 use App\Filament\Admin\Pages\VerificationInboxSettings;
 use App\Filament\Admin\Pages\VerificationNotificationControl;
 use App\Filament\Admin\Pages\VerificationSettings;
+use App\Filament\Clinic\Pages\VerificationReports as ClinicVerificationReports;
 use App\Http\Controllers\Verification\VerificationResultPdfController;
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
+use App\Models\Location;
+use App\Models\ManagedBillingService;
 use App\Models\Organization;
+use App\Models\Provider;
 use App\Models\SaasSetting;
 use App\Models\User;
 use App\Models\VerificationInboxMessage;
 use App\Services\Verification\PdfPresetService;
 use App\Support\AdminClinicScope;
+use App\Support\ClinicPanelScope;
 use App\Support\UserMailboxService;
 use App\Support\VerificationInboxService;
+use App\Support\VerificationReport;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
@@ -192,6 +198,7 @@ it('previews cleanup and deletes only confirmed still-eligible messages', functi
 });
 
 it('requires confirmation before the inbox cleanup action', function () {
+    app(VerificationInboxService::class)->mailbox($this->clinicA->id, true);
     $message = VerificationInboxMessage::create([
         'clinic_id' => $this->clinicA->id, 'mailbox_uid' => 100,
         'folder_name' => 'INBOX', 'folder_type' => 'inbox', 'message_hash' => hash('sha256', 'confirmation'),
@@ -223,7 +230,7 @@ it('rejects invalid retention values without saving', function () {
     Livewire::test(VerificationInboxSettings::class)
         ->set('data.verification_inbox_retention_days', -1)
         ->call('save')->assertHasErrors(['data.verification_inbox_retention_days']);
-    expect(app(VerificationInboxService::class)->mailbox($this->clinicA->id)->verification_inbox_retention_days)->toBe(90);
+    expect(app(VerificationInboxService::class)->mailbox($this->clinicA->id))->toBeNull();
 });
 
 it('reports configured mailboxes as untested until an IMAP test succeeds', function () {
@@ -235,4 +242,111 @@ it('reports configured mailboxes as untested until an IMAP test succeeds', funct
     app()->instance(UserMailboxService::class, $mock);
     Livewire::test(UserMailboxSettingsPage::class)->assertSee('Configured, not tested')
         ->call('testConnection')->assertSee('IMAP verified');
+});
+
+it('scopes the assignee breakdown and provider filter to the selected clinic', function () {
+    Filament::setCurrentPanel(Filament::getPanel('clinic'));
+    $service = ManagedBillingService::create([
+        'name' => 'Report Verification', 'slug' => 'report-verification',
+        'category' => 'verification', 'service_level_agreement_hours' => 24,
+        'default_priority' => 'normal', 'status' => true,
+    ]);
+
+    $providerIds = [];
+    foreach ([$this->clinicA, $this->clinicB] as $clinic) {
+        $assignee = User::factory()->create([
+            'name' => $clinic->clinic_name.' reviewer',
+            'clinic_id' => $clinic->id,
+        ]);
+        $location = Location::create([
+            'clinic_id' => $clinic->id, 'location_name' => 'Report office', 'status' => true,
+        ]);
+        $provider = Provider::create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'location_id' => $location->id,
+            'user_id' => $assignee->id,
+            'status' => true,
+        ]);
+        $providerIds[$clinic->id] = $provider->id;
+
+        BillingWorkItem::create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'provider_id' => $provider->id,
+            'managed_billing_service_id' => $service->id,
+            'assigned_to' => $assignee->id,
+            'title' => $clinic->clinic_name.' verification',
+            'status' => BillingWorkItem::STATUS_DONE,
+            'priority' => 'normal',
+        ]);
+    }
+
+    foreach ([$this->clinicA, $this->clinicB] as $clinic) {
+        session([ClinicPanelScope::SESSION_KEY => $clinic->id]);
+        $providerId = $providerIds[$clinic->id];
+        expect(VerificationReport::providerOptions($clinic->id))
+            ->toBe([$providerId => $clinic->clinic_name.' reviewer']);
+
+        $page = Livewire::test(ClinicVerificationReports::class)
+            ->assertStatus(200)
+            ->set('data.provider_id', $providerId)
+            ->assertHasNoErrors();
+        expect($page->instance()->getAssigneeVisualization())
+            ->toBe([['label' => $clinic->clinic_name.' reviewer', 'value' => 1, 'width' => 100]]);
+    }
+
+    session()->forget(ClinicPanelScope::SESSION_KEY);
+    expect(Livewire::test(ClinicVerificationReports::class)->instance()->getAssigneeVisualization())->toBe([]);
+});
+
+it('keeps shared inbox defaults unsaved until Save and preserves the saved password', function () {
+    $mock = Mockery::mock(VerificationInboxService::class)->makePartial();
+    $mock->shouldReceive('testMailboxConnection')->once()
+        ->withArgs(fn ($draft) => ! $draft->exists && $draft->verification_inbox_host === 'shared.example.test')
+        ->andReturn(['ok' => true, 'message' => 'Test succeeded']);
+    app()->instance(VerificationInboxService::class, $mock);
+
+    $page = Livewire::test(VerificationInboxSettings::class)
+        ->assertSet('data.verification_inbox_port', 993)
+        ->assertSet('data.verification_inbox_retention_days', 90)
+        ->assertSee('Not synced yet')
+        ->set('data.verification_inbox_host', 'shared.example.test')
+        ->set('data.verification_inbox_password', 'synthetic-shared-password')
+        ->call('testConnection')->assertHasNoErrors();
+    $this->assertDatabaseCount('verification_inbox_mailboxes', 0);
+
+    $page->call('save')->assertHasNoErrors()->assertSet('data.verification_inbox_password', '');
+    $this->assertDatabaseCount('verification_inbox_mailboxes', 1);
+    $page->set('data.verification_inbox_provider', 'Edited provider')->call('save')->assertHasNoErrors();
+
+    $mailbox = $mock->mailbox($this->clinicA->id);
+    expect($mailbox->verification_inbox_provider)->toBe('Edited provider')
+        ->and($mailbox->verification_inbox_password)->toBe('synthetic-shared-password')
+        ->and($mock->mailbox($this->clinicB->id))->toBeNull();
+});
+
+it('keeps personal mailbox defaults unsaved on open, connection test and rejected Save', function () {
+    $mock = Mockery::mock(UserMailboxService::class)->makePartial();
+    $mock->shouldReceive('testConnection')->once()
+        ->withArgs(fn ($draft) => ! $draft->exists && $draft->user_id === $this->admin->id)
+        ->andReturn(['ok' => true, 'message' => 'Test succeeded']);
+    app()->instance(UserMailboxService::class, $mock);
+
+    $page = Livewire::test(UserMailboxSettingsPage::class)
+        ->assertSet('data.enabled', false)
+        ->assertSet('data.imap_username', $this->admin->email)
+        ->call('save')->assertNotified('IMAP password required')
+        ->set('data.imap_password', 'synthetic-personal-password')
+        ->call('testConnection')->assertHasNoErrors();
+    $this->assertDatabaseCount('user_mailboxes', 0);
+
+    $page->call('save')->assertHasNoErrors()->assertSet('data.imap_password', '');
+    $this->assertDatabaseCount('user_mailboxes', 1);
+    $page->set('data.attachment_limit_mb', 10)->call('save')->assertHasNoErrors();
+
+    $mailbox = $mock->mailbox($this->admin);
+    expect($mailbox->attachment_limit_mb)->toBe(10)
+        ->and($mailbox->imap_password)->toBe('synthetic-personal-password')
+        ->and($mailbox->smtp_password)->toBe('synthetic-personal-password');
 });

@@ -72,8 +72,7 @@ class VerificationInboxSettings extends Page implements HasForms
     {
         $this->settingsClinicId = $this->selectedClinic()?->id;
         if ($this->selectedClinicId()) {
-            $this->settings = $this->getSettingsRecord();
-            $state = $this->settings->only($this->settingKeys());
+            $state = $this->getSettingsRecord()->only($this->settingKeys());
             $state['verification_inbox_password'] = '';
             $this->form->fill($state);
         }
@@ -243,9 +242,20 @@ class VerificationInboxSettings extends Page implements HasForms
         }
 
         $settings = $this->getSettingsRecord();
-        $settings->update($state);
-        $this->settings = $settings->fresh();
-        $refill = $this->settings->only($this->settingKeys());
+
+        if (! $settings->exists) {
+            $settings = VerificationInboxMailbox::query()->createOrFirst(
+                ['clinic_id' => $settings->clinic_id],
+                array_replace(VerificationInboxMailbox::defaultState($settings->clinic_id), $state),
+            );
+        }
+
+        if (! $settings->wasRecentlyCreated) {
+            $settings->update($state);
+        }
+
+        $this->settings = $settings;
+        $refill = $settings->only($this->settingKeys());
         $refill['verification_inbox_password'] = '';
         $this->form->fill($refill);
 
@@ -291,7 +301,7 @@ class VerificationInboxSettings extends Page implements HasForms
             ->{$result['ok'] ? 'success' : 'danger'}()
             ->send();
 
-        $this->settings = $this->getSettingsRecord()->fresh();
+        $this->settings = null;
     }
 
     protected function runCleanup(VerificationInboxService $service): void
@@ -309,7 +319,7 @@ class VerificationInboxSettings extends Page implements HasForms
             ->{$result['ok'] ? 'success' : 'warning'}()
             ->send();
 
-        $this->settings = $this->getSettingsRecord()->fresh();
+        $this->settings = null;
     }
 
     public function getVerificationNavItems(): array
@@ -336,7 +346,10 @@ class VerificationInboxSettings extends Page implements HasForms
     protected function prepareCleanupPreview(): void
     {
         abort_unless(static::canAccess() && $this->hasClinicScope(), 403);
-        $this->cleanupMessageIds = app(VerificationInboxService::class)->cleanupMessageIds($this->getSettingsRecord());
+        $settings = $this->getSettingsRecord();
+        $this->cleanupMessageIds = $settings->exists
+            ? app(VerificationInboxService::class)->cleanupMessageIds($settings)
+            : [];
         $this->cleanupAttachmentCount = VerificationInboxAttachment::query()
             ->whereIn('verification_inbox_message_id', $this->cleanupMessageIds)->count();
     }
@@ -360,7 +373,11 @@ class VerificationInboxSettings extends Page implements HasForms
 
     protected function getSettingsRecord(): VerificationInboxMailbox
     {
-        return $this->settings ??= app(VerificationInboxService::class)->mailbox($this->selectedClinicId(), createIfMissing: true);
+        $clinicId = $this->selectedClinicId();
+        abort_if($clinicId === null, 403);
+
+        return $this->settings ??= app(VerificationInboxService::class)->mailbox($clinicId)
+            ?? new VerificationInboxMailbox(VerificationInboxMailbox::defaultState($clinicId));
     }
 
     protected function settingKeys(): array

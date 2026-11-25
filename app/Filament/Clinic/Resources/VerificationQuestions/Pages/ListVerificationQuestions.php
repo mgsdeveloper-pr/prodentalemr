@@ -301,7 +301,10 @@ class ListVerificationQuestions extends Page
             $rules['newTemplateSectionData.parent_section_key'] = ['required', 'string'];
         }
 
-        $data = $this->validate($rules)['newTemplateSectionData'];
+        $data = $this->validate($rules, [], [
+            'newTemplateSectionData.label' => $this->templateSectionMode === 'sub_section' ? 'sub-section name' : 'section name',
+            'newTemplateSectionData.parent_section_key' => 'parent section',
+        ])['newTemplateSectionData'];
 
         $this->createTemplateSection([
             'template_key' => $this->selectedTemplateKey,

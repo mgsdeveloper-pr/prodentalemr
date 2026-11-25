@@ -6,6 +6,7 @@ use App\Models\AdaProcedureCode;
 use App\Models\SaasEntitlementAuditLog;
 use App\Support\AdaProcedureCodeGovernance;
 use App\Support\AdaProcedureCodeImportService;
+use App\Support\SaasNotifications;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -199,11 +200,11 @@ class AdaProcedureCodeImport extends Page implements HasForms
         } catch (\Throwable $throwable) {
             $this->previewResult = null;
 
-            Notification::make()
-                ->title('Preview failed')
-                ->body($throwable->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::importFailed(
+                'Preview failed',
+                $throwable,
+                'Try the downloaded ADA/CDT sample. If a valid file still fails, ask your administrator to check the server logs.',
+            );
         } finally {
             if (is_string($storedPath) && Storage::disk('local')->exists($storedPath)) {
                 Storage::disk('local')->delete($storedPath);
@@ -235,12 +236,13 @@ class AdaProcedureCodeImport extends Page implements HasForms
             }
 
             $this->form->fill();
+            $this->previewResult = null;
 
-            Notification::make()
-                ->title('Import failed')
-                ->body($throwable->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::importFailed(
+                'Import failed',
+                $throwable,
+                'Review the code directory before retrying. If a valid file still fails, ask your administrator to check the server logs.',
+            );
 
             return;
         }

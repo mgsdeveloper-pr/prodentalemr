@@ -115,7 +115,13 @@ it('reviews an uploaded section file and requires confirmation before adding', f
     $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('questions.csv', stream_get_contents($stream));
     fclose($stream);
     Livewire::test(ListVerificationQuestions::class)->call('selectBuilderVersion', $draft->id)
-        ->call('openSectionUpload')->call('downloadSectionSample')->assertFileDownloaded('section-questions.csv')
+        ->call('openTemplateSectionModal', 'section')
+        ->assertSeeHtml('form="builder-section-form"')
+        ->call('submitTemplateSection')->assertHasErrors('newTemplateSectionData.label')
+        ->assertSee('The section name field is required.')
+        ->call('closeTemplateSectionModal')
+        ->call('openSectionUpload')->assertSeeHtml('aria-label="Upload Questions"')
+        ->call('downloadSectionSample')->assertFileDownloaded('section-questions.csv')
         ->set('upload', $file)->call('reviewSectionUpload')->assertHasNoErrors()->assertSet('sectionUploadErrors', [])
         ->assertSee('Clinic specific question?')->call('saveSectionUpload')->assertHasErrors('confirmSectionUpload')
         ->set('confirmSectionUpload', true)->call('saveSectionUpload')->assertHasNoErrors()->assertSet('showSectionUpload', false);
@@ -135,7 +141,8 @@ it('copies the selected historical version rather than a different active versio
     $active = $old->replicate();
     $active->fill(['version_number' => 2, 'name' => 'New Active', 'is_active' => true])->save();
     $page = Livewire::test(ListVerificationQuestions::class)->call('selectBuilderVersion', $old->id)
-        ->call('openCreateDraftModal')->set('draftName', 'Historical Copy')->call('submitCreateDraftVersion')->assertHasNoErrors();
+        ->call('openCreateDraftModal')->assertSeeHtml('form="builder-copy-form"')
+        ->set('draftName', 'Historical Copy')->call('submitCreateDraftVersion')->assertHasNoErrors();
     $draft = VerificationTemplateVersion::findOrFail($page->get('selectedTemplateVersionId'));
     expect($draft->source_version_id)->toBe($old->id)->and($draft->sections()->count())->toBe(1);
 });
@@ -424,6 +431,9 @@ it('publishes a clinic draft without activation unless explicitly confirmed', fu
     $draft = $service->createDraftFromPublished($this->version);
     Livewire::withQueryParams(['version' => $draft->id])->test(ListVerificationQuestions::class)
         ->call('reviewPublishing')->assertSet('showPublishReview', true)
+        ->assertSeeHtml('wire:key="builder-publication-confirmation"')
+        ->assertSeeHtml('aria-label="Review publication"')
+        ->assertSeeHtml('data-return-focus="builder-publication-review"')
         ->call('publishDraftVersion')->assertHasNoErrors();
     expect($draft->fresh()->status)->toBe('published')->and($draft->fresh()->is_active)->toBeFalse()
         ->and($this->version->fresh()->active_full_form)->toBeTrue();
@@ -569,6 +579,8 @@ it('allows a clinic draft action on page two and moves back when the last row is
     expect($rows->count())->toBe(1);
     $row = $rows->first();
     $page->call('reviewDraftLifecycle', $row['id'], 'delete')
+        ->assertSeeHtml('wire:key="clinic-draft-lifecycle-confirmation"')
+        ->assertSeeHtml('aria-label="Review draft deletion"')
         ->call('confirmDraftLifecycle')->assertHasNoErrors();
     expect($page->instance()->getClinicTemplateVersionRows()->currentPage())->toBe(1)
         ->and(VerificationTemplateVersion::find($row['id']))->toBeNull();

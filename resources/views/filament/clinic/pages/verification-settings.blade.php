@@ -26,12 +26,12 @@
         .vs-page {
             --vs-teal: #0f8f86;
             --vs-teal-dark: #08756f;
-            --vs-navy: #111936;
-            --vs-text: #25345d;
-            --vs-muted: #667697;
-            --vs-border: #dfe7f3;
-            --vs-soft: #f6f9fd;
-            --vs-teal-soft: #eafaf8;
+            --vs-navy: var(--pwdl-text-primary);
+            --vs-text: var(--pwdl-text-secondary);
+            --vs-muted: var(--pwdl-text-muted);
+            --vs-border: var(--pwdl-border-default);
+            --vs-soft: var(--pwdl-surface-muted);
+            --vs-teal-soft: var(--pwdl-brand-primary-soft);
             width: 100%;
             max-width: none;
             margin: 0;
@@ -44,7 +44,7 @@
         .vs-card {
             border: 1px solid var(--vs-border);
             border-radius: 8px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             box-shadow: 0 14px 36px rgba(15, 23, 42, 0.04);
         }
 
@@ -52,7 +52,7 @@
             border: 0;
             border-bottom: 1px solid var(--vs-border);
             box-shadow: none;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -112,7 +112,7 @@
             padding: 10px 16px;
             border: 1px solid var(--vs-border);
             border-radius: 9px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             color: var(--vs-navy);
             font-size: 13px;
             font-weight: 800;
@@ -168,15 +168,15 @@
             height: 42px;
             border-radius: 999px;
             background: var(--vs-teal-soft);
-            color: var(--vs-teal-dark);
+            color: var(--pwdl-brand-accent);
             font-size: 13px;
             font-weight: 900;
             flex: 0 0 auto;
         }
 
-        .vs-icon--purple { background: #f2eafe; color: #6d4aff; }
-        .vs-icon--orange { background: #fff2df; color: #f97316; }
-        .vs-icon--blue { background: #edf4ff; color: #2563eb; }
+        .vs-icon--purple { background: var(--pwdl-status-info-soft); color: var(--pwdl-status-info-text); }
+        .vs-icon--orange { background: var(--pwdl-status-warning-soft); color: var(--pwdl-status-warning-text); }
+        .vs-icon--blue { background: var(--pwdl-status-info-soft); color: var(--pwdl-status-info-text); }
 
         .vs-label {
             color: var(--vs-muted);
@@ -236,7 +236,7 @@
             padding: 14px 16px;
             border: 1px solid var(--vs-border);
             border-radius: 12px;
-            background: #f8fafc;
+            background: var(--pwdl-surface-muted);
             color: var(--vs-muted);
             font-size: 13px;
             line-height: 1.55;
@@ -275,7 +275,7 @@
             gap: 12px;
             align-items: center;
             padding: 13px 12px;
-            border-bottom: 1px solid #edf2f7;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
             color: var(--vs-text);
         }
 
@@ -317,10 +317,10 @@
         }
 
         .vs-settings-item.is-active {
-            border: 1px solid #bde8e4;
+            border: 1px solid var(--pwdl-brand-outline);
             border-left: 3px solid var(--vs-teal);
             border-radius: 10px;
-            background: linear-gradient(90deg, var(--vs-teal-soft) 0%, #ffffff 100%);
+            background: linear-gradient(90deg, var(--vs-teal-soft) 0%, var(--pwdl-surface-card) 100%);
             box-shadow: 0 10px 26px rgba(15, 143, 134, 0.06);
         }
 
@@ -331,13 +331,13 @@
             width: 34px;
             height: 34px;
             border-radius: 9px;
-            color: #29436d;
+            color: var(--pwdl-text-secondary);
             font-size: 11px;
             font-weight: 900;
         }
 
         .vs-settings-item.is-active .vs-settings-icon {
-            color: var(--vs-teal-dark);
+            color: var(--pwdl-brand-accent);
         }
 
         .vs-form-card {
@@ -377,7 +377,7 @@
         }
 
         .vs-required {
-            color: #dc2626;
+            color: var(--pwdl-status-danger-text);
         }
 
         .vs-input,
@@ -385,9 +385,9 @@
         .vs-textarea {
             width: 100%;
             min-height: 42px;
-            border: 1px solid #d7e0ec;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 9px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             padding: 10px 12px;
             color: var(--vs-navy);
             font-size: 13px;
@@ -402,16 +402,16 @@
         .vs-segment {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            border: 1px solid #d7e0ec;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 9px;
             overflow: hidden;
             min-height: 42px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
         }
 
         .vs-segment button {
             border: 0;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             color: var(--vs-text);
             font-size: 13px;
             font-weight: 800;
@@ -419,9 +419,9 @@
         }
 
         .vs-segment button.is-active {
-            border: 1px solid #8ed8d1;
+            border: 1px solid var(--pwdl-brand-outline);
             background: var(--vs-teal-soft);
-            color: var(--vs-teal-dark);
+            color: var(--pwdl-brand-accent);
         }
 
         .vs-toggle-row {
@@ -433,7 +433,7 @@
             padding: 14px 16px;
             border: 1px solid var(--vs-border);
             border-radius: 10px;
-            background: #fbfdff;
+            background: var(--pwdl-surface-muted);
         }
 
         .vs-toggle {
@@ -456,7 +456,7 @@
             gap: 14px;
             padding: 16px 18px;
             border-bottom: 1px solid var(--vs-border);
-            background: #fbfdff;
+            background: var(--pwdl-surface-muted);
         }
 
         .vs-checkbox-grid {
@@ -489,9 +489,9 @@
         }
 
         .vs-question-card {
-            border: 1px solid #e1e8f2;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 12px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             overflow: hidden;
         }
 
@@ -501,8 +501,8 @@
             justify-content: space-between;
             gap: 12px;
             padding: 12px 14px;
-            background: #fbfdff;
-            border-bottom: 1px solid #edf2f7;
+            background: var(--pwdl-surface-muted);
+            border-bottom: 1px solid var(--pwdl-border-subtle);
         }
 
         .vs-question-grid {
@@ -516,9 +516,9 @@
             width: 186px;
             min-height: 250px;
             margin: 0 auto;
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 8px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             padding: 18px 16px;
             box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
         }
@@ -542,7 +542,7 @@
         .vs-preview-line {
             height: 7px;
             border-radius: 999px;
-            background: #e6edf6;
+            background: var(--pwdl-border-subtle);
             margin-top: 9px;
         }
 
@@ -572,7 +572,7 @@
             border: 1px solid var(--vs-border);
             border-radius: 12px;
             overflow-x: auto;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
         }
 
         .vs-table {
@@ -583,7 +583,7 @@
 
         .vs-table th {
             padding: 13px 16px;
-            background: #f8fafc;
+            background: var(--pwdl-surface-muted);
             border-bottom: 1px solid var(--vs-border);
             color: var(--vs-muted);
             font-size: 11px;
@@ -595,14 +595,14 @@
 
         .vs-table td {
             padding: 15px 16px;
-            border-bottom: 1px solid #edf2f7;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
             color: var(--vs-text);
             font-size: 13px;
             vertical-align: top;
         }
 
         .vs-table tbody tr:hover td {
-            background: #fbfdff;
+            background: var(--pwdl-surface-muted);
         }
 
         .vs-table tr:last-child td {
@@ -628,98 +628,44 @@
             gap: 6px;
             padding: 5px 9px;
             border-radius: 999px;
-            border: 1px solid #dbeafe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid var(--pwdl-border-default);
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 11px;
             font-weight: 900;
             white-space: nowrap;
         }
 
         .vs-pill--draft {
-            border-color: #fed7aa;
-            background: #fff7ed;
-            color: #c2410c;
+            border-color: var(--pwdl-border-default);
+            background: var(--pwdl-status-warning-soft);
+            color: var(--pwdl-status-warning-text);
         }
 
         .vs-pill--published {
-            border-color: #99f6e4;
-            background: #f0fdfa;
-            color: var(--vs-teal-dark);
+            border-color: var(--pwdl-brand-outline);
+            background: var(--pwdl-brand-primary-soft);
+            color: var(--pwdl-brand-accent);
         }
 
         .vs-pill--muted {
-            border-color: #e2e8f0;
-            background: #f8fafc;
+            border-color: var(--pwdl-border-subtle);
+            background: var(--pwdl-surface-muted);
             color: var(--vs-muted);
         }
 
-        .vs-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            display: grid;
-            place-items: center;
-            padding: 24px;
-            background: rgba(15, 23, 42, 0.45);
-            backdrop-filter: blur(4px);
-        }
-
-        .vs-modal {
-            width: min(680px, 100%);
-            max-height: calc(100vh - 48px);
-            overflow: auto;
-            border: 1px solid var(--vs-border);
-            border-radius: 18px;
-            background: #ffffff;
-            box-shadow: 0 26px 70px rgba(15, 23, 42, 0.24);
-        }
-
-        .vs-modal-header,
-        .vs-modal-footer {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 18px 20px;
-        }
-
-        .vs-modal-header {
-            border-bottom: 1px solid var(--vs-border);
-        }
-
-        .vs-modal-footer {
-            align-items: center;
-            border-top: 1px solid var(--vs-border);
-            background: #fbfdff;
-        }
-
-        .vs-modal-title {
-            margin: 0;
-            color: var(--vs-navy);
-            font-size: 18px;
-            font-weight: 900;
-            line-height: 1.2;
-        }
-
-        .vs-modal-body {
-            display: grid;
-            gap: 18px;
-            padding: 20px;
-        }
-
         .vs-error {
-            color: #dc2626;
+            color: var(--pwdl-status-danger-text);
             font-size: 12px;
             font-weight: 700;
         }
 
         .vs-alert {
             padding: 12px 14px;
-            border: 1px solid #fed7aa;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 10px;
-            background: #fff7ed;
-            color: #9a3412;
+            background: var(--pwdl-status-warning-soft);
+            color: var(--pwdl-status-warning-text);
             font-size: 12px;
             line-height: 1.5;
         }
@@ -786,7 +732,7 @@
             @if ($clinic && in_array($activeSettingsSection, ['template-selection', 'pdf-settings'], true))
                 <div>
                     <div class="vs-actions">
-                        <button type="button" wire:click.prevent="save" class="vs-button vs-button--primary" wire:loading.attr="disabled" wire:target="save">
+                        <button id="clinic-active-forms-review" type="button" wire:click.prevent="save" class="vs-button vs-button--primary" wire:loading.attr="disabled" wire:target="save">
                             <span wire:loading.remove wire:target="save">{{ $activeSettingsSection === 'template-selection' ? 'Review Activation' : 'Save PDF Settings' }}</span>
                             <span wire:loading wire:target="save">Saving...</span>
                         </button>
@@ -915,7 +861,7 @@
                                     @if (\App\Filament\Clinic\Pages\ImportVerificationTemplate::canAccess())
                                         <a class="vs-button" href="{{ \App\Filament\Clinic\Pages\ImportVerificationTemplate::getUrl(panel: 'clinic') }}">Import Template</a>
                                     @endif
-                                    <button type="button" wire:click.prevent="createClinicTemplateDraft" wire:loading.attr="disabled" wire:target="createClinicTemplateDraft" class="vs-button">
+                                    <button type="button" id="clinic-create-template-draft" wire:click.prevent="createClinicTemplateDraft" wire:loading.attr="disabled" wire:target="createClinicTemplateDraft" class="vs-button">
                                         <span wire:loading.remove wire:target="createClinicTemplateDraft">Create Draft Template</span>
                                         <span wire:loading wire:target="createClinicTemplateDraft">Preparing...</span>
                                     </button>
@@ -973,7 +919,7 @@
                                             </td>
                                         </tr>
                                     @endif
-                                    <tr>
+                                    <tr wire:key="clinic-template-row-{{ $row['id'] }}">
                                         <td>
                                             <div style="color:var(--vs-navy);font-size:14px;font-weight:900;">{{ $row['name'] }}</div>
                                             <div class="vs-small">{{ $row['version'] }} · {{ $row['visibility'] }}</div>
@@ -1009,7 +955,7 @@
                                                 <a href="{{ $templateUrl }}?version={{ $row['id'] }}{{ $row['is_draft'] ? '&draft=1' : '' }}" wire:navigate class="vs-button">
                                                     {{ $row['is_draft'] && $row['can_edit'] ? 'Edit Draft' : 'View' }}
                                                 </a>
-                                                <details><summary class="vs-button">Details &amp; History</summary>
+                                                <details wire:ignore.self><summary class="vs-button">Details &amp; History</summary>
                                                 @if ($row['is_draft'] && $row['can_edit'])
                                                     <button type="button" wire:click.prevent="openEditClinicTemplateDraftModal({{ $row['id'] }})" class="vs-button">Edit Details</button>
                                                 @endif
@@ -1281,195 +1227,195 @@
         </section>
 
         @if ($draftLifecycleReview)
-            <div class="vs-modal-backdrop" x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.cancelDraftLifecycleReview()">
-                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="draft-lifecycle-review-title">
-                    <header class="vs-modal-header">
-                        <h2 id="draft-lifecycle-review-title">{{ $draftLifecycleReview['action'] === 'publish' ? 'Review publication' : 'Review draft deletion' }}</h2>
-                    </header>
-                    <div class="vs-modal-body">
-                        <p><strong>{{ $draftLifecycleReview['label'] }}</strong></p>
-                        @if ($draftLifecycleReview['action'] === 'publish')
-                            <p>Publish this draft so it can be selected in Active Forms.</p>
-                        @else
-                            <p>Permanently delete this unused draft, including its sections and questions.</p>
-                        @endif
-                    </div>
-                    <footer class="vs-modal-footer">
-                        <button type="button" class="vs-button" wire:click="cancelDraftLifecycleReview" wire:loading.attr="disabled" wire:target="confirmDraftLifecycle">Cancel</button>
-                        <button type="button" class="vs-button vs-button--primary" wire:click="confirmDraftLifecycle" wire:loading.attr="disabled" wire:target="confirmDraftLifecycle">
-                            {{ $draftLifecycleReview['action'] === 'publish' ? 'Publish Draft' : 'Delete Draft' }}
-                        </button>
-                    </footer>
-                </section>
-            </div>
+            <x-pds.confirmation-dialog
+                :title="$draftLifecycleReview['action'] === 'publish' ? 'Review publication' : 'Review draft deletion'"
+                :open="true"
+                dismiss="$wire.cancelDraftLifecycleReview()"
+                wire:key="clinic-draft-lifecycle-confirmation"
+            >
+                <p><strong>{{ $draftLifecycleReview['label'] }}</strong></p>
+                @if ($draftLifecycleReview['action'] === 'publish')
+                    <p>Publish this draft so it can be selected in Active Forms.</p>
+                @else
+                    <p>Permanently delete this unused draft, including its sections and questions.</p>
+                @endif
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="cancelDraftLifecycleReview" wire:loading.attr="disabled" wire:target="confirmDraftLifecycle">Cancel</x-filament::button>
+                    <x-filament::button
+                        :color="$draftLifecycleReview['action'] === 'publish' ? 'primary' : 'danger'"
+                        wire:click="confirmDraftLifecycle"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmDraftLifecycle"
+                    >
+                        {{ $draftLifecycleReview['action'] === 'publish' ? 'Publish Draft' : 'Delete Draft' }}
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
 
         @if ($showActivationReview)
-            <div class="vs-modal-backdrop">
-                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="activation-review-title">
-                    <header class="vs-modal-header"><h2 id="activation-review-title">Confirm Active Forms</h2></header>
-                    <div class="vs-modal-body">
-                        <strong>{{ $activationReview['clinic_name'] ?? '' }}</strong>
-                        @forelse ($activationReview['labels'] ?? [] as $form => $label)
-                            <p><strong>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }}</strong>: {{ $label }}</p>
-                        @empty
-                            <p>No active form changes.</p>
-                        @endforelse
-                        <p>Only new requests use these selections. Existing requests and PDF settings remain unchanged.</p>
-                        @error('activation')<p role="alert">{{ $message }}</p>@enderror
-                        @error('template')<p role="alert">{{ $message }}</p>@enderror
-                    </div>
-                    <footer class="vs-modal-footer"><button type="button" class="vs-button" wire:click="$set('showActivationReview', false)">Cancel</button><button type="button" class="vs-button vs-button--primary" wire:click="confirmActiveForms" wire:loading.attr="disabled">Confirm Activation</button></footer>
-                </section>
-            </div>
+            <x-pds.confirmation-dialog
+                title="Confirm Active Forms"
+                :open="true"
+                dismiss="$wire.set('showActivationReview', false)"
+                return-focus="clinic-active-forms-review"
+                wire:key="clinic-active-forms-confirmation"
+            >
+                <strong>{{ $activationReview['clinic_name'] ?? '' }}</strong>
+                @forelse ($activationReview['labels'] ?? [] as $form => $label)
+                    <p><strong>{{ $form === 'full_form' ? 'Full Form' : 'Short Form' }}</strong>: {{ $label }}</p>
+                @empty
+                    <p>No active form changes.</p>
+                @endforelse
+                <p>Only new requests use these selections. Existing requests and PDF settings remain unchanged.</p>
+                @error('activation')<p role="alert">{{ $message }}</p>@enderror
+                @error('template')<p role="alert">{{ $message }}</p>@enderror
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="$set('showActivationReview', false)">Cancel</x-filament::button>
+                    <x-filament::button wire:click="confirmActiveForms" wire:loading.attr="disabled" wire:target="confirmActiveForms">Confirm Activation</x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
         @if ($this->showCreateTemplateDraftModal)
-            <div class="vs-modal-backdrop" wire:key="clinic-create-template-draft-modal">
-                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-create-template-draft-title">
-                    <header class="vs-modal-header">
-                        <span>
-                            <h2 id="clinic-create-template-draft-title" class="vs-modal-title">Create Template Draft</h2>
-                            <p class="vs-card-subtitle">Name the draft, choose the form type, and decide how it should start.</p>
-                        </span>
-                        <button type="button" wire:click.prevent="closeCreateTemplateDraftModal" class="vs-button">Close</button>
-                    </header>
+            <x-pds.confirmation-dialog
+                title="Create Template Draft"
+                :open="true"
+                dismiss="$wire.closeCreateTemplateDraftModal()"
+                return-focus="clinic-create-template-draft"
+                wire:key="clinic-create-template-draft-modal"
+            >
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeCreateTemplateDraftModal" label="Close create template draft" />
+                </x-slot:headerAction>
+                <p>Name the draft, choose the form type, and decide how it should start.</p>
+                @if ($this->existingNamedDrafts())
+                    <div class="vs-field">
+                        <strong>Continue Existing Draft</strong>
+                        @foreach ($this->existingNamedDrafts() as $existingDraft)
+                            <a class="vs-button" href="{{ $templateUrl }}?version={{ $existingDraft['id'] }}&draft=1">{{ $existingDraft['name'] }} · v{{ $existingDraft['version'] }}</a>
+                        @endforeach
+                        <strong>Or Create Another Named Draft</strong>
+                    </div>
+                @endif
+                <div class="vs-field">
+                    <label for="clinic-create-draft-template-name">Template Name <span class="vs-required">*</span></label>
+                    <input
+                        type="text"
+                        class="vs-input"
+                        id="clinic-create-draft-template-name" aria-required="true" autofocus wire:model.defer="newClinicTemplateDraftData.template_name"
+                        placeholder="Example: Demo Solo Dental Clinic Custom Template"
+                    >
+                    @error('newClinicTemplateDraftData.template_name')
+                        <div class="vs-error" role="alert">{{ $message }}</div>
+                    @enderror
+                </div>
 
-                    <div class="vs-modal-body">
-                        @if ($this->existingNamedDrafts())
-                            <div class="vs-field">
-                                <strong>Continue Existing Draft</strong>
-                                @foreach ($this->existingNamedDrafts() as $existingDraft)
-                                    <a class="vs-button" href="{{ $templateUrl }}?version={{ $existingDraft['id'] }}&draft=1">{{ $existingDraft['name'] }} · v{{ $existingDraft['version'] }}</a>
-                                @endforeach
-                                <strong>Or Create Another Named Draft</strong>
-                            </div>
-                        @endif
-                        <div class="vs-field">
-                            <label>Template Name <span class="vs-required">*</span></label>
-                            <input
-                                type="text"
-                                class="vs-input"
-                                wire:model.defer="newClinicTemplateDraftData.template_name"
-                                placeholder="Example: Demo Solo Dental Clinic Custom Template"
-                            >
-                            @error('newClinicTemplateDraftData.template_name')
-                                <div class="vs-error">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="vs-grid">
-                            <div class="vs-field">
-                                <label>Form Type</label>
-                                <select class="vs-select" wire:model.live="newClinicTemplateDraftData.form_type">
-                                    @foreach (\Illuminate\Support\Arr::except(\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS, ['both']) as $formType => $formTypeLabel)
-                                        <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newClinicTemplateDraftData.form_type')
-                                    <div class="vs-error">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="vs-field">
-                                <label>Replicate Type</label>
-                                <select class="vs-select" wire:model.live="newClinicTemplateDraftData.starting_point">
-                                    <option value="active">Copy active clinic template</option>
-                                    <option value="specific_version">Copy an existing template</option>
-                                    <option value="fresh">Start fresh</option>
-                                </select>
-                                @error('newClinicTemplateDraftData.starting_point')
-                                    <div class="vs-error">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        @if (($this->newClinicTemplateDraftData['starting_point'] ?? 'active') === 'specific_version')
-                            <div class="vs-field">
-                                <label>Template to Copy</label>
-                                <select class="vs-select" wire:model.defer="newClinicTemplateDraftData.source_version_id">
-                                    <option value="">Select a template</option>
-                                    @foreach ($this->clinicTemplateDraftSourceOptions() as $versionId => $versionLabel)
-                                        <option value="{{ $versionId }}">{{ $versionLabel }}</option>
-                                    @endforeach
-                                </select>
-                                @error('newClinicTemplateDraftData.source_version_id')
-                                    <div class="vs-error">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        @endif
-
-                        @if (($this->newClinicTemplateDraftData['starting_point'] ?? 'active') === 'fresh')
-                            <div class="vs-alert">
-                                Fresh draft creates an empty clinic template structure. Use this only when the clinic needs a fully custom setup from the beginning.
-                            </div>
-                        @else
-                            <div class="vs-alert" style="border-color:#bfdbfe;background:#eff6ff;color:#1e40af;">
-                                Copying keeps the existing sections and questions, then lets you safely edit the new draft before publishing.
-                            </div>
-                        @endif
+                <div class="vs-grid">
+                    <div class="vs-field">
+                        <label for="clinic-create-draft-form-type">Form Type</label>
+                        <select class="vs-select" id="clinic-create-draft-form-type" wire:model.live="newClinicTemplateDraftData.form_type">
+                            @foreach (\Illuminate\Support\Arr::except(\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS, ['both']) as $formType => $formTypeLabel)
+                                <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
+                            @endforeach
+                        </select>
+                        @error('newClinicTemplateDraftData.form_type')
+                            <div class="vs-error" role="alert">{{ $message }}</div>
+                        @enderror
                     </div>
 
-                    <footer class="vs-modal-footer">
-                        <span class="vs-small">This creates a draft only. Publishing does not change the active clinic form; activation requires a separate confirmation.</span>
-                        <span style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
-                            <button type="button" wire:click.prevent="closeCreateTemplateDraftModal" class="vs-button">Cancel</button>
-                            <button type="button" wire:click.prevent="submitCreateClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitCreateClinicTemplateDraft" class="vs-button vs-button--primary">
-                                <span wire:loading.remove wire:target="submitCreateClinicTemplateDraft">Create Draft Template</span>
-                                <span wire:loading wire:target="submitCreateClinicTemplateDraft">Creating...</span>
-                            </button>
-                        </span>
-                    </footer>
-                </section>
-            </div>
+                    <div class="vs-field">
+                        <label for="clinic-create-draft-starting-point">Replicate Type</label>
+                        <select class="vs-select" id="clinic-create-draft-starting-point" wire:model.live="newClinicTemplateDraftData.starting_point">
+                            <option value="active">Copy active clinic template</option>
+                            <option value="specific_version">Copy an existing template</option>
+                            <option value="fresh">Start fresh</option>
+                        </select>
+                        @error('newClinicTemplateDraftData.starting_point')
+                            <div class="vs-error" role="alert">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                @if (($this->newClinicTemplateDraftData['starting_point'] ?? 'active') === 'specific_version')
+                    <div class="vs-field">
+                        <label for="clinic-create-draft-source-version-id">Template to Copy</label>
+                        <select class="vs-select" id="clinic-create-draft-source-version-id" wire:model.defer="newClinicTemplateDraftData.source_version_id">
+                            <option value="">Select a template</option>
+                            @foreach ($this->clinicTemplateDraftSourceOptions() as $versionId => $versionLabel)
+                                <option value="{{ $versionId }}">{{ $versionLabel }}</option>
+                            @endforeach
+                        </select>
+                        @error('newClinicTemplateDraftData.source_version_id')
+                            <div class="vs-error" role="alert">{{ $message }}</div>
+                        @enderror
+                    </div>
+                @endif
+
+                @if (($this->newClinicTemplateDraftData['starting_point'] ?? 'active') === 'fresh')
+                    <div class="vs-alert">
+                        Fresh draft creates an empty clinic template structure. Use this only when the clinic needs a fully custom setup from the beginning.
+                    </div>
+                @else
+                    <div class="vs-alert" style="border-color:#bfdbfe;background:#eff6ff;color:#1e40af;">
+                        Copying keeps the existing sections and questions, then lets you safely edit the new draft before publishing.
+                    </div>
+                @endif
+                <p class="vs-small">This creates a draft only. Publishing does not change the active clinic form; activation requires a separate confirmation.</p>
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeCreateTemplateDraftModal">Cancel</x-filament::button>
+                    <x-filament::button wire:click="submitCreateClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitCreateClinicTemplateDraft">
+                        <span wire:loading.remove wire:target="submitCreateClinicTemplateDraft">Create Draft Template</span>
+                        <span wire:loading wire:target="submitCreateClinicTemplateDraft">Creating...</span>
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
 
         @if ($this->showEditTemplateDraftModal)
-            <div class="vs-modal-backdrop" wire:key="clinic-edit-template-draft-modal">
-                <section class="vs-modal" role="dialog" aria-modal="true" aria-labelledby="clinic-edit-template-draft-title">
-                    <header class="vs-modal-header">
-                        <span>
-                            <h2 id="clinic-edit-template-draft-title" class="vs-modal-title">Edit Draft Details</h2>
-                            <p class="vs-card-subtitle">Update this unused draft before opening the builder or publishing it.</p>
-                        </span>
-                        <button type="button" wire:click.prevent="closeEditClinicTemplateDraftModal" class="vs-button">Close</button>
-                    </header>
+            <x-pds.confirmation-dialog
+                title="Edit Draft Details"
+                :open="true"
+                dismiss="$wire.closeEditClinicTemplateDraftModal()"
+                wire:key="clinic-edit-template-draft-modal"
+            >
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeEditClinicTemplateDraftModal" label="Close edit draft details" />
+                </x-slot:headerAction>
+                <p>Update this unused draft before opening the builder or publishing it.</p>
+                <div class="vs-field">
+                    <label for="clinic-edit-draft-template-name">Template Name <span class="vs-required">*</span></label>
+                    <input type="text" class="vs-input" id="clinic-edit-draft-template-name" aria-required="true" autofocus wire:model.defer="editClinicTemplateDraftData.template_name">
+                    @error('editClinicTemplateDraftData.template_name')<div class="vs-error" role="alert">{{ $message }}</div>@enderror
+                </div>
 
-                    <div class="vs-modal-body">
-                        <div class="vs-field">
-                            <label>Template Name <span class="vs-required">*</span></label>
-                            <input type="text" class="vs-input" wire:model.defer="editClinicTemplateDraftData.template_name">
-                            @error('editClinicTemplateDraftData.template_name')<div class="vs-error">{{ $message }}</div>@enderror
-                        </div>
+                <div class="vs-field">
+                    <label for="clinic-edit-draft-form-type">Form Type</label>
+                    <select class="vs-select" id="clinic-edit-draft-form-type" wire:model.defer="editClinicTemplateDraftData.form_type">
+                        @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $formType => $formTypeLabel)
+                            <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
+                        @endforeach
+                    </select>
+                    @error('editClinicTemplateDraftData.form_type')<div class="vs-error" role="alert">{{ $message }}</div>@enderror
+                </div>
 
-                        <div class="vs-field">
-                            <label>Form Type</label>
-                            <select class="vs-select" wire:model.defer="editClinicTemplateDraftData.form_type">
-                                @foreach (\App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS as $formType => $formTypeLabel)
-                                    <option value="{{ $formType }}">{{ $formTypeLabel }}</option>
-                                @endforeach
-                            </select>
-                            @error('editClinicTemplateDraftData.form_type')<div class="vs-error">{{ $message }}</div>@enderror
-                        </div>
+                <div class="vs-field">
+                    <label for="clinic-edit-draft-notes">Change Notes</label>
+                    <textarea class="vs-textarea" id="clinic-edit-draft-notes" wire:model.defer="editClinicTemplateDraftData.notes" placeholder="Describe the purpose of this draft."></textarea>
+                    @error('editClinicTemplateDraftData.notes')<div class="vs-error" role="alert">{{ $message }}</div>@enderror
+                </div>
+                <p class="vs-small">Published and referenced templates remain read-only.</p>
 
-                        <div class="vs-field">
-                            <label>Change Notes</label>
-                            <textarea class="vs-textarea" wire:model.defer="editClinicTemplateDraftData.notes" placeholder="Describe the purpose of this draft."></textarea>
-                            @error('editClinicTemplateDraftData.notes')<div class="vs-error">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <footer class="vs-modal-footer">
-                        <span class="vs-small">Published and referenced templates remain read-only.</span>
-                        <span style="display:flex;align-items:center;justify-content:flex-end;gap:10px;">
-                            <button type="button" wire:click.prevent="closeEditClinicTemplateDraftModal" class="vs-button">Cancel</button>
-                            <button type="button" wire:click.prevent="submitEditClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitEditClinicTemplateDraft" class="vs-button vs-button--primary">
-                                <span wire:loading.remove wire:target="submitEditClinicTemplateDraft">Save Changes</span>
-                                <span wire:loading wire:target="submitEditClinicTemplateDraft">Saving...</span>
-                            </button>
-                        </span>
-                    </footer>
-                </section>
-            </div>
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeEditClinicTemplateDraftModal">Cancel</x-filament::button>
+                    <x-filament::button wire:click="submitEditClinicTemplateDraft" wire:loading.attr="disabled" wire:target="submitEditClinicTemplateDraft">
+                        <span wire:loading.remove wire:target="submitEditClinicTemplateDraft">Save Changes</span>
+                        <span wire:loading wire:target="submitEditClinicTemplateDraft">Saving...</span>
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
     </div>
     <script>

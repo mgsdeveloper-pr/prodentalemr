@@ -77,7 +77,7 @@
                 </button>
             @endif
             @if ($canReturnForRework)
-                <button type="button" onclick="openWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 10px 14px; border-radius: 12px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 12px; font-weight: 900; cursor: pointer;">
+                <button type="button" x-data x-on:click="document.getElementById('rework-reason-modal')?.dispatchEvent(new Event('open-workflow-dialog'))" style="display: inline-flex; align-items: center; justify-content: center; min-width: 160px; padding: 10px 14px; border-radius: 12px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 12px; font-weight: 900; cursor: pointer;">
                     Return for Correction
                 </button>
             @endif

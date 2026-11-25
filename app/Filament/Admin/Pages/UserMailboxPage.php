@@ -115,6 +115,7 @@ class UserMailboxPage extends Page
                 }),
             Action::make('compose')
                 ->label('Compose')
+                ->extraAttributes(['id' => 'mailbox-compose'])
                 ->icon('heroicon-o-pencil-square')
                 ->visible(fn (): bool => $this->isConfigured())
                 ->action('openComposeModal'),

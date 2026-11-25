@@ -559,11 +559,7 @@ class DsoOnboarding extends Page implements HasForms
                 return compact('dso', 'organization', 'clinic', 'location', 'user', 'subscription');
             });
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('DSO onboarding failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::onboardingFailed('DSO onboarding failed', $exception, $this->draft?->entry_point === 'website');
 
             return null;
         }

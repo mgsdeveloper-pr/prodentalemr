@@ -141,6 +141,8 @@ it('opens publication review only after completeness checks and allows one subse
     $page->call('unmountAction')
         ->call('openTemplateSectionModal', 'custom_frequency')
         ->assertSet('showTemplateSectionModal', true)
+        ->assertSeeHtml('aria-label="Add Sub-section"')
+        ->assertSeeHtml('x-on:keydown.escape.stop.prevent="$wire.closeTemplateSectionModal()"')
         ->set('newTemplateSectionData.label', 'Review subsection')
         ->call('createSelectedTemplateSection')
         ->assertHasNoErrors()

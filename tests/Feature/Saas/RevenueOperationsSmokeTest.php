@@ -822,6 +822,41 @@ it('allows verification managers to request clinic information before starting w
     expect($workItem->activities()->where('activity_type', 'info_requested_from_clinic')->exists())->toBeTrue();
 });
 
+it('keeps the correction dialog open on error and closes it only after returning the request', function () {
+    $manager = User::factory()->create(['status' => true]);
+    $manager->assignRole('verification_manager');
+    $manager->verificationClinics()->attach($this->clinic->id);
+    $this->actingAs($manager);
+    Filament::setCurrentPanel(Filament::getPanel('verification'));
+
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $manager->id,
+        'title' => 'Synthetic correction dialog request',
+        'status' => BillingWorkItem::STATUS_REVIEW,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+    ]);
+
+    $page = Livewire::test(EditVerificationRequest::class, ['record' => $request->getRouteKey()])
+        ->call('saveAndTransition', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->assertHasErrors('data.return_reason')
+        ->assertNotDispatched('close-workflow-modal');
+
+    expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_REVIEW);
+
+    $page->set('data.return_reason', 'Review the missing synthetic answer.')
+        ->call('saveAndTransition', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->assertHasNoErrors()
+        ->assertDispatched('close-workflow-modal', modalId: 'rework-reason-modal');
+
+    expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
+});
+
 it('allows clinic users to respond to verification information requests', function () {
     $verificationManager = User::factory()->create([
         'name' => 'Verification Manager',

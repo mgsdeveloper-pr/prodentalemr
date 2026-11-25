@@ -1,6 +1,5 @@
 <x-filament-panels::page>
     @php
-        $summary = $this->getUpdateSummary();
         $pending = $summary['pending'];
         $checks = $summary['checks'];
         $run = $summary['run'];
@@ -44,7 +43,9 @@
             <section class="system-update-card">
                 <div class="system-update-card-head">
                     <h3>{{ $isFailed ? 'Update stopped' : 'Update in progress' }}</h3>
-                    <p>{{ $run['message'] ?? 'Preparing update status.' }}</p>
+                    @unless($isFailed)
+                        <p>{{ $run['message'] ?? 'Preparing update status.' }}</p>
+                    @endunless
                 </div>
                 <div class="system-update-card-body">
                     <div class="system-update-progress"><span style="width:{{ $progress }}%"></span></div>
@@ -56,7 +57,7 @@
                         <p class="system-update-code" style="margin:14px 0 0;color:#0f172a;">Applying: {{ $run['current_migration'] }}</p>
                     @endif
                     @if($isFailed)
-                        <div class="system-update-alert" style="margin-top:14px;border-color:#fecaca;background:#fef2f2;color:#991b1b;">{{ $run['error'] ?? 'The update could not continue.' }}</div>
+                        <div class="system-update-alert" role="alert" style="margin-top:14px;border-color:#fecaca;background:#fef2f2;color:#991b1b;">Ask your server administrator to check the logs for this release before retrying the update.</div>
                         <div class="system-update-field" style="margin-top:14px;max-width:420px;">
                             <label for="recovery-password">Confirm SaaS Admin password to restore application access</label>
                             <input id="recovery-password" type="password" wire:model="confirmationPassword" autocomplete="current-password">

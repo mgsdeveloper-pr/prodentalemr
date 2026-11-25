@@ -24,6 +24,13 @@ class EditAppointment extends EditRecord
 
     protected Width|string|null $maxContentWidth = Width::Full;
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $data['appointment_date'] = $this->record->appointment_date?->toDateString();
+
+        return $data;
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data['organization_id'] = AppointmentWorkspaceScope::selectedOrganizationId();
