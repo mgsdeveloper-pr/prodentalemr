@@ -147,6 +147,11 @@ class VerificationTemplateVersion extends Model
         return $this->hasMany(self::class, 'parent_version_id');
     }
 
+    public function sourcedVersions(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_version_id');
+    }
+
     public function isPublished(): bool
     {
         return $this->status === self::STATUS_PUBLISHED;
@@ -209,17 +214,17 @@ class VerificationTemplateVersion extends Model
         return $this->isUnusedDraft();
     }
 
-    public function lifecycleLockReason(): ?string
+    public function lifecycleLockReason(?bool $hasRequests = null, ?bool $hasDependents = null): ?string
     {
         if ($this->status !== self::STATUS_DRAFT || filled($this->published_at)) {
             return 'Published and historical templates are read-only. Create a new draft to make changes.';
         }
 
-        if ($this->requestUsageCount() > 0) {
+        if ($hasRequests ?? ($this->requestUsageCount() > 0)) {
             return 'This template is used by a verification request and is retained for record history.';
         }
 
-        if ($this->dependentVersionCount() > 0) {
+        if ($hasDependents ?? ($this->dependentVersionCount() > 0)) {
             return 'Another template was created from this draft, so it is retained as a source record.';
         }
 

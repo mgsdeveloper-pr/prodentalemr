@@ -58,10 +58,54 @@ test('users can not authenticate with invalid password', function () {
 });
 
 test('users can logout', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['status' => true]);
 
     $response = $this->actingAs($user)->post('/logout');
 
     $this->assertGuest();
     $response->assertRedirect('/');
+});
+
+test('inactive users cannot sign in or update their sign in timestamp', function () {
+    $user = User::factory()->create(['status' => false, 'last_login_at' => null]);
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'password', 'remember' => true])
+        ->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+    expect($user->fresh()->last_login_at)->toBeNull();
+});
+
+test('successful sign ins record the time but failed attempts do not', function () {
+    $this->freezeTime();
+    $user = User::factory()->create(['status' => true, 'last_login_at' => null]);
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'wrong-password']);
+    expect($user->fresh()->last_login_at)->toBeNull();
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'password']);
+    expect($user->fresh()->last_login_at->toDateTimeString())->toBe(now()->toDateTimeString());
+});
+
+test('disabling a signed in user revokes access without changing their profile', function (string $path) {
+    $this->seed(RoleSeeder::class);
+    $user = User::factory()->create(['status' => true]);
+    $user->assignRole('saas_admin');
+    $this->actingAs($user);
+    $user->update(['status' => false]);
+
+    $this->withSession(['clinic_workspace' => 'verification'])->get($path)
+        ->assertRedirect('/login');
+    $this->assertGuest();
+    expect($user->fresh()->exists)->toBeTrue();
+})->with(['/profile', '/saas/user-management', '/clinic/users', '/verification/users']);
+
+test('inactive users cannot submit profile changes or authenticated json requests', function () {
+    $user = User::factory()->create(['status' => false, 'name' => 'Unchanged']);
+    $this->actingAs($user)->patch('/profile', ['name' => 'Changed', 'email' => $user->email])
+        ->assertRedirect('/login');
+    expect($user->fresh()->name)->toBe('Unchanged');
+
+    $this->actingAs($user)->getJson('/profile')->assertUnauthorized();
+    $this->assertGuest();
 });

@@ -1,9 +1,8 @@
+@use('App\Filament\Clinic\Resources\Appointments\AppointmentResource')
+@use('App\Filament\Clinic\Resources\Patients\PatientResource')
+
 <x-filament-panels::page>
     @php
-        use App\Filament\Clinic\Resources\Appointments\AppointmentResource;
-        use App\Filament\Clinic\Resources\Patients\PatientResource;
-        use App\Filament\Clinic\Resources\TreatmentPlans\TreatmentPlanResource;
-
         /** @var \App\Models\Patient $patient */
         $patient = $this->getRecord();
         $stats = $this->getProfileStats();
@@ -18,7 +17,6 @@
         $genderLabel = filled($patient->gender) ? str($patient->gender)->replace('_', ' ')->title()->toString() : '-';
         $patientName = trim($patient->first_name . ' ' . $patient->last_name) ?: 'Patient Profile';
         $appointmentIndexUrl = AppointmentResource::getUrl('index');
-        $treatmentIndexUrl = TreatmentPlanResource::getUrl('index');
         $patientIndexUrl = PatientResource::getUrl('index');
     @endphp
 
@@ -235,9 +233,6 @@
                             <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #0f766e;">Treatment &amp; Follow-Up</div>
                             <h3 style="margin: 8px 0 0; font-size: 24px; line-height: 1.15; font-weight: 900; color: #0f172a;">Treatment Plans & Follow-Up</h3>
                         </div>
-                        <a href="{{ $treatmentIndexUrl }}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border-radius: 12px; border: 1px solid #cbd5e1; background: #ffffff; color: #1e293b; font-size: 14px; font-weight: 700; text-decoration: none;">
-                            Open Treatment Plans
-                        </a>
                     </div>
 
                     <div style="display: grid; gap: 14px;">

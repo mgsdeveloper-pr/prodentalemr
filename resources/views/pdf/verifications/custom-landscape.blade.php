@@ -40,6 +40,7 @@
     </style>
 </head>
 <body>
+    @include('pdf.verifications.coverage-assessment')
 @php
     $formLabel = ($state['vf_form_type'] ?? 'full_form') === 'short_form' ? 'Short Form' : 'Full Form';
     $patientName = $state['vf_patient_full_name'] ?: $summary['patient_name'];

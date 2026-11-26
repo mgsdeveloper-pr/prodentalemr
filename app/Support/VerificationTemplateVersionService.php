@@ -12,9 +12,13 @@ use Illuminate\Validation\ValidationException;
 
 class VerificationTemplateVersionService
 {
-    public function provisionRegisteredClinic(Clinic $clinic): void
+    public function provisionRegisteredClinic(Clinic $clinic, bool $requireBoth = false): void
     {
-        DB::transaction(function () use ($clinic): void {
+        if ($requireBoth && ! $clinic->hasVerificationServices()) {
+            return;
+        }
+
+        DB::transaction(function () use ($clinic, $requireBoth): void {
             Clinic::whereKey($clinic->id)->lockForUpdate()->firstOrFail();
             foreach (['full_form', 'short_form'] as $form) {
                 if (VerificationTemplateVersion::where('scope', 'clinic')->where('clinic_id', $clinic->id)
@@ -26,7 +30,17 @@ class VerificationTemplateVersionService
                     ->whereIn('form_type', ['both', $form])
                     ->whereIn('clinic_visibility', [VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE, VerificationTemplateVersion::CLINIC_VISIBILITY_DEFAULT])
                     ->orderByDesc('version_number')->lockForUpdate()->first();
-                if (! $master || ! $master->questions()->where('is_active', true)->whereIn('form_type', ['both', $form])->exists()) continue;
+                if (! $master || ! $master->questions()->where('is_active', true)->whereIn('form_type', ['both', $form])->exists()) {
+                    if ($requireBoth) {
+                        $label = VerificationTemplateVersion::FORM_TYPE_OPTIONS[$form];
+
+                        throw ValidationException::withMessages([
+                            'template' => "Release an active SaaS Master Template with questions for {$label} before creating this clinic.",
+                        ]);
+                    }
+
+                    continue;
+                }
                 $version = VerificationTemplateVersion::create([
                     'scope' => 'clinic', 'clinic_id' => $clinic->id, 'organization_id' => $clinic->organization_id,
                     'template_key' => $master->template_key, 'parent_version_id' => $master->id, 'source_version_id' => $master->id,
@@ -189,6 +203,7 @@ class VerificationTemplateVersionService
             $lockedDraft = VerificationTemplateVersion::query()
                 ->lockForUpdate()
                 ->findOrFail($draft->getKey());
+            abort_unless(auth()->user()?->can('manage', $lockedDraft), 403);
 
             if (! $lockedDraft->canEditDirectly()) {
                 throw ValidationException::withMessages([
@@ -224,13 +239,134 @@ class VerificationTemplateVersionService
         });
     }
 
-    public function deleteUnusedDraft(VerificationTemplateVersion $draft): void
+    public function reorderDraftQuestions(?int $versionId, ?int $clinicId, array $questionIds, array $sectionKeys, bool $activeOnly = false): void
     {
-        DB::transaction(function () use ($draft): void {
-            $lockedDraft = VerificationTemplateVersion::query()
-                ->lockForUpdate()
-                ->findOrFail($draft->getKey());
+        DB::transaction(function () use ($versionId, $clinicId, $questionIds, $sectionKeys, $activeOnly): void {
+            $version = $this->lockEditableDraft($versionId, $clinicId);
 
+            $questions = $version->questions()
+                ->whereIn('section_key', $sectionKeys)
+                ->when($activeOnly, fn ($query) => $query->where('is_active', true))
+                ->whereIn('id', $questionIds)
+                ->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+
+            if ($questions->count() !== count($questionIds)) {
+                throw ValidationException::withMessages(['template' => 'The question list changed. Reload it before reordering.']);
+            }
+
+            foreach ($questionIds as $index => $id) {
+                $questions[$id]->forceFill(['sort_order' => ($index + 1) * 10])->saveQuietly();
+            }
+        });
+    }
+
+    public function lockEditableDraft(?int $versionId, ?int $clinicId): VerificationTemplateVersion
+    {
+        abort_unless($versionId, 404);
+        if ($clinicId !== null) {
+            Clinic::whereKey($clinicId)->lockForUpdate()->firstOrFail();
+        }
+
+        $version = VerificationTemplateVersion::query()
+            ->where('scope', $clinicId === null ? VerificationTemplateVersion::SCOPE_MASTER : VerificationTemplateVersion::SCOPE_CLINIC)
+            ->where('clinic_id', $clinicId)
+            ->lockForUpdate()
+            ->findOrFail($versionId);
+        abort_unless(auth()->user()?->can('manage', $version), 403);
+        if (! $version->canEditDirectly()) {
+            throw ValidationException::withMessages(['template' => 'This template is protected. Open an editable draft before making changes.']);
+        }
+
+        return $version;
+    }
+
+    public function addMasterDraftSection(int $versionId, string $label, ?string $parentSectionKey): void
+    {
+        DB::transaction(function () use ($versionId, $label, $parentSectionKey): void {
+            $draft = $this->lockEditableDraft($versionId, null);
+            if (filled($parentSectionKey)) {
+                abort_unless($parentSectionKey !== 'custom_layout_needs_mapping'
+                    && $draft->sections()->where('section_key', $parentSectionKey)
+                        ->whereNull('parent_section_key')->where('is_active', true)->exists(), 422);
+            }
+
+            $baseKey = VerificationTemplateSection::makeSectionKey($label, $parentSectionKey);
+            $sectionKey = $baseKey;
+            $counter = 2;
+            while ($draft->sections()->where('section_key', $sectionKey)->exists()) {
+                $sectionKey = $baseKey.'_'.$counter++;
+            }
+
+            $sortOrder = (int) $draft->sections()->where('parent_section_key', $parentSectionKey)->max('sort_order') + 10;
+            $draft->sections()->create([
+                'template_key' => $draft->template_key,
+                'section_key' => $sectionKey,
+                'parent_section_key' => $parentSectionKey,
+                'label' => $label,
+                'sort_order' => $sortOrder,
+                'is_builtin' => false,
+                'is_locked_by_admin' => false,
+                'is_active' => true,
+            ]);
+        });
+    }
+
+    public function toggleEmptyMasterDraftSection(int $versionId, string $sectionKey): void
+    {
+        DB::transaction(function () use ($versionId, $sectionKey): void {
+            $draft = $this->lockEditableDraft($versionId, null);
+            $section = $draft->sections()->where('section_key', $sectionKey)->firstOrFail();
+            abort_if($draft->questions()->where('section_key', $sectionKey)->where('is_active', true)->exists(), 422);
+            abort_if($draft->sections()->where('parent_section_key', $sectionKey)->exists(), 422);
+            $section->update(['allow_empty' => ! $section->allow_empty]);
+        });
+    }
+
+    public function deleteMasterDraftQuestion(VerificationFormQuestion $question): ?bool
+    {
+        return DB::transaction(function () use ($question): ?bool {
+            $draft = $this->lockEditableDraft($question->template_version_id, null);
+            $record = $draft->questions()->whereNull('clinic_id')->whereNull('organization_id')
+                ->findOrFail($question->getKey());
+            abort_if($record->is_builtin || $record->is_locked_by_admin, 403);
+
+            return $record->delete();
+        });
+    }
+
+    public function draftRevision(VerificationTemplateVersion $draft, bool $lock = false): string
+    {
+        return hash('sha256', serialize([
+            $draft->getAttributes(),
+            $draft->sections()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()->map->getAttributes()->all(),
+            $draft->questions()->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()->map->getAttributes()->all(),
+        ]));
+    }
+
+    public function assertReviewedDraft(VerificationTemplateVersion $draft, string $expectedRevision, string $field = 'template'): void
+    {
+        if (! hash_equals($expectedRevision, $this->draftRevision($draft, lock: true))) {
+            throw ValidationException::withMessages([$field => 'This draft changed after review. Close this confirmation and review it again.']);
+        }
+    }
+
+    public function deleteUnusedDraft(VerificationTemplateVersion $draft, ?string $expectedRevision = null): void
+    {
+        DB::transaction(function () use ($draft, $expectedRevision): void {
+            if ($draft->clinic_id) {
+                Clinic::whereKey($draft->clinic_id)->lockForUpdate()->firstOrFail();
+            }
+            $lockedDraft = VerificationTemplateVersion::query()
+                ->where('scope', $draft->scope)
+                ->where('clinic_id', $draft->clinic_id)
+                ->where('template_key', $draft->template_key)
+                ->orderBy('id')->lockForUpdate()->get()->firstWhere('id', $draft->getKey());
+            abort_unless($lockedDraft, 404);
+            abort_unless(auth()->user()?->can('manage', $lockedDraft), 403);
+
+            if ($expectedRevision !== null) {
+                $this->assertReviewedDraft($lockedDraft, $expectedRevision);
+            }
             if (! $lockedDraft->canDeletePermanently()) {
                 throw ValidationException::withMessages([
                     'template' => $lockedDraft->lifecycleLockReason()
@@ -243,6 +379,8 @@ class VerificationTemplateVersionService
             $clinicId = $lockedDraft->clinic_id;
             $wasWorkingDraft = (bool) $lockedDraft->is_working_draft;
 
+            $before = VerificationTemplateLifecycleAudit::state($lockedDraft);
+            $replacementDraft = null;
             $lockedDraft->questions()->delete();
             $lockedDraft->sections()->delete();
             \App\Models\VerificationTemplateImportReceipt::where('template_version_id', $lockedDraft->id)
@@ -264,6 +402,13 @@ class VerificationTemplateVersionService
                     $replacementDraft->forceFill(['is_working_draft' => true])->save();
                 }
             }
+
+            VerificationTemplateLifecycleAudit::record(auth()->user(), $lockedDraft, 'delete', $before, [
+                ...$before,
+                'status' => 'deleted',
+                'is_working_draft' => false,
+                'replacement_working_version_id' => $replacementDraft?->id,
+            ]);
         });
     }
 
@@ -273,6 +418,7 @@ class VerificationTemplateVersionService
             $lockedDraft = VerificationTemplateVersion::query()
                 ->lockForUpdate()
                 ->findOrFail($draft->getKey());
+            abort_unless(auth()->user()?->can('manage', $lockedDraft), 403);
 
             if (! $lockedDraft->canEditDirectly()) {
                 throw ValidationException::withMessages([
@@ -281,13 +427,39 @@ class VerificationTemplateVersionService
                 ]);
             }
 
+            $before = VerificationTemplateLifecycleAudit::state($lockedDraft);
             $lockedDraft->forceFill([
                 'status' => VerificationTemplateVersion::STATUS_ARCHIVED,
                 'is_active' => false,
                 'is_working_draft' => false,
             ])->save();
 
-            return $lockedDraft->refresh();
+            $lockedDraft->refresh();
+            VerificationTemplateLifecycleAudit::record(auth()->user(), $lockedDraft, 'archive', $before, VerificationTemplateLifecycleAudit::state($lockedDraft));
+
+            return $lockedDraft;
+        });
+    }
+
+    public function restoreArchivedDraft(VerificationTemplateVersion $version): VerificationTemplateVersion
+    {
+        return DB::transaction(function () use ($version): VerificationTemplateVersion {
+            $locked = VerificationTemplateVersion::query()->lockForUpdate()->findOrFail($version->id);
+            abort_unless(auth()->user()?->can('manage', $locked), 403);
+
+            if ($locked->status !== VerificationTemplateVersion::STATUS_ARCHIVED || $locked->published_at !== null) {
+                throw ValidationException::withMessages(['template' => 'Only an archived, unpublished draft can be restored.']);
+            }
+
+            $before = VerificationTemplateLifecycleAudit::state($locked);
+            $locked->forceFill([
+                'status' => VerificationTemplateVersion::STATUS_DRAFT,
+                'is_active' => false,
+                'is_working_draft' => false,
+            ])->save();
+            VerificationTemplateLifecycleAudit::record(auth()->user(), $locked, 'restore', $before, VerificationTemplateLifecycleAudit::state($locked));
+
+            return $locked;
         });
     }
 
@@ -513,15 +685,16 @@ class VerificationTemplateVersionService
         ?string $clinicVisibility = null,
         bool $activate = false,
         ?array $expectedActive = null,
+        ?string $expectedRevision = null,
     ): VerificationTemplateVersion {
-        abort_unless(auth()->user()?->canPublishVerificationTemplate($draft->clinic), 403);
+        abort_unless(auth()->user()?->can('release', $draft), 403);
         if ($clinicVisibility !== null && ! array_key_exists($clinicVisibility, VerificationTemplateVersion::CLINIC_VISIBILITY_OPTIONS)) {
             throw ValidationException::withMessages([
                 'clinic_visibility' => 'Select a valid clinic release option.',
             ]);
         }
 
-        return DB::transaction(function () use ($draft, $name, $notes, $clinicVisibility, $activate, $expectedActive): VerificationTemplateVersion {
+        return DB::transaction(function () use ($draft, $name, $notes, $clinicVisibility, $activate, $expectedActive, $expectedRevision): VerificationTemplateVersion {
             if ($draft->clinic_id) {
                 Clinic::whereKey($draft->clinic_id)->lockForUpdate()->firstOrFail();
                 if ($activate && $expectedActive !== null) {
@@ -533,6 +706,10 @@ class VerificationTemplateVersionService
                 ->orderBy('id')->lockForUpdate()->get()->firstWhere('id', $draft->getKey());
             abort_unless($lockedDraft, 404);
 
+            if ($expectedRevision !== null) {
+                $this->assertReviewedDraft($lockedDraft, $expectedRevision);
+            }
+
             if (! $lockedDraft->canEditDirectly()) {
                 throw ValidationException::withMessages([
                     'template' => $lockedDraft->lifecycleLockReason()
@@ -541,18 +718,22 @@ class VerificationTemplateVersionService
             }
 
             $this->assertPublishable($lockedDraft);
+            $before = VerificationTemplateLifecycleAudit::state($lockedDraft);
 
             $lockedDraft->forceFill([
                 'name' => filled($name) ? trim((string) $name) : $lockedDraft->name,
                 'notes' => filled($notes) ? trim((string) $notes) : $lockedDraft->notes,
                 'clinic_visibility' => $clinicVisibility ?? $lockedDraft->clinic_visibility,
                 'status' => VerificationTemplateVersion::STATUS_PUBLISHED,
-                'is_active' => $activate,
+                'is_active' => false,
                 'active_full_form' => false,
                 'active_short_form' => false,
                 'is_working_draft' => false,
                 'published_at' => now(),
             ])->save();
+
+            $lockedDraft->refresh();
+            VerificationTemplateLifecycleAudit::record(auth()->user(), $lockedDraft, 'publish', $before, VerificationTemplateLifecycleAudit::state($lockedDraft));
 
             if ($activate) {
                 $this->activatePublishedVersion($lockedDraft);
@@ -703,7 +884,7 @@ class VerificationTemplateVersionService
 
     public function activatePublishedVersion(VerificationTemplateVersion $version, ?string $formType = null): void
     {
-        abort_unless(auth()->user()?->canPublishVerificationTemplate($version->clinic), 403);
+        abort_unless(auth()->user()?->can('release', $version), 403);
         $forms = $formType ? [$formType] : ($version->form_type === 'both' ? ['short_form', 'full_form'] : [$version->form_type]);
         foreach ($forms as $form) {
             if (! in_array($form, ['short_form', 'full_form'], true) || ! in_array($version->form_type, ['both', $form], true)) {
@@ -719,14 +900,33 @@ class VerificationTemplateVersionService
             if (! $selected || $selected->status !== 'published' || $selected->clinic_visibility === 'retired') {
                 throw ValidationException::withMessages(['template' => 'Only a published, non-retired template can be activated.']);
             }
+            $previousSlots = [];
+            $nextSlots = [];
+            $before = VerificationTemplateLifecycleAudit::state($selected);
             foreach ($forms as $form) {
                 if (! in_array($selected->form_type, ['both', $form], true)) {
                     throw ValidationException::withMessages(['template' => 'This template no longer supports the selected form. Review the selections again.']);
+                }
+                $previousSlots[$form] = $versions->firstWhere('active_'.$form, true)?->id;
+                $nextSlots[$form] = $selected->id;
+                if ($previousSlots[$form] === $selected->id) {
+                    continue;
                 }
                 (clone $query)->update(['active_'.$form => false]);
                 VerificationTemplateVersion::whereKey($selected->id)->update(['active_'.$form => true]);
             }
             (clone $query)->update(['is_active' => DB::raw('(active_short_form OR active_full_form)')]);
+            if ($previousSlots === $nextSlots) {
+                return;
+            }
+
+            $before['active_slots'] = $previousSlots;
+            $after = VerificationTemplateLifecycleAudit::state($selected->refresh()) + ['active_slots' => $nextSlots];
+            VerificationTemplateLifecycleAudit::record(auth()->user(), $selected, 'activate', $before, $after);
+
+            if ($selected->scope === VerificationTemplateVersion::SCOPE_MASTER && $selected->isAvailableToClinics()) {
+                VerificationTemplateLifecycleAudit::record(auth()->user(), $selected, 'release', $before, $after);
+            }
         });
     }
 
@@ -765,6 +965,7 @@ class VerificationTemplateVersionService
             $lockedDraft = VerificationTemplateVersion::query()
                 ->lockForUpdate()
                 ->findOrFail($draft->getKey());
+            abort_unless(auth()->user()?->can('manage', $lockedDraft), 403);
 
             if (! $lockedDraft->canEditDirectly()) {
                 throw ValidationException::withMessages([
@@ -794,7 +995,11 @@ class VerificationTemplateVersionService
             return $workItem;
         }
 
-        $version = $this->latestPublishedVersionForWorkItem($workItem);
+        $versionId = $workItem->verification_template_version_id ?: data_get($workItem->verification_template_snapshot, 'version.id');
+        $version = $versionId
+            ? VerificationTemplateVersion::query()->where('clinic_id', $workItem->clinic_id)
+                ->where('scope', $workItem->clinic_id ? 'clinic' : 'master')->findOrFail($versionId)
+            : $this->latestPublishedVersionForWorkItem($workItem);
 
         return $this->replaceWorkItemSnapshot($workItem, $version);
     }
@@ -805,21 +1010,28 @@ class VerificationTemplateVersionService
         if (! in_array($form, ['short_form', 'full_form'], true)) {
             throw ValidationException::withMessages(['template' => 'Choose Short Form or Full Form before selecting a template.']);
         }
-        $active = VerificationTemplateVersion::query()
-            ->where('scope', $workItem->clinic_id ? 'clinic' : 'master')
-            ->where('clinic_id', $workItem->clinic_id)->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
-            ->where('status', 'published')->where('clinic_visibility', '!=', 'retired')
-            ->whereIn('form_type', ['both', $form])->where('active_'.$form, true)->latest('id')->first();
-        if ($active) return $active;
-        $hasOtherForm = VerificationTemplateVersion::query()->where('scope', $workItem->clinic_id ? 'clinic' : 'master')
-            ->where('clinic_id', $workItem->clinic_id)->where('template_key', VerificationFormQuestion::DEFAULT_TEMPLATE_KEY)
-            ->where('status', 'published')->where('is_active', true)->exists();
-        if ($hasOtherForm) {
-            throw ValidationException::withMessages(['template' => 'No active template is configured for this form. Ask an administrator to activate it.']);
+        return $this->findActivePublishedVersion($workItem->clinic_id, formType: $form)
+            ?? throw ValidationException::withMessages(['template' => 'No active template is configured for this form. Ask an administrator to activate it.']);
+    }
+
+    public function findActivePublishedVersion(
+        ?int $clinicId = null,
+        string $templateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        ?string $formType = null,
+    ): ?VerificationTemplateVersion {
+        if ($formType !== null && ! in_array($formType, ['full_form', 'short_form'], true)) {
+            return null;
         }
-        return $workItem->clinic
-            ? $this->ensureClinicPublishedVersion($workItem->clinic, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $form)
-            : $this->ensureMasterVersion(VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $form);
+
+        return VerificationTemplateVersion::query()
+            ->where('scope', $clinicId ? 'clinic' : 'master')
+            ->where('clinic_id', $clinicId)
+            ->where('template_key', $templateKey)
+            ->where('status', 'published')
+            ->where('clinic_visibility', '!=', 'retired')
+            ->when($formType, fn ($query) => $query->whereIn('form_type', ['both', $formType])->where('active_'.$formType, true),
+                fn ($query) => $query->where('is_active', true))
+            ->latest('id')->first();
     }
 
     public function workItemUsesLatestPublishedVersion(BillingWorkItem $workItem): bool

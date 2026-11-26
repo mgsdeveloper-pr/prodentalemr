@@ -8,8 +8,6 @@ use App\Filament\Saas\Pages\CallingProviders;
 use App\Filament\Saas\Pages\ClientManagement;
 use App\Filament\Saas\Pages\Dashboard;
 use App\Filament\Saas\Pages\DsoOnboarding;
-use App\Filament\Saas\Pages\EligibilityConnections;
-use App\Filament\Saas\Pages\EligibilityConnectionSettings;
 use App\Filament\Saas\Pages\ModuleSettings;
 use App\Filament\Saas\Pages\NotificationCentre;
 use App\Filament\Saas\Pages\OrganizationWorkspace;
@@ -20,6 +18,8 @@ use App\Filament\Saas\Pages\SetupChecks;
 use App\Filament\Saas\Pages\SystemUpdates;
 use App\Filament\Saas\Pages\TenantOnboarding;
 use App\Filament\Saas\Pages\UserManagement;
+use App\Filament\Saas\Pages\WebsitePayments;
+use App\Filament\Saas\Pages\WebsiteRegistrations;
 use App\Filament\Saas\Resources\ClientServiceEnrollments\ClientServiceEnrollmentResource;
 use App\Filament\Saas\Resources\Clinics\ClinicResource;
 use App\Filament\Saas\Resources\Dsos\DsoResource;
@@ -131,13 +131,13 @@ class SaasPanelProvider extends PanelProvider
                 \App\Filament\Saas\Pages\ImportVerificationTemplate::class,
                 Dashboard::class,
                 ClientManagement::class,
+                WebsiteRegistrations::class,
                 OrganizationWorkspace::class,
                 TenantOnboarding::class,
                 DsoOnboarding::class,
                 NotificationCentre::class,
                 PaymentCredentials::class,
-                EligibilityConnectionSettings::class,
-                EligibilityConnections::class,
+                WebsitePayments::class,
                 CallingProviders::class,
                 BillingSettings::class,
                 AdaProcedureCodeImport::class,

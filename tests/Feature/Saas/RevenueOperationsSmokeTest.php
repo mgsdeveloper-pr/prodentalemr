@@ -7,7 +7,9 @@ use App\Filament\Admin\Pages\VerificationRequestResponse as AdminVerificationReq
 use App\Filament\Clinic\Pages\VerificationRequestResponse as ClinicVerificationRequestResponse;
 use App\Filament\Clinic\Resources\VerificationRequests\Tables\VerificationRequestsTable;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\ListVerificationFormQuestions;
+use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\BillingWorkItem;
 use App\Models\BillingWorkItemAttachment;
 use App\Models\ClientServiceEnrollment;
@@ -41,6 +43,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 function publishRevenueTemplate(VerificationTemplateVersion $draft, ...$options): VerificationTemplateVersion
@@ -78,6 +81,7 @@ beforeEach(function () {
     ]);
 
     seedWorkflowMaster();
+    app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
@@ -100,7 +104,7 @@ beforeEach(function () {
     $this->saasUser->verificationClinics()->attach($this->clinic->id);
     foreach (['saas', 'verification'] as $panel) {
         foreach (['view', 'update'] as $action) {
-            $this->saasUser->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($panel.'.template_publishing.'.$action, 'web'));
+            $this->saasUser->givePermissionTo(Permission::findOrCreate($panel.'.template_publishing.'.$action, 'web'));
         }
     }
 
@@ -516,6 +520,10 @@ it('protects the complete cross panel verification lifecycle and historical outp
 
     $this->actingAs($specialist);
     $answers->execute($request, $requiredQuestion->id, 'CONF-100', actor: $specialist);
+    $request->update(['coverage_assessment' => ['outcome' => 'active', 'patient_name' => 'Lifecycle patient',
+        'insurance_name' => 'Lifecycle policy', 'member_id' => 'TEST-100',
+        'service_date' => $this->appointment->appointment_date->toDateString(),
+        'source' => 'Payer portal', 'reason' => 'Active for appointment date.']]);
     $request = $workflow->submitForQa($request, $specialist);
     expect($request->normalized_status)->toBe(BillingWorkItem::STATUS_REVIEW);
 
@@ -558,6 +566,8 @@ it('protects the complete cross panel verification lifecycle and historical outp
             ]],
         ],
     ]);
+    // Approval captures the actual reviewed data, not a fabricated older payload.
+    $request->verificationProfile()->updateOrCreate([], data_get($request->formSubmissions()->latest('version')->first()->payload, 'verification_profile'));
     $request = $workflow->approveQa($request, $manager);
     $lockedVersionId = $request->verification_template_version_id;
 
@@ -574,7 +584,7 @@ it('protects the complete cross panel verification lifecycle and historical outp
     ]);
     $recordedResult = app(VerificationResultService::class)->summary($request->fresh());
 
-    expect($recordedResult['eligibility_status'])->toBe('Verified')
+    expect($recordedResult['eligibility_status'])->toBe('Active Coverage')
         ->and($recordedResult['effective_date'])->toBe('Jan 01, 2026')
         ->and($recordedResult['annual_maximum'])->toBe('$1,500.00')
         ->and($recordedResult['coverage_preventive'])->toBe('100%');
@@ -810,6 +820,41 @@ it('allows verification managers to request clinic information before starting w
 
     expect($workItem->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE);
     expect($workItem->activities()->where('activity_type', 'info_requested_from_clinic')->exists())->toBeTrue();
+});
+
+it('keeps the correction dialog open on error and closes it only after returning the request', function () {
+    $manager = User::factory()->create(['status' => true]);
+    $manager->assignRole('verification_manager');
+    $manager->verificationClinics()->attach($this->clinic->id);
+    $this->actingAs($manager);
+    Filament::setCurrentPanel(Filament::getPanel('verification'));
+
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'location_id' => $this->location->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $manager->id,
+        'title' => 'Synthetic correction dialog request',
+        'status' => BillingWorkItem::STATUS_REVIEW,
+        'outcome_status' => 'pending',
+        'priority' => 'normal',
+    ]);
+
+    $page = Livewire::test(EditVerificationRequest::class, ['record' => $request->getRouteKey()])
+        ->call('saveAndTransition', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->assertHasErrors('data.return_reason')
+        ->assertNotDispatched('close-workflow-modal');
+
+    expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_REVIEW);
+
+    $page->set('data.return_reason', 'Review the missing synthetic answer.')
+        ->call('saveAndTransition', BillingWorkItem::STATUS_RETURNED_FOR_REWORK)
+        ->assertHasNoErrors()
+        ->assertDispatched('close-workflow-modal', modalId: 'rework-reason-modal');
+
+    expect($request->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_RETURNED_FOR_REWORK);
 });
 
 it('allows clinic users to respond to verification information requests', function () {
@@ -1056,7 +1101,7 @@ it('reviews refresh safely and preserves custom answers and history', function (
     if (in_array($scenario, ['ui-discard', 'ui-save'], true)) {
         $manager->verificationClinics()->attach($this->clinic->id);
         Filament::setCurrentPanel(Filament::getPanel('verification'));
-        Livewire::test(\App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest::class, ['record' => $work->getRouteKey()])
+        Livewire::test(EditVerificationRequest::class, ['record' => $work->getRouteKey()])
             ->set('data.notes', 'Unsaved change to discard')
             ->call('refreshVerificationTemplate')
             ->assertSet('showTemplateRefresh', true)
@@ -1066,10 +1111,14 @@ it('reviews refresh safely and preserves custom answers and history', function (
             ->call('confirmTemplateRefresh')
             ->assertHasNoErrors()
             ->assertSet('showTemplateRefresh', false);
-        if ($scenario === 'ui-save') expect($work->fresh()->notes)->toBe('Unsaved change to discard');
-        else expect($work->fresh()->notes)->not->toBe('Unsaved change to discard');
+        if ($scenario === 'ui-save') {
+            expect($work->fresh()->notes)->toBe('Unsaved change to discard');
+        } else {
+            expect($work->fresh()->notes)->not->toBe('Unsaved change to discard');
+        }
         expect($work->fresh()->normalized_status)->toBe(BillingWorkItem::STATUS_PENDING);
         expect($work->fresh()->verification_template_version_id)->toBe($target->id);
+
         return;
     }
     if ($scenario === 'stale') {
@@ -1083,10 +1132,11 @@ it('reviews refresh safely and preserves custom answers and history', function (
         try {
             $refresh->execute($work, $review['token']);
             $this->fail('Unsafe refresh was accepted.');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             expect($work->fresh()->verification_template_version_id)->toBe($published->id);
             expect($work->formSubmissions()->count())->toBe(0);
         }
+
         return;
     }
     $result = $refresh->execute($work, $review['token']);
@@ -1312,21 +1362,27 @@ it('replicates the platform master template into a clinic template copy', functi
         'is_active' => true,
     ]);
 
-    $clinicVersion = $versions->ensureClinicPublishedVersion($this->clinic);
+    $newClinic = Clinic::create([
+        'organization_id' => $this->organization->id,
+        'clinic_name' => 'Master Copy Clinic',
+        'clinic_code' => 'MASTER-COPY',
+        'status' => true,
+    ]);
+    $clinicVersion = $versions->findActivePublishedVersion($newClinic->id, formType: 'full_form');
 
     $clinicQuestion = VerificationFormQuestion::query()
         ->where('template_version_id', $clinicVersion->id)
-        ->where('clinic_id', $this->clinic->id)
+        ->where('clinic_id', $newClinic->id)
         ->where('source_question_id', $question->id)
         ->first();
 
     expect($clinicVersion->scope)->toBe(VerificationTemplateVersion::SCOPE_CLINIC)
         ->and($clinicVersion->parent_version_id)->toBe($master->id)
-        ->and($clinicVersion->form_type)->toBe($master->form_type)
+        ->and($clinicVersion->form_type)->toBe(VerificationTemplateVersion::FORM_TYPE_FULL)
         ->and($clinicVersion->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE)
         ->and($clinicQuestion)->not->toBeNull()
         ->and($clinicQuestion->organization_id)->toBe($this->organization->id)
-        ->and($clinicQuestion->clinic_id)->toBe($this->clinic->id);
+        ->and($clinicQuestion->clinic_id)->toBe($newClinic->id);
 
     expect(VerificationFormQuestion::query()
         ->whereKey($question->id)
@@ -1545,6 +1601,7 @@ it('requires an explicit clinic release choice when publishing a master template
 
     Livewire::test(ListVerificationFormQuestions::class)
         ->call('selectTemplateVersion', $draft->id)
+        ->call('reviewSelectedTemplate')
         ->call('publishDraftVersion', [
             'version_name' => 'Missing Release Choice',
             'change_description' => 'This should remain a draft.',
@@ -1558,10 +1615,12 @@ it('publishes and releases a master template to clinics when selected', function
     Filament::setCurrentPanel(Filament::getPanel('saas'));
 
     $versions = app(VerificationTemplateVersionService::class);
-    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+    $previous = $versions->ensureMasterVersion();
+    $draft = $versions->createDraftFromPublished($previous);
 
     Livewire::test(ListVerificationFormQuestions::class)
         ->call('selectTemplateVersion', $draft->id)
+        ->call('reviewSelectedTemplate')
         ->call('publishDraftVersion', [
             'version_name' => 'Clinic Release',
             'change_description' => 'Released for clinic use.',
@@ -1571,6 +1630,30 @@ it('publishes and releases a master template to clinics when selected', function
     expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_PUBLISHED)
         ->and($draft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE)
         ->and($draft->fresh()->isAvailableToClinics())->toBeTrue();
+
+    $logs = AuditLog::where('module', 'verification_templates')->orderBy('id')->get();
+    expect($logs->pluck('action')->all())->toBe(['publish', 'activate', 'release']);
+    foreach ($logs as $log) {
+        $before = json_decode($log->old_values, true);
+        $after = json_decode($log->new_values, true);
+        expect($log->user_id)->toBe($this->saasUser->id)
+            ->and($after['actor_user_id'])->toBe($this->saasUser->id)
+            ->and($after['template_version_id'])->toBe($draft->id)
+            ->and($after['scope'])->toBe('master')
+            ->and($log->clinic_id)->toBeNull();
+        if ($log->action === 'publish') {
+            expect($before['status'])->toBe('draft')
+                ->and($after['status'])->toBe('published')
+                ->and($after['active_full_form'])->toBeFalse();
+        } else {
+            expect($before['active_slots']['full_form'])->toBe($previous->id)
+                ->and($after['active_slots']['full_form'])->toBe($draft->id)
+                ->and($after['clinic_visibility'])->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE);
+        }
+    }
+
+    $versions->activatePublishedVersion($draft->fresh());
+    expect(AuditLog::where('module', 'verification_templates')->count())->toBe(3);
 });
 
 it('publishes an internal-only master template when selected', function () {
@@ -1582,6 +1665,7 @@ it('publishes an internal-only master template when selected', function () {
 
     Livewire::test(ListVerificationFormQuestions::class)
         ->call('selectTemplateVersion', $draft->id)
+        ->call('reviewSelectedTemplate')
         ->call('publishDraftVersion', [
             'version_name' => 'Internal Release',
             'change_description' => 'Published for SaaS review only.',
@@ -1592,6 +1676,25 @@ it('publishes an internal-only master template when selected', function () {
         ->and($draft->fresh()->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
         ->and($draft->fresh()->isAvailableToClinics())->toBeFalse();
 });
+
+it('rejects master publish and deletion after the reviewed draft changes', function (string $review, string $action) {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+    $page = Livewire::test(ListVerificationFormQuestions::class)
+        ->call('selectTemplateVersion', $draft->id)->call($review);
+    $draft->questions()->firstOrFail()->update(['prompt' => 'Edited after review']);
+    if ($action === 'publishDraftVersion') {
+        $page->call($action, ['release_mode' => 'release_to_clinics'])->assertHasErrors('template');
+    } else {
+        $page->call($action)->assertHasErrors('template');
+    }
+    expect($draft->fresh()->status)->toBe('draft');
+})->with([
+    ['reviewSelectedTemplate', 'publishDraftVersion'],
+    ['reviewDraftRemoval', 'deleteSelectedUnusedDraft'],
+]);
 
 it('rejects clinic template versions in the saas master template workspace', function () {
     $this->actingAs($this->saasUser);
@@ -1670,7 +1773,12 @@ it('protects published and source template versions from direct edits and deleti
     expect(fn () => $versions->archiveUnusedDraft($sourceDraft))
         ->toThrow(ValidationException::class);
 
-    Livewire::test(ListVerificationFormQuestions::class)
+    $component = Livewire::test(ListVerificationFormQuestions::class);
+    $rows = $component->instance()->getTemplateVersionHistory()->getCollection()->keyBy('id');
+    expect($rows[$sourceDraft->id]['can_edit_directly'])->toBeFalse()
+        ->and($rows[$published->id]['can_edit_directly'])->toBeFalse();
+
+    $component
         ->call('setWorkingDraft', $sourceDraft->id)
         ->call('archiveDraft', $sourceDraft->id);
 
@@ -1679,7 +1787,9 @@ it('protects published and source template versions from direct edits and deleti
 });
 
 it('protects a template draft once a verification request references it', function () {
-    $this->actingAs($this->saasUser);
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+    $this->actingAs($admin);
 
     $versions = app(VerificationTemplateVersionService::class);
     $draft = $versions->createDraftFromSource($versions->ensureClinicPublishedVersion($this->clinic), [
@@ -1743,4 +1853,145 @@ it('does not replicate a hidden master template into a new clinic', function () 
         ->and($hiddenMaster->clinic_visibility)->toBe(VerificationTemplateVersion::CLINIC_VISIBILITY_HIDDEN)
         ->and($clinicVersion->source_version_id)->toBe($visibleMaster->id)
         ->and($clinicVersion->source_version_id)->not->toBe($hiddenMaster->id);
+});
+
+it('audits archived, restored and deleted drafts and rolls back audit entries with the write', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+    $versions = app(VerificationTemplateVersionService::class);
+    $draft = $versions->createDraftFromPublished($versions->ensureMasterVersion());
+    $logs = AuditLog::query()->where('module', 'verification_templates');
+
+    DB::beginTransaction();
+    try {
+        $versions->archiveUnusedDraft($draft);
+        expect((clone $logs)->count())->toBe(1);
+    } finally {
+        DB::rollBack();
+    }
+    expect((clone $logs)->count())->toBe(0)
+        ->and($draft->fresh()->status)->toBe('draft');
+
+    Livewire::test(ListVerificationFormQuestions::class)
+        ->call('archiveDraft', $draft->id)->assertHasNoErrors()
+        ->call('restoreArchivedDraft', $draft->id)->assertHasNoErrors()
+        ->call('reviewDraftRemoval')
+        ->call('deleteSelectedUnusedDraft')->assertHasNoErrors();
+
+    $entries = $logs->orderBy('id')->get();
+    expect($entries->pluck('action')->all())->toBe(['archive', 'restore', 'delete']);
+    foreach ([['draft', 'archived'], ['archived', 'draft'], ['draft', 'deleted']] as $index => [$oldStatus, $newStatus]) {
+        $entry = $entries[$index];
+        $before = json_decode($entry->old_values, true);
+        $after = json_decode($entry->new_values, true);
+        expect($entry->user_id)->toBe($this->saasUser->id)
+            ->and($after['actor_user_id'])->toBe($this->saasUser->id)
+            ->and($before['template_version_id'])->toBe($draft->id)
+            ->and($after['template_version_id'])->toBe($draft->id)
+            ->and($before['status'])->toBe($oldStatus)
+            ->and($after['status'])->toBe($newStatus);
+    }
+    expect(VerificationTemplateVersion::withTrashed()->find($draft->id))->toBeNull();
+});
+
+it('shows each active master slot and counts only inactive published versions as previous', function (string $configuration, string $shortVersion) {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $previous = $versions->ensureMasterVersion();
+    $previous->update(['is_active' => false]);
+
+    $attributes = [
+        'scope' => 'master', 'template_key' => $previous->template_key,
+        'status' => 'published', 'is_active' => true,
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+    ];
+    VerificationTemplateVersion::create($attributes + [
+        'version_number' => 2, 'name' => 'Active Full Master',
+        'form_type' => $configuration === 'shared' ? 'both' : 'full_form',
+    ]);
+    if ($configuration === 'separate') {
+        VerificationTemplateVersion::create($attributes + [
+            'version_number' => 3, 'name' => 'Active Short Master', 'form_type' => 'short_form',
+        ]);
+    }
+
+    $page = Livewire::test(ListVerificationFormQuestions::class)->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML($page->html());
+    $summary = (new DOMXPath($document))->query('//section[@aria-label="Master Template summary"]')->item(0);
+    expect($summary)->not->toBeNull();
+    $text = preg_replace('/\s+/u', ' ', trim($summary->textContent));
+
+    expect($text)->toContain('Full Form v2 Active Full Master')
+        ->toContain('Short Form '.$shortVersion)
+        ->toContain('Previous Published 1 Retained for history');
+})->with([
+    'separate versions' => ['separate', 'v3 Active Short Master'],
+    'shared version' => ['shared', 'v2 Active Full Master'],
+    'missing Short' => ['full-only', 'No active version'],
+]);
+
+it('paginates master history without hiding the summary or breaking older draft actions', function () {
+    $this->actingAs($this->saasUser);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $versions = app(VerificationTemplateVersionService::class);
+    $active = $versions->ensureMasterVersion();
+    $active->update(['version_number' => 2]);
+    $draft = VerificationTemplateVersion::create([
+        'scope' => 'master', 'template_key' => $active->template_key, 'status' => 'draft',
+        'version_number' => 1, 'name' => 'Oldest Paginated Draft', 'form_type' => 'full_form',
+    ]);
+    foreach (range(3, 21) as $number) {
+        VerificationTemplateVersion::create([
+            'scope' => 'master', 'template_key' => $active->template_key, 'status' => 'draft',
+            'version_number' => $number, 'name' => 'Paginated Draft '.$number, 'form_type' => 'full_form',
+        ]);
+    }
+
+    $component = Livewire::test(ListVerificationFormQuestions::class)
+        ->assertDontSee($draft->name)
+        ->assertSee('Pagination Navigation')
+        ->call('nextPage', 'historyPage')
+        ->assertSet('paginators.historyPage', 2)
+        ->assertSee($draft->name)
+        ->assertDontSee('Paginated Draft 21');
+
+    $page = $component->instance();
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    try {
+        $page->getTemplateVersionHistory();
+        $historyQueries = collect(DB::getQueryLog())->filter(
+            fn (array $query) => str_contains($query['query'], 'verification_template_versions')
+                || str_contains($query['query'], 'billing_work_items'),
+        );
+        expect($historyQueries)->toHaveCount(2);
+    } finally {
+        DB::disableQueryLog();
+        DB::flushQueryLog();
+    }
+
+    expect($page->getTemplateHistorySummary()['active_forms']['Full Form']->id)->toBe($active->id)
+        ->and($page->getTemplateHistorySummary()['drafts'])->toBe(20);
+
+    $component->call('archiveDraft', $draft->id)->assertHasNoErrors()
+        ->call('restoreArchivedDraft', $draft->id)->assertHasNoErrors()
+        ->call('closeTemplateVersionPanel')
+        ->assertSet('paginators.historyPage', 2)
+        ->assertSee($draft->name)
+        ->call('setWorkingDraft', $draft->id)->assertHasNoErrors();
+    expect($draft->fresh()->is_working_draft)->toBeTrue();
+
+    $component->call('selectTemplateVersion', $draft->id)
+        ->call('reviewDraftRemoval')
+        ->assertActionMounted('deleteUnusedDraft')
+        ->callMountedAction()->assertHasNoErrors()
+        ->assertSet('selectedTemplateVersionId', null)
+        ->assertSet('paginators.historyPage', 1)
+        ->assertSee('Paginated Draft 21');
+
+    expect(VerificationTemplateVersion::withTrashed()->find($draft->id))->toBeNull();
 });

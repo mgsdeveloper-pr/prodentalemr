@@ -66,6 +66,20 @@ class DsoOnboarding extends Page implements HasForms
 
     protected ?OnboardingDraft $draft = null;
 
+    #[\Livewire\Attributes\Locked]
+    public ?string $draftReference = null;
+
+    public function hydrate(): void
+    {
+        $this->draft = app(ClientOnboardingService::class)->findForUser($this->draftReference, auth()->user(), 'dso_onboarding');
+        abort_if($this->draft?->activated_at !== null || $this->draft?->status === OnboardingDraft::STATUS_ACTIVATED, 409, 'This onboarding is complete. Open the existing account instead.');
+    }
+
+    public function dehydrate(): void
+    {
+        $this->draftReference = $this->draft?->public_id;
+    }
+
     public static function canAccess(): bool
     {
         return auth()->user()?->canPerformSaasModuleAction('organizations', 'add') ?? false;
@@ -78,6 +92,11 @@ class DsoOnboarding extends Page implements HasForms
             auth()->user(),
             'dso_onboarding',
         );
+        if ($this->draft && ($this->draft->activated_at !== null || $this->draft->status === OnboardingDraft::STATUS_ACTIVATED)) {
+            abort_unless($this->draft->dso_id, 409, 'This onboarding is already complete.');
+            $this->redirect(DsoResource::getUrl('view', ['record' => $this->draft->dso_id]));
+            return;
+        }
         $this->verificationModel = $this->draft?->verification_model;
         $this->verificationModel = ! $this->draft && in_array(request()->query('verification_model'), ClientOnboardingService::VERIFICATION_MODELS, true)
             ? request()->query('verification_model')
@@ -251,8 +270,7 @@ class DsoOnboarding extends Page implements HasForms
                             Select::make('location_city')
                                 ->label('City')
                                 ->options(fn (Get $get): array => UsLocationOptions::cityOptions($get('location_state')))
-                                ->searchable()
-                                ->preload()
+                                ->native()
                                 ->live()
                                 ->afterStateUpdated(fn (Get $get, Set $set, ?string $state) => $set('location_zip_code', UsLocationOptions::zipFor($get('location_state'), $state))),
                             TextInput::make('location_zip_code')
@@ -425,6 +443,14 @@ class DsoOnboarding extends Page implements HasForms
 
         try {
             $result = DB::transaction(function () use ($state): array {
+                if ($this->draft) {
+                    $this->draft = app(ClientOnboardingService::class)->lockEditable($this->draft);
+                }
+                if ($this->draft?->entry_point === 'website') {
+                    $this->draft = OnboardingDraft::whereKey($this->draft->id)->lockForUpdate()->firstOrFail();
+                    abort_unless($this->draft->status === OnboardingDraft::STATUS_UNDER_REVIEW, 409, 'This registration is no longer awaiting activation.');
+                    \App\Services\WebsiteCheckout\CheckoutService::assertReadyForActivation($this->draft, $state);
+                }
                 $plan = (! empty($state['attach_subscription']) && ! empty($state['subscription_plan_id']))
                     ? SubscriptionPlan::find($state['subscription_plan_id'])
                     : null;
@@ -457,7 +483,7 @@ class DsoOnboarding extends Page implements HasForms
                     'account_manager_user_id' => auth()->id(),
                 ]);
 
-                $clinic = Clinic::create([
+                $clinic = Clinic::createWithRequiredVerificationTemplates([
                     'organization_id' => $organization->id,
                     'clinic_name' => $state['clinic_name'],
                     'clinic_code' => $clinicCode,
@@ -526,14 +552,14 @@ class DsoOnboarding extends Page implements HasForms
                     ]);
                 }
 
+                if ($this->draft) {
+                    SaasNotifications::clearIncompleteOnboarding($this->draft);
+                    app(ClientOnboardingService::class)->activate($this->draft, $organization, $dso);
+                }
                 return compact('dso', 'organization', 'clinic', 'location', 'user', 'subscription');
             });
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('DSO onboarding failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::onboardingFailed('DSO onboarding failed', $exception, $this->draft?->entry_point === 'website');
 
             return null;
         }
@@ -544,21 +570,12 @@ class DsoOnboarding extends Page implements HasForms
             ->success()
             ->send();
 
-        if ($this->draft) {
-            SaasNotifications::clearIncompleteOnboarding($this->draft);
-            app(ClientOnboardingService::class)->activate(
-                $this->draft,
-                $result['organization'],
-                $result['dso'],
-            );
-        }
-
         return redirect(DsoResource::getUrl('view', ['record' => $result['dso']]));
     }
 
     protected function syncDraft(): void
     {
-        $state = $this->form->getState();
+        $state = $this->data ?? [];
         $this->draft ??= app(ClientOnboardingService::class)->start(
             auth()->user(),
             'dso',

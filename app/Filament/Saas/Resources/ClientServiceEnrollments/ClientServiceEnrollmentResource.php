@@ -34,6 +34,11 @@ class ClientServiceEnrollmentResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'display_title';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['organization.name', 'clinic.clinic_name', 'managedBillingService.name'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return ClientServiceEnrollmentForm::configure($schema);

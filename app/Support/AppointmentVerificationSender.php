@@ -6,7 +6,6 @@ use App\Actions\Verification\CreateVerificationRequestAction;
 use App\Filament\Clinic\Resources\VerificationRequests\Schemas\VerificationRequestForm;
 use App\Models\Appointment;
 use App\Models\BillingWorkItem;
-use App\Models\VerificationProfile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -106,10 +105,7 @@ class AppointmentVerificationSender
                 'source' => $isManaged ? 'clinic_request' : 'clinic_self_service',
                 'processing_mode' => $processingMode,
                 'notes' => $appointment->appointment_type,
-            ]);
-
-            VerificationProfile::query()->create([
-                'billing_work_item_id' => $workItem->getKey(),
+            ], [
                 'form_type' => 'full_form',
                 'requested_by_name' => auth()->user()?->name,
                 'requested_by_role_slug' => auth()->user()?->roles?->pluck('name')->first(),

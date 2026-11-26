@@ -297,7 +297,7 @@ class SaasSetting extends Model
 
         if (! Schema::hasTable('saas_settings')) {
             return static::rememberCurrentRequestInstance(new static([
-                'platform_name' => 'ProDental EMR',
+                'platform_name' => 'Denentiq',
                 'default_country' => 'USA',
                 'default_timezone' => 'America/New_York',
             'default_currency' => 'USD',
@@ -416,10 +416,25 @@ class SaasSetting extends Model
         return static::rememberCurrentRequestInstance(Cache::remember(
             'saas_settings.current',
             now()->addMinutes(5),
-            fn (): self => static::query()->firstOrCreate(
+            fn (): self => static::loadCurrent(),
+        ));
+    }
+
+    private static function loadCurrent(): self
+    {
+        // Existing installations can have a settings row with an auto-generated ID.
+        $existing = static::query()->orderBy('id')->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        // Use the fixed key only for this trusted insert of application defaults.
+        return static::unguarded(
+            fn (): self => static::query()->createOrFirst(
                 ['id' => 1],
                 [
-                    'platform_name' => 'ProDental EMR',
+                    'platform_name' => 'Denentiq',
                     'default_country' => 'USA',
                     'default_timezone' => 'America/New_York',
                     'default_currency' => 'USD',
@@ -520,7 +535,7 @@ class SaasSetting extends Model
                     'verification_round_robin_last_user_id' => null,
                 ],
             ),
-        ));
+        );
     }
 
     protected static function currentRequestInstance(): ?self
@@ -552,16 +567,12 @@ class SaasSetting extends Model
 
     public function brandName(): string
     {
-        return $this->platform_name ?: 'ProDental EMR';
+        return 'Denentiq';
     }
 
     public function brandLogoUrl(): ?string
     {
-        if (blank($this->logo_path)) {
-            return null;
-        }
-
-        return Storage::disk('branding')->url($this->logo_path);
+        return asset('images/brand/denentiq-horizontal-primary.svg');
     }
 
     public function brandLogo(): ?HtmlString

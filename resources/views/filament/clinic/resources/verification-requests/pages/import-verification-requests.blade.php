@@ -114,6 +114,7 @@
                 <div style="padding:18px 22px;border-bottom:1px solid #edf2f7;">
                     <div style="font-size:12px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#0f766e;">Upload file</div>
                     <div style="margin-top:6px;font-size:15px;line-height:1.7;color:#64748b;">Use the sample workbook or a CSV with matching headers. One row equals one verification request.</div>
+                    <div style="margin-top:6px;color:#64748b;">For <code>form_type</code>, use Full Form or Short Form. Leave it blank to use Full Form.</div>
                 </div>
                 <div style="padding:22px;">
                     {{ $this->form }}

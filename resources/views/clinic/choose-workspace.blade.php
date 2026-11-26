@@ -18,7 +18,7 @@
                 </h1>
             </div>
 
-            @if (! $clinic || (! $canUseVerification && ! $canUseClinicPms))
+            @if (! $clinic || ! $canUseVerification)
                 <form method="GET" action="{{ route('clinic.clinic-scope') }}" style="background:white;padding:24px;border:1px solid #dbe4e8;border-radius:8px;">
                     <label for="entry-clinic">Clinic</label>
                     <select id="entry-clinic" name="clinic_id" required style="display:block;width:100%;margin:12px 0;padding:12px;border:1px solid #cbd5e1;border-radius:6px;">
@@ -28,7 +28,7 @@
                     <button type="submit" style="background:#087f79;color:white;padding:10px 20px;border:0;border-radius:6px;">Continue</button>
                     @if (empty($clinicOptions))<p>No clinics are available for your account.</p>@endif
                 </form>
-                @if ($clinic)<p>No workspace is enabled for this clinic. Select another clinic or contact your administrator.</p>@endif
+                @if ($clinic)<p>Verification is not enabled for this clinic. Select another clinic or contact your administrator.</p>@endif
             @endif
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 18px;">
                 @if ($canUseVerification)
@@ -54,28 +54,6 @@
                     </form>
                 @endif
 
-                @if ($canUseClinicPms)
-                    <form method="POST" action="{{ route('clinic.switch-workspace', ['workspace' => \App\Support\ClinicWorkspace::CLINIC_PMS]) }}">
-                        @csrf
-                    <button type="submit"
-                        style="min-height: 210px; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; border-radius: 22px; border: 1px solid #fed7aa; background: #ffffff; color: #0f172a; text-decoration: none; box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);"
-                    >
-                        <div>
-                            <div style="width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center; border-radius: 16px; background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h12a2.25 2.25 0 0 1 2.25 2.25v9A2.25 2.25 0 0 1 18 18.75H6a2.25 2.25 0 0 1-2.25-2.25v-9ZM7.5 9.75h3M7.5 13.5h6M16.5 9.75h.008M16.5 13.5h.008" />
-                                </svg>
-                            </div>
-                            <h2 style="margin: 18px 0 8px; font-size: 24px; line-height: 1.2; font-weight: 850;">Clinic PMS</h2>
-                            <p style="margin: 0; color: #64748b; font-size: 15px; line-height: 1.6;">Patients, appointments, treatment plans, documents, claims, and billing work.</p>
-                        </div>
-                        <div style="margin-top: 24px; display: inline-flex; align-items: center; gap: 8px; color: #c2410c; font-size: 14px; font-weight: 800;">
-                            Open Clinic PMS
-                            <span aria-hidden="true">-></span>
-                        </div>
-                    </button>
-                    </form>
-                @endif
             </div>
         </section>
     </main>

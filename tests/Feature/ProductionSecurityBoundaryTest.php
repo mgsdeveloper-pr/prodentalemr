@@ -65,7 +65,7 @@ it('uses one compact audited portal credential workspace across clinic and verif
         ->and($sharedView)
         ->toContain('pd-credential-table')
         ->toContain('Search portals or accounts')
-        ->toContain('<th>Authentication</th>')
+        ->toContain('<th scope="col" role="columnheader">Authentication</th>')
         ->toContain('View credentials')
         ->toContain('Manage authentication')
         ->toContain('Needs attention')

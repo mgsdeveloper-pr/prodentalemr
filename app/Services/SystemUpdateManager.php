@@ -82,7 +82,7 @@ class SystemUpdateManager
         return Cache::lock(self::LOCK_NAME, 120)->block(5, function () use ($userId): array {
             $active = $this->currentRun();
             if (is_array($active) && in_array($active['status'] ?? null, ['preparing', 'running'], true)) {
-                throw new RuntimeException('A system update is already in progress.');
+                throw new SystemUpdateBlocked('A system update is in progress. Wait for it to finish before activating the latest code.');
             }
 
             $activation = [
@@ -97,7 +97,6 @@ class SystemUpdateManager
                 'completed_migrations' => [],
                 'current_migration' => null,
                 'message' => 'Latest application code activated successfully.',
-                'error' => null,
             ];
 
             try {
@@ -114,7 +113,6 @@ class SystemUpdateManager
                 return $activation;
             } catch (Throwable $exception) {
                 $activation['status'] = 'failed';
-                $activation['error'] = $exception->getMessage();
                 $activation['message'] = 'Latest application code could not be activated.';
                 $activation['completed_at'] = now()->toIso8601String();
                 $this->recordHistory($activation);
@@ -148,16 +146,16 @@ class SystemUpdateManager
         return Cache::lock(self::LOCK_NAME, 120)->block(5, function () use ($userId): array {
             $active = $this->currentRun();
             if (is_array($active) && in_array($active['status'] ?? null, ['preparing', 'running'], true)) {
-                throw new RuntimeException('Another system update is already in progress.');
+                throw new SystemUpdateBlocked('An update is already in progress. Refresh this page to see its status.');
             }
 
             $pending = $this->pendingMigrations();
             if ($pending === []) {
-                throw new RuntimeException('The database is already current.');
+                throw new SystemUpdateBlocked('The database is already current. Use Activate latest code for a code-only release.');
             }
 
             if (! $this->productionGatesPass()) {
-                throw new RuntimeException('One or more required production checks failed.');
+                throw new SystemUpdateBlocked('Resolve the failed required preflight checks before starting an update.');
             }
 
             $run = [
@@ -171,7 +169,6 @@ class SystemUpdateManager
                 'completed_migrations' => [],
                 'current_migration' => null,
                 'message' => 'Preparing the protected update session.',
-                'error' => null,
                 'maintenance_started_here' => ! app()->isDownForMaintenance(),
             ];
 
@@ -199,7 +196,6 @@ class SystemUpdateManager
                 $this->writeState($run);
             } catch (Throwable $exception) {
                 $run['status'] = 'failed';
-                $run['error'] = $exception->getMessage();
                 $run['message'] = 'Update preparation failed. Restore access after reviewing the failure.';
                 $this->writeState($run);
                 $this->recordHistory($run);
@@ -225,7 +221,7 @@ class SystemUpdateManager
         return Cache::lock(self::LOCK_NAME, 120)->block(5, function () use ($userId): array {
             $run = $this->currentRun();
             if (! is_array($run) || ($run['status'] ?? null) !== 'running') {
-                throw new RuntimeException('There is no active update to continue.');
+                throw new SystemUpdateBlocked('There is no active update to continue. Refresh this page to see its status.');
             }
 
             try {
@@ -281,16 +277,9 @@ class SystemUpdateManager
                 return $this->complete($run, $userId);
             } catch (Throwable $exception) {
                 $run['status'] = 'failed';
-                $run['error'] = $exception->getMessage();
                 $run['message'] = 'Update stopped. Review the failure before restoring access.';
                 $this->writeState($run);
                 $this->recordHistory($run);
-
-                Log::critical('SaaS system update failed.', [
-                    'release_id' => $run['id'] ?? null,
-                    'initiated_by' => $userId,
-                    'exception' => $exception,
-                ]);
 
                 throw $exception;
             }
@@ -305,7 +294,7 @@ class SystemUpdateManager
         return Cache::lock(self::LOCK_NAME, 120)->block(5, function () use ($userId): array {
             $run = $this->currentRun();
             if (! is_array($run) || ($run['status'] ?? null) !== 'failed') {
-                throw new RuntimeException('Recovery is only available after a failed update.');
+                throw new SystemUpdateBlocked('Refresh this page. Recovery is available only after a failed update.');
             }
 
             if (($run['maintenance_started_here'] ?? false) && app()->isDownForMaintenance()) {

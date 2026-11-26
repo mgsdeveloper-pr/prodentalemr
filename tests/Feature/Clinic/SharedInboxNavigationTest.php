@@ -80,6 +80,8 @@ it('shows the clinic-scoped shared inbox in clinic navigation', function (): voi
         ->assertSee('Mailbox Connection')
         ->assertSee('Inbox Test Clinic');
 
+    $this->assertDatabaseCount('verification_inbox_mailboxes', 0);
+
     Filament::setCurrentPanel(Filament::getPanel('clinic'));
     Livewire::test(VerificationSharedInboxSettings::class)
         ->set('data.verification_inbox_provider', 'Clinic test mailbox')

@@ -488,10 +488,11 @@ trait InteractsWithAppointmentEditor
             ->where('clinic_id', AppointmentWorkspaceScope::selectedClinicId())
             ->where('provider_id', $providerId)
             ->whereNotIn('status', ['cancelled', 'no_show'])
-            ->whereBetween('appointment_date', [$from->toDateString(), $to->toDateString()])
+            ->where('appointment_date', '>=', $from->toDateString())
+            ->where('appointment_date', '<', $to->copy()->addDay()->toDateString())
             ->when(filled($this->getEditingRecordId()), fn ($query) => $query->whereKeyNot($this->getEditingRecordId()))
             ->get(['appointment_date', 'start_time', 'end_time'])
-            ->groupBy(fn (Appointment $appointment): string => (string) $appointment->appointment_date);
+            ->groupBy(fn (Appointment $appointment): string => $appointment->appointment_date->toDateString());
     }
 
     protected function getCalendarDayAvailability(Carbon $date, ?int $providerId, int $duration, Collection $appointmentsByDate, array $schedulingContext): array

@@ -21,7 +21,7 @@ class Dashboard extends BaseDashboard
         $clinic = ClinicWorkspace::clinicForUser();
         $workspace = ClinicWorkspace::selectedOrDefault($clinic);
 
-        return in_array($workspace, [ClinicWorkspace::VERIFICATION, ClinicWorkspace::CLINIC_PMS], true);
+        return $workspace === ClinicWorkspace::VERIFICATION;
     }
 
     public static function getNavigationGroup(): string|UnitEnum|null

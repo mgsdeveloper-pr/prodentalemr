@@ -37,7 +37,7 @@ class ClinicPanelProvider extends PanelProvider
         return AppShell::registerSharedSidebar(AppShell::register($panel
             ->id('clinic')
             ->path('clinic')
-            ->homeUrl(fn (): string => ClinicWorkspace::homeUrl(ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) ?: ClinicWorkspace::CLINIC_PMS))
+            ->homeUrl(fn (): string => ClinicWorkspace::homeUrl(ClinicWorkspace::selectedOrDefault(ClinicWorkspace::clinicForUser()) ?: ClinicWorkspace::VERIFICATION))
             ->userMenu()
             ->userMenuItems([
                 'saas_workspace' => MenuItem::make()
@@ -52,24 +52,6 @@ class ClinicPanelProvider extends PanelProvider
                     ->url(fn (): string => url('/verification'))
                     ->visible(fn (): bool => auth()->check() && auth()->user()->canAccessPanel(app(PanelRegistry::class)->get('admin')))
                     ->sort(840),
-                'choose_workspace' => MenuItem::make()
-                    ->label('Choose Workspace')
-                    ->icon(Heroicon::OutlinedSquares2x2)
-                    ->url(fn (): string => route('clinic.choose-workspace'))
-                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()))
-                    ->sort(850),
-                'switch_to_verification' => MenuItem::make()
-                    ->label('Go to Verification Zone')
-                    ->icon(Heroicon::OutlinedClipboardDocumentCheck)
-                    ->url(fn (): string => route('clinic.choose-workspace'))
-                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::VERIFICATION)
-                    ->sort(860),
-                'switch_to_clinic_pms' => MenuItem::make()
-                    ->label('Go to Clinic PMS')
-                    ->icon(Heroicon::OutlinedBuildingOffice2)
-                    ->url(fn (): string => route('clinic.choose-workspace'))
-                    ->visible(fn (): bool => ClinicWorkspace::needsChoice(ClinicWorkspace::clinicForUser()) && ClinicWorkspace::selected() !== ClinicWorkspace::CLINIC_PMS)
-                    ->sort(870),
                 'logout' => MenuItem::make()->hidden(),
                 'sign_out' => MenuItem::make()
                     ->label('Sign out')
@@ -87,17 +69,36 @@ class ClinicPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Clinic Management'),
                 NavigationGroup::make()->label('Clinic Directory'),
                 NavigationGroup::make()->label('Managed Services'),
-                NavigationGroup::make()->label('Clinical Records'),
-                NavigationGroup::make()->label('Dental Charting'),
-                NavigationGroup::make()->label('Treatment Planning'),
-                NavigationGroup::make()->label('Financial Records'),
                 NavigationGroup::make()->label('Administration'),
                 NavigationGroup::make()->label('Settings'),
             ])
-            ->discoverResources(in: app_path('Filament/Clinic/Resources'), for: 'App\Filament\Clinic\Resources')
-            ->discoverPages(in: app_path('Filament/Clinic/Pages'), for: 'App\Filament\Clinic\Pages')
+            ->resources([
+                \App\Filament\Clinic\Resources\Appointments\AppointmentResource::class,
+                \App\Filament\Clinic\Resources\InsuranceCarriers\InsuranceCarrierResource::class,
+                \App\Filament\Clinic\Resources\Locations\LocationResource::class,
+                \App\Filament\Clinic\Resources\ManagedServiceRequests\ManagedServiceRequestResource::class,
+                \App\Filament\Clinic\Resources\PatientDocuments\PatientDocumentResource::class,
+                \App\Filament\Clinic\Resources\PatientInsurancePolicies\PatientInsurancePolicyResource::class,
+                \App\Filament\Clinic\Resources\Patients\PatientResource::class,
+                \App\Filament\Clinic\Resources\PortalCredentials\PortalCredentialResource::class,
+                \App\Filament\Clinic\Resources\Providers\ProviderResource::class,
+                \App\Filament\Clinic\Resources\Users\UserResource::class,
+                \App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource::class,
+                \App\Filament\Clinic\Resources\VerificationRequests\VerificationRequestResource::class,
+            ])
             ->pages([
                 Dashboard::class,
+                \App\Filament\Clinic\Pages\AppointmentCalendar::class,
+                \App\Filament\Clinic\Pages\ImportVerificationTemplate::class,
+                \App\Filament\Clinic\Pages\OrganizationOperations::class,
+                \App\Filament\Clinic\Pages\PortalCredentialSettings::class,
+                \App\Filament\Clinic\Pages\RolesAndPermissions::class,
+                \App\Filament\Clinic\Pages\VerificationClinicAssignments::class,
+                \App\Filament\Clinic\Pages\VerificationQuestionArrangement::class,
+                \App\Filament\Clinic\Pages\VerificationReports::class,
+                \App\Filament\Clinic\Pages\VerificationSettings::class,
+                \App\Filament\Clinic\Pages\VerificationSharedInbox::class,
+                \App\Filament\Clinic\Pages\VerificationSharedInboxSettings::class,
                 DocumentCenter::class,
                 VerificationRequestResponse::class,
                 VerificationNotificationCentre::class,

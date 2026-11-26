@@ -18,6 +18,7 @@
             @if ($this->focusMode)
                 @include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-strip')
             @endif
+            @if (data_get($this->data, 'coverage_assessment.outcome') !== 'inactive')
             <details class="uel2-progress-disclosure">
                 <summary>
                     <span class="uel2-progress-disclosure__summary">Verification Progress</span>
@@ -43,6 +44,7 @@
                     </div>
                 </div>
             </details>
+            @endif
             @foreach ($structuredSections as $section)
                 <section class="uel2-section" wire:key="structured-{{ $section['key'] }}">
                     <div class="uel2-header"><h2>{{ $section['label'] }}</h2><span class="uel2-pill">{{ $structuredCounts[$section['key']]['answered'] }}/{{ $structuredCounts[$section['key']]['total'] }} Completed</span></div>

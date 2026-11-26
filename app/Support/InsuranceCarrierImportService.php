@@ -4,7 +4,7 @@ namespace App\Support;
 
 use App\Models\InsuranceCarrier;
 use Illuminate\Support\Str;
-use RuntimeException;
+use Throwable;
 use ZipArchive;
 
 class InsuranceCarrierImportService
@@ -34,7 +34,7 @@ class InsuranceCarrierImportService
         $rows = $this->readRows($path, $originalName);
 
         if ($rows === []) {
-            throw new RuntimeException('The uploaded file does not contain any insurance rows.');
+            throw new ImportValidationException('The uploaded file does not contain any insurance rows.');
         }
 
         $result = [
@@ -78,14 +78,22 @@ class InsuranceCarrierImportService
                         default => 'Already matches the central directory.',
                     },
                 ];
-            } catch (\Throwable $throwable) {
+            } catch (Throwable $throwable) {
+                $message = 'This row could not be processed. Ask your administrator to check the server logs before retrying.';
+
+                if ($throwable instanceof ImportValidationException) {
+                    $message = $throwable->getMessage();
+                } else {
+                    report($throwable);
+                }
+
                 $result['failed']++;
                 $result['rows'][] = [
                     'row' => $index + 2,
                     'insurance_name' => trim((string) ($row['insurance_name'] ?? '')),
                     'payer_id' => trim((string) ($row['payer_id'] ?? '')),
                     'status' => 'failed',
-                    'message' => $throwable->getMessage(),
+                    'message' => $message,
                 ];
             }
         }
@@ -96,11 +104,11 @@ class InsuranceCarrierImportService
     protected function validateRow(array $row): void
     {
         if (blank($row['insurance_name'] ?? null)) {
-            throw new RuntimeException('Insurance Name is required.');
+            throw new ImportValidationException('Insurance Name is required.');
         }
 
         if (filled($row['website'] ?? null) && filter_var($row['website'], FILTER_VALIDATE_URL) === false) {
-            throw new RuntimeException('Website must be a complete valid URL.');
+            throw new ImportValidationException('Website must be a complete valid URL.');
         }
     }
 
@@ -191,7 +199,7 @@ class InsuranceCarrierImportService
         return match ($extension) {
             'csv' => $this->readCsvRows($path),
             'xlsx' => $this->readXlsxRows($path),
-            default => throw new RuntimeException('Unsupported file type. Upload a CSV or XLSX file.'),
+            default => throw new ImportValidationException('Unsupported file type. Upload a CSV or XLSX file.'),
         };
     }
 
@@ -200,7 +208,7 @@ class InsuranceCarrierImportService
         $handle = fopen($path, 'rb');
 
         if (! $handle) {
-            throw new RuntimeException('Unable to read the uploaded CSV file.');
+            throw new ImportValidationException('Unable to read the uploaded CSV file.');
         }
 
         $headers = null;
@@ -232,7 +240,7 @@ class InsuranceCarrierImportService
         $zip = new ZipArchive();
 
         if ($zip->open($path) !== true) {
-            throw new RuntimeException('Unable to open the uploaded Excel file.');
+            throw new ImportValidationException('Unable to open the uploaded Excel file.');
         }
 
         $sharedStrings = [];
@@ -252,7 +260,7 @@ class InsuranceCarrierImportService
         $zip->close();
 
         if ($sheetXml === false) {
-            throw new RuntimeException('The uploaded workbook does not contain a first worksheet.');
+            throw new ImportValidationException('The uploaded workbook does not contain a first worksheet.');
         }
 
         $xml = simplexml_load_string($sheetXml);

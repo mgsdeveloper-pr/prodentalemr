@@ -7,7 +7,7 @@ use App\Models\Encounter;
 use App\Models\Location;
 use App\Models\Organization;
 use App\Models\Patient;
-use App\Models\PatientConsentForm;
+use App\Models\PatientDocument;
 use App\Models\PatientInsuranceClaim;
 use App\Models\PatientInsuranceClaimLineItem;
 use App\Models\PatientInsurancePolicy;
@@ -20,10 +20,7 @@ use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
 use App\Models\User;
 use App\Support\ClinicStatementNotifications;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Barryvdh\DomPDF\PDF as DomPdfWrapper;
 use Database\Seeders\RoleSeeder;
-use Dompdf\Dompdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
@@ -277,30 +274,6 @@ beforeEach(function () {
 
     $this->statement->refreshSummary();
 
-    Storage::disk('local')->put('patient-consent-forms/test-consent.pdf', 'consent-pdf');
-
-    $this->consentForm = PatientConsentForm::create([
-        'organization_id' => $this->organization->id,
-        'clinic_id' => $this->clinic->id,
-        'location_id' => $this->location->id,
-        'patient_id' => $this->patient->id,
-        'provider_id' => $this->provider->id,
-        'encounter_id' => $this->encounter->id,
-        'uploaded_by' => $this->admin->id,
-        'form_type' => 'treatment_consent',
-        'title' => 'Treatment Consent',
-        'status' => 'signed',
-        'document_date' => today(),
-        'signed_on' => today(),
-        'signed_by_name' => 'John Smith',
-        'typed_signature' => 'John Smith',
-        'file_path' => 'patient-consent-forms/test-consent.pdf',
-        'original_filename' => 'test-consent.pdf',
-        'mime_type' => 'application/pdf',
-        'file_size' => 12,
-        'body_text' => 'Patient consents to restorative treatment.',
-    ]);
-
     SaasSetting::current()->forceFill([
         'email_enabled' => true,
         'email_mailer' => 'log',
@@ -309,27 +282,23 @@ beforeEach(function () {
     ])->save();
 });
 
-it('registers the new clinic workflow routes cleanly', function () {
-    $router = app('router');
+it('registers the clinic verification workflows and leaves removed PMS screens unavailable', function () {
+    $routes = app('router')->getRoutes();
 
-    expect($router->getRoutes()->match(Request::create('/clinic/patient-insurance-claims', 'GET'))->uri())
-        ->toBe('clinic/patient-insurance-claims');
-    expect($router->getRoutes()->match(Request::create('/clinic/dental-chart', 'GET'))->uri())
-        ->toBe('clinic/dental-chart');
-    expect($router->getRoutes()->match(Request::create('/clinic/patient-statements', 'GET'))->uri())
-        ->toBe('clinic/patient-statements');
-    expect($router->getRoutes()->match(Request::create('/clinic/clinic-operatories', 'GET'))->uri())
-        ->toBe('clinic/clinic-operatories');
-    expect($router->getRoutes()->match(Request::create('/clinic/patient-consent-forms', 'GET'))->uri())
-        ->toBe('clinic/patient-consent-forms');
-    expect($router->getRoutes()->match(Request::create('/clinic/appointments', 'GET'))->uri())
-        ->toBe('clinic/appointments');
-    expect($router->getRoutes()->match(Request::create('/clinic/treatment-plans', 'GET'))->uri())
-        ->toBe('clinic/treatment-plans');
-    expect($router->getRoutes()->match(Request::create('/clinic/providers', 'GET'))->uri())
-        ->toBe('clinic/providers');
-    expect($router->getRoutes()->match(Request::create('/clinic/providers/create', 'GET'))->uri())
-        ->toBe('clinic/providers/create');
+    foreach (['appointments', 'patients', 'patient-insurance-policies', 'patient-documents', 'providers', 'providers/create', 'verification-requests'] as $path) {
+        $uri = 'clinic/'.$path;
+        expect($routes->match(Request::create('/'.$uri))->uri())->toBe($uri);
+    }
+
+    $this->actingAs($this->admin);
+
+    foreach (['patient-insurance-claims', 'dental-chart', 'patient-statements', 'clinic-operatories', 'patient-consent-forms', 'treatment-plans'] as $path) {
+        $this->get('/clinic/'.$path)->assertNotFound();
+    }
+
+    foreach (['patient-statements.show', 'patient-statements.download', 'patient-consent-forms.show', 'patient-consent-forms.download'] as $name) {
+        expect($routes->getByName('clinic.'.$name))->toBeNull();
+    }
 });
 
 it('keeps clinic provider records soft deleted for historical safety', function () {
@@ -345,6 +314,17 @@ it('keeps clinic provider records soft deleted for historical safety', function 
     Provider::withTrashed()->findOrFail($providerId)->restore();
 
     expect(Provider::query()->whereKey($providerId)->exists())->toBeTrue();
+});
+
+it('opens a patient profile without the retired treatment plans route', function () {
+    $this->withoutVite();
+
+    $this->actingAs($this->admin)
+        ->get(route('filament.clinic.resources.patients.view', ['record' => $this->patient]))
+        ->assertOk()
+        ->assertSee($this->patient->full_name)
+        ->assertSee('Open Appointments')
+        ->assertDontSee('Open Treatment Plans');
 });
 
 it('rolls claim line item totals into the claim header', function () {
@@ -371,28 +351,30 @@ it('can send a patient statement and track delivery metadata', function () {
     expect($statement->status)->toBe('sent');
 });
 
-it('serves statement pdf and consent preview routes for authorized clinic users', function () {
-    $this->actingAs($this->admin);
+it('previews and downloads a patient document for its clinic', function () {
+    $contents = '%PDF-1.4 synthetic insurance document';
+    Storage::disk('local')->put('patient-documents/insurance.pdf', $contents);
 
-    $pdf = \Mockery::mock(DomPdfWrapper::class, [
-        new Dompdf(),
-        app('config'),
-        app('files'),
-        app('view'),
-    ])->makePartial();
-    $pdf->shouldReceive('setPaper')->once()->with('a4')->andReturnSelf();
-    $pdf->shouldReceive('output')->once()->andReturn('%PDF-1.4 test statement');
+    $document = PatientDocument::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'patient_id' => $this->patient->id,
+        'uploaded_by' => $this->admin->id,
+        'document_type' => 'insurance',
+        'disk' => 'local',
+        'path' => 'patient-documents/insurance.pdf',
+        'original_name' => 'insurance.pdf',
+        'mime_type' => 'application/pdf',
+    ]);
 
-    Pdf::shouldReceive('loadView')
-        ->once()
-        ->with('pdf.patient-statements.show', \Mockery::type('array'))
-        ->andReturn($pdf);
-
-    $this->get(route('clinic.patient-statements.show', $this->statement))
+    $this->actingAs($this->admin)
+        ->get(route('clinic.patient-documents.show', $document))
         ->assertOk()
-        ->assertHeader('content-type', 'application/pdf');
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertHeader('content-disposition', 'inline; filename="insurance.pdf"')
+        ->assertStreamedContent($contents);
 
-    $this->get(route('clinic.patient-consent-forms.show', $this->consentForm))
-        ->assertOk()
-        ->assertHeader('content-type', 'application/pdf');
+    $this->get(route('clinic.patient-documents.download', $document))
+        ->assertDownload('insurance.pdf')
+        ->assertStreamedContent($contents);
 });

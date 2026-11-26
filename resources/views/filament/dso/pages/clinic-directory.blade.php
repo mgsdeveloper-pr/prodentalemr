@@ -13,25 +13,25 @@
         }
 
         .dso-panel {
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 24px;
-            background: #ffffff;
+            background: var(--pd-card);
             box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
             overflow: hidden;
         }
 
         .dso-hero {
             padding: 28px 32px;
-            background: linear-gradient(135deg, #ffffff, #f8fbff);
+            background: linear-gradient(135deg, var(--pd-card), var(--pd-bg));
         }
 
         .dso-pill {
             display: inline-flex;
             padding: 8px 14px;
             border-radius: 999px;
-            border: 1px solid #bfdbfe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.12em;
@@ -40,7 +40,7 @@
 
         .dso-title {
             margin: 14px 0 8px;
-            color: #020617;
+            color: var(--pd-text);
             font-size: 38px;
             line-height: 1;
             font-weight: 900;
@@ -48,7 +48,7 @@
         }
 
         .dso-copy {
-            color: #52637a;
+            color: var(--pwdl-text-secondary);
             font-size: 16px;
             line-height: 1.7;
         }
@@ -59,16 +59,16 @@
             justify-content: space-between;
             gap: 16px;
             padding: 22px 26px;
-            border-top: 1px solid #edf2f7;
-            background: #f8fafc;
+            border-top: 1px solid var(--pwdl-border-subtle);
+            background: var(--pd-bg);
         }
 
         .dso-select {
             min-width: min(520px, 100%);
-            border: 1px solid #cbd5e1;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 16px;
-            background: #ffffff;
-            color: #0f172a;
+            background: var(--pd-card);
+            color: var(--pd-text);
             font-weight: 750;
             padding: 12px 14px;
         }
@@ -79,8 +79,8 @@
         }
 
         .dso-table th {
-            background: #f8fafc;
-            color: #64748b;
+            background: var(--pd-bg);
+            color: var(--pd-muted);
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.12em;
@@ -90,21 +90,21 @@
         }
 
         .dso-table td {
-            border-top: 1px solid #edf2f7;
-            color: #334155;
+            border-top: 1px solid var(--pwdl-border-subtle);
+            color: var(--pwdl-text-secondary);
             font-size: 14px;
             padding: 18px 20px;
             vertical-align: middle;
         }
 
         .dso-name {
-            color: #0f172a;
+            color: var(--pd-text);
             font-weight: 850;
         }
 
         .dso-muted {
             margin-top: 4px;
-            color: #64748b;
+            color: var(--pd-muted);
             font-size: 13px;
         }
 
@@ -113,9 +113,9 @@
             align-items: center;
             padding: 6px 10px;
             border-radius: 999px;
-            border: 1px solid #dbeafe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 12px;
             font-weight: 800;
             white-space: nowrap;
@@ -125,10 +125,10 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid #bfdbfe;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 14px;
-            background: #eff6ff;
-            color: #1d4ed8;
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 13px;
             font-weight: 850;
             padding: 10px 14px;
@@ -136,15 +136,15 @@
         }
 
         .dso-button--active {
-            border-color: #bbf7d0;
-            background: #f0fdf4;
-            color: #047857;
+            border-color: var(--pwdl-border-subtle);
+            background: var(--pwdl-status-success-soft);
+            color: var(--pwdl-status-success-text);
             pointer-events: none;
         }
 
         .dso-empty {
             padding: 42px 24px;
-            color: #64748b;
+            color: var(--pd-muted);
             text-align: center;
         }
 

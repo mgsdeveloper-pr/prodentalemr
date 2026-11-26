@@ -32,6 +32,11 @@ class ManagedServiceRequestResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'display_title';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['reference_number', 'title'];
+    }
+
     protected static ?string $slug = 'service-requests';
 
     public static function getModelLabel(): string

@@ -11,6 +11,7 @@
         @endphp
 
         <title>{{ $brandName }}</title>
+        @include('partials.brand-icons')
 
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
@@ -19,7 +20,7 @@
     </head>
     <body class="font-sans text-slate-900 antialiased">
         <main class="min-h-screen bg-white lg:grid lg:grid-cols-[minmax(0,42%)_minmax(0,58%)]">
-            <section class="relative hidden min-h-screen overflow-hidden border-r border-slate-200 lg:block" aria-label="ProDental dental workspace">
+            <section class="relative hidden min-h-screen overflow-hidden border-r border-slate-200 lg:block" aria-label="Denentiq dental workspace">
                 <img
                     src="{{ $settings->loginImageUrl() }}"
                     alt="Modern dental clinic workspace"
@@ -41,8 +42,7 @@
             <section class="flex min-h-screen flex-col bg-white">
                 <header class="flex h-20 items-center border-b border-slate-200 px-6 sm:px-10 lg:border-b-0 lg:px-14">
                     <a href="/" class="inline-flex items-center gap-3" aria-label="{{ $brandName }} home">
-                        <x-application-logo class="h-10 w-10 flex-none text-xs" />
-                        <span class="text-xl font-bold text-slate-950">{{ $brandName }}</span>
+                        <x-application-logo horizontal class="h-10 w-40 flex-none" />
                     </a>
                 </header>
 

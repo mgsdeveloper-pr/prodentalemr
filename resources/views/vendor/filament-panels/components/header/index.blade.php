@@ -16,9 +16,9 @@
         margin: 0;
         padding: 1rem clamp(1.25rem, 2vw, 2rem);
         border: 0;
-        border-bottom: 1px solid #e4e7ec;
+        border-bottom: 1px solid var(--pwdl-border-subtle, #e4e7ec);
         border-radius: 0;
-        background: #ffffff;
+        background: var(--pwdl-surface-card, #ffffff);
         box-shadow: none;
     }
 
@@ -39,7 +39,7 @@
 
     .pd-hero-header .fi-header-heading {
         margin: 0;
-        color: #101828;
+        color: var(--pwdl-text-primary, #101828);
         font-size: 1.65rem;
         font-weight: 800;
         line-height: 1.2;
@@ -48,7 +48,7 @@
     .pd-hero-header .fi-header-subheading {
         margin: 0;
         max-width: 62rem;
-        color: #667085;
+        color: var(--pwdl-text-muted, #667085);
         font-size: 0.82rem;
         line-height: 1.45;
     }
@@ -71,14 +71,14 @@
     }
 
     .pd-hero-header__breadcrumbs :is(a, span, li) {
-        color: #667085;
+        color: var(--pwdl-text-muted, #667085);
         font-size: 0.74rem;
         font-weight: 600;
     }
 
     .pd-hero-header__breadcrumbs li:last-child :is(a, span),
     .pd-hero-header__breadcrumbs li:last-child {
-        color: #344054;
+        color: var(--pwdl-text-secondary, #344054);
         font-weight: 700;
     }
 

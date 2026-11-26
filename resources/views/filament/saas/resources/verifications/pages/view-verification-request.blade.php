@@ -108,8 +108,12 @@
         .request-timeline__items { max-height: 380px; overflow: auto; }
         .request-timeline__item { padding: 0 0 14px 14px; border-left: 2px solid #dbe4ee; }
         .request-timeline__item:last-child { padding-bottom: 0; }
-        .request-modal { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(15, 23, 42, .56); }
-        .request-modal__dialog { width: min(980px, 100%); max-height: 88vh; overflow: auto; border: 1px solid #dbe4ee; border-radius: 8px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .28); }
+        .pds-workflow-dialog :is(.request-card__header, .request-change-table__cell--head) { background: var(--pwdl-surface-muted); color: var(--pd-text); }
+        .pds-workflow-dialog :is(.request-card__hint, .request-snapshot__question, .request-empty, .request-field__label) { color: var(--pwdl-text-secondary); }
+        .pds-workflow-dialog :is(.request-change-table__question, .request-snapshot__answer) { color: var(--pd-text); }
+        .pds-workflow-dialog .request-change-table__previous { background: var(--pwdl-status-danger-soft); color: var(--pwdl-status-danger-text); }
+        .pds-workflow-dialog .request-change-table__current { background: var(--pwdl-status-success-soft); color: var(--pwdl-status-success-text); }
+        .pds-workflow-dialog :is(.request-card__header, .request-change-table, .request-change-table__cell, .request-snapshot, .request-snapshot__row) { border-color: var(--pd-border); }
         .request-change-table { display: grid; grid-template-columns: minmax(190px, 1.25fr) repeat(2, minmax(160px, 1fr)); border-top: 1px solid #dbe4ee; border-left: 1px solid #dbe4ee; }
         .request-change-table__cell { min-width: 0; padding: 12px 14px; border-right: 1px solid #dbe4ee; border-bottom: 1px solid #dbe4ee; font-size: 12px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
         .request-change-table__cell--head { background: #f8fafc; color: #475569; font-size: 10px; font-weight: 800; text-transform: uppercase; }
@@ -165,6 +169,17 @@
                         <span class="request-chip request-chip--active">{{ $eligibilityStatus }}</span>
                     </div>
                     <div>
+                        @if (!empty($resultSummary['coverage_assessment']))
+                            <div class="request-result-band request-result-band--three">
+                                @foreach (\App\Services\Verification\CoverageAssessmentService::FIELDS as $key => $label)
+                                    <div><div class="request-field__label">{{ $label }}</div><div class="request-field__value">{{ $resultSummary['coverage_assessment'][$key] ?? 'Not recorded' }}</div></div>
+                                @endforeach
+                            </div>
+                            @if (data_get($resultSummary, 'coverage_assessment.outcome') === 'inactive')
+                                <p style="padding:14px">Benefit questions not assessed: coverage inactive for the checked date of service. Saved benefit answers are retained in history.</p>
+                            @endif
+                        @endif
+                        @if (data_get($resultSummary, 'coverage_assessment.outcome') !== 'inactive')
                         <div class="request-result-band request-result-band--three">
                             @foreach (['Eligibility status' => $eligibilityStatus, 'Effective date' => $resultSummary['effective_date'], 'Network status' => $resultSummary['network_status']] as $label => $value)
                                 <div class="request-result__item"><div class="request-field__label">{{ $label }}</div><div class="request-result__value">{{ $value }}</div></div>
@@ -180,6 +195,7 @@
                                 <div class="request-result__item"><div class="request-field__label">{{ $label }} coverage</div><div class="request-result__value">{{ $value }}</div></div>
                             @endforeach
                         </div>
+                        @endif
                     </div>
                 </section>
 
@@ -353,11 +369,11 @@
                     </div>
                 </section>
 
-                <details class="request-card request-timeline">
+                <details class="request-card request-timeline" wire:ignore.self wire:key="saved-request-timeline">
                     <summary class="request-card__header"><div><h3 class="request-card__title">Timeline</h3><p class="request-card__hint">{{ $activities->count() }} recorded events</p></div><span class="request-chip">Open</span></summary>
                     <div class="request-card__body request-timeline__items">
                         @forelse ($activities as $activity)
-                            <div class="request-timeline__item"><div class="request-field__value">{{ $activity['type'] }}</div><div style="margin-top:4px; font-size:12px; line-height:1.55; color:#475569;">{{ $activity['description'] }}</div>@if (filled($activity['details']))<div style="margin-top:5px; font-size:11px; line-height:1.5; color:#64748b; white-space:pre-line;">{{ $activity['details'] }}</div>@endif<div class="request-field__label" style="margin-top:6px;">{{ $activity['author'] }} &middot; {{ $activity['created_at'] }}</div>@if ($canViewSubmissionSnapshots && filled($activity['submission_id']))<button type="button" class="request-copy" style="margin-top:7px; padding:0;" wire:click="openSubmissionSnapshot({{ (int) $activity['submission_id'] }})">View snapshot</button>@endif</div>
+                            <div class="request-timeline__item" wire:key="request-activity-{{ $activity['id'] ?? 'stale' }}"><div class="request-field__value">{{ $activity['type'] }}</div><div style="margin-top:4px; font-size:12px; line-height:1.55; color:#475569;">{{ $activity['description'] }}</div>@if (filled($activity['details']))<div style="margin-top:5px; font-size:11px; line-height:1.5; color:#64748b; white-space:pre-line;">{{ $activity['details'] }}</div>@endif<div class="request-field__label" style="margin-top:6px;">{{ $activity['author'] }} &middot; {{ $activity['created_at'] }}</div>@if ($canViewSubmissionSnapshots && filled($activity['submission_id']))<button type="button" class="request-copy" style="margin-top:7px; padding:0;" id="request-snapshot-{{ $activity['id'] }}" wire:click="openSubmissionSnapshot({{ (int) $activity['submission_id'] }}, {{ $activity['id'] }})">View snapshot</button>@endif</div>
                         @empty
                             <p class="request-empty">No activity has been recorded.</p>
                         @endforelse
@@ -368,8 +384,8 @@
     </div>
 
     @if ($showSubmissionSnapshotModal && filled($selectedSubmissionSnapshot))
-        <div class="request-modal" wire:key="submission-snapshot-modal"><div class="request-modal__dialog">
-            <div class="request-card__header"><div><h3 class="request-card__title">Form Answer Changes</h3><p class="request-card__hint">Submission v{{ data_get($selectedSubmissionSnapshot, 'headline.version', '-') }} &middot; {{ data_get($selectedSubmissionSnapshot, 'headline.submitted_at', '-') }} &middot; {{ count($selectedSubmissionSnapshot['form_changes'] ?? []) }} changes</p></div><button type="button" class="request-link" wire:click="closeSubmissionSnapshot">Close</button></div>
+        <x-pds.workflow-dialog labelled-by="form-answer-changes-title" dismiss="$wire.closeSubmissionSnapshot()" width="62rem" wire:key="submission-snapshot-modal" :return-focus="$snapshotReturnActivityId ? 'request-snapshot-'.$snapshotReturnActivityId : null">
+            <div class="request-card__header"><div><h3 id="form-answer-changes-title" class="request-card__title">Form Answer Changes</h3><p class="request-card__hint">Submission v{{ data_get($selectedSubmissionSnapshot, 'headline.version', '-') }} &middot; {{ data_get($selectedSubmissionSnapshot, 'headline.submitted_at', '-') }} &middot; {{ count($selectedSubmissionSnapshot['form_changes'] ?? []) }} changes</p></div><button type="button" class="request-link" wire:click="closeSubmissionSnapshot" autofocus>Close</button></div>
             <div class="request-card__body">
                 @if (! empty($selectedSubmissionSnapshot['form_changes']))
                     <div class="request-change-table">
@@ -390,7 +406,7 @@
                     @if (empty($selectedSubmissionSnapshot['answers']))<p class="request-empty" style="margin-top:10px;">No dynamic question answers were stored in this submission.</p>@endif
                 </details>
             </div>
-        </div></div>
+        </x-pds.workflow-dialog>
     @endif
 
     <script>

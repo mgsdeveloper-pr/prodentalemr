@@ -4,21 +4,21 @@
 </style>
 <div class="pd-booking-grid">
     <div>
-        <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; color: #0f172a;">Appointment Date<span style="color: #dc2626;">*</span></div>
-        <div style="border: 1px solid #dbe4ee; border-radius: 10px; background: #ffffff; overflow: hidden;">
-            <div style="padding: 12px 14px; border-bottom: 1px solid #e8edf3; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                <button type="button" wire:click="previousCalendarMonth" style="width: 28px; height: 28px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #64748b; cursor: pointer;">&lsaquo;</button>
-                <div style="display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: #64748b;">
+        <div style="margin-bottom: 8px; font-size: 12px; font-weight: 800; color: var(--pd-text);">Appointment Date<span style="color: var(--pwdl-status-danger-text);">*</span></div>
+        <div style="border: 1px solid var(--pd-border); border-radius: 10px; background: var(--pd-card); overflow: hidden;">
+            <div style="padding: 12px 14px; border-bottom: 1px solid var(--pwdl-border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                <button type="button" wire:click="previousCalendarMonth" aria-label="Previous month" style="width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--pd-border); background: var(--pd-card); color: var(--pd-muted); cursor: pointer;">&lsaquo;</button>
+                <div style="display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; color: var(--pd-muted);">
                     <span>{{ $calendarMonthLabel }}</span>
                     <span>{{ $calendarYearLabel }}</span>
                 </div>
-                <button type="button" wire:click="nextCalendarMonth" style="width: 28px; height: 28px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #64748b; cursor: pointer;">&rsaquo;</button>
+                <button type="button" wire:click="nextCalendarMonth" aria-label="Next month" style="width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--pd-border); background: var(--pd-card); color: var(--pd-muted); cursor: pointer;">&rsaquo;</button>
             </div>
 
             <div style="padding: 12px;">
                 <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px;">
                     @foreach (['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as $dayLabel)
-                        <div style="text-align: center; font-size: 11px; font-weight: 700; color: #64748b;">{{ $dayLabel }}</div>
+                        <div style="text-align: center; font-size: 11px; font-weight: 700; color: var(--pd-muted);">{{ $dayLabel }}</div>
                     @endforeach
                 </div>
 
@@ -30,34 +30,34 @@
                                     $tone = $day['availability_tone'] ?? 'idle';
                                     $styles = match ($tone) {
                                         'open' => [
-                                            'border' => '#bfded0',
-                                            'background' => '#dcefe6',
-                                            'color' => '#166534',
-                                            'meta' => '#15803d',
+                                            'border' => 'var(--pwdl-status-success)',
+                                            'background' => 'var(--pwdl-status-success-soft)',
+                                            'color' => 'var(--pwdl-status-success-text)',
+                                            'meta' => 'var(--pwdl-status-success-text)',
                                         ],
                                         'full' => [
-                                            'border' => '#fcd7a4',
-                                            'background' => '#fff1d6',
-                                            'color' => '#c2410c',
-                                            'meta' => '#ea580c',
+                                            'border' => 'var(--pwdl-status-warning)',
+                                            'background' => 'var(--pwdl-status-warning-soft)',
+                                            'color' => 'var(--pwdl-status-warning-text)',
+                                            'meta' => 'var(--pwdl-status-warning-text)',
                                         ],
                                         'blocked' => [
-                                            'border' => '#f4bfd5',
-                                            'background' => '#fce7f3',
-                                            'color' => '#be185d',
-                                            'meta' => '#db2777',
+                                            'border' => 'var(--pwdl-status-danger)',
+                                            'background' => 'var(--pwdl-status-danger-soft)',
+                                            'color' => 'var(--pwdl-status-danger-text)',
+                                            'meta' => 'var(--pwdl-status-danger-text)',
                                         ],
                                         'muted' => [
-                                            'border' => '#e6ebf2',
-                                            'background' => '#f4f7fb',
-                                            'color' => '#cbd5e1',
-                                            'meta' => '#cbd5e1',
+                                            'border' => 'var(--pwdl-border-subtle)',
+                                            'background' => 'var(--pwdl-surface-muted)',
+                                            'color' => 'var(--pwdl-border-strong)',
+                                            'meta' => 'var(--pwdl-border-strong)',
                                         ],
                                         default => [
-                                            'border' => '#e6ebf2',
-                                            'background' => '#ffffff',
-                                            'color' => '#64748b',
-                                            'meta' => '#94a3b8',
+                                            'border' => 'var(--pwdl-border-subtle)',
+                                            'background' => 'var(--pd-card)',
+                                            'color' => 'var(--pd-muted)',
+                                            'meta' => 'var(--pwdl-text-placeholder)',
                                         ],
                                     };
 
@@ -110,13 +110,13 @@
 
     <div>
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
-            <div style="font-size: 12px; font-weight: 800; color: #0f172a;">Available Slot<span style="color: #dc2626;">*</span></div>
+            <div style="font-size: 12px; font-weight: 800; color: var(--pd-text);">Available Slot<span style="color: var(--pwdl-status-danger-text);">*</span></div>
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <div style="font-size: 11px; font-weight: 700; color: #64748b;">{{ $selectedDuration }} min slots</div>
-                <div style="font-size: 11px; color: #64748b;">Showing times in <strong>{{ $displayTimezone }}</strong></div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--pd-muted);">{{ $selectedDuration }} min slots</div>
+                <div style="font-size: 11px; color: var(--pd-muted);">Showing times in <strong>{{ $displayTimezone }}</strong></div>
             </div>
         </div>
-        <div style="min-height: 320px; border: 1px solid #e6ebf2; border-radius: 10px; background: #f7f9fc; overflow: hidden;">
+        <div style="min-height: 320px; border: 1px solid var(--pwdl-border-subtle); border-radius: 10px; background: var(--pwdl-surface-muted); overflow: hidden;">
             @if (count($availableSlots))
                 <div style="padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
                     @foreach ($availableSlots as $slot)
@@ -126,9 +126,9 @@
                             style="
                                 padding: 14px 12px;
                                 border-radius: 10px;
-                                border: 1px solid {{ $slot['is_selected'] ? '#0f766e' : '#dbe4ee' }};
-                                background: {{ $slot['is_selected'] ? '#ecfdf5' : '#ffffff' }};
-                                color: {{ $slot['is_selected'] ? '#0f766e' : '#334155' }};
+                                border: 1px solid {{ $slot['is_selected'] ? '#0f766e' : 'var(--pd-border)' }};
+                                background: {{ $slot['is_selected'] ? 'var(--pwdl-status-success-soft)' : 'var(--pd-card)' }};
+                                color: {{ $slot['is_selected'] ? 'var(--pwdl-status-success-text)' : 'var(--pwdl-text-secondary)' }};
                                 font-size: 13px;
                                 font-weight: 700;
                                 text-align: center;
@@ -140,16 +140,16 @@
                     @endforeach
                 </div>
             @else
-                <div style="min-height: 320px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 18px; font-size: 14px; line-height: 1.7; color: #64748b;">
+                <div style="min-height: 320px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 18px; font-size: 14px; line-height: 1.7; color: var(--pd-muted);">
                     {{ $availabilityMessage }}
                 </div>
             @endif
         </div>
-        <div style="margin-top: 10px; font-size: 12px; line-height: 1.6; color: #64748b;">
+        <div style="margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--pd-muted);">
             Selected slot: <strong>{{ $selectedSlotLabel }}</strong>
         </div>
         @error('data.start_time')
-            <div role="alert" style="margin-top: 8px; padding: 10px 12px; border: 1px solid #fecaca; border-radius: 6px; background: #fef2f2; color: #b91c1c; font-size: 12px; font-weight: 700; line-height: 1.5;">
+            <div role="alert" style="margin-top: 8px; padding: 10px 12px; border: 1px solid var(--pwdl-status-danger); border-radius: 6px; background: var(--pwdl-status-danger-soft); color: var(--pwdl-status-danger-text); font-size: 12px; font-weight: 700; line-height: 1.5;">
                 {{ $message }} Please choose an available slot and save again.
             </div>
         @enderror

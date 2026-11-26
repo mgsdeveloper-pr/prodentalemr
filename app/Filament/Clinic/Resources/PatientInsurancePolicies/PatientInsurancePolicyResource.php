@@ -33,6 +33,11 @@ class PatientInsurancePolicyResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'display_title';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['patient.first_name', 'patient.last_name', 'insurance_company'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return PatientInsurancePolicyForm::configure($schema);

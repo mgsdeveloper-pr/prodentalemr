@@ -13,13 +13,19 @@ class VerificationAuditService
     {
         $seen = [];
         while ($question->isConditionalQuestion()) {
-            if (isset($seen[$question->id])) return false;
+            if (isset($seen[$question->id])) {
+                return false;
+            }
             $seen[$question->id] = true;
             $parent = $questions->firstWhere('id', $question->parent_question_id);
-            if (! $parent) return false;
+            if (! $parent) {
+                return false;
+            }
             $field = $parent->is_builtin ? $parent->field_key : 'custom_question_'.$parent->id;
             $value = $state[$field] ?? null;
-            if (! is_scalar($value) || ! $question->matchesTrigger($value)) return false;
+            if (! is_scalar($value) || ! $question->matchesTrigger($value)) {
+                return false;
+            }
             $question = $parent;
         }
 
@@ -35,6 +41,15 @@ class VerificationAuditService
             'verificationCoverageCodes',
         ]);
 
+        $coverage = app(CoverageAssessmentService::class);
+        $coverageMissing = $coverage->missingForRequest($request);
+        if (! $this->templateVersionId($request)) {
+            $coverageMissing['template'] = 'No active template is configured for this form. Ask an administrator to activate it.';
+        }
+        if ($coverage->isInactive($request)) {
+            return $coverageMissing;
+        }
+
         $formType = $request->verificationProfile?->form_type ?: 'full_form';
         $questions = $this->requiredApplicableQuestions(
             $request,
@@ -42,7 +57,7 @@ class VerificationAuditService
             $formType,
         );
         $answers = $request->verificationFormAnswers->keyBy('verification_form_question_id');
-        $missing = [];
+        $missing = $coverageMissing;
 
         foreach ($questions->where('input_type', '!=', 'frequency_row') as $question) {
             if ($question->isConditionalQuestion()) {
@@ -132,9 +147,11 @@ class VerificationAuditService
             return (int) $versionId;
         }
 
-        return (int) app(VerificationTemplateVersionService::class)
-            ->latestPublishedVersionForWorkItem($request)
-            ->getKey();
+        // Zero keeps downstream queries from matching unversioned question rows.
+        return app(VerificationTemplateVersionService::class)->findActivePublishedVersion(
+            $request->clinic_id,
+            formType: $request->verificationProfile?->form_type ?: 'full_form',
+        )?->id ?? 0;
     }
 
     protected function questionFromRequestTemplate(BillingWorkItem $request, int $questionId): ?VerificationFormQuestion

@@ -365,11 +365,11 @@ class NotificationCentre extends Page implements HasForms
         try {
             SaasMailSettings::sendTestEmail($state, $recipient);
         } catch (Throwable $exception) {
-            Notification::make()
-                ->title('Test email failed')
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::actionFailed(
+                'Test email failed',
+                $exception,
+                'Check the mail server settings and the recipient, then try again. If the problem persists, ask your administrator to check the server logs.',
+            );
 
             return;
         }

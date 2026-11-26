@@ -34,7 +34,7 @@ class SubscriptionPlanInfolist
                                     ->formatStateUsing(fn (?string $state): string => SubscriptionPlan::workspaceModeOptions()[$state] ?? 'Not set')
                                     ->color('info'),
                                 TextEntry::make('price')
-                                    ->money('USD')
+                                    ->money(fn ($record) => $record->currency ?: 'USD')
                                     ->badge()
                                     ->color('success'),
                                 IconEntry::make('status')

@@ -8,6 +8,8 @@ use Carbon\CarbonInterface;
 
 class SLAService
 {
+    public const DUE_DATE_FORMAT = 'M d, Y h:i A T';
+
     public const DEFAULT_PRIORITY_WINDOWS = [
         'low' => ['days' => 5],
         'normal' => ['days' => 3],
@@ -64,7 +66,7 @@ class SLAService
         return [
             'status' => $status,
             'label' => $this->label($status),
-            'due_at' => optional($request->due_at)->format('M d, Y h:i A') ?: '-',
+            'due_at' => $request->due_at?->copy()->setTimezone(config('app.timezone'))->format(self::DUE_DATE_FORMAT) ?? '-',
             'relative' => $this->relativeDueLabel($request),
             'is_paused' => $status === 'paused_waiting_clinic',
             'pause_reason' => $status === 'paused_waiting_clinic' ? 'Waiting on clinic response' : '-',

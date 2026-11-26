@@ -34,12 +34,22 @@ it('renders the enterprise appshell foundation partials', function (): void {
         ->toContain('pd-appshell-global-header__search')
         ->toContain('pd-appshell-global-header__utilities')
         ->toContain('pd-appshell-user-menu')
+        ->toMatch('/data-appshell-slot="notifications".*data-appshell-slot="theme-toggle".*data-appshell-slot="help"/s')
+        ->toContain('pd-appshell-theme-toggle__moon')
+        ->toContain('pd-appshell-theme-toggle__sun')
+        ->toContain("@click=\"\$dispatch('theme-changed', \$store.theme === 'dark' ? 'light' : 'dark')\"")
         ->toContain('role="dialog"')
         ->toContain('aria-label="Close global search"')
         ->toContain('@click.self="closeSearch()"')
-        ->toContain("event.key === 'Escape'")
+        ->toContain('@cancel.prevent="closeSearch()"')
+        ->toContain('@keydown.escape.stop.prevent="closeSearch()"')
+        ->toContain('@keydown.tab="wrapSearchFocus($event)"')
+        ->toContain('aria-controls="pd-global-search-dialog"')
+        ->toContain('aria-controls="pd-global-search-results"')
+        ->toContain('aria-activedescendant')
+        ->toContain('role="status"')
         ->toContain("endpoint: '\\/global-search'")
-        ->toContain('ProDental')
+        ->toContain('Denentiq')
         ->toContain('Verification')
         ->not->toContain('ProDental EMR');
 
@@ -52,6 +62,10 @@ it('renders the enterprise appshell foundation partials', function (): void {
     expect(substr_count($globalHeader, 'pd-appshell-workspace-switcher'))->toBeGreaterThanOrEqual(1);
     expect($globalHeader)->not->toContain('data-appshell-slot="user-profile"');
 
+    preg_match('/<div class="pd-appshell-user-menu__panel">(.*?)<\/div>/s', $globalHeader, $menu);
+    expect($menu[1])->toContain('Profile settings', 'Sign out')->not->toContain('theme-toggle');
+    expect(substr_count($menu[1], '<a '))->toBe(2);
+
     expect(view('filament.appshell.workspace-header', ['workspace' => 'verification'])->render())
         ->toContain('pd-appshell-workspace-header')
         ->toContain('Verification Workspace');
@@ -61,7 +75,7 @@ it('renders the enterprise appshell foundation partials', function (): void {
 
     expect(view('filament.appshell.compact-footer', ['workspace' => 'verification'])->render())
         ->toContain('pd-appshell-footer')
-        ->toContain('ProDental')
+        ->toContain('Denentiq')
         ->toContain('&copy; '.now()->year)
         ->not->toContain('Verification')
         ->not->toContain('Development')

@@ -12,11 +12,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [\App\Http\Middleware\EnsureActiveAccount::class]);
         // Laravel validates this short-lived HMAC cookie before allowing the
         // initiating administrator through maintenance mode during an update.
         $middleware->encryptCookies(except: ['laravel_maintenance']);
 
         $middleware->validateCsrfTokens(except: [
+            // Server-to-server bridge; authenticated with a private shared key.
+            // The website proxy separately validates its browser session CSRF.
+            'website-api/*',
+            // Provider signatures are verified before payment processing.
+            'website-payments/webhook/*',
             'logout',
             'admin/logout',
             'clinic/logout',

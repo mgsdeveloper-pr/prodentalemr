@@ -29,6 +29,12 @@
 
     <style>
         .verification-reports-grid {
+            --verification-reports-indigo: #4338ca;
+        }
+        html.dark .verification-reports-grid {
+            --verification-reports-indigo: #c7d2fe;
+        }
+        .verification-reports-grid {
             display: grid;
             gap: 20px;
         }
@@ -72,8 +78,8 @@
 
         .verification-reports-snapshot-box {
             border-radius: 16px;
-            border: 1px solid #e8eef5;
-            background: #f8fafc;
+            border: 1px solid var(--pwdl-border-subtle);
+            background: var(--pd-bg);
             padding: 14px;
         }
 
@@ -82,14 +88,14 @@
             font-weight: 800;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            color: #64748b;
+            color: var(--pd-muted);
         }
 
         .verification-reports-snapshot-value {
             margin-top: 6px;
             font-size: 22px;
             font-weight: 800;
-            color: #0f172a;
+            color: var(--pd-text);
         }
 
         .verification-reports-breakdowns {
@@ -99,9 +105,9 @@
         }
 
         .verification-reports-card {
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 22px;
-            background: #ffffff;
+            background: var(--pd-card);
             box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
             overflow: hidden;
         }
@@ -121,7 +127,7 @@
             font-size: 32px;
             line-height: 1;
             font-weight: 800;
-            color: #0f172a;
+            color: var(--pd-text);
             margin-top: 8px;
         }
 
@@ -130,7 +136,7 @@
             align-items: center;
             justify-content: center;
             border-radius: 999px;
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             padding: 6px 12px;
             font-size: 11px;
             font-weight: 800;
@@ -148,14 +154,14 @@
             justify-content: space-between;
             gap: 12px;
             font-size: 13px;
-            color: #334155;
+            color: var(--pwdl-text-secondary);
             margin-bottom: 6px;
         }
 
         .verification-reports-bar__track {
             height: 8px;
             border-radius: 999px;
-            background: #eef2f7;
+            background: var(--pwdl-surface-muted);
             overflow: hidden;
         }
 
@@ -166,9 +172,9 @@
 
         .verification-reports-table-wrap {
             overflow-x: auto;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 18px;
-            background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+            background: linear-gradient(180deg, var(--pd-bg) 0%, var(--pd-card) 100%);
         }
 
         .verification-reports-table {
@@ -190,9 +196,9 @@
             align-items: center;
             justify-content: center;
             border-radius: 999px;
-            border: 1px solid #dbe4ee;
-            background: #ffffff;
-            color: #475569;
+            border: 1px solid var(--pd-border);
+            background: var(--pd-card);
+            color: var(--pwdl-text-secondary);
             padding: 8px 14px;
             font-size: 12px;
             font-weight: 700;
@@ -201,49 +207,49 @@
         }
 
         .verification-reports-chip:hover {
-            border-color: #bfdbfe;
-            color: #1d4ed8;
+            border-color: var(--pwdl-border-subtle);
+            color: var(--pwdl-status-info-text);
         }
 
         .verification-reports-chip--clear {
-            background: #f8fafc;
-            color: #0f172a;
+            background: var(--pd-bg);
+            color: var(--pd-text);
         }
 
         .verification-reports-chip--active {
-            background: #eff6ff;
-            border-color: #93c5fd;
-            color: #1d4ed8;
+            background: var(--pwdl-status-info-soft);
+            border-color: var(--pwdl-status-info);
+            color: var(--pwdl-status-info-text);
         }
 
         .verification-reports-table th,
         .verification-reports-table td {
             padding: 13px 14px;
-            border-top: 1px solid #e8eef5;
+            border-top: 1px solid var(--pwdl-border-subtle);
             text-align: left;
             font-size: 13px;
         }
 
         .verification-reports-table th {
-            color: #64748b;
+            color: var(--pd-muted);
             font-weight: 800;
             letter-spacing: 0.03em;
-            background: #f8fafc;
+            background: var(--pd-bg);
             border-top: none;
             white-space: nowrap;
         }
 
         .verification-reports-table tbody tr:nth-child(even) {
-            background: #fbfdff;
+            background: var(--pd-bg);
         }
 
         .verification-reports-table tbody tr:hover {
-            background: #f8fbff;
+            background: var(--pd-bg);
         }
 
         .verification-reports-table tbody td:first-child {
             font-weight: 800;
-            color: #0f172a;
+            color: var(--pd-text);
         }
 
         @media (max-width: 1200px) {
@@ -279,12 +285,12 @@
                     <div class="verification-reports-card__body">
                         <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Month Wise Report</div>
-                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Month Wise Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                     Verification requests grouped by created month.
                                 </div>
                             </div>
-                            <span class="verification-reports-pill" style="background: #eff6ff; border-color: #bfdbfe; color: #2563eb;">
+                            <span class="verification-reports-pill" style="background: var(--pwdl-status-info-soft); border-color: var(--pwdl-border-subtle); color: var(--pwdl-status-info-text);">
                                 Monthly
                             </span>
                         </div>
@@ -301,7 +307,7 @@
                                     </div>
                                 </div>
                             @empty
-                                <div style="font-size: 13px; color: #64748b;">No month-wise data matches the current filters.</div>
+                                <div style="font-size: 13px; color: var(--pd-muted);">No month-wise data matches the current filters.</div>
                             @endforelse
                         </div>
                     </div>
@@ -311,12 +317,12 @@
                     <div class="verification-reports-card__body">
                         <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Clinic Wise Report</div>
-                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Clinic Wise Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                     Verification requests grouped by clinic.
                                 </div>
                             </div>
-                            <span class="verification-reports-pill" style="background: #ecfdf5; border-color: #bbf7d0; color: #15803d;">
+                            <span class="verification-reports-pill" style="background: var(--pwdl-status-success-soft); border-color: var(--pwdl-border-subtle); color: var(--pwdl-status-success-text);">
                                 Clinic
                             </span>
                         </div>
@@ -333,7 +339,7 @@
                                     </div>
                                 </div>
                             @empty
-                                <div style="font-size: 13px; color: #64748b;">No clinic-wise data matches the current filters.</div>
+                                <div style="font-size: 13px; color: var(--pd-muted);">No clinic-wise data matches the current filters.</div>
                             @endforelse
                         </div>
                     </div>
@@ -343,12 +349,12 @@
                     <div class="verification-reports-card__body">
                         <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Urgent / Normal Report</div>
-                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                                <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Urgent / Normal Report</div>
+                                <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                     Verification requests grouped by form priority.
                                 </div>
                             </div>
-                            <span class="verification-reports-pill" style="background: #fffbeb; border-color: #fde68a; color: #d97706;">
+                            <span class="verification-reports-pill" style="background: var(--pwdl-status-warning-soft); border-color: var(--pwdl-border-subtle); color: var(--pwdl-status-warning-text);">
                                 Priority
                             </span>
                         </div>
@@ -363,12 +369,12 @@
                                     <div class="verification-reports-bar__track">
                                         <div
                                             class="verification-reports-bar__fill"
-                                            style="width: {{ $row['width'] }}%; background: {{ $row['key'] === 'urgent' ? '#d97706' : '#64748b' }};"
+                                            style="width: {{ $row['width'] }}%; background: {{ $row['key'] === 'urgent' ? '#d97706' : 'var(--pd-muted)' }};"
                                         ></div>
                                     </div>
                                 </div>
                             @empty
-                                <div style="font-size: 13px; color: #64748b;">No urgent or normal data matches the current filters.</div>
+                                <div style="font-size: 13px; color: var(--pd-muted);">No urgent or normal data matches the current filters.</div>
                             @endforelse
                         </div>
                     </div>
@@ -379,19 +385,19 @@
             @foreach ($summaryCards as $card)
                 @php
                     $accent = match ($card['accent'] ?? 'slate') {
-                        'emerald' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'text' => '#15803d'],
-                        'sky' => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'text' => '#2563eb'],
-                        'rose' => ['bg' => '#fff1f2', 'border' => '#fecdd3', 'text' => '#e11d48'],
-                        'amber' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'text' => '#d97706'],
-                        'indigo' => ['bg' => '#eef2ff', 'border' => '#c7d2fe', 'text' => '#4338ca'],
-                        default => ['bg' => '#f8fafc', 'border' => '#dbe4ee', 'text' => '#475569'],
+                        'emerald' => ['bg' => 'var(--pwdl-status-success-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-success-text)'],
+                        'sky' => ['bg' => 'var(--pwdl-status-info-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-info-text)'],
+                        'rose' => ['bg' => 'var(--pwdl-status-danger-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-danger-text)'],
+                        'amber' => ['bg' => 'var(--pwdl-status-warning-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-warning-text)'],
+                        'indigo' => ['bg' => 'var(--pwdl-status-info-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--verification-reports-indigo)'],
+                        default => ['bg' => 'var(--pd-bg)', 'border' => 'var(--pd-border)', 'text' => 'var(--pwdl-text-secondary)'],
                     };
                 @endphp
                 <div class="verification-reports-card">
                     <div class="verification-reports-card__body">
                         <div class="verification-reports-kpi">
                             <div>
-                                <div style="font-size: 13px; font-weight: 700; color: #64748b;">{{ $card['label'] }}</div>
+                                <div style="font-size: 13px; font-weight: 700; color: var(--pd-muted);">{{ $card['label'] }}</div>
                                 <div class="verification-reports-kpi__value">{{ $card['value'] }}</div>
                             </div>
                             <span
@@ -401,7 +407,7 @@
                                 {{ $card['label'] }}
                             </span>
                         </div>
-                        <div style="margin-top: 14px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                        <div style="margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                             {{ $card['description'] }}
                         </div>
                     </div>
@@ -414,18 +420,18 @@
                 @foreach ($slaAnalytics['cards'] ?? [] as $card)
                     @php
                         $accent = match ($card['accent'] ?? 'slate') {
-                            'emerald' => ['bg' => '#ecfdf5', 'border' => '#bbf7d0', 'text' => '#15803d'],
-                            'sky' => ['bg' => '#eff6ff', 'border' => '#bfdbfe', 'text' => '#2563eb'],
-                            'amber' => ['bg' => '#fffbeb', 'border' => '#fde68a', 'text' => '#d97706'],
-                            'indigo' => ['bg' => '#eef2ff', 'border' => '#c7d2fe', 'text' => '#4338ca'],
-                            default => ['bg' => '#f8fafc', 'border' => '#dbe4ee', 'text' => '#475569'],
+                            'emerald' => ['bg' => 'var(--pwdl-status-success-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-success-text)'],
+                            'sky' => ['bg' => 'var(--pwdl-status-info-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-info-text)'],
+                            'amber' => ['bg' => 'var(--pwdl-status-warning-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--pwdl-status-warning-text)'],
+                            'indigo' => ['bg' => 'var(--pwdl-status-info-soft)', 'border' => 'var(--pwdl-border-subtle)', 'text' => 'var(--verification-reports-indigo)'],
+                            default => ['bg' => 'var(--pd-bg)', 'border' => 'var(--pd-border)', 'text' => 'var(--pwdl-text-secondary)'],
                         };
                     @endphp
                     <div class="verification-reports-card">
                         <div class="verification-reports-card__body">
                             <div class="verification-reports-kpi">
                                 <div>
-                                    <div style="font-size: 13px; font-weight: 700; color: #64748b;">{{ $card['label'] }}</div>
+                                    <div style="font-size: 13px; font-weight: 700; color: var(--pd-muted);">{{ $card['label'] }}</div>
                                     <div class="verification-reports-kpi__value">{{ $card['value'] }}</div>
                                 </div>
                                 <span
@@ -435,7 +441,7 @@
                                     {{ $card['label'] }}
                                 </span>
                             </div>
-                            <div style="margin-top: 14px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                            <div style="margin-top: 14px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                 {{ $card['description'] }}
                             </div>
                         </div>
@@ -447,14 +453,14 @@
                 <div class="verification-reports-card__body">
                     <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
                         <div>
-                            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Operational Snapshot</div>
-                            <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                            <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Operational Snapshot</div>
+                            <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                 Current queue pressure across SLA-sensitive exception states.
                             </div>
                         </div>
-                        <div style="text-align: right; font-size: 13px; color: #64748b;">
+                        <div style="text-align: right; font-size: 13px; color: var(--pd-muted);">
                             <div>Scope</div>
-                            <div style="margin-top: 4px; font-weight: 700; color: #0f172a;">{{ $this->getAppliedScopeLabel() }}</div>
+                            <div style="margin-top: 4px; font-weight: 700; color: var(--pd-text);">{{ $this->getAppliedScopeLabel() }}</div>
                         </div>
                     </div>
 
@@ -511,27 +517,27 @@
                 <div class="verification-reports-card__body">
                     <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
                         <div>
-                            <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Verification Trend</div>
-                            <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                            <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Verification Trend</div>
+                            <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                                 Track created versus completed verification requests across the selected reporting window.
                             </div>
                         </div>
-                        <div style="text-align: right; font-size: 13px; color: #64748b;">
+                        <div style="text-align: right; font-size: 13px; color: var(--pd-muted);">
                             <div>Scope</div>
-                            <div style="margin-top: 4px; font-weight: 700; color: #0f172a;">{{ $this->getAppliedScopeLabel() }}</div>
+                            <div style="margin-top: 4px; font-weight: 700; color: var(--pd-text);">{{ $this->getAppliedScopeLabel() }}</div>
                         </div>
                     </div>
 
                     <div style="margin-top: 20px; overflow-x: auto;">
                         <svg viewBox="0 0 640 220" style="width: 100%; min-width: 640px; height: 260px;">
-                            <line x1="20" y1="200" x2="620" y2="200" stroke="#e5e7eb" stroke-width="1" />
-                            <line x1="20" y1="20" x2="20" y2="200" stroke="#e5e7eb" stroke-width="1" />
+                            <line x1="20" y1="200" x2="620" y2="200" style="stroke: var(--pwdl-border-subtle);" stroke-width="1" />
+                            <line x1="20" y1="20" x2="20" y2="200" style="stroke: var(--pwdl-border-subtle);" stroke-width="1" />
                             <polyline fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="{{ $trendChart['created_points'] }}" />
                             <polyline fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="{{ $trendChart['completed_points'] }}" />
                         </svg>
                     </div>
 
-                    <div style="display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: #64748b;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--pd-muted);">
                         <span style="display: inline-flex; align-items: center; gap: 8px;">
                             <span style="width: 10px; height: 10px; border-radius: 999px; background: #3b82f6;"></span>
                             Created
@@ -547,8 +553,8 @@
 
             <div class="verification-reports-card">
                 <div class="verification-reports-card__body">
-                    <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Workload Snapshot</div>
-                    <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                    <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Workload Snapshot</div>
+                    <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                         Top assignees in the current verification reporting view.
                     </div>
 
@@ -564,7 +570,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div style="font-size: 13px; color: #64748b;">No assignee activity is available for the current filters.</div>
+                            <div style="font-size: 13px; color: var(--pd-muted);">No assignee activity is available for the current filters.</div>
                         @endforelse
                     </div>
                 </div>
@@ -574,7 +580,7 @@
         <section class="verification-reports-breakdowns">
             <div class="verification-reports-card">
                 <div class="verification-reports-card__body">
-                    <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Status Breakdown</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Status Breakdown</div>
                     <div class="verification-reports-bars">
                         @forelse ($statusVisualization as $row)
                             <div>
@@ -587,7 +593,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div style="font-size: 13px; color: #64748b;">No status data matches the current filters.</div>
+                            <div style="font-size: 13px; color: var(--pd-muted);">No status data matches the current filters.</div>
                         @endforelse
                     </div>
                 </div>
@@ -595,7 +601,7 @@
 
             <div class="verification-reports-card">
                 <div class="verification-reports-card__body">
-                    <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Outcome Breakdown</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Outcome Breakdown</div>
                     <div class="verification-reports-bars">
                         @forelse ($outcomeVisualization as $row)
                             <div>
@@ -608,7 +614,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div style="font-size: 13px; color: #64748b;">No outcome data matches the current filters.</div>
+                            <div style="font-size: 13px; color: var(--pd-muted);">No outcome data matches the current filters.</div>
                         @endforelse
                     </div>
                 </div>
@@ -616,7 +622,7 @@
 
             <div class="verification-reports-card">
                 <div class="verification-reports-card__body">
-                    <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Ownership Mix</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Ownership Mix</div>
                     <div class="verification-reports-bars">
                         @forelse ($sourceVisualization as $row)
                             <div>
@@ -629,7 +635,7 @@
                                 </div>
                             </div>
                         @empty
-                            <div style="font-size: 13px; color: #64748b;">No ownership data matches the current filters.</div>
+                            <div style="font-size: 13px; color: var(--pd-muted);">No ownership data matches the current filters.</div>
                         @endforelse
                     </div>
                 </div>
@@ -641,8 +647,8 @@
             <div class="verification-reports-card__body">
                 <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
                     <div>
-                        <div style="font-size: 18px; font-weight: 800; color: #0f172a;">Recent Verification Activity</div>
-                        <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: #64748b;">
+                        <div style="font-size: 18px; font-weight: 800; color: var(--pd-text);">Recent Verification Activity</div>
+                        <div style="margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--pd-muted);">
                             Latest requests based on the active report filters.
                         </div>
                         <div class="verification-reports-chips">
@@ -667,7 +673,7 @@
                             @endif
                         </div>
                     </div>
-                    <div style="display: inline-flex; align-items: center; justify-content: center; border: 1px solid #dbe4ee; border-radius: 999px; background: #f8fafc; padding: 8px 14px; font-size: 12px; font-weight: 700; color: #475569;">
+                    <div style="display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--pd-border); border-radius: 999px; background: var(--pd-bg); padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--pwdl-text-secondary);">
                         {{ count($recentRows) }} rows
                     </div>
                 </div>
@@ -700,7 +706,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" style="color: #64748b;">No verification activity matches the current filters.</td>
+                                    <td colspan="8" style="color: var(--pd-muted);">No verification activity matches the current filters.</td>
                                 </tr>
                             @endforelse
                         </tbody>

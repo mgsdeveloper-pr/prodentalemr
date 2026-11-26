@@ -395,6 +395,7 @@ class AppointmentForm
                     ->schema([
                         Toggle::make('verification_required')
                             ->label('Insurance verification required')
+                            ->helperText('Verification requests created from this appointment use Full Form.')
                             ->default(true)
                             ->live()
                             ->columnSpan(4),

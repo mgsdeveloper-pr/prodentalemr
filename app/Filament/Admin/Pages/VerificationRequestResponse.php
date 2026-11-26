@@ -150,7 +150,6 @@ class VerificationRequestResponse extends Page
         $this->requestComposerWorkItemId = null;
         $this->requestComposerReason = '';
         $this->resetErrorBag('requestComposerReason');
-        $this->dispatch('verification-request-composer-closed');
     }
 
     public function sendRequestToClinic(): void

@@ -53,6 +53,7 @@ beforeEach(function () {
     ]);
 
     seedWorkflowMaster();
+    app(\App\Support\VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
 
     $this->location = Location::create([
         'clinic_id' => $this->clinic->id,
@@ -656,7 +657,9 @@ it('deletes only unused clinic drafts and protects the active template', functio
         ->firstOrFail();
 
     Livewire::test(VerificationSettings::class)
-        ->call('deleteUnusedClinicTemplateDraft', $draft->id)
+        ->call('reviewDraftLifecycle', $draft->id, 'delete')
+        ->assertSee('Review draft deletion')
+        ->call('confirmDraftLifecycle')
         ->assertHasNoErrors();
 
     expect(VerificationTemplateVersion::withTrashed()->find($draft->id))->toBeNull();
@@ -699,7 +702,9 @@ it('lets clinics select the active published template from settings', function (
 
     $draft->questions()->create(['template_key' => 'template_3', 'section_key' => 'template_3_verification_information', 'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'both', 'is_active' => true]);
     $component
-        ->call('publishClinicTemplateDraft', $draft->id)
+        ->call('reviewDraftLifecycle', $draft->id, 'publish')
+        ->assertSee('Review publication')
+        ->call('confirmDraftLifecycle')
         ->assertHasNoErrors();
 
     $previousTemplate = VerificationTemplateVersion::query()
@@ -714,6 +719,7 @@ it('lets clinics select the active published template from settings', function (
     expect($component->instance()->getClinicTemplateOptions())
         ->toHaveKey($previousTemplate->getKey());
 
+    $originalFullId = $component->get('data.template_full_form_id');
     $originalShortId = $component->get('data.template_short_form_id');
     expect($previousTemplate->id)->toBe($draft->id)
         ->and($previousTemplate->is_active)->toBeFalse();
@@ -728,6 +734,15 @@ it('lets clinics select the active published template from settings', function (
     expect($previousTemplate->fresh()->active_full_form)->toBeTrue()
         ->and($previousTemplate->fresh()->active_short_form)->toBeFalse()
         ->and(VerificationTemplateVersion::findOrFail($originalShortId)->active_short_form)->toBeTrue();
+
+    $log = AuditLog::where('module', 'verification_templates')->where('action', 'activate')->sole();
+    $before = json_decode($log->old_values, true);
+    $after = json_decode($log->new_values, true);
+    expect($log->user_id)->toBe($this->clinicUser->id)
+        ->and($log->clinic_id)->toBe($this->clinic->id)
+        ->and($before['active_slots'])->toBe(['full_form' => $originalFullId])
+        ->and($after['active_slots'])->toBe(['full_form' => $previousTemplate->id])
+        ->and(AuditLog::where('module', 'verification_templates')->where('action', 'release')->exists())->toBeFalse();
 });
 
 it('maps only visible selected clinic portal credentials into verification settings', function () {
@@ -860,4 +875,175 @@ it('keeps portal secrets out of the initial clinic credential page and audits ex
 
     Livewire::test(PortalCredentialSettings::class)
         ->assertRedirect(PortalCredentialResource::getUrl('index'));
+});
+
+it('requires a fresh Clinic Settings review when draft content changes before confirmation', function (string $action) {
+    $this->actingAs($this->clinicUser);
+    $this->clinicUser->givePermissionTo(Permission::findOrCreate('clinic.template_publishing.view', 'web'));
+    $this->clinicUser->givePermissionTo(Permission::findOrCreate('clinic.template_publishing.update', 'web'));
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $draft = VerificationTemplateVersion::create([
+        'scope' => VerificationTemplateVersion::SCOPE_CLINIC,
+        'clinic_id' => $this->clinic->id,
+        'organization_id' => $this->organization->id,
+        'template_key' => 'template_3',
+        'name' => 'Reviewed Full Form Draft',
+        'version_number' => 2,
+        'status' => VerificationTemplateVersion::STATUS_DRAFT,
+        'form_type' => VerificationTemplateVersion::FORM_TYPE_FULL,
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+    ]);
+    $draft->questions()->create([
+        'template_key' => 'template_3', 'section_key' => 'template_3_verification_information',
+        'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'both', 'is_active' => true,
+    ]);
+    $versions->assertPublishable($draft);
+    $active = $versions->activeClinicForms($this->clinic->id);
+
+    Livewire::test(VerificationSettings::class)->call('confirmDraftLifecycle')->assertForbidden();
+
+    $component = Livewire::test(VerificationSettings::class)
+        ->call('reviewDraftLifecycle', $draft->id, $action)
+        ->assertSet('draftLifecycleReview.version_id', $draft->id);
+
+    $draft->questions()->firstOrFail()->update(['prompt' => 'Edited after review']);
+    $component->call('confirmDraftLifecycle')
+        ->assertSet('draftLifecycleReview', [])
+        ->assertNotified('Draft action could not be completed');
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT)
+        ->and($draft->questions()->where('prompt', 'Edited after review')->exists())->toBeTrue()
+        ->and($versions->activeClinicForms($this->clinic->id))->toBe($active);
+
+    $component->call('reviewDraftLifecycle', $draft->id, $action)
+        ->call('cancelDraftLifecycleReview')
+        ->call('confirmDraftLifecycle')->assertForbidden();
+})->with(['publish', 'delete']);
+
+it('refuses to review a Clinic Settings draft outside the selected clinic', function () {
+    $this->actingAs($this->clinicUser);
+    $otherClinic = Clinic::create([
+        'organization_id' => $this->organization->id, 'clinic_name' => 'Other template clinic',
+        'clinic_code' => 'CLN-TB-OTHER', 'status' => true,
+    ]);
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $foreign = $versions->createDraftFromPublished($versions->ensureClinicPublishedVersion($otherClinic));
+
+    Livewire::test(VerificationSettings::class)->call('reviewDraftLifecycle', $foreign->id, 'delete')->assertNotFound();
+
+    expect($foreign->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT);
+});
+
+it('rechecks Clinic Settings publishing permission when confirming the reviewed draft', function () {
+    $this->actingAs($this->clinicUser);
+    $this->clinicUser->givePermissionTo(Permission::findOrCreate('clinic.template_publishing.view', 'web'));
+    $permission = Permission::findOrCreate('clinic.template_publishing.update', 'web');
+    $this->clinicUser->givePermissionTo($permission);
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $draft = VerificationTemplateVersion::create([
+        'scope' => VerificationTemplateVersion::SCOPE_CLINIC,
+        'clinic_id' => $this->clinic->id,
+        'organization_id' => $this->organization->id,
+        'template_key' => 'template_3',
+        'name' => 'Reviewed Full Form Draft',
+        'version_number' => 2,
+        'status' => VerificationTemplateVersion::STATUS_DRAFT,
+        'form_type' => VerificationTemplateVersion::FORM_TYPE_FULL,
+        'clinic_visibility' => VerificationTemplateVersion::CLINIC_VISIBILITY_VISIBLE,
+    ]);
+    $draft->questions()->create([
+        'template_key' => 'template_3', 'section_key' => 'template_3_verification_information',
+        'prompt' => 'Reference', 'input_type' => 'text', 'form_type' => 'both', 'is_active' => true,
+    ]);
+    $versions->assertPublishable($draft);
+
+    $component = Livewire::test(VerificationSettings::class)
+        ->call('reviewDraftLifecycle', $draft->id, 'publish')
+        ->assertSet('draftLifecycleReview.version_id', $draft->id);
+
+    $this->clinicUser->revokePermissionTo($permission);
+    $component->call('confirmDraftLifecycle')->assertForbidden();
+
+    expect($draft->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT);
+});
+
+it('enforces the same draft permissions in the policy and lifecycle service across clinic scopes', function () {
+    $other = Clinic::create([
+        'organization_id' => $this->organization->id,
+        'clinic_name' => 'Policy QA Clinic', 'clinic_code' => 'CLN-TB-POLICY', 'status' => true,
+    ]);
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $own = $versions->createDraftFromPublished($versions->ensureClinicPublishedVersion($this->clinic));
+    $foreign = $versions->createDraftFromPublished($versions->ensureClinicPublishedVersion($other));
+    $this->actingAs($this->clinicUser);
+
+    expect($this->clinicUser->can('view', $own))->toBeTrue()
+        ->and($this->clinicUser->can('update', $own))->toBeTrue()
+        ->and($this->clinicUser->can('delete', $own))->toBeTrue()
+        ->and($this->clinicUser->can('publish', $own))->toBeFalse()
+        ->and($this->clinicUser->can('view', $foreign))->toBeFalse()
+        ->and($this->clinicUser->can('update', $foreign))->toBeFalse()
+        ->and($this->clinicUser->can('delete', $foreign))->toBeFalse();
+
+    expect(fn () => $versions->deleteUnusedDraft($foreign))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+    foreach (['view', 'update'] as $action) {
+        $this->clinicUser->givePermissionTo(Permission::findOrCreate('clinic.template_publishing.'.$action, 'web'));
+    }
+    expect($this->clinicUser->can('publish', $own))->toBeTrue()
+        ->and($this->clinicUser->can('publish', $foreign))->toBeFalse();
+    expect(fn () => $versions->publishDraft($foreign))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+    expect($foreign->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT);
+});
+
+it('scopes delegated Verification template permissions to assigned clinics', function () {
+    $other = Clinic::create([
+        'organization_id' => $this->organization->id, 'clinic_name' => 'Unassigned policy clinic',
+        'clinic_code' => 'CLN-TB-UNASSIGNED', 'status' => true, 'verification_services_enabled' => true,
+    ]);
+    $this->clinic->update(['allow_verification_manager_template_edits' => true, 'verification_services_enabled' => true]);
+    foreach ([$this->clinic, $other] as $clinic) {
+        ClientServiceEnrollment::create([
+            'organization_id' => $clinic->organization_id,
+            'clinic_id' => $clinic->id,
+            'managed_billing_service_id' => $this->verificationService->id,
+            'created_by' => $this->clinicUser->id,
+            'status' => 'active',
+            'start_date' => today(),
+        ]);
+    }
+    $versions = app(\App\Support\VerificationTemplateVersionService::class);
+    $assigned = $versions->createDraftFromPublished($versions->ensureClinicPublishedVersion($this->clinic));
+    $unassigned = $versions->createDraftFromPublished($versions->ensureClinicPublishedVersion($other));
+    $manager = User::factory()->create(['status' => true]);
+    $manager->assignRole('verification_manager');
+    $manager->verificationClinics()->attach($this->clinic->id);
+    foreach (['verification.view', 'template_management.view', 'template_publishing.view', 'template_publishing.update'] as $permission) {
+        $manager->givePermissionTo(Permission::findOrCreate('verification.'.$permission, 'web'));
+    }
+
+    foreach (['view', 'update', 'delete', 'publish'] as $ability) {
+        expect($manager->can($ability, $assigned))->toBeTrue()
+            ->and($manager->can($ability, $unassigned))->toBeFalse();
+    }
+    $this->actingAs($manager);
+    $url = '/verification/clinic-templates';
+    $this->get($url.'?version='.$assigned->id)->assertOk()
+        ->assertSee('href="'.url($url).'"', escape: false);
+    $this->get($url.'?version='.$unassigned->id)->assertNotFound();
+    $this->get('/clinic/verification-questions?version='.$assigned->id)->assertForbidden();
+
+    Filament::setCurrentPanel(Filament::getPanel('verification'));
+    $page = Livewire::withQueryParams(['version' => $assigned->id])
+        ->test(\App\Filament\Admin\Resources\ClinicTemplates\Pages\ManageClinicTemplate::class);
+    $manager->revokePermissionTo('verification.template_publishing.update');
+    expect($manager->can('update', $assigned))->toBeTrue();
+    $page->call('reviewPublishing')->assertForbidden();
+    expect($assigned->fresh()->status)->toBe(VerificationTemplateVersion::STATUS_DRAFT);
+
+    $this->clinic->update(['allow_verification_manager_template_edits' => false]);
+    expect($manager->can('update', $assigned->fresh()))->toBeFalse();
+    $this->get($url.'?version='.$assigned->id)->assertForbidden();
+    $this->clinic->update(['allow_verification_manager_template_edits' => true]);
+    $manager->verificationClinics()->detach($this->clinic->id);
+    $this->get($url.'?version='.$assigned->id)->assertForbidden();
 });

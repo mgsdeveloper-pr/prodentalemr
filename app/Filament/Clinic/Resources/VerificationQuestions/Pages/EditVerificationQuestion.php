@@ -12,6 +12,8 @@ use Livewire\Attributes\Url;
 
 class EditVerificationQuestion extends EditRecord
 {
+    protected ?bool $hasDatabaseTransactions = true;
+
     public function form(\Filament\Schemas\Schema $schema): \Filament\Schemas\Schema
     {
         if (! $this->getRecord()->is_builtin) {
@@ -32,7 +34,7 @@ class EditVerificationQuestion extends EditRecord
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data) {
             // Serialize against publication and recheck lifecycle and clinic access at save time.
-            $version = \App\Models\VerificationTemplateVersion::query()->lockForUpdate()->findOrFail($record->template_version_id);
+            $version = app(\App\Support\VerificationTemplateVersionService::class)->lockEditableDraft($record->template_version_id, ClinicPanelScope::selectedClinicId());
             $fresh = VerificationFormQuestion::query()->lockForUpdate()->findOrFail($record->getKey());
             $fresh->setRelation('templateVersion', $version);
             abort_unless(VerificationQuestionResource::canEdit($fresh), 403);

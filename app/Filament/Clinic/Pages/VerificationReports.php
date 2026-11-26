@@ -308,7 +308,7 @@ class VerificationReports extends Page implements HasForms
         $clinicId = $this->selectedClinicId();
 
         if ($clinicId) {
-            $query->where('clinic_id', $clinicId);
+            $query->where('billing_work_items.clinic_id', $clinicId);
         } else {
             $query->whereRaw('1 = 0');
         }

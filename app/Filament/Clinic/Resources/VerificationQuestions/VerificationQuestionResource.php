@@ -40,7 +40,7 @@ use UnitEnum;
 
 class VerificationQuestionResource extends Resource
 {
-    protected static bool $shouldRegisterNavigation = false;
+    protected static bool $shouldRegisterNavigation = true;
 
     protected static ?string $model = VerificationFormQuestion::class;
 
@@ -55,6 +55,11 @@ class VerificationQuestionResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Verification';
 
     protected static ?int $navigationSort = 4;
+
+    public static function getNavigationUrl(): string
+    {
+        return \App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management'], panel: 'clinic');
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -534,11 +539,11 @@ class VerificationQuestionResource extends Resource
             ->latest('id')
             ->first();
 
-        if ($draft) {
+        if ($draft || $versionId !== null) {
             return $draft;
         }
 
-        return app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($clinic, $templateKey);
+        return app(VerificationTemplateVersionService::class)->findActivePublishedVersion($clinic->id, $templateKey);
     }
 
     public static function clinicTemplateOptions(?Clinic $clinic = null): array

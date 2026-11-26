@@ -14,6 +14,13 @@ class SubscriptionPlan extends Model
 
     protected $fillable = [
         'name',
+        'website_published',
+        'verification_model',
+        'billing_interval',
+        'currency',
+        'quote_required',
+        'website_description',
+        'website_sort_order',
         'plan_code',
         'price',
         'plan_type',
@@ -33,6 +40,8 @@ class SubscriptionPlan extends Model
     {
         return [
             'price' => 'decimal:2',
+            'website_published' => 'boolean',
+            'quote_required' => 'boolean',
             'included_modules' => 'array',
             'included_features' => 'array',
             'plan_limits' => 'array',
@@ -43,6 +52,23 @@ class SubscriptionPlan extends Model
     }
 
     public const PLAN_TYPE_PMS = 'pms';
+
+    public static function verificationModelOptions(bool $includeLegacy = true): array
+    {
+        $options = ['self_service' => 'Verification Platform', 'managed_service' => 'Managed Verification — Platform Included'];
+        // Retain legacy identifiers for saved plans, registrations and payment snapshots.
+        if ($includeLegacy) $options['hybrid'] = 'Managed Verification — Platform Included';
+        return $options;
+    }
+
+    public function scopeWebsiteAvailable($query)
+    {
+        return $query->where('status', true)->where('website_published', true)
+            ->where('plan_type', self::PLAN_TYPE_VERIFICATION)
+            ->where('workspace_mode', self::WORKSPACE_VERIFICATION)
+            ->where(fn ($q) => $q->whereNull('trial_days')->orWhere('trial_days', 0))
+            ->whereIn('verification_model', array_keys(self::verificationModelOptions()));
+    }
 
     public const PLAN_TYPE_VERIFICATION = 'verification';
 

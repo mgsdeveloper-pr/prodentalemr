@@ -20,9 +20,55 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 class SaasNotifications
 {
+    public static function actionFailed(string $title, Throwable $exception, string $message): void
+    {
+        report($exception);
+
+        Notification::make()->title($title)->body($message)->danger()->send();
+    }
+
+    public static function importFailed(string $title, Throwable $exception, string $message): void
+    {
+        if ($exception instanceof ImportValidationException) {
+            Notification::make()->title($title)->body($exception->getMessage())->warning()->send();
+
+            return;
+        }
+
+        self::actionFailed($title, $exception, $message);
+    }
+
+    public static function onboardingFailed(string $title, Throwable $exception, bool $websiteRegistration): void
+    {
+        $notification = Notification::make()->title($title);
+
+        if ($exception instanceof ValidationException) {
+            $notification->body($exception->validator->errors()->first() ?: 'Review the onboarding details and try again.')
+                ->warning()->send();
+
+            return;
+        }
+
+        if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 409) {
+            $message = $websiteRegistration
+                ? 'Reload the registration. Confirm that it is awaiting activation and that any required payment matches the selected plan.'
+                : 'Reload onboarding. If the account was already created, open it from Clients.';
+            $notification->body($message)->warning()->send();
+
+            return;
+        }
+
+        report($exception);
+        $notification->body('Review the onboarding details and try again. If the problem persists, ask your administrator to check the server logs.')
+            ->danger()->send();
+    }
+
     protected static function recipients(): Collection
     {
         return User::query()
@@ -186,7 +232,7 @@ class SaasNotifications
                 $user,
                 'account_access_updated',
                 'Account access updated',
-                'An administrator updated your ProDental account or access permissions.',
+                'An administrator updated your Denentiq account or access permissions.',
                 'security.account-updated.' . $user->getKey() . '.' . now()->timestamp,
             );
         }

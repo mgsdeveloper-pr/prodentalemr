@@ -144,7 +144,7 @@ class ClientManagement extends Page
                 },
                 'progress' => max(1, (int) $draft->last_completed_step),
                 'updated' => $draft->updated_at?->diffForHumans() ?? 'Not started',
-                'url' => $onboarding->resumeUrl($draft),
+                'url' => $draft->entry_point === 'website' ? WebsiteRegistrations::getUrl() : $onboarding->resumeUrl($draft),
             ])
             ->all();
     }

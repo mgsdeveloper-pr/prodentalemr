@@ -8,9 +8,7 @@ use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Controllers\Clinic\BillingWorkItemAttachmentController as ClinicBillingWorkItemAttachmentController;
 use App\Http\Controllers\Clinic\ChooseWorkspaceController;
 use App\Http\Controllers\Clinic\ClinicPanelScopeController;
-use App\Http\Controllers\Clinic\PatientConsentFormController;
 use App\Http\Controllers\Clinic\PatientDocumentController;
-use App\Http\Controllers\Clinic\PatientFinancialDocumentController;
 use App\Http\Controllers\Clinic\VerificationRequestSampleController;
 use App\Http\Controllers\Dso\DsoClinicScopeController;
 use App\Http\Controllers\GlobalSearchController;
@@ -35,6 +33,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
+
+Route::prefix('website-api')->middleware([\App\Http\Middleware\WebsiteRegistrationBridge::class, 'throttle:120,1'])->group(function () {
+    Route::get('plans', [\App\Http\Controllers\WebsiteRegistrationController::class, 'plans']);
+    Route::post('start', [\App\Http\Controllers\WebsiteRegistrationController::class, 'start']);
+    Route::post('resume', [\App\Http\Controllers\WebsiteRegistrationController::class, 'resume']);
+    Route::post('redeem', [\App\Http\Controllers\WebsiteRegistrationController::class, 'redeem']);
+    Route::get('draft', [\App\Http\Controllers\WebsiteRegistrationController::class, 'show']);
+    Route::post('save', [\App\Http\Controllers\WebsiteRegistrationController::class, 'save']);
+    Route::post('submit', [\App\Http\Controllers\WebsiteRegistrationController::class, 'submit']);
+    Route::get('checkout', [\App\Http\Controllers\WebsiteCheckoutController::class, 'show']);
+    Route::post('checkout-start', [\App\Http\Controllers\WebsiteCheckoutController::class, 'start'])->middleware('throttle:12,1');
+    Route::post('checkout-refresh', [\App\Http\Controllers\WebsiteCheckoutController::class, 'refresh'])->middleware('throttle:12,1');
+});
+
+Route::post('/website-payments/webhook/{gateway}', [\App\Http\Controllers\WebsiteCheckoutController::class, 'webhook'])
+    ->where('gateway', '[a-z0-9_-]+')->middleware('throttle:120,1')->name('website-payments.webhook');
 
 Route::redirect('/verification/login', '/login');
 Route::redirect('/admin/login', '/login');
@@ -75,12 +89,6 @@ Route::middleware('auth')->group(function () {
         ->name('saas.master-template.legacy-question-edit');
     Route::get('/clinic/patient-documents/{document}/view', [PatientDocumentController::class, 'show'])->name('clinic.patient-documents.show');
     Route::get('/clinic/patient-documents/{document}/download', [PatientDocumentController::class, 'download'])->name('clinic.patient-documents.download');
-    Route::get('/clinic/patient-consent-forms/{consent}/view', [PatientConsentFormController::class, 'show'])->name('clinic.patient-consent-forms.show');
-    Route::get('/clinic/patient-consent-forms/{consent}/download', [PatientConsentFormController::class, 'download'])->name('clinic.patient-consent-forms.download');
-    Route::get('/clinic/patient-statements/{statement}/view', [PatientFinancialDocumentController::class, 'showStatement'])->name('clinic.patient-statements.show');
-    Route::get('/clinic/patient-statements/{statement}/download', [PatientFinancialDocumentController::class, 'downloadStatement'])->name('clinic.patient-statements.download');
-    Route::get('/clinic/patient-ledger-entries/{entry}/receipt/view', [PatientFinancialDocumentController::class, 'showReceipt'])->name('clinic.patient-ledger-entries.receipt.show');
-    Route::get('/clinic/patient-ledger-entries/{entry}/receipt/download', [PatientFinancialDocumentController::class, 'downloadReceipt'])->name('clinic.patient-ledger-entries.receipt.download');
     Route::get('/verification/sign-out', fn () => view('auth.panel-sign-out', ['performUrl' => route('admin.signout.perform')]))->name('admin.signout');
     Route::get('/verification/clinic-scope', AdminClinicScopeController::class)->name('admin.clinic-scope');
     Route::redirect('/verification/unassigned-patients', '/verification/unassigned-requests')
@@ -94,7 +102,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dso/clinic-scope', DsoClinicScopeController::class)->name('dso.clinic-scope');
     Route::get('/choose-workspace', [ChooseWorkspaceController::class, 'show'])->name('clinic.choose-workspace');
     Route::post('/choose-workspace/{workspace}', [ChooseWorkspaceController::class, 'switch'])
-        ->whereIn('workspace', [ClinicWorkspace::VERIFICATION, ClinicWorkspace::CLINIC_PMS])
+        ->whereIn('workspace', [ClinicWorkspace::VERIFICATION])
         ->name('clinic.switch-workspace');
     Route::get('/clinic/clinic-scope', ClinicPanelScopeController::class)->name('clinic.clinic-scope');
     Route::get('/clinic/verification-requests/sample', VerificationRequestSampleController::class)->name('clinic.verification-requests.sample');

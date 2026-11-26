@@ -11,20 +11,18 @@ class ClinicWorkspace
 
     public const VERIFICATION = 'verification';
 
-    public const CLINIC_PMS = 'clinic_pms';
-
     public static function selected(): ?string
     {
         $workspace = session(self::SESSION_KEY);
 
-        return in_array($workspace, [self::VERIFICATION, self::CLINIC_PMS], true)
+        return $workspace === self::VERIFICATION
             ? $workspace
             : null;
     }
 
     public static function select(string $workspace): void
     {
-        if (in_array($workspace, [self::VERIFICATION, self::CLINIC_PMS], true)) {
+        if ($workspace === self::VERIFICATION) {
             session([self::SESSION_KEY => $workspace]);
         }
     }
@@ -57,10 +55,6 @@ class ClinicWorkspace
 
         if ($clinic->hasActiveVerificationServices()) {
             $workspaces[] = self::VERIFICATION;
-        }
-
-        if ($clinic->hasActiveClinicOperations()) {
-            $workspaces[] = self::CLINIC_PMS;
         }
 
         return $workspaces;
@@ -99,7 +93,6 @@ class ClinicWorkspace
     {
         return match ($workspace) {
             self::VERIFICATION => url('/clinic/verification-requests'),
-            self::CLINIC_PMS => url('/clinic'),
             default => url('/clinic'),
         };
     }
@@ -125,56 +118,20 @@ class ClinicWorkspace
         return url('/clinic');
     }
 
-    public static function moduleMatchesSelectedWorkspace(string $module, ?Clinic $clinic): bool
-    {
-        if (! self::needsChoice($clinic)) {
-            return true;
-        }
-
-        $selected = self::selected();
-
-        if ($selected === self::VERIFICATION) {
-            return in_array($module, self::verificationModules(), true)
-                || in_array($module, self::sharedModules(), true);
-        }
-
-        if ($selected === self::CLINIC_PMS) {
-            return in_array($module, self::clinicPmsModules(), true)
-                || in_array($module, self::sharedModules(), true);
-        }
-
-        return true;
-    }
-
     public static function verificationModules(): array
     {
         return [
             'verification_requests',
+            'managed_services',
             'template_management',
             'template_publishing',
             'appointments',
+            'patients',
+            'patient_insurance_policies',
+            'insurance_directory',
+            'patient_documents',
             'portal_credentials',
             'calling',
-        ];
-    }
-
-    public static function clinicPmsModules(): array
-    {
-        return [
-            'patients',
-            'appointments',
-            'encounters',
-            'treatment_plans',
-            'clinic_services',
-            'dental_chart_entries',
-            'perio_charts',
-            'patient_documents',
-            'patient_insurance_policies',
-            'patient_ledger_entries',
-            'patient_insurance_claims',
-            'patient_statements',
-            'clinic_operatories',
-            'patient_consent_forms',
         ];
     }
 

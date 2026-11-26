@@ -15,9 +15,9 @@
 
         .dso-hero,
         .dso-card {
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 24px;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+            background: linear-gradient(135deg, var(--pd-card) 0%, var(--pd-bg) 100%);
             box-shadow: 0 18px 42px rgba(15, 23, 42, 0.06);
         }
 
@@ -35,9 +35,9 @@
             width: fit-content;
             padding: 8px 14px;
             border-radius: 999px;
-            border: 1px solid #bfdbfe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.12em;
@@ -46,7 +46,7 @@
 
         .dso-title {
             margin: 14px 0 8px;
-            color: #020617;
+            color: var(--pd-text);
             font-size: clamp(30px, 3vw, 44px);
             line-height: 1;
             font-weight: 900;
@@ -55,21 +55,21 @@
 
         .dso-copy {
             max-width: 780px;
-            color: #52637a;
+            color: var(--pwdl-text-secondary);
             font-size: 16px;
             line-height: 1.7;
         }
 
         .dso-health {
             min-width: 260px;
-            border: 1px solid #bbf7d0;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 22px;
-            background: #f0fdf4;
+            background: var(--pwdl-status-success-soft);
             padding: 18px;
         }
 
         .dso-health__label {
-            color: #047857;
+            color: var(--pwdl-status-success-text);
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.14em;
@@ -78,7 +78,7 @@
 
         .dso-health__value {
             margin-top: 8px;
-            color: #064e3b;
+            color: var(--pwdl-status-success-text);
             font-size: 28px;
             font-weight: 900;
         }
@@ -90,15 +90,15 @@
         }
 
         .dso-stat {
-            border: 1px solid var(--dso-border, #dbe4ee);
+            border: 1px solid var(--dso-border, var(--pd-border));
             border-radius: 22px;
-            background: var(--dso-bg, #ffffff);
+            background: var(--dso-bg, var(--pd-card));
             padding: 20px;
             min-height: 142px;
         }
 
         .dso-stat__label {
-            color: var(--dso-accent, #64748b);
+            color: var(--dso-accent, var(--pd-muted));
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.12em;
@@ -107,7 +107,7 @@
 
         .dso-stat__value {
             margin-top: 12px;
-            color: #020617;
+            color: var(--pd-text);
             font-size: 38px;
             line-height: 1;
             font-weight: 900;
@@ -115,7 +115,7 @@
 
         .dso-stat__hint {
             margin-top: 12px;
-            color: #64748b;
+            color: var(--pd-muted);
             font-size: 13px;
             line-height: 1.5;
         }
@@ -132,12 +132,12 @@
             gap: 16px;
             align-items: center;
             padding: 20px 24px;
-            border-bottom: 1px solid #edf2f7;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
         }
 
         .dso-card__title {
             margin: 0;
-            color: #0f172a;
+            color: var(--pd-text);
             font-size: 22px;
             font-weight: 900;
             letter-spacing: -0.03em;
@@ -154,8 +154,8 @@
         }
 
         .dso-table th {
-            background: #f8fafc;
-            color: #64748b;
+            background: var(--pd-bg);
+            color: var(--pd-muted);
             font-size: 12px;
             font-weight: 850;
             letter-spacing: 0.12em;
@@ -165,21 +165,21 @@
         }
 
         .dso-table td {
-            border-top: 1px solid #edf2f7;
-            color: #334155;
+            border-top: 1px solid var(--pwdl-border-subtle);
+            color: var(--pwdl-text-secondary);
             font-size: 14px;
             padding: 16px 18px;
             vertical-align: top;
         }
 
         .dso-name {
-            color: #0f172a;
+            color: var(--pd-text);
             font-weight: 850;
         }
 
         .dso-muted {
             margin-top: 4px;
-            color: #64748b;
+            color: var(--pd-muted);
             font-size: 13px;
         }
 
@@ -188,16 +188,16 @@
             align-items: center;
             padding: 6px 10px;
             border-radius: 999px;
-            border: 1px solid #dbeafe;
-            background: #eff6ff;
-            color: #1d4ed8;
+            border: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
             font-size: 12px;
             font-weight: 800;
         }
 
         .dso-empty {
             padding: 36px 24px;
-            color: #64748b;
+            color: var(--pd-muted);
             text-align: center;
         }
 
@@ -234,22 +234,22 @@
         </section>
 
         <section class="dso-stats">
-            <div class="dso-stat" style="--dso-bg:#ffffff; --dso-border:#dbe4ee; --dso-accent:#475569;">
+            <div class="dso-stat" style="--dso-bg:var(--pd-card); --dso-border:var(--pd-border); --dso-accent:var(--pwdl-text-secondary);">
                 <div class="dso-stat__label">Organizations</div>
                 <div class="dso-stat__value">{{ $stats['organizations'] }}</div>
                 <div class="dso-stat__hint">Practice groups linked to this DSO.</div>
             </div>
-            <div class="dso-stat" style="--dso-bg:#eff6ff; --dso-border:#bfdbfe; --dso-accent:#1d4ed8;">
+            <div class="dso-stat" style="--dso-bg:var(--pwdl-status-info-soft); --dso-border:var(--pwdl-border-subtle); --dso-accent:var(--pwdl-status-info-text);">
                 <div class="dso-stat__label">Clinics</div>
                 <div class="dso-stat__value">{{ $stats['clinics'] }}</div>
                 <div class="dso-stat__hint">{{ $stats['pms_clinics'] }} clinic operations, {{ $stats['verification_clinics'] }} verification enabled.</div>
             </div>
-            <div class="dso-stat" style="--dso-bg:#fff7ed; --dso-border:#fed7aa; --dso-accent:#c2410c;">
+            <div class="dso-stat" style="--dso-bg:var(--pwdl-status-warning-soft); --dso-border:var(--pwdl-border-subtle); --dso-accent:var(--pwdl-status-warning-text);">
                 <div class="dso-stat__label">Open Verifications</div>
                 <div class="dso-stat__value">{{ $stats['open_verifications'] }}</div>
                 <div class="dso-stat__hint">{{ $stats['waiting_on_clinic'] }} waiting on clinic response.</div>
             </div>
-            <div class="dso-stat" style="--dso-bg:#f0fdf4; --dso-border:#bbf7d0; --dso-accent:#047857;">
+            <div class="dso-stat" style="--dso-bg:var(--pwdl-status-success-soft); --dso-border:var(--pwdl-border-subtle); --dso-accent:var(--pwdl-status-success-text);">
                 <div class="dso-stat__label">This Month</div>
                 <div class="dso-stat__value">{{ $stats['appointments_mtd'] }}</div>
                 <div class="dso-stat__hint">{{ $stats['completed_mtd'] }} verifications completed this month.</div>

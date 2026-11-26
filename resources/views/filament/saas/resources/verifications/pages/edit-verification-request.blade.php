@@ -1,33 +1,31 @@
 <x-filament-panels::page>
     @if ($showTemplateRefresh)
-        <div x-data x-trap.inert.noscroll="true" x-on:keydown.escape.stop="$wire.set('showTemplateRefresh', false)" role="dialog" aria-modal="true" aria-label="Review template refresh" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;">
-            <div style="background:#fff;color:#17212b;border-radius:8px;padding:24px;width:640px;max-width:100%;max-height:85vh;overflow:auto;">
-                <h2 style="font-size:18px;font-weight:700;">Refresh Template</h2>
-                @error('templateRefresh') <p role="alert" style="color:#b91c1c;">{{ $message }}</p> @enderror
-                @if ($templateRefreshReview === [])
-                    <p style="margin:16px 0;">Save current edits before reviewing the replacement, or discard them and use the last saved answers. Cancel keeps your current form.</p>
-                    <x-filament::button wire:click="prepareTemplateRefresh('save')" wire:loading.attr="disabled">Save &amp; Continue</x-filament::button>
-                    <x-filament::button color="gray" wire:click="prepareTemplateRefresh('discard')" wire:loading.attr="disabled">Discard &amp; Continue</x-filament::button>
+        <x-pds.workflow-dialog labelled-by="request-template-refresh-title" dismiss="$wire.set('showTemplateRefresh', false)" width="40rem" return-focus="request-workbench-more" wire:key="request-template-refresh">
+            <h2 id="request-template-refresh-title" style="font-size:18px;font-weight:700;">Refresh Template</h2>
+            @error('templateRefresh') <p role="alert" style="color: #b91c1c;">{{ $message }}</p> @enderror
+            @if ($templateRefreshReview === [])
+                <p style="margin:16px 0;">Save current edits before reviewing the replacement, or discard them and use the last saved answers. Cancel keeps your current form.</p>
+                <x-filament::button wire:click="prepareTemplateRefresh('save')" wire:loading.attr="disabled">Save &amp; Continue</x-filament::button>
+                <x-filament::button color="gray" wire:click="prepareTemplateRefresh('discard')" wire:loading.attr="disabled">Discard &amp; Continue</x-filament::button>
+            @else
+                <p style="margin:16px 0;"><strong>{{ $templateRefreshReview['from'] }}</strong><br>Replace with: <strong>{{ $templateRefreshReview['to'] }}</strong></p>
+                <p>Compatible answers transfer. Removed answers remain in read-only submission history. Request status stays unchanged.</p>
+                <ul style="margin:16px 0;padding-left:20px;list-style:disc;">
+                    @forelse ($templateRefreshReview['changes'] as $change)
+                        <li>{{ $change }}</li>
+                    @empty
+                        <li>No questions added, removed, or renamed.</li>
+                    @endforelse
+                </ul>
+                @if ($templateRefreshReview['blocked'])
+                    <p style="color: #b91c1c;">Refresh blocked: these questions have changed answer definitions and need mapping review.</p>
+                    <ul>@foreach ($templateRefreshReview['blocked'] as $prompt)<li>{{ $prompt }}</li>@endforeach</ul>
                 @else
-                    <p style="margin:16px 0;"><strong>{{ $templateRefreshReview['from'] }}</strong><br>Replace with: <strong>{{ $templateRefreshReview['to'] }}</strong></p>
-                    <p>Compatible answers transfer. Removed answers remain in read-only submission history. Request status stays unchanged.</p>
-                    <ul style="margin:16px 0;padding-left:20px;list-style:disc;">
-                        @forelse ($templateRefreshReview['changes'] as $change)
-                            <li>{{ $change }}</li>
-                        @empty
-                            <li>No questions added, removed, or renamed.</li>
-                        @endforelse
-                    </ul>
-                    @if ($templateRefreshReview['blocked'])
-                        <p style="color:#b91c1c;">Refresh blocked: these questions have changed answer definitions and need mapping review.</p>
-                        <ul>@foreach ($templateRefreshReview['blocked'] as $prompt)<li>{{ $prompt }}</li>@endforeach</ul>
-                    @else
-                        <x-filament::button wire:click="confirmTemplateRefresh" wire:loading.attr="disabled">Confirm Refresh</x-filament::button>
-                    @endif
+                    <x-filament::button wire:click="confirmTemplateRefresh" wire:loading.attr="disabled">Confirm Refresh</x-filament::button>
                 @endif
-                <x-filament::button color="gray" wire:click="$set('showTemplateRefresh', false)">Cancel</x-filament::button>
-            </div>
-        </div>
+            @endif
+            <x-filament::button color="gray" wire:click="$set('showTemplateRefresh', false)" autofocus>Cancel</x-filament::button>
+        </x-pds.workflow-dialog>
     @endif
     @php
         $record = $this->getRecord();
@@ -105,8 +103,6 @@
             'frequency_major' => $this->getDynamicQuestionsForSection('frequency_major'),
             'frequency_orthodontics_benefit' => $this->getDynamicQuestionsForSection('frequency_orthodontics_benefit'),
         ];
-        $canViewSubmissionSnapshots = $this->canViewSubmissionSnapshots();
-        $selectedSubmissionSnapshot = $this->selectedSubmissionSnapshot;
         $correctionFocus = $this->getCorrectionFocus();
         $actionToneStyles = [
             'primary' => 'border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8;',
@@ -168,13 +164,13 @@
             default => 'Save progress',
         };
         $latestActivity = $activityTimeline->first();
-        $templateVersionRecord = $record->verificationTemplateVersion;
+        $templateVersionRecord = $this->getReviewTemplateVersion();
         $templateSnapshotVersion = data_get($record->verification_template_snapshot, 'version', []);
         $templateVersionNumber = data_get($templateSnapshotVersion, 'version_number') ?? $templateVersionRecord?->version_number;
         $templateScope = data_get($templateSnapshotVersion, 'scope') ?? $templateVersionRecord?->scope;
         $templateName = data_get($templateSnapshotVersion, 'name') ?? $templateVersionRecord?->name;
         $templateFormType = data_get($templateSnapshotVersion, 'form_type') ?? $templateVersionRecord?->form_type;
-        $templateFormTypeLabel = \App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS[$templateFormType] ?? 'Full + Short';
+        $templateFormTypeLabel = \App\Models\VerificationTemplateVersion::FORM_TYPE_OPTIONS[$templateFormType] ?? null;
         $templateChipLabel = trim(collect([
             $templateScope ? str($templateScope)->headline()->toString() : null,
             $templateVersionNumber ? 'v' . $templateVersionNumber : null,
@@ -284,7 +280,7 @@
                         Save
                     </button>
                 <div x-data="{ open: false }" style="position:relative;">
-                    <button type="button" x-on:click="open = ! open" style="display:inline-flex;align-items:center;justify-content:center;min-width:74px;height:40px;border-radius:12px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:12px;font-weight:900;cursor:pointer;">More</button>
+                    <button id="request-workbench-more" type="button" x-on:click="open = ! open" style="display:inline-flex;align-items:center;justify-content:center;min-width:74px;height:40px;border-radius:12px;border:1px solid #dbe4ee;background:#ffffff;color:#334155;font-size:12px;font-weight:900;cursor:pointer;">More</button>
                     <div x-show="open" x-transition x-on:click.outside="open = false" style="position:absolute;right:0;top:46px;z-index:40;display:grid;gap:6px;min-width:190px;padding:8px;border:1px solid #dbe4ee;border-radius:14px;background:#ffffff;box-shadow:0 16px 34px rgba(15,23,42,0.14);">
                         @if ($this->auditReady)
                             <button type="button" x-on:click="open = false" wire:click="auditVerification" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:6px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
@@ -292,7 +288,7 @@
                             </button>
                         @endif
                         @if ($canRequestClinicInfo)
-                            <button type="button" x-on:click="open = false" wire:click="openInfoRequestModal" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
+                            <button type="button" x-on:click="open = false; $wire.openInfoRequestModal()" style="display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:10px;border:1px solid #fed7aa;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:850;cursor:pointer;text-align:left;">
                                 Request Clinic Info
                             </button>
                         @endif
@@ -1174,7 +1170,7 @@
             <section class="vt3-status-rail" aria-label="Verification request summary">
                 <span class="vt3-status-chip vt3-status-chip--primary">Status <strong>{{ $requestStatusLabel }}</strong></span>
                 <span class="vt3-status-chip">Next <strong>{{ $requestNextAction }}</strong></span>
-                <span class="vt3-status-chip" title="{{ $templateName ?: 'Template snapshot' }}">Template <strong>{{ $templateChipLabel ?: 'Attached' }}</strong></span>
+                <span class="vt3-status-chip" title="{{ $templateName ?: 'Template snapshot' }}">Template <strong>{{ $templateChipLabel ?: 'Setup required' }}</strong></span>
                 <span class="vt3-status-chip">SLA <strong>{{ $slaSnapshot['label'] ?? 'Not Set' }}</strong></span>
                 <span class="vt3-status-chip">Activity <strong>{{ $activityTimeline->count() }}</strong></span>
             </section>
@@ -1191,12 +1187,22 @@
 
         <form wire:submit="save">
             <section class="vt3-form-stage" style="display: flex; flex-direction: column; gap: 18px;">
+                @include('filament.saas.resources.verifications.pages.partials.coverage-assessment')
+                @if (data_get($this->data, 'coverage_assessment.outcome') === 'inactive')
+                    <details class="coverage-assessment">
+                        <summary>Retained form answers (not assessed)</summary>
+                        <fieldset disabled style="border:0;padding:0;min-width:0">
+                            @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
+                        </fieldset>
+                    </details>
+                @else
                 @include('filament.saas.resources.verifications.pages.partials.verification-form-template-3')
+                @endif
             </section>
         </form>
 
         @unless ($this->focusMode)
-            <details class="vt3-operations-panel">
+            <details class="vt3-operations-panel" wire:ignore.self wire:key="workbench-request-activity">
                 <summary style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; cursor: pointer; list-style: none;">
                     <span>
                         <span style="display: block; font-size: 11px; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #0f766e;">Request Activity</span>
@@ -1230,253 +1236,100 @@
     </div>
 
     @if ($showInfoRequestField && $this->showInfoRequestModal)
-        <div id="info-request-modal" style="position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.62);">
-            <div style="width: min(720px, 100%); border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28); overflow: hidden;">
-                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
-                    <div>
-                        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">Clinic Information Needed</div>
-                        <h3 style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a;">Request Clinic Information</h3>
-                        <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Explain exactly what the clinic must provide. This moves the request to Waiting on Clinic and pauses SLA timing until they respond.
-                        </p>
-                    </div>
-                    <button type="button" wire:click="closeInfoRequestModal" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+        <x-pds.workflow-dialog id="info-request-modal" labelled-by="info-request-title" dismiss="$wire.closeInfoRequestModal()" return-focus="request-workbench-more" wire:key="workbench-info-request">
+            <div style="padding: 20px 22px; border-bottom: 1px solid  var(--pd-border); display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
+                <div>
+                    <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--pwdl-status-success-text);">Clinic Information Needed</div>
+                    <h3 id="info-request-title" style="margin: 0; font-size: 24px; font-weight: 800; color: var(--pd-text);">Request Clinic Information</h3>
+                    <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: var(--pd-muted);">
+                        Explain exactly what the clinic must provide. This moves the request to Waiting on Clinic and pauses SLA timing until they respond.
+                    </p>
                 </div>
-                <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
-                    <textarea
-                        wire:model.live="data.info_request_reason"
-                        placeholder="Example: Please upload the updated insurance card and confirm the subscriber date of birth before verification can continue."
-                        style="{{ $textareaStyle }} min-height: 150px;"
-                    ></textarea>
-                    <div style="font-size: 12px; line-height: 1.6; color: #64748b;">
-                        Use this when the clinic must provide missing information before verification can continue.
-                    </div>
-                    @error('data.info_request_reason')
-                        <div style="font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 12px;">
-                    <button type="button" wire:click="closeInfoRequestModal" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 13px; font-weight: 800; cursor: pointer;">
-                        Cancel
-                    </button>
-                    <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE }}')" wire:loading.attr="disabled" wire:target="saveAndTransition" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 180px; padding: 11px 16px; border-radius: 14px; border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; font-size: 13px; font-weight: 800; cursor: pointer;">
-                        <span wire:loading.remove wire:target="saveAndTransition">Send to Clinic</span>
-                        <span wire:loading.inline-flex wire:target="saveAndTransition" style="display: none; align-items: center; gap: 8px;">
-                            <span style="width: 14px; height: 14px; border-radius: 999px; border: 2px solid #bfdbfe; border-top-color: #1d4ed8; animation: pd-spin 0.8s linear infinite;"></span>
-                            Sending...
-                        </span>
-                    </button>
-                </div>
+                <button type="button" wire:click="closeInfoRequestModal" aria-label="Close information request" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); font-size: 20px; cursor: pointer;">&times;</button>
             </div>
-        </div>
+            <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+                <textarea
+                    id="workbench-info-reason" wire:model.live="data.info_request_reason" aria-label="Information needed from the clinic" autofocus @error('data.info_request_reason') aria-invalid="true" aria-describedby="workbench-info-reason-error" @enderror
+                    placeholder="Example: Please upload the updated insurance card and confirm the subscriber date of birth before verification can continue."
+                    style="{{ $textareaStyle }} min-height: 150px;"
+                ></textarea>
+                <div style="font-size: 12px; line-height: 1.6; color: var(--pd-muted);">
+                    Use this when the clinic must provide missing information before verification can continue.
+                </div>
+                @error('data.info_request_reason')
+                    <div id="workbench-info-reason-error" role="alert" x-data x-init="$nextTick(() => document.getElementById('workbench-info-reason')?.focus())" style="font-size: 12px; font-weight: 700; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                @enderror
+            </div>
+            <div data-dialog-actions style="padding: 18px 22px; border-top: 1px solid  var(--pd-border); display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" wire:click="closeInfoRequestModal" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_AWAITING_CLINIC_RESPONSE }}')" wire:loading.attr="disabled" wire:target="saveAndTransition" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 180px; padding: 11px 16px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pwdl-status-info-soft); color: var(--pwdl-status-info-text); font-size: 13px; font-weight: 800; cursor: pointer;">
+                    <span wire:loading.remove wire:target="saveAndTransition">Send to Clinic</span>
+                    <span wire:loading.inline-flex wire:target="saveAndTransition" style="display: none; align-items: center; gap: 8px;">
+                        <span style="width: 14px; height: 14px; border-radius: 999px; border: 2px solid  var(--pd-border); border-top-color: #1d4ed8; animation: pd-spin 0.8s linear infinite;"></span>
+                        Sending...
+                    </span>
+                </button>
+            </div>
+        </x-pds.workflow-dialog>
     @endif
 
     @if ($showReworkReasonField || $canReturnForRework)
-        <div id="rework-reason-modal" style="position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.62);">
-            <div style="width: min(720px, 100%); border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28); overflow: hidden;">
-                <div style="padding: 20px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
-                    <div>
-                        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #10b981;">Audit Review</div>
-                        <h3 style="margin: 0; font-size: 24px; font-weight: 800; color: #0f172a;">Return for Correction</h3>
-                        <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Describe the correction or quality issue before sending this request back to the specialist.
-                        </p>
-                    </div>
-                    <button type="button" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
-                </div>
-                <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
-                    <textarea
-                        wire:model.live="data.return_reason"
-                        placeholder="Example: Coverage percentage was applied to the wrong service category and needs to be corrected before closure."
-                        style="{{ $textareaStyle }} min-height: 150px;"
-                    ></textarea>
-                    <div style="font-size: 12px; line-height: 1.6; color: #64748b;">
-                        Use this when the request is being returned for correction or quality rework.
-                    </div>
-                    @error('data.return_reason')
-                        <div style="font-size: 12px; font-weight: 700; color: #be123c;">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div style="padding: 18px 22px; border-top: 1px solid #edf2f7; display: flex; justify-content: flex-end; gap: 12px;">
-                    <button type="button" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 13px; font-weight: 800; cursor: pointer;">
-                        Cancel
-                    </button>
-                    <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK }}')" onclick="closeWorkflowModal('rework-reason-modal')" style="display: inline-flex; align-items: center; justify-content: center; min-width: 172px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; font-size: 13px; font-weight: 800; cursor: pointer;">
-                        Return for Correction
-                    </button>
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <div id="reference-viewer-modal" style="position: fixed; inset: 0; z-index: 85; display: none; align-items: center; justify-content: center; padding: 28px; background: rgba(15, 23, 42, 0.68);">
-        <div style="position: relative; width: min(1080px, 100%); max-height: 88vh; border-radius: 24px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28); display: flex; flex-direction: column;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid #e2e8f0;">
+        <x-pds.workflow-dialog id="rework-reason-modal" labelled-by="rework-reason-title" :auto-open="false" wire:key="workbench-rework" x-on:close-workflow-modal.window="if ($event.detail.modalId === $el.id) $el.close()">
+            <div style="padding: 20px 22px; border-bottom: 1px solid  var(--pd-border); display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;">
                 <div>
-                    <div id="reference-viewer-label" style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Reference</div>
-                    <div id="reference-viewer-name" style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: #0f172a;">Document</div>
+                    <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--pwdl-status-success-text);">Audit Review</div>
+                    <h3 id="rework-reason-title" style="margin: 0; font-size: 24px; font-weight: 800; color: var(--pd-text);">Return for Correction</h3>
+                    <p style="margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: var(--pd-muted);">
+                        Describe the correction or quality issue before sending this request back to the specialist.
+                    </p>
                 </div>
-                <button type="button" onclick="closeReferenceViewerModal()" style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+                <button type="button" x-on:click="$el.closest('dialog').close()" aria-label="Close correction dialog" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); font-size: 20px; cursor: pointer;">&times;</button>
             </div>
-            <div style="padding: 16px 22px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #f8fafc;">
-                <div id="reference-viewer-description" style="font-size: 13px; line-height: 1.7; color: #64748b;">Review the saved document without leaving the verification workflow.</div>
-                <a id="reference-viewer-link" href="#" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: #ffffff; color: #4338ca; font-size: 12px; font-weight: 800; text-decoration: none;">
-                    Open in new tab
-                </a>
-            </div>
-            <div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">
-                <iframe id="reference-viewer-frame" src="about:blank" title="Reference Viewer" style="width: 100%; height: 68vh; border: 0; background: #ffffff;"></iframe>
-            </div>
-        </div>
-    </div>
-
-    @if ($showSubmissionSnapshotModal && filled($selectedSubmissionSnapshot))
-        <div style="position: fixed; inset: 0; z-index: 90; background: rgba(15, 23, 42, 0.56); display: flex; align-items: center; justify-content: center; padding: 28px;">
-            <div style="width: min(1080px, 100%); max-height: 88vh; overflow: auto; border-radius: 28px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28);">
-                <div style="padding: 22px 24px; border-bottom: 1px solid #edf2f7; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
-                    <div>
-                        <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #4f46e5;">Form Submission Snapshot</div>
-                        <h3 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 700; color: #0f172a;">Saved Verification Payload</h3>
-                        <p style="margin: 12px 0 0; font-size: 14px; line-height: 1.7; color: #64748b;">
-                            Review the exact form data that was saved at this point in the workflow, including the request status, verification profile, and captured answers.
-                        </p>
-                    </div>
-                    <button type="button" wire:click="closeSubmissionSnapshot" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #334155; font-size: 20px; cursor: pointer;">&times;</button>
+            <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;">
+                <textarea
+                    id="workbench-correction-reason" wire:model.live="data.return_reason" aria-label="Correction needed" autofocus @error('data.return_reason') aria-invalid="true" aria-describedby="workbench-correction-reason-error" @enderror
+                    placeholder="Example: Coverage percentage was applied to the wrong service category and needs to be corrected before closure."
+                    style="{{ $textareaStyle }} min-height: 150px;"
+                ></textarea>
+                <div style="font-size: 12px; line-height: 1.6; color: var(--pd-muted);">
+                    Use this when the request is being returned for correction or quality rework.
                 </div>
-                    </button>
-                </div>
-
-                <div style="padding: 22px 24px; display: flex; flex-direction: column; gap: 20px;">
-                    <section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
-                        @foreach ([
-                            'Version' => filled($selectedSubmissionSnapshot['headline']['version'] ?? null) ? 'v' . $selectedSubmissionSnapshot['headline']['version'] : '-',
-                            'Submitted At' => $selectedSubmissionSnapshot['headline']['submitted_at'] ?? '-',
-                            'Submitted By' => $selectedSubmissionSnapshot['headline']['submitted_by'] ?? '-',
-                            'Source Panel' => $selectedSubmissionSnapshot['headline']['panel'] ?? '-',
-                            'Status' => $selectedSubmissionSnapshot['headline']['status'] ?? '-',
-                            'Outcome' => $selectedSubmissionSnapshot['headline']['outcome'] ?? '-',
-                            'Priority' => $selectedSubmissionSnapshot['headline']['priority'] ?? '-',
-                        ] as $label => $value)
-                            <div style="border: 1px solid #e5e7eb; border-radius: 18px; background: #f8fafc; padding: 14px 16px;">
-                                <div style="margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #6b7280;">{{ $label }}</div>
-                                <div style="font-size: 14px; font-weight: 700; color: #111827; line-height: 1.6;">{{ $value }}</div>
-                            </div>
-                        @endforeach
-                    </section>
-
-                    <section style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; overflow: hidden;">
-                        <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                            <h4 style="margin: 0; font-size: 17px; font-weight: 700; color: #111827;">Changes From Previous Submission</h4>
-                            <span style="font-size: 12px; font-weight: 700; color: #64748b;">{{ count($selectedSubmissionSnapshot['changes'] ?? []) }} differences</span>
-                        </div>
-                        <div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-                            @forelse ($selectedSubmissionSnapshot['changes'] ?? [] as $change)
-                                <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 14px;">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
-                                        <div style="font-size: 13px; font-weight: 700; color: #111827;">{{ $change['label'] }}</div>
-                                        <span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">
-                                            {{ $change['group'] ?? 'Verification Audit' }}
-                                        </span>
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
-                                        <div style="border: 1px solid #fecdd3; border-radius: 14px; background: #fff1f2; padding: 12px;">
-                                            <div style="margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #be123c;">Previous</div>
-                                            <div style="font-size: 13px; line-height: 1.65; color: #334155; white-space: pre-line;">{{ $change['before'] }}</div>
-                                        </div>
-                                        <div style="border: 1px solid #bbf7d0; border-radius: 14px; background: #ecfdf5; padding: 12px;">
-                                            <div style="margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #15803d;">Current</div>
-                                            <div style="font-size: 13px; line-height: 1.65; color: #334155; white-space: pre-line;">{{ $change['after'] }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            @empty
-                                <div style="font-size: 13px; color: #64748b;">This is the first saved submission for this request, so there is no previous version to compare.</div>
-                            @endforelse
-                        </div>
-                    </section>
-
-                    @foreach ([
-                        'Submission Summary' => $selectedSubmissionSnapshot['summary'] ?? [],
-                        'Queue Snapshot' => $selectedSubmissionSnapshot['work_item'] ?? [],
-                        'Verification Profile' => $selectedSubmissionSnapshot['verification_profile'] ?? [],
-                    ] as $sectionTitle => $rows)
-                        <section style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; overflow: hidden;">
-                            <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7;">
-                                <h4 style="margin: 0; font-size: 17px; font-weight: 700; color: #111827;">{{ $sectionTitle }}</h4>
-                            </div>
-                            <div style="padding: 16px 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px;">
-                                @forelse ($rows as $row)
-                                    <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 12px 14px;">
-                                        <div style="margin-bottom: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #6b7280;">{{ $row['label'] }}</div>
-                                        <div style="font-size: 13px; line-height: 1.65; color: #334155; white-space: pre-line;">{{ $row['value'] }}</div>
-                                    </div>
-                                @empty
-                                    <div style="grid-column: 1 / -1; font-size: 13px; color: #64748b;">No saved values were captured for this section.</div>
-                                @endforelse
-                            </div>
-                        </section>
-                    @endforeach
-
-                    <section style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; overflow: hidden;">
-                        <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                            <h4 style="margin: 0; font-size: 17px; font-weight: 700; color: #111827;">Captured Answers</h4>
-                            <span style="font-size: 12px; font-weight: 700; color: #64748b;">{{ count($selectedSubmissionSnapshot['answers'] ?? []) }} saved</span>
-                        </div>
-                        <div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;">
-                            @forelse ($selectedSubmissionSnapshot['answers'] ?? [] as $answer)
-                                <div style="border: 1px solid #e5e7eb; border-radius: 16px; background: #f8fafc; padding: 14px;">
-                                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
-                                        <div style="font-size: 14px; font-weight: 700; color: #111827;">{{ $answer['prompt'] }}</div>
-                                        <span style="display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;">
-                                            {{ $answer['code'] }}
-                                        </span>
-                                    </div>
-                                    <div style="font-size: 13px; line-height: 1.7; color: #334155; white-space: pre-line;">{{ $answer['value'] }}</div>
-                                </div>
-                            @empty
-                                <div style="font-size: 13px; color: #64748b;">No dynamic answers were stored for this submission.</div>
-                            @endforelse
-                        </div>
-                    </section>
-
-                    <section style="border: 1px solid #e5e7eb; border-radius: 22px; background: #ffffff; overflow: hidden;">
-                        <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7;">
-                            <h4 style="margin: 0; font-size: 17px; font-weight: 700; color: #111827;">Exact Payload</h4>
-                        </div>
-                        <div style="padding: 16px 18px;">
-                            <pre style="margin: 0; padding: 16px; border-radius: 18px; background: #0f172a; color: #e2e8f0; font-size: 12px; line-height: 1.7; overflow: auto; white-space: pre-wrap;">{{ $selectedSubmissionSnapshot['raw_payload'] ?? '{}' }}</pre>
-                        </div>
-                    </section>
-                </div>
+                @error('data.return_reason')
+                    <div id="workbench-correction-reason-error" role="alert" x-data x-init="$nextTick(() => document.getElementById('workbench-correction-reason')?.focus())" style="font-size: 12px; font-weight: 700; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                @enderror
             </div>
-        </div>
+            <div data-dialog-actions style="padding: 18px 22px; border-top: 1px solid  var(--pd-border); display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" x-on:click="$el.closest('dialog').close()" style="display: inline-flex; align-items: center; justify-content: center; min-width: 132px; padding: 11px 16px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="button" wire:click="saveAndTransition('{{ \App\Models\BillingWorkItem::STATUS_RETURNED_FOR_REWORK }}')" wire:loading.attr="disabled" wire:target="saveAndTransition" style="display: inline-flex; align-items: center; justify-content: center; min-width: 172px; padding: 11px 16px; border-radius: 14px; border: 1px solid #fecdd3; background: var(--pwdl-status-danger-soft); color: var(--pwdl-status-danger-text); font-size: 13px; font-weight: 800; cursor: pointer;">
+                    Return for Correction
+                </button>
+            </div>
+        </x-pds.workflow-dialog>
     @endif
 
+    <x-pds.workflow-dialog id="reference-viewer-modal" labelled-by="reference-viewer-name" :auto-open="false" width="68rem" wire:key="workbench-reference-viewer" x-on:click.self="$el.close()" x-on:workflow-dialog-closed="$el.querySelector('iframe').src = 'about:blank'">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px 22px; border-bottom: 1px solid  var(--pd-border);">
+            <div>
+                <div id="reference-viewer-label" style="font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--pd-muted);">Reference</div>
+                <h2 id="reference-viewer-name" style="margin-top: 6px; font-size: 18px; font-weight: 800; line-height: 1.4; color: var(--pd-text);">Document</h2>
+            </div>
+            <button type="button" x-on:click="$el.closest('dialog').close()" aria-label="Close reference preview" autofocus style="display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); font-size: 20px; cursor: pointer;">&times;</button>
+        </div>
+        <div style="padding: 16px 22px; border-bottom: 1px solid  var(--pd-border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--pwdl-surface-muted);">
+            <div id="reference-viewer-description" style="font-size: 13px; line-height: 1.7; color: var(--pd-muted);">Review the saved document without leaving the verification workflow.</div>
+            <a id="reference-viewer-link" href="#" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #c7d2fe; background: var(--pd-card); color: var(--pwdl-status-info-text); font-size: 12px; font-weight: 800; text-decoration: none;">
+                Open in new tab
+            </a>
+        </div>
+        <div style="flex: 1 1 auto; min-height: 68vh; background: #0f172a;">
+            <iframe id="reference-viewer-frame" tabindex="-1" src="about:blank" title="Reference Viewer" style="width: 100%; height: 68vh; border: 0; background: var(--pd-card);"></iframe>
+        </div>
+    </x-pds.workflow-dialog>
     <script>
-        function openWorkflowModal(modalId) {
-            const modal = document.getElementById(modalId);
-
-            if (!modal) return;
-
-            modal.style.display = 'flex';
-        }
-
-        function closeWorkflowModal(modalId) {
-            const modal = document.getElementById(modalId);
-
-            if (!modal) return;
-
-            modal.style.display = 'none';
-        }
-
-        document.addEventListener('close-workflow-modal', function (event) {
-            const modalId = event.detail?.modalId;
-
-            if (!modalId) return;
-
-            closeWorkflowModal(modalId);
-        });
-
         function openReferenceViewerModal(payload) {
             const modal = document.getElementById('reference-viewer-modal');
             const frame = document.getElementById('reference-viewer-frame');
@@ -1492,26 +1345,8 @@
             name.textContent = payload.name || 'Document';
             label.textContent = payload.label || 'Reference';
             description.textContent = payload.description || 'Review the saved document without leaving the verification workflow.';
-            modal.style.display = 'flex';
+            modal.dispatchEvent(new Event('open-workflow-dialog'));
         }
-
-        function closeReferenceViewerModal() {
-            const modal = document.getElementById('reference-viewer-modal');
-            const frame = document.getElementById('reference-viewer-frame');
-
-            if (!modal || !frame) return;
-
-            modal.style.display = 'none';
-            frame.src = 'about:blank';
-        }
-
-        document.addEventListener('click', function (event) {
-            const referenceModal = document.getElementById('reference-viewer-modal');
-
-            if (referenceModal && event.target === referenceModal) {
-                closeReferenceViewerModal();
-            }
-        });
 
         async function copyVerificationQuickReference(text, button) {
             if (!text) return;
@@ -1528,13 +1363,6 @@
             }, 1200);
         }
 
-        document.addEventListener('keydown', function (event) {
-            const referenceModal = document.getElementById('reference-viewer-modal');
-
-            if (event.key === 'Escape' && referenceModal && referenceModal.style.display === 'flex') {
-                closeReferenceViewerModal();
-            }
-        });
     </script>
     <x-filament::modal id="raise-urgent-request" width="md">
         <x-slot name="heading">Raise urgent request</x-slot>

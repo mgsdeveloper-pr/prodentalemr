@@ -12,21 +12,21 @@ use Illuminate\Validation\ValidationException;
 
 class ClinicTemplateBuilder
 {
-    public function editable(int $id): Version
+    public function editable(int $id, ?int $clinicId = null): Version
     {
         $version = Version::query()->where('scope', 'clinic')
-            ->where('clinic_id', ClinicPanelScope::selectedClinicId())->lockForUpdate()->findOrFail($id);
-        abort_unless(auth()->user()?->canManageClinicTemplateSections($version->clinic), 403);
+            ->where('clinic_id', $clinicId ?? ClinicPanelScope::selectedClinicId())->lockForUpdate()->findOrFail($id);
+        abort_unless(auth()->user()?->can('manage', $version), 403);
         if (! $version->canEditDirectly()) {
             throw ValidationException::withMessages(['editor' => 'This version is protected. Create a named draft to change it.']);
         }
         return $version;
     }
 
-    public function save(int $versionId, ?int $id, array $input): Question
+    public function save(int $versionId, ?int $id, array $input, ?int $clinicId = null): Question
     {
-        return DB::transaction(function () use ($versionId, $id, $input) {
-            $version = $this->editable($versionId);
+        return DB::transaction(function () use ($versionId, $id, $input, $clinicId) {
+            $version = $this->editable($versionId, $clinicId);
             $question = $id ? $version->questions()->findOrFail($id) : new Question;
             $data = Validator::make($input, [
                 'prompt' => 'required|string|max:1000', 'section_key' => 'required|string',
@@ -134,10 +134,13 @@ class ClinicTemplateBuilder
         });
     }
 
-    public function remove(int $versionId, array $ids, array $sectionKeys = []): void
+    public function remove(int $versionId, array $ids, array $sectionKeys = [], ?string $expectedRevision = null, ?int $clinicId = null): void
     {
-        DB::transaction(function () use ($versionId, $ids, $sectionKeys) {
-            $version = $this->editable($versionId);
+        DB::transaction(function () use ($versionId, $ids, $sectionKeys, $expectedRevision, $clinicId) {
+            $version = $this->editable($versionId, $clinicId);
+            if ($expectedRevision !== null) {
+                app(VerificationTemplateVersionService::class)->assertReviewedDraft($version, $expectedRevision, 'removal');
+            }
             if ($sectionKeys && $version->questions()->whereIn('section_key', $sectionKeys)->whereNotIn('id', $ids)->exists()) {
                 throw ValidationException::withMessages(['removal' => 'This section changed after review. Cancel and review the removal again.']);
             }

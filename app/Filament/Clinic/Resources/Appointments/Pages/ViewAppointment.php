@@ -29,12 +29,12 @@ class ViewAppointment extends ViewRecord
                 ->visible(fn (): bool => filled($this->record->verification_work_item_id))
                 ->url(fn (): string => $this->verificationUrl($this->record->verificationWorkItem)),
             Action::make('sendManagedVerification')
-                ->label('Send to Managed Service')
+                ->label('Send Full Form to Managed Service')
                 ->icon('heroicon-o-paper-airplane')
                 ->visible(fn (): bool => $this->canStartVerification(BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE))
                 ->action(fn () => $this->startVerification(BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE)),
             Action::make('startClinicVerification')
-                ->label('Start Verification')
+                ->label('Start Full Form Verification')
                 ->icon('heroicon-o-pencil-square')
                 ->visible(fn (): bool => $this->canStartVerification(BillingWorkItem::PROCESSING_MODE_SELF_MANAGED))
                 ->action(fn () => $this->startVerification(BillingWorkItem::PROCESSING_MODE_SELF_MANAGED)),

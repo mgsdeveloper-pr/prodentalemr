@@ -69,7 +69,7 @@ it('records account security alerts for the affected user', function () {
         $this->user,
         'password_reset',
         'Password changed',
-        'Your ProDental password was successfully changed.',
+        'Your Denentiq password was successfully changed.',
         'security.password-reset.test-user',
     );
 

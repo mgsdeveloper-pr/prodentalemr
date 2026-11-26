@@ -63,7 +63,7 @@ class IncompleteOnboarding extends TableWidget
                     ->sortable(),
             ])
             ->defaultSort('updated_at', 'desc')
-            ->recordUrl(fn (OnboardingDraft $record): string => app(ClientOnboardingService::class)->resumeUrl($record))
+            ->recordUrl(fn (OnboardingDraft $record): string => $record->entry_point === 'website' ? \App\Filament\Saas\Pages\WebsiteRegistrations::getUrl() : app(ClientOnboardingService::class)->resumeUrl($record))
             ->defaultKeySort(false)
             ->paginated(false)
             ->emptyStateHeading('No incomplete onboarding drafts')

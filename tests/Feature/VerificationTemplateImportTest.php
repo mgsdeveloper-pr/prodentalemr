@@ -141,6 +141,8 @@ it('opens publication review only after completeness checks and allows one subse
     $page->call('unmountAction')
         ->call('openTemplateSectionModal', 'custom_frequency')
         ->assertSet('showTemplateSectionModal', true)
+        ->assertSeeHtml('aria-label="Add Sub-section"')
+        ->assertSeeHtml('x-on:keydown.escape.stop.prevent="$wire.closeTemplateSectionModal()"')
         ->set('newTemplateSectionData.label', 'Review subsection')
         ->call('createSelectedTemplateSection')
         ->assertHasNoErrors()
@@ -440,11 +442,16 @@ it('requires a separate publishing grant even when editing is allowed', function
         $editor->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('saas.template_management.'.$action, 'web'));
     }
     $this->actingAs($editor);
-    expect($editor->canManageVerificationTemplateSections())->toBeTrue();
+    expect($editor->canManageVerificationTemplateSections())->toBeTrue()
+        ->and($editor->can('view', $draft))->toBeTrue()
+        ->and($editor->can('update', $draft))->toBeTrue()
+        ->and($editor->can('delete', $draft))->toBeTrue()
+        ->and($editor->can('publish', $draft))->toBeFalse();
     expect(fn () => app(VerificationTemplateVersionService::class)->publishDraft($draft))->toThrow(HttpException::class);
     foreach (['view', 'update'] as $action) {
         $editor->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('saas.template_publishing.'.$action, 'web'));
     }
+    expect($editor->can('publish', $draft))->toBeTrue();
     expect(app(VerificationTemplateVersionService::class)->publishDraft($draft)->status)->toBe('published');
 });
 
@@ -507,6 +514,7 @@ it('previews a csv without writes then creates only one unpublished draft', func
         ->and($published->fresh()->is_active)->toBeTrue()
         ->and($published->fresh()->questions()->count())->toBe(3);
     $draft = VerificationTemplateVersion::latest('id')->first();
+    $page->assertSee(route('filament.saas.resources.master-template.index', ['version' => $draft->id]));
     expect($draft->status)->toBe('draft')->and($draft->is_active)->toBeFalse()
         ->and($draft->form_type)->toBe('full_form')
         ->and($draft->questions()->count())->toBe(3);
@@ -518,6 +526,46 @@ it('registers the import routes and renders the master page', function () {
     expect(route('filament.admin.pages.import-verification-template'))->toContain('/verification/import-verification-template');
     expect(route('filament.clinic.pages.import-verification-template'))->toContain('/clinic/import-verification-template');
 });
+
+it('links Clinic and Managed Verification imports to the exact imported draft', function (string $panel, string $pageClass) {
+    $organization = Organization::create(['name' => 'Import Link QA', 'owner_name' => 'QA Owner', 'status' => true]);
+    $clinic = Clinic::create([
+        'organization_id' => $organization->id, 'clinic_name' => 'Import Link Clinic',
+        'clinic_code' => 'IMPORT-LINK', 'status' => true, 'verification_services_enabled' => true,
+        'verification_service_status' => 'active', 'service_status' => 'active',
+    ]);
+    $service = \App\Models\ManagedBillingService::create([
+        'name' => 'Import Link Verification', 'slug' => 'import-link', 'category' => 'verification', 'status' => true,
+    ]);
+    $clinic->serviceEnrollments()->create([
+        'organization_id' => $organization->id, 'managed_billing_service_id' => $service->id, 'status' => 'active',
+    ]);
+    session([AdminClinicScope::SESSION_KEY => $clinic->id, \App\Support\ClinicPanelScope::SESSION_KEY => $clinic->id]);
+    Filament::setCurrentPanel(Filament::getPanel($panel));
+    $csv = implode(',', VerificationTemplateImport::HEADERS)."\n";
+    foreach ($this->importer->sampleRows() as $row) {
+        $row[6] = 'short_form';
+        $csv .= implode(',', $row)."\n";
+    }
+    $page = Livewire::test($pageClass)
+        ->set('formType', 'short_form')->set('templateName', 'Imported Short Draft')
+        ->set('upload', UploadedFile::fake()->createWithContent('sample.csv', $csv))->call('preview')
+        ->set('mappings', ['custom', 'custom', 'custom'])->call('validateMappings')
+        ->set('confirmed', true)->call('importDraft')->assertHasNoErrors();
+    $draft = VerificationTemplateVersion::where('clinic_id', $clinic->id)->sole();
+    $builder = route('filament.clinic.resources.verification-questions.index', ['version' => $draft->id, 'form' => 'short_form']);
+    $link = $panel === 'clinic' ? $builder : route('clinic.clinic-scope', [
+        'clinic_id' => $clinic->id, 'template_version_id' => $draft->id,
+    ]);
+    $page->assertSee($link)->assertSee('Open Template Builder');
+    if ($panel === 'admin') {
+        $this->get($link)->assertRedirect($builder);
+    }
+    $this->get($builder)->assertOk()->assertSee('Imported Short Draft');
+})->with([
+    ['clinic', \App\Filament\Clinic\Pages\ImportVerificationTemplate::class],
+    ['admin', \App\Filament\Admin\Pages\ImportVerificationTemplate::class],
+]);
 
 it('requires approval and invalidates it after changing a mapping', function (string $type) {
     $csv = implode(',', VerificationTemplateImport::HEADERS)."\n"
@@ -584,4 +632,31 @@ it('blocks clinic switching and unauthorized cross clinic imports', function () 
     $staff->assignRole('clinic_admin');
     expect(fn () => $this->importer->createDraft($staff, $b, 'Forbidden', $this->rows))
         ->toThrow(HttpException::class);
+});
+
+it('deletes a custom SaaS question through the guarded editor action', function () {
+    $draft = $this->importer->createDraft($this->user, null, 'Question deletion review', [compoundImportRow()]);
+    $question = $draft->questions()->sole();
+
+    Livewire::test(\App\Filament\Saas\Resources\VerificationFormQuestions\Pages\EditVerificationFormQuestion::class, [
+        'record' => $question->getRouteKey(),
+    ])->callAction('delete')->assertHasNoActionErrors();
+
+    expect($question->fresh())->toBeNull();
+});
+
+it('rejects SaaS section and question mutations after publication', function () {
+    $draft = $this->importer->createDraft($this->user, null, 'Published content protection', [compoundImportRow()]);
+    $service = app(VerificationTemplateVersionService::class);
+    $question = $draft->questions()->sole();
+    $published = $service->publishDraft($draft);
+    $before = $service->snapshot($published);
+
+    expect(fn () => $service->addMasterDraftSection($published->id, 'Late section', null))
+        ->toThrow(ValidationException::class)
+        ->and(fn () => $service->toggleEmptyMasterDraftSection($published->id, $question->section_key))
+        ->toThrow(ValidationException::class)
+        ->and(fn () => $service->deleteMasterDraftQuestion($question))
+        ->toThrow(ValidationException::class)
+        ->and($service->snapshot($published->fresh()))->toBe($before);
 });

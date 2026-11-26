@@ -10,28 +10,36 @@
     </header>
 
     <x-danger-button
-        x-data=""
-        x-on:click.prevent="$dispatch('open-modal', 'confirm-user-deletion')"
+        id="open-account-deletion"
+        type="button"
+        x-data
+        x-on:click="$dispatch('open-account-deletion')"
     >{{ __('Delete Account') }}</x-danger-button>
 
-    <x-modal name="confirm-user-deletion" :show="$errors->userDeletion->isNotEmpty()" focusable>
+    <x-pds.workflow-dialog
+        labelled-by="account-deletion-title"
+        :auto-open="$errors->userDeletion->isNotEmpty()"
+        return-focus="open-account-deletion"
+        width="36rem"
+        x-on:open-account-deletion.window="open()"
+    >
         <form method="post" action="{{ route('profile.destroy') }}" class="p-6">
             @csrf
             @method('delete')
 
-            <h2 class="text-lg font-medium text-gray-900">
+            <h2 id="account-deletion-title" class="text-lg font-medium">
                 {{ __('Are you sure you want to delete your account?') }}
             </h2>
 
-            <p class="mt-1 text-sm text-gray-600">
+            <p class="mt-1 text-sm" style="color: var(--pwdl-text-secondary, #475569)">
                 {{ __('Once your account is deleted, all of its resources and data will be permanently deleted. Please enter your password to confirm you would like to permanently delete your account.') }}
             </p>
 
             <div class="mt-6">
-                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
+                <x-input-label for="account-deletion-password" value="{{ __('Password') }}" class="sr-only" />
 
                 <x-text-input
-                    id="password"
+                    id="account-deletion-password"
                     name="password"
                     type="password"
                     class="mt-1 block w-3/4"
@@ -42,7 +50,7 @@
             </div>
 
             <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
+                <x-secondary-button autofocus x-on:click="$el.closest('dialog').close()">
                     {{ __('Cancel') }}
                 </x-secondary-button>
 
@@ -51,5 +59,5 @@
                 </x-danger-button>
             </div>
         </form>
-    </x-modal>
+    </x-pds.workflow-dialog>
 </section>

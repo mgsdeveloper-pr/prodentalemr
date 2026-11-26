@@ -23,7 +23,7 @@
         <table class="grid">
             <tr>
                 <td style="width: 56%; padding-right: 16px;">
-                    <div style="font-size: 28px; font-weight: 700;">{{ $settings->platform_name ?: 'ProDental EMR' }}</div>
+                    <div style="font-size: 28px; font-weight: 700;">{{ $settings->brandName() }}</div>
                     <div class="muted" style="margin-top: 6px;">Patient Statement</div>
                     <div style="margin-top: 18px;">
                         <div class="section-title">Patient</div>

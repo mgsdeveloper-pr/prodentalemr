@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Verification\ArchiveClinicTemplateVersionAction;
 use App\Actions\Verification\CreateVerificationRequestAction;
 use App\Actions\Verification\EscalateVerificationRequestAction;
 use App\Actions\Verification\SaveVerificationAnswerAction;
 use App\Filament\Saas\Resources\Verifications\Pages\EditVerificationRequest;
 use App\Filament\Saas\Resources\Verifications\Tables\VerificationRequestsTable;
 use App\Filament\Saas\Resources\Verifications\VerificationRequestResource;
+use App\Models\AuditLog;
 use App\Models\BillingWorkItem;
 use App\Models\ClientServiceEnrollment;
 use App\Models\Clinic;
@@ -15,16 +17,23 @@ use App\Models\User;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
+use App\Services\Verification\CoverageAssessmentService;
 use App\Services\Verification\PDFService;
+use App\Services\Verification\QualityService;
+use App\Services\Verification\StatusService;
 use App\Services\Verification\VerificationAuditService;
+use App\Services\Verification\VerificationResultService;
 use App\Support\VerificationResultPdf;
 use App\Support\VerificationTemplateVersionService;
 use Barryvdh\DomPDF\PDF;
 use Database\Seeders\RoleSeeder;
 use Dompdf\Dompdf;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 
 beforeEach(function () {
     $this->seed(RoleSeeder::class);
@@ -52,7 +61,7 @@ beforeEach(function () {
     ]);
     $this->user->assignRole('verification_manager');
     foreach (['view', 'update'] as $action) {
-        $this->user->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('verification.template_publishing.'.$action, 'web'));
+        $this->user->givePermissionTo(Permission::findOrCreate('verification.template_publishing.'.$action, 'web'));
     }
     $this->user->verificationClinics()->attach($this->clinic->id);
 
@@ -83,6 +92,89 @@ beforeEach(function () {
     app(VerificationTemplateVersionService::class)->ensureMasterVersion();
 });
 
+it('validates coverage evidence without inventing a termination date or reference', function () {
+    $service = app(CoverageAssessmentService::class);
+    $data = ['outcome' => 'inactive', 'patient_name' => 'QA Patient', 'insurance_name' => 'QA Policy',
+        'member_id' => 'TEST-ONLY', 'service_date' => '2026-10-15', 'source' => 'Insurance phone call', 'reason' => 'Policy terminated before service.'];
+    expect($service->missing($data, '2026-10-15'))->toBe([])
+        ->and($service->missing($data, '2026-10-16'))->toHaveKey('coverage.service_date')
+        ->and($service->missing(array_replace($data, ['outcome' => 'unconfirmed'])))->toHaveKey('coverage.outcome')
+        ->and($service->missing(array_replace($data, ['reason' => ' '])))->toHaveKey('coverage.reason')
+        ->and($service->missing(array_replace($data, ['service_date' => 'not-a-date'])))->toHaveKey('coverage.service_date');
+});
+
+it('retains answers while inactive coverage bypasses benefits but not review', function (string $formType) {
+    $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $question = VerificationFormQuestion::create(['template_version_id' => $version->id, 'template_key' => 'template_3',
+        'section_key' => 'template_3_maximums_deductibles', 'prompt' => 'Annual maximum?', 'input_type' => 'text',
+        'form_type' => $formType, 'is_active' => true, 'is_builtin' => false, 'is_required_for_audit' => true]);
+    $assessment = ['outcome' => 'inactive', 'patient_name' => 'QA Patient', 'insurance_name' => 'QA Policy',
+        'member_id' => 'TEST-ONLY', 'service_date' => '2026-10-15', 'source' => 'Insurance phone call', 'reason' => 'Confirmed terminated.'];
+    $work = BillingWorkItem::create(['organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Coverage test', 'status' => 'in_progress', 'priority' => 'normal',
+        'verification_template_version_id' => $version->id, 'coverage_assessment' => $assessment]);
+    $work->verificationProfile()->create(['form_type' => $formType, 'appointment_date' => '2026-10-15']);
+    $audit = app(VerificationAuditService::class);
+    expect($audit->missingRequiredAnswers($work))->toBe([]);
+    expect(fn () => app(QualityService::class)->approve($work, $this->user))->toThrow(AuthorizationException::class);
+    $work->coverage_assessment = array_replace($assessment, ['outcome' => 'active']);
+    $work->save();
+    expect($audit->missingRequiredAnswers($work))->not->toBe([]);
+    $work->verificationFormAnswers()->create(['verification_form_question_id' => $question->id, 'answer_value' => '1500']);
+    $work->coverage_assessment = $assessment;
+    $work->save();
+    $work->formSubmissions()->create(['user_id' => $this->user->id, 'panel' => 'verification', 'status' => 'in_progress',
+        'version' => 1, 'payload' => ['work_item' => ['coverage_assessment' => $assessment], 'answers' => [['question_id' => $question->id, 'answer_value' => '1500']]]]);
+    $quality = app(QualityService::class);
+    $quality->submitForReview($work, $this->user);
+    $quality->approve($work->refresh(), $this->user);
+    expect($work->refresh()->status)->toBe('done')->and($work->outcome_status)->toBe('inactive_coverage')
+        ->and($work->verificationFormAnswers()->first()->answer_value)->toBe('1500');
+    $result = app(VerificationResultService::class)->summary($work);
+    expect($result['eligibility_status'])->toBe('Inactive Coverage')->and($result['annual_maximum'])->not->toContain('1500');
+    $snapshot = $work->formSubmissions()->where('status', 'done')->first();
+    expect(data_get($snapshot->payload, 'work_item.coverage_assessment.outcome'))->toBe('inactive');
+    $pdf = VerificationResultPdf::output($work);
+    expect($pdf)->toStartWith('%PDF');
+})->with(['full_form', 'short_form']);
+
+it('saves and reopens coverage evidence without completing the request or clearing answers', function () {
+    Filament::setCurrentPanel(Filament::getPanel('verification'));
+    $work = BillingWorkItem::create(['organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Coverage UI test', 'status' => 'pending', 'priority' => 'normal']);
+    app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $work = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($work);
+    $assessment = ['outcome' => 'inactive', 'patient_name' => 'QA Patient', 'insurance_name' => 'QA Policy',
+        'member_id' => 'TEST-ONLY', 'service_date' => '2026-10-15', 'source' => 'Payer portal', 'reason' => 'Confirmed terminated.'];
+    Livewire::test(EditVerificationRequest::class, ['record' => $work->getRouteKey()])
+        ->assertSet('data.coverage_assessment', [])
+        ->set('data.coverage_assessment', $assessment)
+        ->call('saveAsDraft')->assertHasNoErrors()
+        ->assertSee('Retained form answers (not assessed)')
+        ->assertSet('data.coverage_assessment.outcome', 'inactive');
+    expect($work->fresh()->status)->toBe('pending')->and($work->fresh()->coverage_assessment['reason'])->toBe('Confirmed terminated.');
+    Livewire::test(EditVerificationRequest::class, ['record' => $work->getRouteKey()])
+        ->assertSet('data.coverage_assessment.outcome', 'inactive')
+        ->set('data.coverage_assessment.outcome', 'active')
+        ->call('saveAsDraft')->assertHasNoErrors();
+    expect($work->fresh()->status)->toBe('pending')->and($work->fresh()->coverage_assessment['outcome'])->toBe('active');
+});
+
+it('blocks unconfirmed coverage and missing evidence at review and direct completion', function () {
+    $work = BillingWorkItem::create(['organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Coverage guard test', 'status' => 'review', 'priority' => 'normal',
+        'coverage_assessment' => ['outcome' => 'unconfirmed']]);
+    app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $work = app(VerificationTemplateVersionService::class)->attachSnapshotToWorkItem($work);
+    expect(fn () => app(StatusService::class)->transition($work, 'done'))->toThrow(ValidationException::class);
+    $work->update(['coverage_assessment' => ['outcome' => 'inactive']]);
+    expect(fn () => app(QualityService::class)->approve($work, $this->user))->toThrow(ValidationException::class);
+    expect($work->fresh()->status)->toBe('review');
+});
+
 it('keeps structured progress scoped to active visible questions in the selected form', function () {
     $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
     foreach (['progress_visible' => true, 'progress_hidden' => false] as $key => $active) {
@@ -101,8 +193,10 @@ it('keeps structured progress scoped to active visible questions in the selected
     VerificationFormQuestion::create(array_replace($base, ['form_type' => 'short_form']));
     VerificationFormQuestion::create(array_replace($base, ['is_active' => false]));
     VerificationFormQuestion::create(array_replace($base, ['section_key' => 'progress_hidden']));
-    $page = new class extends EditVerificationRequest {
-        public function configureProgress($version): void {
+    $page = new class extends EditVerificationRequest
+    {
+        public function configureProgress($version): void
+        {
             $this->record = new BillingWorkItem(['verification_template_version_id' => $version->id]);
             $this->data = ['vf_form_type' => 'full_form'];
         }
@@ -286,7 +380,7 @@ it('archives an inactive used template without changing its request snapshot or 
     $snapshot = $request->fresh()->getRawOriginal();
     $questionRows = $version->questions()->get()->toArray();
     $version->update(['is_active' => false, 'active_full_form' => false, 'active_short_form' => false]);
-    $archived = app(\App\Actions\Verification\ArchiveClinicTemplateVersionAction::class)
+    $archived = app(ArchiveClinicTemplateVersionAction::class)
         ->execute($this->user, $this->clinic, $version);
     expect($archived->status)->toBe('archived')->and($archived->deleted_at)->toBeNull()
         ->and($archived->canEditDirectly())->toBeFalse()->and($archived->canDeletePermanently())->toBeFalse()
@@ -295,8 +389,13 @@ it('archives an inactive used template without changing its request snapshot or 
         ->and($archived->questions()->get()->toArray())->toBe($questionRows);
     expect(fn () => $archived->forceDelete())->toThrow(ValidationException::class);
     expect(fn () => $versions->activatePublishedVersion($archived))->toThrow(ValidationException::class);
-    $log = \App\Models\AuditLog::where('module', 'verification_templates')->where('action', 'archive')->firstOrFail();
-    expect($log->user_id)->toBe($this->user->id)->and($log->created_at)->not->toBeNull();
+    $log = AuditLog::where('module', 'verification_templates')->where('action', 'archive')->firstOrFail();
+    expect($log->user_id)->toBe($this->user->id)
+        ->and($log->clinic_id)->toBe($this->clinic->id)
+        ->and($log->created_at)->not->toBeNull()
+        ->and(json_decode($log->old_values, true)['status'])->toBe('published')
+        ->and(json_decode($log->new_values, true)['status'])->toBe('archived')
+        ->and(json_decode($log->new_values, true)['template_version_id'])->toBe($version->id);
     $copy = $versions->createDraftFromPublished($archived);
     expect($copy->status)->toBe('draft')->and($copy->questions()->count())->toBe(count($questionRows));
 });
@@ -391,9 +490,11 @@ it('renders and counts custom sections from the request template version', funct
     ]);
 
     expect(data_get($page->getTemplateThreeCustomSections(), '0.completed'))->toBe(1);
-    $pdf = new class extends VerificationResultPdf {
-        public static function sections($request, $state) {
-            return static::buildSections($request, $state, true);
+    $pdf = new class extends VerificationResultPdf
+    {
+        public static function sections($request, $state)
+        {
+            return self::buildSections($request, $state, true);
         }
     };
     $sections = collect($pdf::sections($request->fresh(), ['vf_form_type' => 'full_form', 'custom_question_'.$question->id => 'Answered']));
@@ -891,8 +992,12 @@ it('does not default authorization or downgrade responses or infer them from zer
         expect(VerificationFormQuestion::defaultFrequencyResponseFields($mode))
             ->not->toContain('pre_auth_required', 'downgrade_applies', 'pre_auth_details', 'downgrade_to');
     }
-    $page = new class extends EditVerificationRequest {
-        public function normalizeForTest(array $rows): array { return $this->normalizeCodeCoverageRows($rows); }
+    $page = new class extends EditVerificationRequest
+    {
+        public function normalizeForTest(array $rows): array
+        {
+            return $this->normalizeCodeCoverageRows($rows);
+        }
     };
     foreach ([['coverage_percent' => 0], ['coverage_status' => 'Not Covered'], []] as $input) {
         $row = $page->normalizeForTest([['description' => 'Test benefit', ...$input]])[0];
@@ -929,9 +1034,11 @@ it('keeps different questions for the same procedure code in PDF output', functi
             'pre_auth_required' => 'No', 'downgrade_applies' => 'No',
         ]);
     }
-    $pdf = new class extends VerificationResultPdf {
-        public static function rows($request) {
-            return static::mapCoverageCodeRowsForSection($request, 'template_3_frequency_diagnostic_preventative');
+    $pdf = new class extends VerificationResultPdf
+    {
+        public static function rows($request)
+        {
+            return self::mapCoverageCodeRowsForSection($request, 'template_3_frequency_diagnostic_preventative');
         }
     };
     $rows = $pdf::rows($request->fresh());
@@ -1147,9 +1254,17 @@ it('counts configured frequency responses and conditional details accurately', f
 });
 
 it('preserves structured select values and formats hydrated dates for native controls', function () {
-    $page = new class extends EditVerificationRequest {
-        public function getInsuranceCarrierOptions(): array { return ['Carrier A' => 'Carrier A']; }
-        public function displayDates(array $data): array { return $this->normalizeVerificationDateFieldsForDisplay($data); }
+    $page = new class extends EditVerificationRequest
+    {
+        public function getInsuranceCarrierOptions(): array
+        {
+            return ['Carrier A' => 'Carrier A'];
+        }
+
+        public function displayDates(array $data): array
+        {
+            return $this->normalizeVerificationDateFieldsForDisplay($data);
+        }
     };
     $page->data = ['vf_insured_relation' => 'self', 'vf_insurance_provider_name' => 'Historical Carrier'];
     expect($page->managedAnswerOptions(['field' => 'vf_insured_relation', 'options' => ['Self', 'Dependent']]))
@@ -1444,4 +1559,91 @@ it('saves a full template draft in bulk without creating an audit submission', f
         ->and($queryCount)->toBeLessThan(30)
         ->and($coverageUpsert)->not->toBeNull()
         ->and(strtolower($coverageUpsert['query']))->toContain('public_id');
+});
+
+it('opens a legacy request and checks refresh availability without provisioning or attaching a snapshot', function (bool $configured) {
+    Filament::setCurrentPanel(Filament::getPanel('verification'));
+    if ($configured) {
+        $version = app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+        $version->update(['uses_section_layout' => true]);
+    }
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id, 'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id, 'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id, 'title' => 'Legacy request', 'status' => 'pending', 'priority' => 'normal',
+    ]);
+    $before = VerificationTemplateVersion::count();
+    $audit = app(VerificationAuditService::class);
+
+    Livewire::test(EditVerificationRequest::class, ['record' => $request->getRouteKey()])
+        ->assertOk()->call('usesSectionLayout')->assertReturned($configured);
+    expect($audit->templateVersionId($request))->toBe($version->id ?? 0)
+        ->and(array_key_exists('template', $audit->missingRequiredAnswers($request)))->toBe(! $configured)
+        ->and(VerificationTemplateVersion::count())->toBe($before)
+        ->and($request->fresh()->verification_template_version_id)->toBeNull()
+        ->and($request->fresh()->verification_template_snapshot)->toBeNull();
+
+    if (! $configured) {
+        expect(app(\App\Actions\Verification\RefreshVerificationTemplateAction::class)->canRefresh($request, $this->user))->toBeFalse();
+    }
+})->with(['missing active form' => [false], 'existing active form' => [true]]);
+
+it('enforces independent active template slots at the database boundary', function (string $scope, string $form) {
+    $source = $scope === 'master'
+        ? VerificationTemplateVersion::query()->where('scope', 'master')->where('active_'.$form, true)->firstOrFail()
+        : app(VerificationTemplateVersionService::class)->ensureClinicPublishedVersion($this->clinic);
+    $candidate = $source->replicate();
+    $candidate->forceFill([
+        'version_number' => $source->version_number + 1,
+        'is_active' => false,
+        'active_full_form' => false,
+        'active_short_form' => false,
+    ])->save();
+
+    expect(fn () => DB::table('verification_template_versions')->where('id', $candidate->id)
+        ->update(['active_'.$form => true]))->toThrow(\Illuminate\Database\UniqueConstraintViolationException::class);
+
+    expect($candidate->fresh()->{'active_'.$form})->toBeFalse()
+        ->and($source->fresh()->{'active_'.$form})->toBeTrue();
+})->with(['master', 'clinic'])->with(['full_form', 'short_form']);
+
+it('renders and preserves a historical clinic request that references a master snapshot', function () {
+    $versions = app(VerificationTemplateVersionService::class);
+    $master = VerificationTemplateVersion::query()->where('scope', 'master')->firstOrFail();
+    $question = VerificationFormQuestion::create([
+        'template_version_id' => $master->id,
+        'template_key' => VerificationFormQuestion::DEFAULT_TEMPLATE_KEY,
+        'section_key' => 'template_3_verification_information',
+        'prompt' => 'Historical master audit question',
+        'form_type' => 'both',
+        'input_type' => 'text',
+        'is_required_for_audit' => true,
+        'is_active' => true,
+    ]);
+    $request = BillingWorkItem::create([
+        'organization_id' => $this->organization->id,
+        'clinic_id' => $this->clinic->id,
+        'managed_billing_service_id' => $this->service->id,
+        'client_service_enrollment_id' => $this->enrollment->id,
+        'assigned_to' => $this->user->id,
+        'title' => 'Historical master snapshot QA',
+        'status' => 'pending',
+        'priority' => 'normal',
+        'verification_template_version_id' => $master->id,
+        'verification_template_snapshot' => $versions->snapshot($master),
+        'verification_template_snapshot_at' => now(),
+    ]);
+    $target = $versions->ensureClinicPublishedVersion($this->clinic);
+    $before = $request->fresh()->getRawOriginal();
+    $audit = app(VerificationAuditService::class);
+    $refresh = app(\App\Actions\Verification\RefreshVerificationTemplateAction::class);
+    $review = $refresh->review($request);
+
+    expect($review['to'])->toBe($target->name.' v'.$target->version_number)
+        ->and($review['pairs'][$question->id] ?? null)->not->toBeNull()
+        ->and($audit->templateVersionId($request))->toBe($master->id)
+        ->and($audit->applicableQuestions($request, $master->template_key, 'full_form', frequencyRows: false)->modelKeys())
+        ->toContain($question->id)
+        ->and(app(PDFService::class)->output($request))->toStartWith('%PDF-')
+        ->and($versions->attachSnapshotToWorkItem($request)->fresh()->getRawOriginal())->toBe($before);
 });

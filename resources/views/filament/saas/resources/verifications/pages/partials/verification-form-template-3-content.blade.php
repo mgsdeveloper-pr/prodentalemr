@@ -1579,6 +1579,7 @@
                 @include('filament.saas.resources.verifications.pages.partials.template-3-quick-reference-strip')
             @endif
 
+            @if (data_get($this->data, 'coverage_assessment.outcome') !== 'inactive')
             <details class="uel2-progress-disclosure">
                 <summary>
                     <span class="uel2-progress-disclosure__summary">Verification Progress</span>
@@ -1615,6 +1616,7 @@
                 </div>
             </details>
 
+            @endif
             <div class="uel2-layout">
                 <div class="uel2-content">
     <section class="uel2-section">
@@ -2314,70 +2316,63 @@
 @endif
 
 @if ($this->showAddInsuranceModal)
-    <div
-        style="position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.58);backdrop-filter:blur(4px);"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-insurance-title"
-    >
-        <div style="width:min(680px,100%);max-height:calc(100vh - 40px);overflow:auto;border:1px solid #dce8e3;border-radius:8px;background:#fff;box-shadow:0 20px 60px rgba(15,23,42,.24);">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid #e8efec;">
-                <div>
-                    <div style="margin-bottom:6px;color:#0b6b4f;font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Insurance Directory</div>
-                    <h3 id="add-insurance-title" style="margin:0;color:#0f172a;font-size:24px;font-weight:900;">Add Insurance</h3>
-                    <p style="margin:7px 0 0;color:#64748b;font-size:var(--pwdl-font-size-body,0.875rem);line-height:1.6;">Create the missing carrier and use it immediately in this verification.</p>
-                </div>
-                <button
-                    type="button"
-                    wire:click="closeAddInsuranceModal"
-                    aria-label="Close"
-                    style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid #dbe4ee;border-radius:999px;background:#fff;color:#475569;font-size:22px;cursor:pointer;"
-                >
-                    &times;
-                </button>
+    <x-pds.workflow-dialog labelled-by="add-insurance-title" dismiss="$wire.closeAddInsuranceModal()" wire:key="workbench-add-insurance" width="43rem">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid  var(--pd-border);">
+            <div>
+                <div style="margin-bottom:6px;color: var(--pwdl-status-success-text);font-size:11px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;">Insurance Directory</div>
+                <h3 id="add-insurance-title" style="margin:0;color: var(--pd-text);font-size:24px;font-weight:900;">Add Insurance</h3>
+                <p style="margin:7px 0 0;color: var(--pd-muted);font-size:var(--pwdl-font-size-body,0.875rem);line-height:1.6;">Create the missing carrier and use it immediately in this verification.</p>
             </div>
+            <button
+                type="button"
+                wire:click="closeAddInsuranceModal"
+                aria-label="Close"
+                style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid  var(--pd-border);border-radius:999px;background: var(--pd-card);color: var(--pwdl-text-secondary);font-size:22px;cursor:pointer;"
+            >
+                &times;
+            </button>
+        </div>
 
-            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:22px;">
-                <div class="uel2-field" style="grid-column:1/-1;">
-                    <label>Insurance Name</label>
-                    <input wire:model.blur="newInsuranceCarrier.insurance_name" placeholder="Enter insurance carrier name" style="{{ $templateThreeInput }}">
-                    @error('newInsuranceCarrier.insurance_name')
-                        <div style="margin-top:6px;color:#be123c;font-size:12px;font-weight:700;">{{ $message }}</div>
-                    @enderror
-                </div>
-                <div class="uel2-field">
-                    <label>Payer ID</label>
-                    <input wire:model.blur="newInsuranceCarrier.payer_id" placeholder="Enter payer ID" style="{{ $templateThreeInput }}">
-                </div>
-                <div class="uel2-field">
-                    <label>Phone Number</label>
-                    <input type="tel" wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="+18005550199" style="{{ $templateThreeInput }}">
-                </div>
-                <div class="uel2-field" style="grid-column:1/-1;">
-                    <label>Claims Address</label>
-                    <textarea wire:model.blur="newInsuranceCarrier.claims_address" placeholder="Enter claims mailing address" style="{{ $templateThreeInput }}"></textarea>
-                </div>
+        <div data-dialog-columns style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding:22px;">
+            <div class="uel2-field" style="grid-column:1/-1;">
+                <label for="new-carrier-insurance-name">Insurance Name</label>
+                <input id="new-carrier-insurance-name" autofocus wire:model.blur="newInsuranceCarrier.insurance_name" placeholder="Enter insurance carrier name" style="{{ $templateThreeInput }}">
+                @error('newInsuranceCarrier.insurance_name')
+                    <div role="alert" style="margin-top:6px;color: var(--pwdl-status-danger-text);font-size:12px;font-weight:700;">{{ $message }}</div>
+                @enderror
             </div>
-
-            <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:16px 22px;border-top:1px solid #e8efec;background:#fbfdfc;">
-                <button
-                    type="button"
-                    wire:click="closeAddInsuranceModal"
-                    style="padding:11px 18px;border:1px solid #dbe4ee;border-radius:6px;background:#fff;color:#475569;font-weight:800;cursor:pointer;"
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    wire:click="addInsuranceCarrier"
-                    wire:loading.attr="disabled"
-                    wire:target="addInsuranceCarrier"
-                    style="padding:11px 18px;border:0;border-radius:6px;background:#0b6b4f;color:#fff;font-weight:900;cursor:pointer;"
-                >
-                    <span wire:loading.remove wire:target="addInsuranceCarrier">Add & Select</span>
-                    <span wire:loading wire:target="addInsuranceCarrier">Adding...</span>
-                </button>
+            <div class="uel2-field">
+                <label for="new-carrier-payer-id">Payer ID</label>
+                <input id="new-carrier-payer-id" wire:model.blur="newInsuranceCarrier.payer_id" placeholder="Enter payer ID" style="{{ $templateThreeInput }}">
+            </div>
+            <div class="uel2-field">
+                <label for="new-carrier-payer-phone">Phone Number</label>
+                <input id="new-carrier-payer-phone" type="tel" wire:model.blur="newInsuranceCarrier.payer_phone" placeholder="+18005550199" style="{{ $templateThreeInput }}">
+            </div>
+            <div class="uel2-field" style="grid-column:1/-1;">
+                <label for="new-carrier-claims-address">Claims Address</label>
+                <textarea id="new-carrier-claims-address" wire:model.blur="newInsuranceCarrier.claims_address" placeholder="Enter claims mailing address" style="{{ $templateThreeInput }}"></textarea>
             </div>
         </div>
-    </div>
+
+        <div data-dialog-actions style="display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:16px 22px;border-top:1px solid  var(--pd-border);background: var(--pwdl-surface-muted);">
+            <button
+                type="button"
+                wire:click="closeAddInsuranceModal"
+                style="padding:11px 18px;border:1px solid  var(--pd-border);border-radius:6px;background: var(--pd-card);color: var(--pwdl-text-secondary);font-weight:800;cursor:pointer;"
+            >
+                Cancel
+            </button>
+            <button
+                type="button"
+                wire:click="addInsuranceCarrier"
+                wire:loading.attr="disabled"
+                wire:target="addInsuranceCarrier"
+                style="padding:11px 18px;border:0;border-radius:6px;background: #0b6b4f;color: #fff;font-weight:900;cursor:pointer;"
+            >
+                <span wire:loading.remove wire:target="addInsuranceCarrier">Add & Select</span>
+                <span wire:loading wire:target="addInsuranceCarrier">Adding...</span>
+            </button>
+        </div>
+    </x-pds.workflow-dialog>
 @endif

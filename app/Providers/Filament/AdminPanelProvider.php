@@ -87,6 +87,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Settings'),
             ])
             ->resources([
+                \App\Filament\Admin\Resources\ClinicTemplates\ClinicTemplateResource::class,
                 VerificationRequestResource::class,
                 PortalCredentialResource::class,
                 UserResource::class,

@@ -4,7 +4,7 @@
             <section style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; padding-inline: 4px;">
                 <button
                     type="button"
-                    wire:click="openReplyModal"
+                    id="mailbox-reply" wire:click="openReplyModal"
                     @disabled(blank($this->selectedMessage['from_email'] ?? null))
                     style="display: inline-flex; align-items: center; gap: 10px; padding: 11px 16px; border: 1px solid #dbe4ee; border-radius: 14px; background: {{ blank($this->selectedMessage['from_email'] ?? null) ? '#f8fafc' : '#ffffff' }}; color: {{ blank($this->selectedMessage['from_email'] ?? null) ? '#94a3b8' : '#0f172a' }}; font-size: 14px; font-weight: 700; cursor: {{ blank($this->selectedMessage['from_email'] ?? null) ? 'not-allowed' : 'pointer' }};"
                 >
@@ -13,7 +13,7 @@
                 </button>
                 <button
                     type="button"
-                    wire:click="openReplyAllModal"
+                    id="mailbox-reply_all" wire:click="openReplyAllModal"
                     @disabled(blank($this->selectedMessage['from_email'] ?? null))
                     style="display: inline-flex; align-items: center; gap: 10px; padding: 11px 16px; border: 1px solid #dbe4ee; border-radius: 14px; background: {{ blank($this->selectedMessage['from_email'] ?? null) ? '#f8fafc' : '#ffffff' }}; color: {{ blank($this->selectedMessage['from_email'] ?? null) ? '#94a3b8' : '#0f172a' }}; font-size: 14px; font-weight: 700; cursor: {{ blank($this->selectedMessage['from_email'] ?? null) ? 'not-allowed' : 'pointer' }};"
                 >
@@ -408,166 +408,164 @@
     </style>
 
     @if ($this->composeModalOpen)
-        <div style="position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.42); display: flex; align-items: flex-end; justify-content: flex-end; padding: 24px;">
-            <div style="width: min(640px, 100%); max-height: calc(100vh - 48px); border-radius: 22px; border: 1px solid #dbe4ee; background: #ffffff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22); overflow: hidden; display: flex; flex-direction: column;">
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid #edf2f7; background: #f8fbff;">
-                    <div style="font-size: 16px; font-weight: 800; color: #0f172a;">{{ $this->composeModalHeading() }}</div>
-                    <button
-                        type="button"
-                        wire:click="closeComposeModal"
-                        style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #475569; cursor: pointer;"
-                    >
-                        <x-heroicon-o-x-mark style="width: 18px; height: 18px;" />
-                    </button>
+        <x-pds.workflow-dialog labelled-by="mailbox-compose-title" dismiss="$wire.closeComposeModal()" width="40rem" placement="corner" wire:key="mailbox-compose-dialog" :return-focus="'mailbox-'.$this->composeMode">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid  var(--pd-border); background: var(--pwdl-surface-muted);">
+                <h2 id="mailbox-compose-title" style="margin:0; font-size:1.125rem; font-weight:800;">{{ $this->composeModalHeading() }}</h2>
+                <button
+                    type="button"
+                    wire:click="closeComposeModal" aria-label="Close message composer"
+                    style="display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); cursor: pointer;"
+                >
+                    <x-heroicon-o-x-mark style="width: 18px; height: 18px;" />
+                </button>
+            </div>
+
+            <div style="position: relative; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0;">
+                <div wire:loading.flex wire:target="submitCompose" style="display: none; position: absolute; inset: 56px 18px 18px; z-index: 2; background: rgba(255, 255, 255, 0.16); backdrop-filter: blur(1px); border-radius: 18px; pointer-events: all; align-items: center; justify-content: center;">
+                    <div style="display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 999px; border: 1px solid  var(--pd-border); background: rgba(255, 255, 255, 0.96); color: var(--pwdl-text-secondary); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12); font-size: 13px; font-weight: 800;">
+                        <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; animation: mailbox-spin 1s linear infinite;">
+                            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="12"></circle>
+                        </svg>
+                        <span>Sending email. Please wait...</span>
+                    </div>
                 </div>
 
-                <div style="position: relative; padding: 18px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; min-height: 0;">
-                    <div wire:loading.flex wire:target="submitCompose" style="display: none; position: absolute; inset: 56px 18px 18px; z-index: 2; background: rgba(255, 255, 255, 0.16); backdrop-filter: blur(1px); border-radius: 18px; pointer-events: all; align-items: center; justify-content: center;">
-                        <div style="display: inline-flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 999px; border: 1px solid #cbd5e1; background: rgba(255, 255, 255, 0.96); color: #334155; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12); font-size: 13px; font-weight: 800;">
+                <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
+                    <label for="mailbox-compose-to" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">To</label>
+                    <input id="mailbox-compose-to" autofocus type="text" wire:model.defer="composeFormData.to" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="recipient@example.com or comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px;">
+                    @error('composeFormData.to')
+                        <div role="alert" style="margin-top: 6px; font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+                    <div>
+                        <label for="mailbox-compose-cc" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">CC</label>
+                        <input id="mailbox-compose-cc" type="text" wire:model.defer="composeFormData.cc" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="Optional comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px;">
+                        @error('composeFormData.cc')
+                            <div role="alert" style="margin-top: 6px; font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div>
+                        <label for="mailbox-compose-bcc" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">BCC</label>
+                        <input id="mailbox-compose-bcc" type="text" wire:model.defer="composeFormData.bcc" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="Optional comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px;">
+                        @error('composeFormData.bcc')
+                            <div role="alert" style="margin-top: 6px; font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                        @enderror
+                    </div>
+                </div>
+
+                <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
+                    <label for="mailbox-compose-subject" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">Subject</label>
+                    <input id="mailbox-compose-subject" type="text" wire:model.defer="composeFormData.subject" wire:loading.attr="disabled" wire:target="submitCompose" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px;">
+                    @error('composeFormData.subject')
+                        <div role="alert" style="margin-top: 6px; font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
+                    <label for="mailbox-compose-body" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">Message</label>
+                    <textarea id="mailbox-compose-body" wire:model.defer="composeFormData.body" wire:loading.attr="disabled" wire:target="submitCompose" rows="10" placeholder="Write your message here." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px; line-height: 1.7; resize: vertical;"></textarea>
+                    @error('composeFormData.body')
+                        <div role="alert" style="margin-top: 6px; font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
+                    <label for="mailbox-compose-attachments" style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">Attachments</label>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <input id="mailbox-compose-attachments"
+                            type="file"
+                            wire:model="composeAttachments"
+                            wire:loading.attr="disabled"
+                            wire:target="composeAttachments,submitCompose"
+                            multiple
+                            style="display: block; width: 100%; padding: 11px 12px; border-radius: 14px; border: 1px dashed  var(--pd-border); background: var(--pwdl-surface-muted); color: var(--pd-text); font-size: 14px;"
+                        >
+                        <div style="font-size: 12px; color: var(--pd-muted);">
+                            Max {{ $this->mailbox()?->attachment_limit_mb ?? 25 }} MB per attachment.
+                        </div>
+
+                        @error('composeAttachments.*')
+                            <div role="alert" style="font-size: 12px; color: var(--pwdl-status-danger-text);">{{ $message }}</div>
+                        @enderror
+
+                        <div wire:loading.flex wire:target="composeAttachments" style="display: none; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--pwdl-status-info-text);">
                             <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; animation: mailbox-spin 1s linear infinite;">
                                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="12"></circle>
                             </svg>
-                            <span>Sending email. Please wait...</span>
+                            <span>Uploading attachment...</span>
                         </div>
-                    </div>
 
-                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
-                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">To</label>
-                        <input type="text" wire:model.defer="composeFormData.to" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="recipient@example.com or comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
-                        @error('composeFormData.to')
-                            <div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-                        <div>
-                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">CC</label>
-                            <input type="text" wire:model.defer="composeFormData.cc" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="Optional comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
-                            @error('composeFormData.cc')
-                                <div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">BCC</label>
-                            <input type="text" wire:model.defer="composeFormData.bcc" wire:loading.attr="disabled" wire:target="submitCompose" placeholder="Optional comma-separated list" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
-                            @error('composeFormData.bcc')
-                                <div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
-                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Subject</label>
-                        <input type="text" wire:model.defer="composeFormData.subject" wire:loading.attr="disabled" wire:target="submitCompose" style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px;">
-                        @error('composeFormData.subject')
-                            <div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
-                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Message</label>
-                        <textarea wire:model.defer="composeFormData.body" wire:loading.attr="disabled" wire:target="submitCompose" rows="10" placeholder="Write your message here." style="width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px; line-height: 1.7; resize: vertical;"></textarea>
-                        @error('composeFormData.body')
-                            <div style="margin-top: 6px; font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                        @enderror
-                    </div>
-
-                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose">
-                        <label style="display: block; margin-bottom: 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Attachments</label>
-                        <div style="display: flex; flex-direction: column; gap: 12px;">
-                            <input
-                                type="file"
-                                wire:model="composeAttachments"
-                                wire:loading.attr="disabled"
-                                wire:target="composeAttachments,submitCompose"
-                                multiple
-                                style="display: block; width: 100%; padding: 11px 12px; border-radius: 14px; border: 1px dashed #cbd5e1; background: #f8fafc; color: #0f172a; font-size: 14px;"
-                            >
-                            <div style="font-size: 12px; color: #64748b;">
-                                Max {{ $this->mailbox()?->attachment_limit_mb ?? 25 }} MB per attachment.
-                            </div>
-
-                            @error('composeAttachments.*')
-                                <div style="font-size: 12px; color: #dc2626;">{{ $message }}</div>
-                            @enderror
-
-                            <div wire:loading.flex wire:target="composeAttachments" style="display: none; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #1d4ed8;">
-                                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; animation: mailbox-spin 1s linear infinite;">
-                                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="42" stroke-dashoffset="12"></circle>
-                                </svg>
-                                <span>Uploading attachment...</span>
-                            </div>
-
-                            @if ($this->composeAttachments !== [])
-                                <div style="display: flex; flex-direction: column; gap: 8px;">
-                                    @foreach ($this->composeAttachments as $index => $attachment)
-                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff;">
-                                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
-                                                <div style="font-size: 13px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                    {{ method_exists($attachment, 'getClientOriginalName') ? $attachment->getClientOriginalName() : 'Attachment' }}
-                                                </div>
-                                                <div style="font-size: 11px; color: #64748b;">
-                                                    {{ method_exists($attachment, 'getSize') ? number_format(($attachment->getSize() ?? 0) / 1024 / 1024, 2) : '0.00' }} MB
-                                                </div>
+                        @if ($this->composeAttachments !== [])
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                @foreach ($this->composeAttachments as $index => $attachment)
+                                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card);">
+                                        <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                                            <div style="font-size: 13px; font-weight: 700; color: var(--pd-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                {{ method_exists($attachment, 'getClientOriginalName') ? $attachment->getClientOriginalName() : 'Attachment' }}
                                             </div>
-                                            <button
-                                                type="button"
-                                                wire:click="removeComposeAttachment({{ $index }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="composeAttachments,submitCompose"
-                                                style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid #dbe4ee; background: #ffffff; color: #64748b; cursor: pointer; flex-shrink: 0;"
-                                            >
-                                                <x-heroicon-o-x-mark style="width: 16px; height: 16px;" />
-                                            </button>
+                                            <div style="font-size: 11px; color: var(--pd-muted);">
+                                                {{ method_exists($attachment, 'getSize') ? number_format(($attachment->getSize() ?? 0) / 1024 / 1024, 2) : '0.00' }} MB
+                                            </div>
                                         </div>
-                                    @endforeach
-                                </div>
-                            @endif
+                                        <button
+                                            type="button"
+                                            wire:click="removeComposeAttachment({{ $index }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="composeAttachments,submitCompose"
+                                            style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 999px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-muted); cursor: pointer; flex-shrink: 0;"
+                                        >
+                                            <x-heroicon-o-x-mark style="width: 16px; height: 16px;" />
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                @if ($this->isReplyMode() && $this->selectedMessage)
+                    <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose" style="display: flex; flex-direction: column; gap: 10px;">
+                        <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--pd-muted);">Original Message</div>
+                        <div style="border: 1px solid  var(--pd-border); border-radius: 16px; background: var(--pwdl-surface-muted); overflow: hidden;">
+                            <div style="padding: 12px 14px; border-bottom: 1px solid  var(--pd-border); font-size: 12px; line-height: 1.7; color: var(--pwdl-text-secondary);">
+                                <strong>From:</strong> {{ $this->selectedMessage['from_name'] ?: ($this->selectedMessage['from_email'] ?? 'Unknown sender') }}<br>
+                                <strong>Received:</strong> {{ $this->selectedMessage['received_label'] ?? 'Unknown time' }}
+                            </div>
+                            <iframe
+                                title="Original email preview" tabindex="-1"
+                                sandbox="allow-same-origin"
+                                src="{{ $this->messagePreviewUrl() }}"
+                                style="width: 100%; min-height: 260px; border: 0; background: var(--pd-card);"
+                            ></iframe>
                         </div>
                     </div>
-
-                    @if ($this->isReplyMode() && $this->selectedMessage)
-                        <div wire:loading.class="mailbox-compose-form-disabled" wire:target="submitCompose" style="display: flex; flex-direction: column; gap: 10px;">
-                            <div style="font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b;">Original Message</div>
-                            <div style="border: 1px solid #dbe4ee; border-radius: 16px; background: #f8fbff; overflow: hidden;">
-                                <div style="padding: 12px 14px; border-bottom: 1px solid #e2e8f0; font-size: 12px; line-height: 1.7; color: #475569;">
-                                    <strong>From:</strong> {{ $this->selectedMessage['from_name'] ?: ($this->selectedMessage['from_email'] ?? 'Unknown sender') }}<br>
-                                    <strong>Received:</strong> {{ $this->selectedMessage['received_label'] ?? 'Unknown time' }}
-                                </div>
-                                <iframe
-                                    title="Original email preview"
-                                    sandbox="allow-same-origin"
-                                    src="{{ $this->messagePreviewUrl() }}"
-                                    style="width: 100%; min-height: 260px; border: 0; background: #ffffff;"
-                                ></iframe>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-
-                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 16px 18px; border-top: 1px solid #edf2f7; background: #ffffff; flex-shrink: 0;">
-                    <button
-                        type="button"
-                        wire:click="closeComposeModal"
-                        wire:loading.attr="disabled"
-                        wire:target="submitCompose"
-                        style="display: inline-flex; align-items: center; justify-content: center; padding: 11px 16px; border-radius: 14px; border: 1px solid #dbe4ee; background: #ffffff; color: #0f172a; font-size: 14px; font-weight: 700; cursor: pointer;"
-                    >
-                        Close
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="submitCompose"
-                        wire:loading.attr="disabled"
-                        wire:target="submitCompose"
-                        style="display: inline-flex; align-items: center; justify-content: center; padding: 11px 18px; border-radius: 14px; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer;"
-                    >
-                        <span wire:loading.remove wire:target="submitCompose">Send</span>
-                        <span wire:loading.inline wire:target="submitCompose" style="display: none;">Sending...</span>
-                    </button>
-                </div>
+                @endif
             </div>
-        </div>
+
+            <div data-dialog-actions style="display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 16px 18px; border-top: 1px solid  var(--pd-border); background: var(--pd-card); flex-shrink: 0;">
+                <button
+                    type="button"
+                    wire:click="closeComposeModal"
+                    wire:loading.attr="disabled"
+                    wire:target="submitCompose"
+                    style="display: inline-flex; align-items: center; justify-content: center; padding: 11px 16px; border-radius: 14px; border: 1px solid  var(--pd-border); background: var(--pd-card); color: var(--pd-text); font-size: 14px; font-weight: 700; cursor: pointer;"
+                >
+                    Close
+                </button>
+                <button
+                    type="button"
+                    wire:click="submitCompose"
+                    wire:loading.attr="disabled"
+                    wire:target="submitCompose"
+                    style="display: inline-flex; align-items: center; justify-content: center; padding: 11px 18px; border-radius: 14px; border: 1px solid #0f766e; background: #0f766e; color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer;"
+                >
+                    <span wire:loading.remove wire:target="submitCompose">Send</span>
+                    <span wire:loading.inline wire:target="submitCompose" style="display: none;">Sending...</span>
+                </button>
+            </div>
+        </x-pds.workflow-dialog>
     @endif
 
     <x-filament-actions::modals />

@@ -145,6 +145,7 @@ class StatusService
         return in_array($request->normalized_status, [
             BillingWorkItem::STATUS_IN_PROGRESS,
             BillingWorkItem::STATUS_RETURNED_FOR_REWORK,
+            BillingWorkItem::STATUS_INCOMPLETE,
         ], true)
             && $request->canUserTransitionTo($actor, BillingWorkItem::STATUS_REVIEW);
     }

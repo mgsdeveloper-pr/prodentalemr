@@ -1,17 +1,220 @@
 <?php
 
 use App\Filament\Saas\Pages\OrganizationWorkspace;
+use App\Filament\Saas\Pages\TenantOnboarding;
+use App\Filament\Saas\Pages\DsoOnboarding;
+use App\Filament\Saas\Resources\Clinics\Pages\CreateClinic;
+use App\Models\Dso;
 use App\Filament\Saas\Resources\Clinics\Schemas\ClinicForm;
 use App\Models\Clinic;
 use App\Models\OnboardingDraft;
 use App\Models\Organization;
 use App\Models\User;
+use App\Models\VerificationTemplateVersion;
 use App\Services\ClientOnboardingService;
 use App\Support\PanelPermissionMatrix;
 use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Exceptions;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
+
+it('keeps completed onboarding immutable even when a stale draft is saved or activated', function (): void {
+    $user = User::factory()->create();
+    $service = app(ClientOnboardingService::class);
+    $draft = $service->start($user, 'single_clinic', 'managed_service');
+    $stale = $draft->fresh();
+    $organization = Organization::create(['name' => 'Completed QA', 'owner_name' => 'QA Owner', 'status' => true]);
+    $service->activate($draft, $organization);
+    $before = $draft->fresh()->getAttributes();
+
+    foreach (['save', 'activate'] as $operation) {
+        try {
+            $operation === 'save'
+                ? $service->save($stale, ['organization_name' => 'Changed'], 1)
+                : $service->activate($stale, $organization);
+            $this->fail('Completed onboarding accepted '.$operation);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            expect($exception->getStatusCode())->toBe(409);
+        }
+        expect($draft->fresh()->getAttributes())->toBe($before);
+    }
+});
+
+it('commits internal onboarding and completion together or rolls it back with a safe error', function (bool $failCompletion, bool $isDso): void {
+    $this->seed(RoleSeeder::class);
+    seedWorkflowMaster();
+    $user = User::factory()->create();
+    $user->assignRole('saas_admin');
+    $this->actingAs($user);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    $service = app(ClientOnboardingService::class);
+    $draft = $service->start($user, $isDso ? 'dso' : 'single_clinic', 'managed_service');
+    $email = 'atomic-owner@example.test';
+    $details = [
+        'organization_name' => 'Atomic QA', 'organization_owner_name' => 'QA Owner',
+        'clinic_name' => 'Atomic Clinic', 'location_name' => 'Main',
+        'location_country' => 'USA', 'location_state' => 'Texas', 'location_city' => 'Austin',
+        'clinic_timezone' => 'America/Chicago',
+    ];
+    $details += $isDso
+        ? [
+            'dso_name' => 'Atomic QA DSO', 'dso_primary_contact_name' => 'QA Owner',
+            'dso_email' => 'atomic-dso@example.test', 'dso_admin_name' => 'QA Owner', 'dso_admin_email' => $email,
+        ]
+        : ['owner_name' => 'QA Owner', 'owner_email' => $email, 'owner_phone' => '2025550146'];
+    $service->save($draft, $details, 4);
+
+    $failure = new RuntimeException('UX02_INTERNAL_ONLY onboarding database failure /srv/private/qa.php');
+    if ($failCompletion) {
+        Exceptions::fake();
+        $this->partialMock(ClientOnboardingService::class)
+            ->shouldReceive('activate')->once()->andThrow($failure);
+    }
+
+    $passwordField = $isDso ? 'dso_admin_password' : 'owner_password';
+    $browser = Livewire::withQueryParams(['onboarding' => $draft->public_id])->test($isDso ? DsoOnboarding::class : TenantOnboarding::class)
+        ->fillForm([
+            'attach_subscription' => false,
+            $passwordField => 'SyntheticOnly!123',
+            $passwordField.'_confirmation' => 'SyntheticOnly!123',
+        ])
+        ->call('create')->assertHasNoFormErrors();
+
+    if ($failCompletion) {
+        $browser->assertNotified(Notification::make()
+            ->title($isDso ? 'DSO onboarding failed' : 'Organization onboarding failed')
+            ->body('Review the onboarding details and try again. If the problem persists, ask your administrator to check the server logs.')
+            ->danger())
+            ->assertDontSee('UX02_INTERNAL_ONLY');
+        Exceptions::assertReported(fn (RuntimeException $reported): bool => $reported === $failure);
+    } else {
+        $browser->assertRedirect();
+    }
+
+    expect(Organization::count())->toBe($failCompletion ? 0 : 1)
+        ->and(Dso::count())->toBe(! $failCompletion && $isDso ? 1 : 0)
+        ->and(Clinic::count())->toBe($failCompletion ? 0 : 1)
+        ->and(User::where('email', $email)->count())->toBe($failCompletion ? 0 : 1)
+        ->and($draft->fresh()->status)->toBe($failCompletion ? 'draft' : 'activated');
+})->with([false, true])->with([false, true]);
+
+it('keeps onboarding field validation actionable', function (string $page, string $requiredField): void {
+    $this->seed(RoleSeeder::class);
+    $admin = User::factory()->create(['status' => true]);
+    $admin->assignRole('saas_admin');
+    $this->actingAs($admin);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+
+    Livewire::test($page)->call('create')->assertHasFormErrors([$requiredField => 'required']);
+    $this->assertDatabaseCount('clinics', 0);
+})->with([
+    [TenantOnboarding::class, 'organization_name'],
+    [DsoOnboarding::class, 'dso_name'],
+]);
+
+it('requires both released forms when creating a verification clinic', function (string $entry, bool $missingShort): void {
+    $this->seed(RoleSeeder::class);
+    $master = seedWorkflowMaster();
+    if ($missingShort) {
+        $master->update(['active_short_form' => false]);
+    }
+    $user = User::factory()->create(['status' => true]);
+    $user->assignRole('saas_admin');
+    $this->actingAs($user);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+    $provisioner = Mockery::mock(\App\Support\VerificationTemplateVersionService::class)->makePartial();
+    $provisioner->shouldReceive('provisionRegisteredClinic')
+        ->once()->with(Mockery::type(Clinic::class), true)->passthru();
+    $this->instance(\App\Support\VerificationTemplateVersionService::class, $provisioner);
+
+
+    $data = [
+        'organization_name' => 'Template QA Organization', 'organization_owner_name' => 'QA Owner',
+        'clinic_name' => 'Template QA Clinic', 'clinic_timezone' => 'America/Chicago',
+        'location_name' => 'Main', 'location_country' => 'USA', 'location_state' => 'Texas', 'location_city' => 'Austin',
+        'attach_subscription' => false,
+    ];
+    if ($entry === 'direct') {
+        $organization = Organization::create(['name' => 'Existing QA Organization', 'owner_name' => 'QA Owner', 'status' => true]);
+        $browser = Livewire::test(CreateClinic::class)->fillForm([
+            'organization_id' => $organization->id, 'clinic_name' => $data['clinic_name'],
+            'verification_services_enabled' => true,
+        ])->call('create');
+        if ($missingShort) {
+            $browser->assertHasFormErrors(['verification_default_form_template']);
+        }
+    } else {
+        $dso = $entry === 'dso';
+        $data += $dso ? [
+            'dso_name' => 'Template QA DSO', 'dso_primary_contact_name' => 'QA Contact', 'dso_email' => 'dso@example.test',
+            'dso_admin_name' => 'QA Admin', 'dso_admin_email' => 'dso-admin@example.test',
+            'dso_admin_password' => 'SyntheticOnly!123', 'dso_admin_password_confirmation' => 'SyntheticOnly!123',
+        ] : [
+            'owner_name' => 'QA Owner', 'owner_email' => 'owner@example.test', 'owner_phone' => '2025550146',
+            'owner_password' => 'SyntheticOnly!123', 'owner_password_confirmation' => 'SyntheticOnly!123',
+        ];
+        $browser = Livewire::test($dso ? DsoOnboarding::class : TenantOnboarding::class)
+            ->fillForm($data)->call('create')->assertHasNoFormErrors();
+        if ($missingShort) {
+            $browser->assertNotified(Notification::make()
+                ->title($dso ? 'DSO onboarding failed' : 'Organization onboarding failed')
+                ->body('Release an active SaaS Master Template with questions for Short Form before creating this clinic.')
+                ->warning());
+            expect(Organization::count())->toBe(0)->and(Dso::count())->toBe(0);
+        }
+    }
+
+    if ($missingShort) {
+        expect(Clinic::count())->toBe(0)
+            ->and(VerificationTemplateVersion::where('scope', 'clinic')->count())->toBe(0);
+
+        return;
+    }
+
+    $browser->assertRedirect();
+    $clinic = Clinic::where('clinic_name', $data['clinic_name'])->sole();
+    $versions = VerificationTemplateVersion::where('clinic_id', $clinic->id)->get()->keyBy('form_type');
+    expect($versions)->toHaveCount(2);
+    foreach (['full_form', 'short_form'] as $form) {
+        $version = $versions[$form];
+        expect($version->source_version_id)->toBe($master->id)
+            ->and($version->status)->toBe('published')
+            ->and($version->{'active_'.$form})->toBeTrue()
+            ->and($version->questions()->count())->toBeGreaterThan(0);
+    }
+    (new \App\Support\VerificationTemplateVersionService)->provisionRegisteredClinic($clinic, requireBoth: true);
+    expect(VerificationTemplateVersion::where('clinic_id', $clinic->id)->pluck('id')->sort()->values()->all())
+        ->toBe($versions->pluck('id')->sort()->values()->all());
+})->with(['organization', 'dso', 'direct'])->with([false, true]);
+
+it('redirects completed onboarding and rejects stale browser actions', function (string $structure, string $page): void {
+    $this->seed(RoleSeeder::class);
+    $user = User::factory()->create();
+    $user->assignRole('saas_admin');
+    $this->actingAs($user);
+    Filament::setCurrentPanel(Filament::getPanel('saas'));
+    $service = app(ClientOnboardingService::class);
+    $draft = $service->start($user, $structure, 'managed_service');
+    $browser = Livewire::withQueryParams(['onboarding' => $draft->public_id])->test($page);
+    $organization = Organization::create(['name' => 'Completed Browser QA', 'owner_name' => 'QA Owner', 'status' => true]);
+    $dso = $structure === 'dso' ? Dso::create(['name' => 'Completed DSO QA', 'status' => true]) : null;
+    $service->activate($draft, $organization, $dso);
+    $before = $draft->fresh()->getAttributes();
+
+    Livewire::withQueryParams(['onboarding' => $draft->public_id])->test($page)->assertRedirect($dso
+        ? \App\Filament\Saas\Resources\Dsos\DsoResource::getUrl('view', ['record' => $dso])
+        : \App\Filament\Saas\Resources\Organizations\OrganizationResource::getUrl('view', ['record' => $organization]));
+    $browser->call('create')->assertStatus(409);
+    expect($draft->fresh()->getAttributes())->toBe($before)
+        ->and(Organization::count())->toBe(1)
+        ->and(Clinic::count())->toBe(0);
+})->with([
+    ['single_clinic', TenantOnboarding::class],
+    ['dso', DsoOnboarding::class],
+]);
 
 it('renders the focused client directory for an authorized SaaS user', function (): void {
     $this->seed(RoleSeeder::class);
@@ -202,4 +405,28 @@ it('renders resumable organization and dso onboarding workflows', function (): v
         ->assertOk()
         ->assertSee('DSO Setup')
         ->assertSee('Review & Activate');
+});
+
+it('keeps template setup best-effort when a new clinic has verification disabled', function () {
+    $master = seedWorkflowMaster();
+    $master->update(['active_short_form' => false]);
+    $organization = Organization::create(['name' => 'Operations Only QA', 'owner_name' => 'QA Owner', 'status' => true]);
+    $provisioner = Mockery::mock(\App\Support\VerificationTemplateVersionService::class)->makePartial();
+    $provisioner->shouldReceive('provisionRegisteredClinic')
+        ->once()->with(Mockery::type(Clinic::class), false)->passthru();
+    $this->instance(\App\Support\VerificationTemplateVersionService::class, $provisioner);
+
+    $clinic = Clinic::createWithRequiredVerificationTemplates([
+        'organization_id' => $organization->id,
+        'clinic_name' => 'Operations Only QA Clinic',
+        'clinic_code' => 'TB07-OPS-QA',
+        'status' => true,
+        'verification_services_enabled' => false,
+    ]);
+
+    $copy = VerificationTemplateVersion::where('clinic_id', $clinic->id)->sole();
+    expect($clinic->fresh()->hasVerificationServices())->toBeFalse()
+        ->and($copy->source_version_id)->toBe($master->id)
+        ->and($copy->active_full_form)->toBeTrue()
+        ->and($copy->active_short_form)->toBeFalse();
 });

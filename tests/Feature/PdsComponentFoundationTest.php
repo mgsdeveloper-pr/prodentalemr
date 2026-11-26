@@ -56,7 +56,14 @@ it('renders reusable pds table, feedback, loading, and container components', fu
         <x-pds.banner type="warning">Review required.</x-pds.banner>
         <x-pds.inline-message type="success">Ready</x-pds.inline-message>
         <x-pds.toast title="Updated">Done</x-pds.toast>
-        <x-pds.confirmation-dialog title="Confirm">Continue?</x-pds.confirmation-dialog>
+        <x-pds.confirmation-dialog title="Confirm" :open="true" dismiss="$wire.cancelReview()">
+            Continue?
+            <x-slot:actions><button type="button">Cancel</button></x-slot:actions>
+        </x-pds.confirmation-dialog>
+        <x-pds.workflow-dialog labelled-by="compose-title" dismiss="$wire.closeComposer()" return-focus="compose-button" placement="corner">
+            <h2 id="compose-title">Compose</h2>
+            <button type="button">Cancel</button>
+        </x-pds.workflow-dialog>
         <x-pds.drawer title="Details">Panel</x-pds.drawer>
         <x-pds.slide-panel title="Slide">Panel</x-pds.slide-panel>
         <x-pds.modal title="Modal">Panel</x-pds.modal>
@@ -70,6 +77,17 @@ it('renders reusable pds table, feedback, loading, and container components', fu
         ->toContain('pds-breadcrumb')
         ->toContain('pds-alert')
         ->toContain('pds-confirmation-dialog')
+        ->toContain('aria-label="Confirm"')
+        ->toContain('x-trap.inert.noscroll="true"')
+        ->toContain('x-on:keydown.escape.stop.prevent="$wire.cancelReview()"')
+        ->toContain('pds-confirmation-dialog__actions')
+        ->toContain('<dialog')
+        ->toContain('aria-labelledby="compose-title"')
+        ->toContain('data-return-focus="compose-button"')
+        ->toContain('x-on:cancel.prevent="$wire.closeComposer()"')
+        ->toContain('wire:ignore.self')
+        ->toContain('x-on:keydown.tab="wrapTab($event)"')
+        ->toContain('pds-workflow-dialog--corner')
         ->toContain('pds-drawer')
         ->toContain('pds-modal');
 });

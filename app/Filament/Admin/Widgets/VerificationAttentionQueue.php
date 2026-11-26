@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\BillingWorkItem;
 use App\Models\User;
+use App\Services\Verification\SLAService;
 use App\Services\Verification\StatusService;
 use App\Services\Verification\WorkflowService;
 use App\Support\AdminClinicScope;
@@ -92,7 +93,7 @@ class VerificationAttentionQueue extends TableWidget
                     }),
                 TextColumn::make('due_at')
                     ->label('Due')
-                    ->dateTime('M d, Y h:i A')
+                    ->dateTime(SLAService::DUE_DATE_FORMAT, timezone: config('app.timezone'))
                     ->sortable(),
                 TextColumn::make('assignedTo.name')
                     ->label('Assignee')

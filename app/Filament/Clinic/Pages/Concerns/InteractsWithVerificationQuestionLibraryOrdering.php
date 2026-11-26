@@ -3,12 +3,13 @@
 namespace App\Filament\Clinic\Pages\Concerns;
 
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
+use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use App\Support\VerificationTemplateVersionService;
 
 trait InteractsWithVerificationQuestionLibraryOrdering
 {
@@ -16,9 +17,14 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public string $selectedTemplateKey = VerificationFormQuestion::DEFAULT_TEMPLATE_KEY;
 
+    protected function arrangementClinic(): ?Clinic
+    {
+        return ClinicPanelScope::selectedClinic();
+    }
+
     public function getSelectedClinicName(): ?string
     {
-        return ClinicPanelScope::selectedClinic()?->clinic_name;
+        return $this->arrangementClinic()?->clinic_name;
     }
 
     public function selectTemplate(string $templateKey): void
@@ -43,11 +49,12 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function repositionQuestion(int $questionId, string $direction): void
     {
-        $clinicId = ClinicPanelScope::selectedClinicId();
-        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
+        $clinic = $this->arrangementClinic();
+        $clinicId = $clinic?->id;
+        $version = VerificationQuestionResource::currentClinicWorkingVersion($clinic);
 
         if (! $clinicId
-            || ! (auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false)
+            || ! (auth()->user()?->canManageClinicTemplateSections($clinic) ?? false)
             || $version?->status !== VerificationTemplateVersion::STATUS_DRAFT) {
             Notification::make()
                 ->title('Create a draft first')
@@ -59,7 +66,7 @@ trait InteractsWithVerificationQuestionLibraryOrdering
         }
 
         /** @var VerificationFormQuestion|null $question */
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $organizationId = $clinic->organization_id;
 
         $question = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)
@@ -136,13 +143,9 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
         $newIds = array_values(array_filter($newIds));
 
-        DB::transaction(function () use ($newIds): void {
-            foreach ($newIds as $index => $id) {
-                VerificationFormQuestion::query()
-                    ->whereKey($id)
-                    ->update(['sort_order' => ($index + 1) * 10]);
-            }
-        });
+        app(VerificationTemplateVersionService::class)->reorderDraftQuestions(
+            $version->id, $clinicId, $newIds, [$question->section_key], activeOnly: true,
+        );
 
         Notification::make()
             ->title('Question order updated')
@@ -152,14 +155,15 @@ trait InteractsWithVerificationQuestionLibraryOrdering
 
     public function getQuestionSections(): Collection
     {
-        $clinicId = ClinicPanelScope::selectedClinicId();
+        $clinic = $this->arrangementClinic();
+        $clinicId = $clinic?->id;
 
         if (! $clinicId) {
             return collect();
         }
 
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
-        $version = VerificationQuestionResource::currentClinicWorkingVersion(ClinicPanelScope::selectedClinic());
+        $organizationId = $clinic->organization_id;
+        $version = VerificationQuestionResource::currentClinicWorkingVersion($clinic);
 
         $questions = VerificationFormQuestion::query()
             ->visibleForClinic($clinicId, $organizationId)

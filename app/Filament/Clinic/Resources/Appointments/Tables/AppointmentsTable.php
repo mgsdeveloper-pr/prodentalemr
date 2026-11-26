@@ -187,19 +187,19 @@ class AppointmentsTable
                     ->url(fn (Appointment $record): string => static::verificationUrl($record)),
                 ActionGroup::make([
                     Action::make('sendManagedVerification')
-                        ->label('Send to Managed Service')
+                        ->label('Send Full Form to Managed Service')
                         ->icon('heroicon-o-paper-airplane')
                         ->visible(fn (Appointment $record): bool => static::canStartVerification($record, BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE))
                         ->action(fn (Appointment $record) => static::startVerification($record, BillingWorkItem::PROCESSING_MODE_MANAGED_SERVICE)),
                     Action::make('startClinicVerification')
-                        ->label('Start Clinic Verification')
+                        ->label('Start Clinic Verification (Full Form)')
                         ->icon('heroicon-o-pencil-square')
                         ->visible(fn (Appointment $record): bool => static::canStartVerification($record, BillingWorkItem::PROCESSING_MODE_SELF_MANAGED))
                         ->action(fn (Appointment $record) => static::startVerification($record, BillingWorkItem::PROCESSING_MODE_SELF_MANAGED)),
                 ])
                     ->icon('heroicon-o-clipboard-document-check')
                     ->iconButton()
-                    ->tooltip('Create verification request')
+                    ->tooltip('Create a Full Form verification request')
                     ->visible(fn (Appointment $record): bool => blank($record->verification_work_item_id)
                         && (auth()->user()?->canCreateClinicVerificationRequests() ?? false)),
                 DeleteAction::make()

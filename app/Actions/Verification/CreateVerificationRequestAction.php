@@ -2,14 +2,15 @@
 
 namespace App\Actions\Verification;
 
-use App\Models\BillingWorkItem;
 use App\Models\Appointment;
+use App\Models\BillingWorkItem;
 use App\Models\Clinic;
-use Illuminate\Support\Facades\Validator;
 use App\Services\Verification\AssignmentService;
 use App\Services\Verification\SLAService;
 use App\Services\Verification\VerificationIntakeService;
 use App\Support\VerificationTemplateVersionService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class CreateVerificationRequestAction
 {
@@ -18,11 +19,11 @@ class CreateVerificationRequestAction
         protected SLAService $sla,
         protected VerificationIntakeService $intake,
         protected VerificationTemplateVersionService $templates,
-    ) {
-    }
+    ) {}
 
     public function prepareData(array $data): array
     {
+        $data['coverage_assessment'] ??= ['outcome' => 'unconfirmed'];
         // Existing integrations retain automatic routing unless they supply an explicit method.
         $explicitMethod = array_key_exists('assignment_method', $data);
         $method = $data['assignment_method'] ?? (filled($data['assigned_to'] ?? null) ? 'manual' : 'auto');
@@ -62,9 +63,12 @@ class CreateVerificationRequestAction
 
     public function execute(array $data, array $profile = []): BillingWorkItem
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $profile): BillingWorkItem {
+        return DB::transaction(function () use ($data, $profile): BillingWorkItem {
             $workItem = BillingWorkItem::query()->create($this->prepareData($data));
-            if ($profile) $workItem->verificationProfile()->create($profile);
+            if ($profile) {
+                $workItem->verificationProfile()->create($profile);
+            }
+
             return $this->templates->attachSnapshotToWorkItem($workItem);
         });
     }

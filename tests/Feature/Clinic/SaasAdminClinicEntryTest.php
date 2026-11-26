@@ -4,6 +4,7 @@ use App\Models\Clinic;
 use App\Models\Organization;
 use App\Models\User;
 use App\Support\ClinicPanelScope;
+use App\Support\ClinicWorkspace;
 use Database\Seeders\RoleSeeder;
 
 it('initializes a clinic scope when a SaaS administrator opens the clinic panel', function (): void {
@@ -39,5 +40,6 @@ it('initializes a clinic scope when a SaaS administrator opens the clinic panel'
     expect(session(ClinicPanelScope::SESSION_KEY))->toBe($clinic->getKey());
 
     $this->get(route('clinic.choose-workspace'))
-        ->assertSuccessful();
+        ->assertRedirect(url('/clinic/verification-requests'))
+        ->assertSessionHas(ClinicWorkspace::SESSION_KEY, ClinicWorkspace::VERIFICATION);
 });

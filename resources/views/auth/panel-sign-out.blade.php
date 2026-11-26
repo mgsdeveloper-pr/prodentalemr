@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Signing Out - ProDental EMR</title>
+    <title>Signing Out - Denentiq</title>
+    @include('partials.brand-icons')
     <style>
         body {
             margin: 0;
@@ -44,7 +45,7 @@
 </head>
 <body>
     <div class="card">
-        <div class="brand">ProDental EMR</div>
+        <div class="brand"><img src="{{ asset('images/brand/denentiq-horizontal-primary.svg') }}" alt="Denentiq" style="width: 180px; height: 45px; object-fit: contain; margin: auto;"></div>
         <p class="text">Signing you out...</p>
         <p class="text">
             If you are not redirected automatically,

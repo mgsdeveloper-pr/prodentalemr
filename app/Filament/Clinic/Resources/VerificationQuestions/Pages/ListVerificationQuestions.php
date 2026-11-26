@@ -3,16 +3,17 @@
 namespace App\Filament\Clinic\Resources\VerificationQuestions\Pages;
 
 use App\Filament\Clinic\Resources\VerificationQuestions\VerificationQuestionResource;
+use App\Models\Clinic;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationTemplateSection;
 use App\Models\VerificationTemplateVersion;
 use App\Support\ClinicPanelScope;
 use App\Support\VerificationTemplateVersionService;
+use Illuminate\Support\Facades\DB;
 use App\Support\VerificationTemplateImport;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class ListVerificationQuestions extends Page
 {
@@ -97,15 +98,25 @@ class ListVerificationQuestions extends Page
         'builderFormType' => ['except' => 'full_form', 'as' => 'form'],
     ];
 
+    protected function builderClinic(): ?Clinic
+    {
+        return ClinicPanelScope::selectedClinic();
+    }
+
+    protected function templateLibraryUrl(): string
+    {
+        return \App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']);
+    }
+
     public function mount(): void
     {
         if (! $this->selectedTemplateVersionId) {
-            $this->redirect(\App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']), navigate: true);
+            $this->redirect($this->templateLibraryUrl(), navigate: true);
             return;
         }
         if ($this->selectedTemplateVersionId && ! request()->has('form')) {
             $version = VerificationTemplateVersion::query()->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
-                ->where('clinic_id', ClinicPanelScope::selectedClinicId())->find($this->selectedTemplateVersionId);
+                ->where('clinic_id', $this->builderClinic()?->id)->find($this->selectedTemplateVersionId);
             if ($version && in_array($version->form_type, ['full_form', 'short_form'], true)) {
                 $this->builderFormType = $version->form_type;
             }
@@ -128,8 +139,19 @@ class ListVerificationQuestions extends Page
             $old = VerificationTemplateVersion::find($id);
             $labels[$form] = $old ? $old->name.' · v'.$old->version_number : 'None';
         }
-        $this->publishReview = ['version_id' => $version->id, 'expected' => $active, 'labels' => $labels];
+        $this->publishReview = [
+            'version_id' => $version->id,
+            'revision' => app(VerificationTemplateVersionService::class)->draftRevision($version),
+            'expected' => $active,
+            'labels' => $labels,
+        ];
         $this->showPublishReview = true;
+    }
+
+    public function cancelPublishing(): void
+    {
+        $this->showPublishReview = false;
+        $this->publishReview = [];
     }
 
     public function getImportHistory(): Collection
@@ -279,7 +301,10 @@ class ListVerificationQuestions extends Page
             $rules['newTemplateSectionData.parent_section_key'] = ['required', 'string'];
         }
 
-        $data = $this->validate($rules)['newTemplateSectionData'];
+        $data = $this->validate($rules, [], [
+            'newTemplateSectionData.label' => $this->templateSectionMode === 'sub_section' ? 'sub-section name' : 'section name',
+            'newTemplateSectionData.parent_section_key' => 'parent section',
+        ])['newTemplateSectionData'];
 
         $this->createTemplateSection([
             'template_key' => $this->selectedTemplateKey,
@@ -292,7 +317,7 @@ class ListVerificationQuestions extends Page
         $this->closeTemplateSectionModal();
     }
 
-    public function createTemplateSection(array $data): void
+    protected function createTemplateSection(array $data): void
     {
         if (! $this->canManageSelectedClinicTemplateSections()) {
             Notification::make()->title('Permission denied')->danger()->send();
@@ -300,7 +325,7 @@ class ListVerificationQuestions extends Page
             return;
         }
 
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
 
         if (! $clinic) {
             Notification::make()->title('Select a clinic first')->danger()->send();
@@ -308,9 +333,9 @@ class ListVerificationQuestions extends Page
             return;
         }
 
-        $templateVersionId = $this->getDraftClinicVersion()?->getKey();
+        $version = $this->getDisplayedClinicVersion();
 
-        if (! $this->getDraftClinicVersion() || ! $templateVersionId) {
+        if (! $this->isDraftEditingOpen() || $version?->status !== VerificationTemplateVersion::STATUS_DRAFT) {
             Notification::make()
                 ->title('Create a draft first')
                 ->body('Published clinic template versions are read-only. Create a draft before changing sections.')
@@ -320,34 +345,27 @@ class ListVerificationQuestions extends Page
             return;
         }
 
-        $sectionKey = VerificationTemplateSection::makeSectionKey((string) $data['label'], $data['parent_section_key'] ?? null);
-        $baseKey = $sectionKey;
-        $counter = 2;
+        DB::transaction(function () use ($clinic, $version, $data): void {
+            $draft = app(VerificationTemplateVersionService::class)->lockEditableDraft($version->getKey(), $clinic->id);
+            $baseKey = VerificationTemplateSection::makeSectionKey((string) $data['label'], $data['parent_section_key'] ?? null);
+            $sectionKey = $baseKey;
+            $counter = 2;
 
-        while (VerificationTemplateSection::query()
-            ->where('clinic_id', $clinic->id)
-            ->where('template_version_id', $templateVersionId)
-            ->where('template_key', $data['template_key'])
-            ->where('section_key', $sectionKey)
-            ->exists()) {
-            $sectionKey = $baseKey.'_'.$counter++;
-        }
+            while ($draft->sections()->where('section_key', $sectionKey)->exists()) {
+                $sectionKey = $baseKey.'_'.$counter++;
+            }
 
-        VerificationTemplateSection::query()->create([
-            'organization_id' => $clinic->organization_id,
-            'clinic_id' => $clinic->id,
-            'template_version_id' => $templateVersionId,
-            'template_key' => $data['template_key'],
-            'section_key' => $sectionKey,
-            'parent_section_key' => $data['parent_section_key'] ?? null,
-            'label' => $data['label'],
-            'sort_order' => ((int) VerificationTemplateSection::query()
-                ->where('clinic_id', $clinic->id)
-                ->where('template_version_id', $templateVersionId)
-                ->where('template_key', $data['template_key'])
-                ->max('sort_order')) + 10,
-            'is_active' => true,
-        ]);
+            $draft->sections()->create([
+                'organization_id' => $clinic->organization_id,
+                'clinic_id' => $clinic->id,
+                'template_key' => $draft->template_key,
+                'section_key' => $sectionKey,
+                'parent_section_key' => $data['parent_section_key'] ?? null,
+                'label' => $data['label'],
+                'sort_order' => ((int) $draft->sections()->max('sort_order')) + 10,
+                'is_active' => true,
+            ]);
+        });
 
         Notification::make()
             ->title('Template section created')
@@ -358,14 +376,14 @@ class ListVerificationQuestions extends Page
 
     public function getSelectedClinicName(): ?string
     {
-        return ClinicPanelScope::selectedClinic()?->clinic_name;
+        return $this->builderClinic()?->clinic_name;
     }
 
     public function getVersionSummary(): array
     {
         $active = $this->getActiveClinicVersion();
         $draft = $this->getDraftClinicVersion();
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
         $displayed = $this->getDisplayedClinicVersion();
 
         return [
@@ -412,6 +430,7 @@ class ListVerificationQuestions extends Page
         }
 
         $this->showDraft = true;
+        $this->invalidateDraftReviews();
         $this->selectedTemplateVersionId = $draft->getKey();
         $this->resetBuilderCaches();
 
@@ -420,7 +439,7 @@ class ListVerificationQuestions extends Page
 
     public function closeDraftVersion(): null
     {
-        $this->redirect(\App\Filament\Clinic\Pages\VerificationSettings::getUrl(['section' => 'template-management']), navigate: true);
+        $this->redirect($this->templateLibraryUrl(), navigate: true);
 
         return null;
     }
@@ -496,10 +515,11 @@ class ListVerificationQuestions extends Page
             $data['change_description'] ?? null,
             activate: $activate,
             expectedActive: $this->publishReview['expected'],
+            expectedRevision: $this->publishReview['revision'],
         );
         $this->showDraft = false;
         $this->selectedTemplateVersionId = $published->id;
-        $this->showPublishReview = false;
+        $this->cancelPublishing();
         $this->resetBuilderCaches();
 
         Notification::make()
@@ -518,7 +538,7 @@ class ListVerificationQuestions extends Page
         }
 
         $this->activeVersionResolved = true;
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
 
         return $this->activeVersionCache = $clinic
             ? VerificationTemplateVersion::query()->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -532,7 +552,7 @@ class ListVerificationQuestions extends Page
     public function canPublishSelectedTemplate(): bool
     {
         $draft = $this->getDraftClinicVersion();
-        return $draft && (auth()->user()?->canPublishVerificationTemplate($draft->clinic) ?? false);
+        return $draft && (auth()->user()?->can('release', $draft) ?? false);
     }
 
     public function getDraftClinicVersion(): ?VerificationTemplateVersion
@@ -542,7 +562,7 @@ class ListVerificationQuestions extends Page
         }
 
         $this->draftVersionResolved = true;
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
 
         if (! $clinic) {
             return null;
@@ -565,7 +585,7 @@ class ListVerificationQuestions extends Page
 
     public function getTemplateVersionHistory(): array
     {
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
 
         if (! $clinic) {
             return [];
@@ -680,6 +700,7 @@ class ListVerificationQuestions extends Page
     {
         abort_unless(in_array($form, ['full_form', 'short_form'], true), 422);
         if ($this->guardEditor('selectBuilderForm', [$form])) return;
+        $this->invalidateDraftReviews();
         $this->resetInlineEditor();
         $this->builderFormType = $form;
         $this->showDraft = false;
@@ -694,8 +715,9 @@ class ListVerificationQuestions extends Page
     public function selectBuilderVersion(int $id): void
     {
         if ($this->guardEditor('selectBuilderVersion', [$id])) return;
+        $this->invalidateDraftReviews();
         $this->resetInlineEditor();
-        $clinic = ClinicPanelScope::selectedClinic();
+        $clinic = $this->builderClinic();
         abort_unless($clinic, 403);
         $version = VerificationTemplateVersion::query()
             ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -712,7 +734,7 @@ class ListVerificationQuestions extends Page
 
     protected function canManageSelectedClinicTemplateSections(): bool
     {
-        return auth()->user()?->canManageClinicTemplateSections(ClinicPanelScope::selectedClinic()) ?? false;
+        return auth()->user()?->canManageClinicTemplateSections($this->builderClinic()) ?? false;
     }
 
     public function getCreateUrl(?string $sectionKey = null): string
@@ -728,7 +750,7 @@ class ListVerificationQuestions extends Page
     {
         $question = VerificationFormQuestion::query()
             ->whereKey($questionId)
-            ->where('clinic_id', ClinicPanelScope::selectedClinicId())
+            ->where('clinic_id', $this->builderClinic()?->id)
             ->firstOrFail();
 
         return VerificationQuestionResource::getUrl('edit', [
@@ -767,7 +789,7 @@ class ListVerificationQuestions extends Page
 
     public function deleteQuestion(int $questionId): void
     {
-        $clinicId = ClinicPanelScope::selectedClinicId();
+        $clinicId = $this->builderClinic()?->id;
         $version = $this->getDisplayedClinicVersion();
 
         if (! $clinicId || ! $this->isDraftEditingOpen() || $version?->status !== VerificationTemplateVersion::STATUS_DRAFT) {
@@ -780,44 +802,42 @@ class ListVerificationQuestions extends Page
             return;
         }
 
-        $question = VerificationFormQuestion::query()
-            ->where('clinic_id', $clinicId)
-            ->where('template_version_id', $version->getKey())
-            ->find($questionId);
+        $versions = app(VerificationTemplateVersionService::class);
+        DB::transaction(function () use ($versions, $version, $clinicId, $questionId): void {
+            $draft = $versions->lockEditableDraft($version->getKey(), $clinicId);
+            $question = $draft->questions()->find($questionId);
 
-        if (! $question) {
-            Notification::make()
-                ->title('Question not found')
-                ->danger()
-                ->send();
+            if (! $question) {
+                Notification::make()->title('Question not found')->danger()->send();
 
-            return;
-        }
+                return;
+            }
 
-        if ($question->is_builtin) {
-            Notification::make()
-                ->title('SaaS system questions are protected')
-                ->body('This clinic can reorder inherited questions, but only clinic-added questions can be deleted.')
-                ->warning()
-                ->send();
+            if ($question->is_builtin) {
+                Notification::make()
+                    ->title('SaaS system questions are protected')
+                    ->body('This clinic can reorder inherited questions, but only clinic-added questions can be deleted.')
+                    ->warning()
+                    ->send();
 
-            return;
-        }
+                return;
+            }
 
-        $question->delete();
+            $sectionKey = (string) $question->section_key;
+            $question->delete();
+            $remainingIds = $draft->questions()->where('section_key', $sectionKey)
+                ->orderBy('sort_order')->orderBy('id')->pluck('id')->all();
+            $versions->reorderDraftQuestions($draft->getKey(), $clinicId, $remainingIds, [$sectionKey]);
+            Notification::make()->title('Question deleted')->success()->send();
+        });
 
-        Notification::make()
-            ->title('Question deleted')
-            ->success()
-            ->send();
-
-        $this->normalizeSectionOrder((string) $question->section_key, (int) $clinicId);
+        $this->resetBuilderCaches();
     }
 
     public function repositionQuestion(int $questionId, string $direction): void
     {
-        $clinicId = ClinicPanelScope::selectedClinicId();
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $clinicId = $this->builderClinic()?->id;
+        $organizationId = $this->builderClinic()?->organization_id;
         $version = $this->getDisplayedClinicVersion();
 
         if (! $clinicId || ! $this->isDraftEditingOpen() || $version?->status !== VerificationTemplateVersion::STATUS_DRAFT) {
@@ -851,6 +871,7 @@ class ListVerificationQuestions extends Page
             ->where('template_key', $question->template_key)
             ->where('template_version_id', $version->getKey())
             ->where('section_key', $question->section_key)
+            ->whereIn('form_type', ['both', $this->validBuilderFormType()])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get(['id']);
@@ -905,39 +926,16 @@ class ListVerificationQuestions extends Page
 
         $newIds = array_values(array_filter($newIds));
 
-        DB::transaction(function () use ($newIds): void {
-            foreach ($newIds as $index => $id) {
-                VerificationFormQuestion::query()
-                    ->whereKey($id)
-                    ->update(['sort_order' => ($index + 1) * 10]);
-            }
-        });
+        app(VerificationTemplateVersionService::class)->reorderDraftQuestions(
+            $version->id, $clinicId, $newIds, [$question->section_key],
+        );
 
         Notification::make()
             ->title('Question order updated')
             ->success()
             ->send();
-    }
-
-    protected function normalizeSectionOrder(string $sectionKey, int $clinicId): void
-    {
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
-        $version = $this->getDisplayedClinicVersion();
-
-        $questions = VerificationFormQuestion::query()
-            ->visibleForClinic($clinicId, $organizationId)
-            ->where('template_key', $this->selectedTemplateKey)
-            ->when($version, fn ($query) => $query->where('template_version_id', $version->getKey()))
-            ->where('section_key', $sectionKey)
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id']);
-
-        foreach ($questions as $index => $question) {
-            VerificationFormQuestion::query()
-                ->whereKey($question->id)
-                ->update(['sort_order' => ($index + 1) * 10]);
-        }
+        $this->resetBuilderCaches();
+        $this->dispatch('builder-question-reordered', questionId: $questionId, direction: $direction);
     }
 
     public function getQuestionSections(): Collection
@@ -946,8 +944,8 @@ class ListVerificationQuestions extends Page
             return $this->questionSectionsCache;
         }
 
-        $clinicId = ClinicPanelScope::selectedClinicId();
-        $organizationId = ClinicPanelScope::selectedOrganizationId();
+        $clinicId = $this->builderClinic()?->id;
+        $organizationId = $this->builderClinic()?->organization_id;
         $version = $this->getDisplayedClinicVersion();
 
         if (! $clinicId || ! $version) {
@@ -1095,13 +1093,13 @@ class ListVerificationQuestions extends Page
 
         $sections = $this->getQuestionSections();
         $version = $this->getDisplayedClinicVersion();
-        $clinicId = ClinicPanelScope::selectedClinicId();
+        $clinicId = $this->builderClinic()?->id;
 
         $parentMap = collect();
 
         if ($version) {
             $parentMap = VerificationTemplateSection::query()
-                ->visibleForClinic($clinicId, ClinicPanelScope::selectedOrganizationId())
+                ->visibleForClinic($clinicId, $this->builderClinic()?->organization_id)
                 ->where('template_key', $this->selectedTemplateKey)
                 ->where('template_version_id', $version->getKey())
                 ->pluck('parent_section_key', 'section_key');
@@ -1137,12 +1135,14 @@ class ListVerificationQuestions extends Page
     public function getBuilderCounts(): array
     {
         $mainSections = $this->getTemplateBuilderSections();
+        // Legacy questions can exist without a matching section record.
+        $questions = $this->getDisplayedClinicVersion()?->questions()->get(['is_active']) ?? collect();
 
         return [
             'main_sections' => $mainSections->count(),
             'sub_sections' => $mainSections->sum(fn (array $section): int => count($section['children'])),
-            'questions' => $mainSections->sum('total_count'),
-            'active_questions' => $mainSections->sum('total_active_count'),
+            'questions' => $questions->count(),
+            'active_questions' => $questions->where('is_active', true)->count(),
         ];
     }
 
@@ -1182,6 +1182,10 @@ class ListVerificationQuestions extends Page
         });
 
         $search = str($this->questionSearch)->trim()->lower()->toString();
+
+        if ($this->builderView === 'reorder') {
+            return $questions->values();
+        }
 
         return $questions
             ->when($search !== '', fn (Collection $items): Collection => $items->filter(
@@ -1226,7 +1230,7 @@ class ListVerificationQuestions extends Page
         $this->displayedVersionResolved = true;
 
         if (filled($this->selectedTemplateVersionId)) {
-            $clinic = ClinicPanelScope::selectedClinic();
+            $clinic = $this->builderClinic();
             $selectedVersion = $clinic
                 ? VerificationTemplateVersion::query()
                     ->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
@@ -1249,7 +1253,7 @@ class ListVerificationQuestions extends Page
 
         return $this->displayedVersionCache = $this->getActiveClinicVersion()
             ?? VerificationTemplateVersion::query()->where('scope', VerificationTemplateVersion::SCOPE_CLINIC)
-                ->where('clinic_id', ClinicPanelScope::selectedClinicId())->where('template_key', $this->selectedTemplateKey)
+                ->where('clinic_id', $this->builderClinic()?->id)->where('template_key', $this->selectedTemplateKey)
                 ->whereIn('form_type', ['both', $this->validBuilderFormType()])
                 ->where('status', '!=', VerificationTemplateVersion::STATUS_ARCHIVED)
                 ->orderByDesc('version_number')->orderByDesc('id')->first();

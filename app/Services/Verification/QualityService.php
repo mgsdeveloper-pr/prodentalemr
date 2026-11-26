@@ -6,14 +6,14 @@ use App\Models\BillingWorkItem;
 use App\Models\User;
 use App\Models\VerificationFormSubmission;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class QualityService
 {
     public function __construct(
         protected VerificationAuditService $audit,
-    ) {
-    }
+    ) {}
 
     public function returnForCorrection(BillingWorkItem $request, string $reason, ?User $actor = null): BillingWorkItem
     {
@@ -103,51 +103,69 @@ class QualityService
 
     public function approve(BillingWorkItem $request, ?User $actor = null): BillingWorkItem
     {
-        $actor ??= auth()->user();
-        $this->authorizeTransition($request, $actor, BillingWorkItem::STATUS_DONE);
+        return DB::transaction(function () use ($request, $actor): BillingWorkItem {
+            $request = BillingWorkItem::query()->whereKey($request->getKey())->lockForUpdate()->firstOrFail();
+            $actor ??= auth()->user();
+            $this->authorizeTransition($request, $actor, BillingWorkItem::STATUS_DONE);
 
-        $missing = $this->audit->missingRequiredAnswers($request);
+            $missing = $this->audit->missingRequiredAnswers($request);
 
-        if ($missing !== []) {
-            throw ValidationException::withMessages([
-                'audit' => 'Complete all required verification answers before approving this request.',
-            ]);
-        }
+            if ($missing !== []) {
+                throw ValidationException::withMessages([
+                    'audit' => 'Complete all required verification answers before approving this request.',
+                ]);
+            }
 
-        if (in_array($request->outcome_status, ['pending', 'audit_required'], true)) {
-            $request->outcome_status = 'verified';
-        }
+            if (app(CoverageAssessmentService::class)->isInactive($request)) {
+                $request->outcome_status = 'inactive_coverage';
+            } elseif (data_get($request->coverage_assessment, 'outcome') === 'active') {
+                $request->outcome_status = 'verified';
+            } elseif (in_array($request->outcome_status, ['pending', 'audit_required'], true)) {
+                $request->outcome_status = 'verified';
+            }
 
-        if (! $request->hasFinalOutcome()) {
-            throw ValidationException::withMessages([
-                'outcome_status' => 'Record a final verification result before approving this request.',
-            ]);
-        }
+            if (! $request->hasFinalOutcome()) {
+                throw ValidationException::withMessages([
+                    'outcome_status' => 'Record a final verification result before approving this request.',
+                ]);
+            }
 
-        $request->reviewed_by = $actor?->getAuthIdentifier() ?? $request->reviewed_by;
+            $request->reviewed_by = $actor?->getAuthIdentifier() ?? $request->reviewed_by;
 
-        $request = app(StatusService::class)->transition($request, BillingWorkItem::STATUS_DONE);
+            $request = app(StatusService::class)->transition($request, BillingWorkItem::STATUS_DONE);
 
-        $completion = $this->captureCompletionSnapshot($request, $actor);
+            $completion = $this->captureCompletionSnapshot($request, $actor);
 
-        app(TimelineService::class)->record($request, 'verification_qa_approved', 'Audit approved the verification.', [
-            'reviewed_by' => $actor?->name,
-            'submission_id' => $completion?->getKey(),
-            'submission_version' => $completion?->version,
-        ], $actor);
+            app(TimelineService::class)->record($request, 'verification_qa_approved', 'Audit approved the verification.', [
+                'reviewed_by' => $actor?->name,
+                'submission_id' => $completion?->getKey(),
+                'submission_version' => $completion?->version,
+            ], $actor);
 
-        return $request;
+            return $request;
+        });
     }
 
     protected function captureCompletionSnapshot(BillingWorkItem $request, ?User $actor): ?VerificationFormSubmission
     {
         $latest = $request->formSubmissions()->latest('version')->first();
 
-        if (! $latest || $latest->status === BillingWorkItem::STATUS_DONE) {
+        if ($request->coverage_assessment === null && (! $latest || $latest->status === BillingWorkItem::STATUS_DONE)) {
             return $latest;
         }
 
         $payload = $latest->payload ?? [];
+        if ($request->coverage_assessment !== null) {
+            $request->load(['verificationProfile', 'verificationFormAnswers.question', 'verificationCoverageCodes']);
+            $payload['template_snapshot'] = $request->verification_template_snapshot;
+            $payload['verification_profile'] = $request->verificationProfile?->attributesToArray() ?? [];
+            $payload['coverage_codes'] = $request->verificationCoverageCodes->toArray();
+            $payload['answers'] = $request->verificationFormAnswers->map(fn ($answer) => [
+                'question_id' => $answer->verification_form_question_id, 'prompt' => $answer->question?->prompt,
+                'answer_value' => $answer->answer_value, 'note_value' => $answer->note_value,
+            ])->all();
+        }
+        data_set($payload, 'work_item.coverage_assessment', $request->coverage_assessment);
         data_set($payload, 'work_item.status', BillingWorkItem::STATUS_DONE);
         data_set($payload, 'work_item.outcome_status', $request->outcome_status);
         data_set($payload, 'work_item.priority', $request->priority);

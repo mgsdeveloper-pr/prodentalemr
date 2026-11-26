@@ -5,12 +5,13 @@ namespace App\Filament\Saas\Resources\VerificationFormQuestions\Pages;
 use App\Filament\Saas\Resources\VerificationFormQuestions\Pages\Concerns\InteractsWithVerificationFormQuestionOrdering;
 use App\Filament\Saas\Resources\VerificationFormQuestions\VerificationFormQuestionResource;
 use App\Models\VerificationFormQuestion;
-use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 
 class EditVerificationFormQuestion extends EditRecord
 {
+    protected ?bool $hasDatabaseTransactions = true;
+
     use InteractsWithVerificationFormQuestionOrdering;
 
     protected static string $resource = VerificationFormQuestionResource::class;
@@ -126,12 +127,14 @@ class EditVerificationFormQuestion extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            VerificationFormQuestionResource::deleteQuestionAction(),
         ];
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        app(\App\Support\VerificationTemplateVersionService::class)->lockEditableDraft($this->getRecord()->template_version_id, null);
+        unset($data['template_version_id']);
         $data['organization_id'] = null;
         $data['clinic_id'] = null;
         $data['sort_order'] = (int) ($data['sort_order'] ?? ($this->record?->sort_order ?? 9990));

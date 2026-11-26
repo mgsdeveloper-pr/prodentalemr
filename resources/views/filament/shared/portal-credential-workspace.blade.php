@@ -9,18 +9,25 @@
         wire:poll.30s="clearExpiredPortalCredentialValues"
         x-data="{
             openMenu: null,
+            closeCredentialMenu() {
+                document.getElementById('portal-credential-actions-' + this.openMenu)?.focus({ preventScroll: true });
+                this.openMenu = null;
+            },
             copyProtectedValue(value) {
                 if (!value) return;
                 const fallback = () => {
+                    const focusedElement = document.activeElement;
                     const field = document.createElement('textarea');
                     field.value = value;
                     field.setAttribute('readonly', '');
                     field.style.position = 'fixed';
                     field.style.opacity = '0';
-                    document.body.appendChild(field);
+                    const container = focusedElement?.closest('[role=dialog]') ?? document.body;
+                    container.appendChild(field);
                     field.select();
                     document.execCommand('copy');
                     field.remove();
+                    focusedElement?.focus({ preventScroll: true });
                 };
                 if (navigator.clipboard?.writeText) {
                     navigator.clipboard.writeText(value).catch(fallback);
@@ -83,7 +90,7 @@
             <div class="pd-credential-toolbar">
                 <label class="pd-credential-search">
                     <x-heroicon-o-magnifying-glass />
-                    <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search portals or accounts">
+                    <input type="search" wire:model.live.debounce.300ms="search" placeholder="Search portals or accounts" aria-label="Search portals or accounts">
                 </label>
                 <div class="pd-credential-toolbar-end">
                     <label>
@@ -100,41 +107,44 @@
             </div>
 
             <div class="pd-credential-table-wrap">
-                <table class="pd-credential-table">
-                    <thead>
-                        <tr>
-                            <th>Portal</th>
-                            <th>Account</th>
-                            <th>Authentication</th>
-                            <th>Status</th>
-                            <th>Last updated</th>
-                            <th aria-label="Actions"></th>
+                <table class="pd-credential-table" role="table" aria-label="Portal credentials">
+                    <thead role="rowgroup">
+                        <tr role="row">
+                            <th scope="col" role="columnheader">Portal</th>
+                            <th scope="col" role="columnheader">Account</th>
+                            <th scope="col" role="columnheader">Authentication</th>
+                            <th scope="col" role="columnheader">Status</th>
+                            <th scope="col" role="columnheader">Last updated</th>
+                            <th scope="col" role="columnheader" aria-label="Actions"></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody role="rowgroup">
                         @forelse ($credentials as $credential)
-                            <tr wire:key="portal-credential-{{ $credential->getKey() }}">
-                                <td>
+                            <tr role="row" wire:key="portal-credential-{{ $credential->getKey() }}">
+                                <td role="cell" class="pd-credential-cell-wide">
                                     <div class="pd-credential-primary">
                                         <strong>{{ $credential->portal_name }}</strong>
                                         <span>{{ \App\Models\PortalCredential::CATEGORY_OPTIONS[$credential->portal_category ?: 'other'] ?? 'Other' }}</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td role="cell">
+                                    <span class="pd-credential-field-label" aria-hidden="true">Account</span>
                                     <code class="pd-credential-account">{{ \App\Models\PortalCredential::maskSecret($credential->username) }}</code>
                                 </td>
-                                <td>
+                                <td role="cell">
+                                    <span class="pd-credential-field-label" aria-hidden="true">Authentication</span>
                                     <div class="pd-mfa-summary">
                                         <span class="pd-credential-pill {{ $credential->mfa_required ? 'is-info' : '' }}">{{ $this->credentialAuthenticationLabel($credential) }}</span>
                                         <span>{{ $this->credentialAuthenticationDetail($credential) }}</span>
                                     </div>
                                 </td>
-                                <td>
+                                <td role="cell">
+                                    <span class="pd-credential-field-label" aria-hidden="true">Status</span>
                                     @php($statusLabel = $this->credentialStatusLabel($credential))
                                     <span class="pd-credential-pill {{ $statusLabel === 'Active' ? 'is-active' : ($statusLabel === 'Needs attention' ? 'is-warning' : '') }}">{{ $statusLabel }}</span>
                                 </td>
-                                <td class="pd-date">{{ optional($credential->updated_at)->format('M d, Y') ?: '-' }}</td>
-                                <td>
+                                <td role="cell" class="pd-date"><span class="pd-credential-field-label" aria-hidden="true">Last updated</span>{{ optional($credential->updated_at)->format('M d, Y') ?: '-' }}</td>
+                                <td role="cell" class="pd-credential-cell-wide">
                                     <div class="pd-credential-row-actions">
                                         @if (filled($credential->login_url))
                                             <a class="pd-credential-open" href="{{ $credential->login_url }}" target="_blank" rel="noopener noreferrer">
@@ -146,12 +156,13 @@
                                             </button>
                                         @endif
                                         @if ($this->canUpdatePasswords())
-                                            <div class="pd-credential-menu" x-on:click.outside="openMenu = null">
-                                                <button type="button" class="pd-credential-menu-trigger" x-on:click="openMenu = openMenu === {{ $credential->getKey() }} ? null : {{ $credential->getKey() }}" x-bind:aria-expanded="openMenu === {{ $credential->getKey() }}" aria-haspopup="menu" aria-label="Actions for {{ $credential->portal_name }}">
+                                            <div class="pd-credential-menu" x-on:click.outside="openMenu = null"
+                                                x-on:keydown.escape.stop.prevent="if (openMenu === {{ $credential->getKey() }}) closeCredentialMenu()">
+                                                <button type="button" id="portal-credential-actions-{{ $credential->getKey() }}" class="pd-credential-menu-trigger" x-on:click="openMenu = openMenu === {{ $credential->getKey() }} ? null : {{ $credential->getKey() }}" x-bind:aria-expanded="openMenu === {{ $credential->getKey() }}" aria-controls="portal-credential-options-{{ $credential->getKey() }}" aria-label="Actions for {{ $credential->portal_name }}">
                                                     <x-heroicon-o-ellipsis-vertical />
                                                 </button>
-                                                <div class="pd-credential-menu-popover" x-cloak x-show="openMenu === {{ $credential->getKey() }}" x-transition.origin.top.right role="menu">
-                                                    <button type="button" wire:click="openCredentialInfo({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-eye /><span>View credentials</span></button>
+                                                <div id="portal-credential-options-{{ $credential->getKey() }}" class="pd-credential-menu-popover" x-cloak x-show="openMenu === {{ $credential->getKey() }}" x-transition.origin.top.right>
+                                                    <button type="button" wire:click="openCredentialInfo({{ $credential->getKey() }})" x-on:click="closeCredentialMenu()"><x-heroicon-o-eye /><span>View credentials</span></button>
                                                     @if (filled($credential->username))
                                                         <button type="button" x-on:click="$wire.copyCredentialSecret({{ $credential->getKey() }}, 'username').then(value => copyProtectedValue(value)); openMenu = null"><x-heroicon-o-clipboard /><span>Copy username</span></button>
                                                     @endif
@@ -160,9 +171,9 @@
                                                     @endif
                                                     <span class="pd-credential-menu-rule"></span>
                                                     <a href="{{ $this->editCredentialUrl($credential) }}" wire:navigate><x-heroicon-o-pencil-square /><span>Edit</span></a>
-                                                    <button type="button" wire:click="openPasswordEditor({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-key /><span>Change password</span></button>
+                                                    <button type="button" wire:click="openPasswordEditor({{ $credential->getKey() }})" x-on:click="closeCredentialMenu()"><x-heroicon-o-key /><span>Change password</span></button>
                                                     @if ($credential->security_questions_count > 0)
-                                                        <button type="button" wire:click="openSecurityQuestions({{ $credential->getKey() }})" x-on:click="openMenu = null"><x-heroicon-o-shield-check /><span>Manage authentication</span></button>
+                                                        <button type="button" wire:click="openSecurityQuestions({{ $credential->getKey() }})" x-on:click="closeCredentialMenu()"><x-heroicon-o-shield-check /><span>Manage authentication</span></button>
                                                     @else
                                                         <a href="{{ $this->editCredentialUrl($credential) }}" wire:navigate><x-heroicon-o-shield-check /><span>Manage authentication</span></a>
                                                     @endif
@@ -177,7 +188,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6"><div class="pd-credential-empty"><x-heroicon-o-key /><strong>No portal credentials available</strong><span>No credentials match the selected clinic and filters.</span>@if ($this->canCreatePortalCredentials())<a class="pd-credential-add" href="{{ $this->createCredentialUrl() }}" wire:navigate><x-heroicon-o-plus /><span>Add Credential</span></a>@endif</div></td></tr>
+                            <tr role="row"><td role="cell" colspan="6" class="pd-credential-cell-wide"><div class="pd-credential-empty"><x-heroicon-o-key /><strong>No portal credentials available</strong><span>No credentials match the selected clinic and filters.</span>@if ($this->canCreatePortalCredentials())<a class="pd-credential-add" href="{{ $this->createCredentialUrl() }}" wire:navigate><x-heroicon-o-plus /><span>Add Credential</span></a>@endif</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -186,7 +197,7 @@
         @endif
 
     @if ($this->infoModalOpen)
-        <div class="pd-password-backdrop" wire:keydown.escape.window="closeCredentialInfo">
+        <div class="pd-password-backdrop" x-trap.inert.noscroll="true" x-on:keydown.escape.stop.prevent="$wire.closeCredentialInfo()">
             <section class="pd-credential-details-modal" role="dialog" aria-modal="true" aria-labelledby="credential-details-title">
                 <header>
                     <div>
@@ -237,7 +248,7 @@
     @endif
 
     @if ($this->passwordModalOpen)
-        <div class="pd-password-backdrop" wire:keydown.escape.window="closePasswordEditor">
+        <div class="pd-password-backdrop" x-trap.inert.noscroll="true" x-on:keydown.escape.stop.prevent="$wire.closePasswordEditor()">
             <section class="pd-password-modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
                 <header>
                     <div><span>Security update</span><h2 id="password-modal-title">Change Portal Password</h2><p>{{ $this->editingCredentialName }}</p></div>
@@ -261,7 +272,7 @@
     @endif
 
     @if ($this->securityQuestionsModalOpen)
-        <div class="pd-password-backdrop" wire:keydown.escape.window="closeSecurityQuestions">
+        <div class="pd-password-backdrop" x-trap.inert.noscroll="true" x-on:keydown.escape.stop.prevent="$wire.closeSecurityQuestions()">
             <section class="pd-security-modal" role="dialog" aria-modal="true" aria-labelledby="security-questions-modal-title">
                 <header>
                     <div>
@@ -303,7 +314,7 @@
     </div>
 
     <style>
-        .pd-credential-workspace{display:flex;flex-direction:column;gap:20px}.pd-credential-header{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 28px;margin:-24px -24px 0;border-bottom:1px solid #dbe4ee;background:#fff}.pd-credential-header h1{margin:0;color:#07152f;font-size:28px;line-height:1.2;font-weight:800}.pd-credential-header p{margin:7px 0 10px;color:#64748b;font-size:14px}.pd-credential-header nav{display:flex;align-items:center;gap:7px;color:#64748b;font-size:12px}.pd-credential-header nav svg{width:14px;height:14px}.pd-credential-header nav strong{color:#0f172a}.pd-credential-scope{min-width:220px;padding:10px 14px;border:1px solid #dbe4ee;border-radius:8px;background:#f8fafc}.pd-credential-scope span{display:block;margin-bottom:3px;color:#64748b;font-size:10px;font-weight:700;text-transform:uppercase}.pd-credential-scope strong{display:block;overflow:hidden;color:#0f172a;font-size:13px;text-overflow:ellipsis;white-space:nowrap}.pd-credential-summary{display:grid;grid-template-columns:repeat(3,150px) 1fr;align-items:stretch;border:1px solid #dbe4ee;border-radius:8px;background:#fff;overflow:hidden}.pd-credential-summary>div{padding:14px 18px;border-right:1px solid #edf2f7}.pd-credential-summary span{display:block;color:#64748b;font-size:11px;font-weight:700}.pd-credential-summary strong{display:block;margin-top:4px;color:#07152f;font-size:21px}.pd-credential-summary p{align-self:center;margin:0;padding:14px 18px;color:#64748b;font-size:12px;text-align:right}.pd-credential-table-card{border:1px solid #dbe4ee;border-radius:8px;background:#fff;overflow:hidden;box-shadow:0 3px 10px rgba(15,23,42,.04)}.pd-credential-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:12px;font-weight:700}.pd-credential-search{position:relative;display:block;width:min(420px,100%)}.pd-credential-search svg{position:absolute;left:12px;top:50%;width:17px;height:17px;color:#94a3b8;transform:translateY(-50%)}.pd-credential-search input{width:100%;height:40px;padding:0 13px 0 39px;border:1px solid #cfd9e6;border-radius:7px;background:#fff;color:#0f172a;font-size:13px;outline:none}.pd-credential-search input:focus{border-color:#0f8a83;box-shadow:0 0 0 3px rgba(15,138,131,.1)}.pd-credential-table-wrap{overflow-x:auto}.pd-credential-table{width:100%;min-width:1320px;border-collapse:collapse}.pd-credential-table th{padding:12px 14px;border-bottom:1px solid #dbe4ee;background:#f8fafc;color:#334155;font-size:11px;font-weight:800;text-align:left;white-space:nowrap}.pd-credential-table td{padding:14px;border-bottom:1px solid #edf2f7;color:#334155;font-size:12px;vertical-align:middle}.pd-credential-table tbody tr:last-child td{border-bottom:0}.pd-credential-table tbody tr:hover{background:#fbfefe}.pd-credential-primary strong{display:block;color:#07152f;font-size:13px}.pd-credential-primary span{display:block;margin-top:4px;color:#64748b;font-size:11px}.pd-credential-link{display:inline-flex;align-items:center;gap:6px;color:#0f766e;font-weight:700;text-decoration:none}.pd-credential-link svg{width:15px;height:15px}.pd-muted{color:#94a3b8}.pd-secret-field{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.pd-secret-field code{min-width:82px;color:#334155;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}.pd-secret-field button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #dbe4ee;border-radius:6px;background:#fff;color:#475569;cursor:pointer}.pd-secret-field button:hover{border-color:#99d5d1;color:#0f766e}.pd-secret-field button:disabled{cursor:wait;opacity:.55}.pd-secret-field button svg{width:15px;height:15px}.pd-mfa-summary{display:flex;align-items:flex-start;flex-direction:column;gap:5px}.pd-mfa-summary>span:last-child:not(:first-child){color:#64748b;font-size:10px;font-weight:700}.pd-credential-pill{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid #dbe4ee;border-radius:999px;background:#f8fafc;color:#64748b;font-size:10px;font-weight:700;white-space:nowrap}.pd-credential-pill.is-info{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.pd-credential-pill.is-active{border-color:#a7e4cb;background:#effaf5;color:#067647}.pd-date{color:#64748b!important;white-space:nowrap}.pd-credential-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px}.pd-credential-actions a,.pd-credential-actions button{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 9px;border:1px solid #dbe4ee;border-radius:6px;background:#fff;color:#334155;font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap}.pd-credential-actions a:hover,.pd-credential-actions button:hover{border-color:#99d5d1;color:#0f766e}.pd-credential-actions svg{width:14px;height:14px}.pd-credential-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:54px 24px;color:#64748b;text-align:center}.pd-credential-empty svg{width:28px;height:28px}.pd-credential-empty strong{color:#0f172a;font-size:16px}.pd-password-backdrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.48)}.pd-password-modal,.pd-security-modal{width:min(520px,100%);max-height:min(720px,calc(100vh - 48px));border:1px solid #dbe4ee;border-radius:8px;background:#fff;overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.25)}.pd-security-modal{width:min(720px,100%)}.pd-password-modal>header,.pd-security-modal>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid #edf2f7}.pd-password-modal>header span,.pd-security-modal>header span{color:#0f766e;font-size:10px;font-weight:800;text-transform:uppercase}.pd-password-modal h2,.pd-security-modal h2{margin:5px 0 0;color:#07152f;font-size:21px}.pd-password-modal header p,.pd-security-modal header p{margin:4px 0 0;color:#64748b;font-size:12px}.pd-password-modal header button,.pd-security-modal header button{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid #dbe4ee;border-radius:6px;background:#fff;color:#475569;cursor:pointer}.pd-password-modal header button svg,.pd-security-modal header button svg{width:18px;height:18px}.pd-password-body{display:flex;flex-direction:column;gap:15px;padding:20px 22px}.pd-password-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pd-password-context>div{padding:10px 12px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc}.pd-password-context span,.pd-password-body label>span{display:block;margin-bottom:5px;color:#64748b;font-size:10px;font-weight:800;text-transform:uppercase}.pd-password-context strong,.pd-password-context a{color:#0f172a;font-size:12px;font-weight:700}.pd-password-body input{width:100%;height:42px;padding:0 12px;border:1px solid #cfd9e6;border-radius:6px;color:#0f172a;font-size:13px;outline:none}.pd-password-body input:focus{border-color:#0f8a83;box-shadow:0 0 0 3px rgba(15,138,131,.1)}.pd-password-body small{display:block;margin-top:5px;color:#dc2626;font-size:11px}.pd-password-note{margin:0;color:#64748b;font-size:11px;line-height:1.6}.pd-security-body{max-height:520px;padding:18px 22px;overflow-y:auto}.pd-security-intro{display:flex;align-items:flex-start;gap:8px;margin:0 0 14px;padding:10px 12px;border:1px solid #cde8e4;border-radius:6px;background:#f0fdfa;color:#335b59;font-size:11px;line-height:1.5}.pd-security-intro svg{flex:0 0 auto;width:17px;height:17px;color:#0f766e}.pd-security-list{display:flex;flex-direction:column;gap:9px}.pd-security-list article{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px;padding:13px;border:1px solid #e2e8f0;border-radius:7px;background:#fff}.pd-security-question{position:relative;padding-right:76px}.pd-security-question>span,.pd-security-answer>span{display:block;margin-bottom:5px;color:#64748b;font-size:9px;font-weight:800;text-transform:uppercase}.pd-security-question strong{display:block;color:#0f172a;font-size:12px;line-height:1.45}.pd-security-question em{position:absolute;right:0;top:0;padding:3px 7px;border:1px solid #dbe4ee;border-radius:999px;color:#64748b;font-size:9px;font-style:normal;font-weight:800}.pd-security-question em.is-required{border-color:#a7e4cb;background:#effaf5;color:#067647}.pd-security-answer .pd-secret-field{display:flex}.pd-security-answer code{flex:1}.pd-security-empty{padding:28px;color:#64748b;text-align:center}.pd-password-modal footer,.pd-security-modal footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid #edf2f7}.pd-password-modal footer button,.pd-security-modal footer button{min-height:38px;padding:0 14px;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer}.pd-password-modal footer .is-neutral{border:1px solid #dbe4ee;background:#fff;color:#334155}.pd-password-modal footer .is-primary,.pd-security-modal footer .is-primary{border:1px solid #0f766e;background:#0f766e;color:#fff}@media(max-width:900px){.pd-credential-header{align-items:flex-start;flex-direction:column}.pd-credential-scope{width:100%}.pd-credential-summary{grid-template-columns:repeat(3,1fr)}.pd-credential-summary p{grid-column:1/-1;border-top:1px solid #edf2f7;text-align:left}}@media(max-width:640px){.pd-credential-header{margin-inline:-16px;padding:18px 16px}.pd-credential-summary{grid-template-columns:1fr}.pd-credential-summary>div{border-right:0;border-bottom:1px solid #edf2f7}.pd-credential-summary p{grid-column:auto}.pd-credential-toolbar{align-items:stretch;flex-direction:column}.pd-password-context,.pd-security-list article{grid-template-columns:1fr}.pd-security-question{padding-right:0}.pd-security-question em{position:static;display:inline-flex;margin-top:7px}}
+        .pd-credential-workspace{display:flex;flex-direction:column;gap:20px}.pd-credential-header{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 28px;margin:-24px -24px 0;border-bottom:1px solid var(--pd-border);background:var(--pd-card)}.pd-credential-header h1{margin:0;color:var(--pd-text);font-size:28px;line-height:1.2;font-weight:800}.pd-credential-header p{margin:7px 0 10px;color:var(--pd-muted);font-size:14px}.pd-credential-header nav{display:flex;align-items:center;gap:7px;color:var(--pd-muted);font-size:12px}.pd-credential-header nav svg{width:14px;height:14px}.pd-credential-header nav strong{color:var(--pd-text)}.pd-credential-scope{min-width:220px;padding:10px 14px;border:1px solid var(--pd-border);border-radius:8px;background:var(--pwdl-surface-muted)}.pd-credential-scope span{display:block;margin-bottom:3px;color:var(--pd-muted);font-size:10px;font-weight:700;text-transform:uppercase}.pd-credential-scope strong{display:block;overflow:hidden;color:var(--pd-text);font-size:13px;text-overflow:ellipsis;white-space:nowrap}.pd-credential-summary{display:grid;grid-template-columns:repeat(3,150px) 1fr;align-items:stretch;border:1px solid var(--pd-border);border-radius:8px;background:var(--pd-card);overflow:hidden}.pd-credential-summary>div{padding:14px 18px;border-right:1px solid var(--pwdl-border-subtle)}.pd-credential-summary span{display:block;color:var(--pd-muted);font-size:11px;font-weight:700}.pd-credential-summary strong{display:block;margin-top:4px;color:var(--pd-text);font-size:21px}.pd-credential-summary p{align-self:center;margin:0;padding:14px 18px;color:var(--pd-muted);font-size:12px;text-align:right}.pd-credential-table-card{border:1px solid var(--pd-border);border-radius:8px;background:var(--pd-card);overflow:hidden;box-shadow:0 3px 10px rgba(15,23,42,.04)}.pd-credential-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid var(--pwdl-border-subtle);color:var(--pd-muted);font-size:12px;font-weight:700}.pd-credential-search{position:relative;display:block;width:min(420px,100%)}.pd-credential-search svg{position:absolute;left:12px;top:50%;width:17px;height:17px;color:var(--pwdl-text-placeholder);transform:translateY(-50%)}.pd-credential-search input{width:100%;height:40px;padding:0 13px 0 39px;border:1px solid var(--pwdl-border-strong);border-radius:7px;background:var(--pd-card);color:var(--pd-text);font-size:13px;outline:none}.pd-credential-search input:focus{border-color:var(--pd-primary);box-shadow:0 0 0 3px rgba(15,138,131,.1)}.pd-credential-table-wrap{overflow-x:auto}.pd-credential-table{width:100%;min-width:1320px;border-collapse:collapse}.pd-credential-table th{padding:12px 14px;border-bottom:1px solid var(--pd-border);background:var(--pwdl-surface-muted);color:var(--pwdl-text-secondary);font-size:11px;font-weight:800;text-align:left;white-space:nowrap}.pd-credential-table td{padding:14px;border-bottom:1px solid var(--pwdl-border-subtle);color:var(--pwdl-text-secondary);font-size:12px;vertical-align:middle}.pd-credential-table tbody tr:last-child td{border-bottom:0}.pd-credential-table tbody tr:hover{background:var(--pwdl-surface-muted)}.pd-credential-primary strong{display:block;color:var(--pd-text);font-size:13px}.pd-credential-primary span{display:block;margin-top:4px;color:var(--pd-muted);font-size:11px}.pd-credential-link{display:inline-flex;align-items:center;gap:6px;color:var(--pd-primary);font-weight:700;text-decoration:none}.pd-credential-link svg{width:15px;height:15px}.pd-credential-workspace .pd-muted{color:var(--pwdl-text-placeholder)}.pd-secret-field{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.pd-secret-field code{min-width:82px;color:var(--pwdl-text-secondary);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}.pd-secret-field button{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--pd-border);border-radius:6px;background:var(--pd-card);color:var(--pwdl-text-secondary);cursor:pointer}.pd-secret-field button:hover{border-color:var(--pd-primary);color:var(--pd-primary)}.pd-secret-field button:disabled{cursor:wait;opacity:.55}.pd-secret-field button svg{width:15px;height:15px}.pd-mfa-summary{display:flex;align-items:flex-start;flex-direction:column;gap:5px}.pd-mfa-summary>span:last-child:not(:first-child){color:var(--pd-muted);font-size:10px;font-weight:700}.pd-credential-pill{display:inline-flex;align-items:center;padding:4px 8px;border:1px solid var(--pd-border);border-radius:999px;background:var(--pwdl-surface-muted);color:var(--pd-muted);font-size:10px;font-weight:700;white-space:nowrap}.pd-credential-pill.is-info{border-color:var(--pd-border);background:var(--pwdl-status-info-soft);color:var(--pwdl-status-info-text)}.pd-credential-pill.is-active{border-color:var(--pd-border);background:var(--pwdl-status-success-soft);color:var(--pwdl-status-success-text)}.pd-date{color:var(--pd-muted)!important;white-space:nowrap}.pd-credential-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px}.pd-credential-actions a,.pd-credential-actions button{display:inline-flex;align-items:center;gap:5px;min-height:32px;padding:0 9px;border:1px solid var(--pd-border);border-radius:6px;background:var(--pd-card);color:var(--pwdl-text-secondary);font-size:11px;font-weight:700;text-decoration:none;cursor:pointer;white-space:nowrap}.pd-credential-actions a:hover,.pd-credential-actions button:hover{border-color:var(--pd-primary);color:var(--pd-primary)}.pd-credential-actions svg{width:14px;height:14px}.pd-credential-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:54px 24px;color:var(--pd-muted);text-align:center}.pd-credential-empty svg{width:28px;height:28px}.pd-credential-empty strong{color:var(--pd-text);font-size:16px}.pd-password-backdrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.48)}.pd-password-modal,.pd-security-modal{width:min(520px,100%);max-height:min(720px,calc(100vh - 48px));border:1px solid var(--pd-border);border-radius:8px;background:var(--pd-card);overflow:hidden;box-shadow:0 28px 70px rgba(15,23,42,.25)}.pd-security-modal{width:min(720px,100%)}.pd-password-modal>header,.pd-security-modal>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:20px 22px;border-bottom:1px solid var(--pwdl-border-subtle)}.pd-password-modal>header span,.pd-security-modal>header span{color:var(--pd-primary);font-size:10px;font-weight:800;text-transform:uppercase}.pd-password-modal h2,.pd-security-modal h2{margin:5px 0 0;color:var(--pd-text);font-size:21px}.pd-password-modal header p,.pd-security-modal header p{margin:4px 0 0;color:var(--pd-muted);font-size:12px}.pd-password-modal header button,.pd-security-modal header button{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--pd-border);border-radius:6px;background:var(--pd-card);color:var(--pwdl-text-secondary);cursor:pointer}.pd-password-modal header button svg,.pd-security-modal header button svg{width:18px;height:18px}.pd-password-body{display:flex;flex-direction:column;gap:15px;padding:20px 22px}.pd-password-context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pd-password-context>div{padding:10px 12px;border:1px solid var(--pwdl-border-subtle);border-radius:6px;background:var(--pwdl-surface-muted)}.pd-password-context span,.pd-password-body label>span{display:block;margin-bottom:5px;color:var(--pd-muted);font-size:10px;font-weight:800;text-transform:uppercase}.pd-password-context strong,.pd-password-context a{color:var(--pd-text);font-size:12px;font-weight:700}.pd-password-body input{width:100%;height:42px;padding:0 12px;border:1px solid var(--pwdl-border-strong);border-radius:6px;background:var(--pd-card);color:var(--pd-text);font-size:13px;outline:none}.pd-password-body input:focus{border-color:var(--pd-primary);box-shadow:0 0 0 3px rgba(15,138,131,.1)}.pd-password-body small{display:block;margin-top:5px;color:var(--pwdl-status-danger-text);font-size:11px}.pd-password-note{margin:0;color:var(--pd-muted);font-size:11px;line-height:1.6}.pd-security-body{max-height:520px;padding:18px 22px;overflow-y:auto}.pd-security-intro{display:flex;align-items:flex-start;gap:8px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--pd-border);border-radius:6px;background:var(--pwdl-brand-primary-soft);color:var(--pwdl-text-secondary);font-size:11px;line-height:1.5}.pd-security-intro svg{flex:0 0 auto;width:17px;height:17px;color:var(--pd-primary)}.pd-security-list{display:flex;flex-direction:column;gap:9px}.pd-security-list article{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px;padding:13px;border:1px solid var(--pwdl-border-subtle);border-radius:7px;background:var(--pd-card)}.pd-security-question{position:relative;padding-right:76px}.pd-security-question>span,.pd-security-answer>span{display:block;margin-bottom:5px;color:var(--pd-muted);font-size:9px;font-weight:800;text-transform:uppercase}.pd-security-question strong{display:block;color:var(--pd-text);font-size:12px;line-height:1.45}.pd-security-question em{position:absolute;right:0;top:0;padding:3px 7px;border:1px solid var(--pd-border);border-radius:999px;color:var(--pd-muted);font-size:9px;font-style:normal;font-weight:800}.pd-security-question em.is-required{border-color:var(--pd-border);background:var(--pwdl-status-success-soft);color:var(--pwdl-status-success-text)}.pd-security-answer .pd-secret-field{display:flex}.pd-security-answer code{flex:1}.pd-security-empty{padding:28px;color:var(--pd-muted);text-align:center}.pd-password-modal footer,.pd-security-modal footer{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--pwdl-border-subtle)}.pd-password-modal footer button,.pd-security-modal footer button{min-height:38px;padding:0 14px;border-radius:6px;font-size:12px;font-weight:800;cursor:pointer}.pd-password-modal footer .is-neutral{border:1px solid var(--pd-border);background:var(--pd-card);color:var(--pwdl-text-secondary)}.pd-password-modal footer .is-primary,.pd-security-modal footer .is-primary{border:1px solid var(--pwdl-brand-primary);background:var(--pwdl-brand-primary);color:#fff}@media(max-width:900px){.pd-credential-header{align-items:flex-start;flex-direction:column}.pd-credential-scope{width:100%}.pd-credential-summary{grid-template-columns:repeat(3,1fr)}.pd-credential-summary p{grid-column:1/-1;border-top:1px solid var(--pwdl-border-subtle);text-align:left}}@media(max-width:640px){.pd-credential-header{margin-inline:-16px;padding:18px 16px}.pd-credential-summary{grid-template-columns:1fr}.pd-credential-summary>div{border-right:0;border-bottom:1px solid var(--pwdl-border-subtle)}.pd-credential-summary p{grid-column:auto}.pd-credential-toolbar{align-items:stretch;flex-direction:column}.pd-password-context,.pd-security-list article{grid-template-columns:1fr}.pd-security-question{padding-right:0}.pd-security-question em{position:static;display:inline-flex;margin-top:7px}}
     </style>
 
     <style>
@@ -320,9 +331,9 @@
             gap: 7px;
             min-height: 40px;
             padding: 0 14px;
-            border: 1px solid #0f766e;
+            border: 1px solid var(--pwdl-brand-primary);
             border-radius: 7px;
-            background: #0f766e;
+            background: var(--pwdl-brand-primary);
             color: #fff;
             font-size: 12px;
             font-weight: 800;
@@ -331,8 +342,8 @@
         }
 
         .pd-credential-add:hover {
-            border-color: #115e59;
-            background: #115e59;
+            border-color: var(--pwdl-brand-primary-hover);
+            background: var(--pwdl-brand-primary-hover);
             color: #fff;
         }
 
@@ -377,23 +388,24 @@
             margin-inline: calc(-1 * var(--pd-credential-page-gutter));
             padding: 0 var(--pd-credential-page-gutter);
             border: 0;
-            border-bottom: 1px solid #dbe4ee;
+            border-bottom: 1px solid var(--pd-border);
             border-radius: 0;
             background: transparent;
-            color: #64748b;
+            color: var(--pd-muted);
             font-size: 12px;
         }
 
-        .pd-credential-summary span { color: #64748b; font-size: 12px; font-weight: 600; }
-        .pd-credential-summary strong { display: inline; margin: 0; color: #0f172a; font-size: inherit; }
+        .pd-credential-summary span { color: var(--pd-muted); font-size: 12px; font-weight: 600; }
+        .pd-credential-summary strong { display: inline; margin: 0; color: var(--pd-text); font-size: inherit; }
         .pd-credential-summary i { width: 3px; height: 3px; border-radius: 999px; background: #94a3b8; }
         .pd-credential-summary .needs-attention,
-        .pd-credential-summary .needs-attention strong { color: #b45309; }
+        .pd-credential-summary .needs-attention strong { color: var(--pwdl-status-warning-text); }
 
         .pd-credential-table-card {
             margin-top: 20px;
             overflow: visible;
             box-shadow: none;
+            container-type: inline-size;
         }
 
         .pd-credential-empty-state {
@@ -405,10 +417,10 @@
             gap: 9px;
             margin-top: 20px;
             padding: 48px 24px;
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 8px;
-            background: #ffffff;
-            color: #64748b;
+            background: var(--pd-card);
+            color: var(--pd-muted);
             text-align: center;
         }
         .pd-credential-empty-state__icon {
@@ -419,11 +431,11 @@
             justify-content: center;
             margin-bottom: 7px;
             border-radius: 999px;
-            background: #eefaf8;
-            color: #0f766e;
+            background: var(--pwdl-brand-primary-soft);
+            color: var(--pd-primary);
         }
         .pd-credential-empty-state__icon svg { width: 27px; height: 27px; }
-        .pd-credential-empty-state h2 { margin: 0; color: #0f172a; font-size: 17px; font-weight: 800; }
+        .pd-credential-empty-state h2 { margin: 0; color: var(--pd-text); font-size: 17px; font-weight: 800; }
         .pd-credential-empty-state p { max-width: 440px; margin: 0; font-size: 13px; line-height: 1.55; }
         .pd-credential-empty-state__action {
             display: inline-flex;
@@ -433,15 +445,15 @@
             gap: 7px;
             margin-top: 10px;
             padding: 0 14px;
-            border: 1px solid #0f766e;
+            border: 1px solid var(--pwdl-brand-primary);
             border-radius: 6px;
-            background: #ffffff;
-            color: #0f766e;
+            background: var(--pd-card);
+            color: var(--pd-primary);
             font-size: 12px;
             font-weight: 800;
             text-decoration: none;
         }
-        .pd-credential-empty-state__action:hover { background: #f0fdfa; color: #115e59; }
+        .pd-credential-empty-state__action:hover { background: var(--pwdl-brand-primary-soft); color: var(--pd-primary); }
         .pd-credential-empty-state__action:focus-visible { outline: 2px solid rgba(15,118,110,.24); outline-offset: 2px; }
         .pd-credential-empty-state__action svg { width: 16px; height: 16px; }
 
@@ -450,22 +462,23 @@
             min-width: 170px;
             height: 40px;
             padding: 0 34px 0 12px;
-            border: 1px solid #cfd9e6;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 6px;
-            background: #fff;
-            color: #334155;
+            background: var(--pd-card);
+            color: var(--pwdl-text-secondary);
             font-size: 12px;
             font-weight: 700;
             outline: none;
         }
-        .pd-credential-toolbar-end select:focus { border-color: #0f8a83; box-shadow: 0 0 0 3px rgba(15,138,131,.1); }
+        .pd-credential-toolbar-end select:focus { border-color: var(--pd-primary); box-shadow: 0 0 0 3px rgba(15,138,131,.1); }
 
         .pd-credential-table-wrap { overflow: visible; }
         .pd-credential-table { min-width: 900px; }
         .pd-credential-table th,
         .pd-credential-table td { padding-inline: 18px; }
-        .pd-credential-account { color: #475569; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-        .pd-credential-pill.is-warning { border-color: #fed7aa; background: #fff7ed; color: #b45309; }
+        .pd-credential-account { color: var(--pwdl-text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+        .pd-credential-field-label { display: none; }
+        .pd-credential-pill.is-warning { border-color: var(--pd-border); background: var(--pwdl-status-warning-soft); color: var(--pwdl-status-warning-text); }
 
         .pd-credential-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
         .pd-credential-open {
@@ -475,17 +488,17 @@
             gap: 7px;
             min-height: 36px;
             padding: 0 12px;
-            border: 1px solid #cfd9e6;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 6px;
-            background: #fff;
-            color: #334155;
+            background: var(--pd-card);
+            color: var(--pwdl-text-secondary);
             font-size: 11px;
             font-weight: 700;
             text-decoration: none;
             white-space: nowrap;
         }
-        .pd-credential-open:hover { border-color: #99d5d1; color: #0f766e; }
-        .pd-credential-open:disabled { color: #94a3b8; cursor: not-allowed; }
+        .pd-credential-open:hover { border-color: var(--pd-primary); color: var(--pd-primary); }
+        .pd-credential-open:disabled { color: var(--pwdl-text-placeholder); cursor: not-allowed; }
         .pd-credential-open svg { width: 15px; height: 15px; }
 
         .pd-credential-menu { position: relative; }
@@ -495,13 +508,13 @@
             justify-content: center;
             width: 36px;
             height: 36px;
-            border: 1px solid #cfd9e6;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 6px;
-            background: #fff;
-            color: #475569;
+            background: var(--pd-card);
+            color: var(--pwdl-text-secondary);
             cursor: pointer;
         }
-        .pd-credential-menu-trigger:hover { border-color: #99d5d1; color: #0f766e; }
+        .pd-credential-menu-trigger:hover { border-color: var(--pd-primary); color: var(--pd-primary); }
         .pd-credential-menu-trigger svg { width: 17px; height: 17px; }
         .pd-credential-menu-popover {
             position: absolute;
@@ -510,9 +523,9 @@
             right: 0;
             width: 224px;
             padding: 6px;
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 7px;
-            background: #fff;
+            background: var(--pd-card);
             box-shadow: 0 14px 32px rgba(15,23,42,.14);
         }
         .pd-credential-menu-popover button,
@@ -526,7 +539,7 @@
             border: 0;
             border-radius: 5px;
             background: transparent;
-            color: #334155;
+            color: var(--pwdl-text-secondary);
             font-size: 12px;
             font-weight: 600;
             text-align: left;
@@ -534,50 +547,92 @@
             cursor: pointer;
         }
         .pd-credential-menu-popover button:hover,
-        .pd-credential-menu-popover a:hover { background: #f8fafc; color: #0f766e; }
+        .pd-credential-menu-popover a:hover { background: var(--pwdl-surface-muted); color: var(--pd-primary); }
         .pd-credential-menu-popover svg { flex: 0 0 auto; width: 16px; height: 16px; }
-        .pd-credential-menu-popover .is-danger { color: #dc2626; }
-        .pd-credential-menu-popover .is-danger:hover { background: #fef2f2; color: #b91c1c; }
+        .pd-credential-menu-popover .is-danger { color: var(--pwdl-status-danger-text); }
+        .pd-credential-menu-popover .is-danger:hover { background: var(--pwdl-status-danger-soft); color: var(--pwdl-status-danger-text); }
         .pd-credential-menu-rule { display: block; height: 1px; margin: 5px -6px; background: #edf2f7; }
 
         .pd-credential-details-modal {
             width: min(620px, 100%);
             max-height: min(760px, calc(100vh - 48px));
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pd-border);
             border-radius: 8px;
-            background: #fff;
+            background: var(--pd-card);
             overflow: hidden;
             box-shadow: 0 28px 70px rgba(15,23,42,.25);
         }
-        .pd-credential-details-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid #edf2f7; }
-        .pd-credential-details-modal > header span { color: #0f766e; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-        .pd-credential-details-modal h2 { margin: 5px 0 0; color: #07152f; font-size: 21px; }
-        .pd-credential-details-modal header p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
-        .pd-credential-details-modal header button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid #dbe4ee; border-radius: 6px; background: #fff; color: #475569; cursor: pointer; }
+        .pd-credential-details-modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--pwdl-border-subtle); }
+        .pd-credential-details-modal > header span { color: var(--pd-primary); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .pd-credential-details-modal h2 { margin: 5px 0 0; color: var(--pd-text); font-size: 21px; }
+        .pd-credential-details-modal header p { margin: 4px 0 0; color: var(--pd-muted); font-size: 12px; }
+        .pd-credential-details-modal header button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--pd-border); border-radius: 6px; background: var(--pd-card); color: var(--pwdl-text-secondary); cursor: pointer; }
         .pd-credential-details-modal header button svg { width: 18px; height: 18px; }
         .pd-credential-details-body { display: flex; flex-direction: column; gap: 16px; max-height: 580px; padding: 20px 22px; overflow-y: auto; }
         .pd-credential-details-meta { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
-        .pd-credential-details-meta > div { padding: 11px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; }
+        .pd-credential-details-meta > div { padding: 11px 12px; border: 1px solid var(--pwdl-border-subtle); border-radius: 6px; background: var(--pwdl-surface-muted); }
         .pd-credential-details-meta span,
         .pd-credential-protected-value > span,
-        .pd-credential-details-notes span { display: block; margin-bottom: 5px; color: #64748b; font-size: 10px; font-weight: 800; text-transform: uppercase; }
-        .pd-credential-details-meta strong { display: block; color: #0f172a; font-size: 12px; }
-        .pd-credential-details-meta small { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
-        .pd-credential-protected-value { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        .pd-credential-details-notes span { display: block; margin-bottom: 5px; color: var(--pd-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .pd-credential-details-meta strong { display: block; color: var(--pd-text); font-size: 12px; }
+        .pd-credential-details-meta small { display: block; margin-top: 4px; color: var(--pd-muted); font-size: 10px; }
+        .pd-credential-protected-value { padding: 12px; border: 1px solid var(--pwdl-border-subtle); border-radius: 6px; }
         .pd-credential-protected-value .pd-secret-field { display: flex; }
         .pd-credential-protected-value code { flex: 1; min-width: 0; overflow-wrap: anywhere; }
         .pd-credential-details-notes { display: grid; gap: 10px; }
-        .pd-credential-details-notes > div { padding: 12px; border: 1px solid #e2e8f0; border-radius: 6px; }
-        .pd-credential-details-notes p { margin: 0; color: #334155; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
-        .pd-credential-details-modal footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid #edf2f7; }
+        .pd-credential-details-notes > div { padding: 12px; border: 1px solid var(--pwdl-border-subtle); border-radius: 6px; }
+        .pd-credential-details-notes p { margin: 0; color: var(--pwdl-text-secondary); font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+        .pd-credential-details-modal footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--pwdl-border-subtle); }
         .pd-credential-details-modal footer button,
         .pd-credential-details-modal footer a { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; padding: 0 14px; border-radius: 6px; font-size: 12px; font-weight: 800; text-decoration: none; cursor: pointer; }
-        .pd-credential-details-modal footer .is-neutral { border: 1px solid #dbe4ee; background: #fff; color: #334155; }
-        .pd-credential-details-modal footer .is-primary { border: 1px solid #0f766e; background: #0f766e; color: #fff; }
+        .pd-credential-details-modal footer .is-neutral { border: 1px solid var(--pd-border); background: var(--pd-card); color: var(--pwdl-text-secondary); }
+        .pd-credential-details-modal footer .is-primary { border: 1px solid var(--pwdl-brand-primary); background: var(--pwdl-brand-primary); color: #fff; }
         .pd-credential-details-modal footer svg { width: 15px; height: 15px; }
 
-        @media (max-width: 1100px) {
-            .pd-credential-table-wrap { overflow-x: auto; }
+        .pd-credential-details-modal,
+        .pd-password-modal,
+        .pd-security-modal {
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100dvh - 48px);
+        }
+        .pd-credential-details-modal > header, .pd-credential-details-modal > footer,
+        .pd-password-modal > header, .pd-password-modal > footer,
+        .pd-security-modal > header, .pd-security-modal > footer {
+            flex-shrink: 0;
+        }
+        .pd-credential-details-body, .pd-password-body, .pd-security-body {
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        @container (max-width: 900px) {
+            .pd-credential-table, .pd-credential-table tbody {
+                display: block;
+                min-width: 0;
+            }
+            .pd-credential-table thead {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                overflow: hidden;
+                clip-path: inset(50%);
+                white-space: nowrap;
+            }
+            .pd-credential-table tbody tr {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+                padding: 16px;
+                border-bottom: 1px solid var(--pwdl-border-subtle);
+            }
+            .pd-credential-table tbody tr:last-child { border-bottom: 0; }
+            .pd-credential-table td { padding: 0; border: 0; overflow-wrap: anywhere; }
+            .pd-credential-cell-wide { grid-column: 1 / -1; }
+            .pd-credential-field-label { display: block; margin-bottom: 4px; color: var(--pd-muted); font-size: 11px; }
+            .pd-credential-row-actions { flex-wrap: wrap; justify-content: space-between; }
+            .pd-credential-open, .pd-credential-menu-trigger { min-height: 44px; }
+            .pd-credential-menu-trigger { width: 44px; }
         }
 
         @media (max-width: 640px) {

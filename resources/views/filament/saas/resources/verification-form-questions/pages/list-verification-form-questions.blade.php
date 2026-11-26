@@ -1,11 +1,5 @@
 <x-filament-panels::page>
     @php
-        $templateVersionHistory = collect($this->getTemplateVersionHistory());
-        $publishedCount = $templateVersionHistory->where('status', 'Published')->count();
-        $draftCount = $templateVersionHistory->where('status', 'Draft')->count();
-        $archivedCount = max(0, $templateVersionHistory->count() - $publishedCount - $draftCount);
-        $activeTemplate = $templateVersionHistory->first(fn (array $version): bool => (bool) ($version['is_active'] ?? false));
-        $previousPublishedCount = max(0, $publishedCount - ($activeTemplate ? 1 : 0));
         $selectedTemplateVersion = $this->getSelectedTemplateVersionDetail();
     @endphp
 
@@ -16,7 +10,7 @@
             max-width: none;
             margin: 0;
             gap: 18px;
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
         }
 
         .df-page * {
@@ -32,7 +26,7 @@
 
         .df-title {
             margin: 0;
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
             font-size: 24px;
             line-height: 1.2;
             font-weight: 700;
@@ -40,7 +34,7 @@
 
         .df-subtitle {
             margin: 6px 0 0;
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 14px;
             line-height: 1.55;
         }
@@ -55,9 +49,9 @@
 
         .df-card,
         .df-panel {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 8px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             box-shadow: none;
         }
 
@@ -66,7 +60,7 @@
         }
 
         .df-label {
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
@@ -77,7 +71,7 @@
             font-size: 28px;
             line-height: 1;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
         }
 
         .df-summary {
@@ -99,16 +93,24 @@
         .df-summary__item {
             min-width: 0;
             padding: 14px 16px;
-            border-right: 1px solid #e2e8f0;
+            border-right: 1px solid var(--pwdl-border-subtle);
         }
 
         .df-summary__item:last-child {
             border-right: 0;
         }
 
+        .df-summary__forms {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 5px;
+            overflow-wrap: anywhere;
+        }
+
         .df-summary__value {
             margin-top: 5px;
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
             font-size: 15px;
             line-height: 1.35;
             font-weight: 700;
@@ -116,7 +118,7 @@
 
         .df-summary__note {
             margin-top: 2px;
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 12px;
             line-height: 1.4;
         }
@@ -124,10 +126,10 @@
         .df-input,
         .df-select {
             min-height: 42px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 8px;
-            background: #ffffff;
-            color: #334155;
+            background: var(--pwdl-surface-card);
+            color: var(--pwdl-text-secondary);
             font-size: 14px;
         }
 
@@ -151,20 +153,20 @@
             justify-content: space-between;
             gap: 14px;
             padding: 16px 20px;
-            border-bottom: 1px solid #e2e8f0;
-            background: #ffffff;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-surface-card);
         }
 
         .df-panel-title {
             margin: 0;
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
             font-size: 16px;
             font-weight: 700;
         }
 
         .df-panel-meta {
             margin-top: 3px;
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 12px;
         }
 
@@ -174,10 +176,10 @@
             justify-content: center;
             min-height: 38px;
             padding: 8px 12px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 8px;
-            background: #ffffff;
-            color: #334155;
+            background: var(--pwdl-surface-card);
+            color: var(--pwdl-text-secondary);
             font-size: 13px;
             font-weight: 600;
             text-decoration: none;
@@ -250,9 +252,9 @@
             display: grid;
             min-width: 180px;
             padding: 6px;
-            border: 1px solid #dbe4ee;
+            border: 1px solid var(--pwdl-border-default);
             border-radius: 6px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
         }
 
@@ -261,7 +263,7 @@
             border: 0;
             border-radius: 4px;
             background: transparent;
-            color: #334155;
+            color: var(--pwdl-text-secondary);
             font-size: 13px;
             font-weight: 700;
             text-align: left;
@@ -269,18 +271,18 @@
         }
 
         .df-row-menu__action:hover {
-            background: #f1f5f9;
-            color: #0f766e;
+            background: var(--pwdl-surface-muted);
+            color: var(--pwdl-brand-accent);
         }
 
         .df-table thead {
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-surface-muted);
         }
 
         .df-table th {
             padding: 12px 20px;
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 12px;
             font-weight: 600;
             text-align: left;
@@ -290,23 +292,23 @@
 
         .df-table td {
             padding: 14px 20px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #475569;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
+            color: var(--pwdl-text-secondary);
             vertical-align: top;
         }
 
         .df-table tbody tr:hover {
-            background: #f8fafc;
+            background: var(--pwdl-surface-muted);
         }
 
         .df-name {
-            color: #0f172a;
+            color: var(--pwdl-text-primary);
             font-weight: 700;
         }
 
         .df-small {
             margin-top: 4px;
-            color: #64748b;
+            color: var(--pwdl-text-muted);
             font-size: 12px;
             line-height: 1.45;
         }
@@ -317,26 +319,26 @@
             gap: 6px;
             padding: 5px 9px;
             border-radius: 999px;
-            background: #f8fafc;
-            color: #475569;
+            background: var(--pwdl-surface-muted);
+            color: var(--pwdl-text-secondary);
             font-size: 12px;
             font-weight: 600;
             white-space: nowrap;
         }
 
         .df-badge--teal {
-            background: #f0fdfa;
-            color: #0f766e;
+            background: var(--pwdl-brand-primary-soft);
+            color: var(--pwdl-brand-accent);
         }
 
         .df-badge--blue {
-            background: #eff6ff;
-            color: #1d4ed8;
+            background: var(--pwdl-status-info-soft);
+            color: var(--pwdl-status-info-text);
         }
 
         .df-badge--amber {
-            background: #fffbeb;
-            color: #b45309;
+            background: var(--pwdl-status-warning-soft);
+            color: var(--pwdl-status-warning-text);
         }
 
         .df-dot {
@@ -358,23 +360,23 @@
 
         .df-detail-cell {
             padding: 13px 14px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 10px;
-            background: #f8fafc;
+            background: var(--pwdl-surface-muted);
         }
 
         .df-preview-section {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 12px;
-            background: #ffffff;
+            background: var(--pwdl-surface-card);
             overflow: hidden;
         }
 
         .df-preview-section__head {
             padding: 12px 14px;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
-            color: #0f172a;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
+            background: var(--pwdl-surface-muted);
+            color: var(--pwdl-text-primary);
             font-size: 14px;
             font-weight: 700;
         }
@@ -384,7 +386,7 @@
             grid-template-columns: minmax(0, 1fr) 170px;
             gap: 12px;
             padding: 11px 14px;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--pwdl-border-subtle);
             align-items: center;
         }
 
@@ -396,9 +398,9 @@
             display: inline-flex;
             gap: 6px;
             padding: 4px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--pwdl-border-subtle);
             border-radius: 10px;
-            background: #f8fafc;
+            background: var(--pwdl-surface-muted);
         }
 
         .df-mode-tab {
@@ -410,15 +412,15 @@
             border: 0;
             border-radius: 8px;
             background: transparent;
-            color: #475569;
+            color: var(--pwdl-text-secondary);
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
         }
 
         .df-mode-tab.is-active {
-            background: #ffffff;
-            color: #0f766e;
+            background: var(--pwdl-surface-card);
+            color: var(--pwdl-brand-accent);
             box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
         }
 
@@ -439,36 +441,11 @@
             width: 28px;
             height: 28px;
             margin-right: 8px;
-            border: 1px solid #cbd5e1;
+            border: 1px solid var(--pwdl-border-strong);
             border-radius: 8px;
-            background: #ffffff;
-            color: #334155;
+            background: var(--pwdl-surface-card);
+            color: var(--pwdl-text-secondary);
             cursor: pointer;
-        }
-
-        .df-modal-backdrop {
-            position: fixed;
-            inset: 0;
-            z-index: 60;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: rgba(15, 23, 42, 0.42);
-        }
-
-        .df-modal {
-            width: min(680px, 100%);
-            max-height: calc(100vh - 48px);
-            overflow: auto;
-            border: 1px solid #dbe4ee;
-            border-radius: 18px;
-            background: #ffffff;
-            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.24);
-        }
-
-        .df-modal-body {
-            padding: 18px 20px;
         }
 
         .df-form-grid {
@@ -488,7 +465,7 @@
         }
 
         .df-field label {
-            color: #475569;
+            color: var(--pwdl-text-secondary);
             font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
@@ -515,7 +492,7 @@
             }
 
             .df-summary__item:nth-child(-n+2) {
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid var(--pwdl-border-subtle);
             }
         }
 
@@ -538,7 +515,7 @@
             .df-summary__item,
             .df-summary__item:nth-child(2) {
                 border-right: 0;
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid var(--pwdl-border-subtle);
             }
 
             .df-summary__item:last-child {
@@ -561,27 +538,38 @@
         x-on:master-template-version-opened.window="$nextTick(() => setTimeout(() => document.getElementById('master-template-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 75))"
     >
         @if (! $selectedTemplateVersion)
+        @php
+            $historySummary = $this->getTemplateHistorySummary();
+            $templateVersionHistory = $this->getTemplateVersionHistory();
+        @endphp
         <section class="df-panel df-summary" aria-label="Master Template summary">
             <div class="df-summary__item">
                 <div class="df-label">Current Master Template</div>
-                <div class="df-summary__value">{{ $activeTemplate['version'] ?? 'Not published' }}</div>
-                <div class="df-summary__note">
-                    {{ $activeTemplate ? ($activeTemplate['form_type'] . ' · ' . $activeTemplate['clinic_visibility']) : 'Publish & Activate a reviewed draft for new clinics.' }}
+                <div class="df-summary__forms">
+                    @foreach ($historySummary['active_forms'] as $formLabel => $version)
+                        <div>
+                            <div class="df-summary__note">{{ $formLabel }}</div>
+                            <div class="df-summary__value">{{ $version ? 'v'.$version->version_number : 'No active version' }}</div>
+                            @if ($version)
+                                <div class="df-summary__note">{{ $version->name }} · {{ $version->clinicAvailabilityLabel() }}</div>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Draft Templates</div>
-                <div class="df-summary__value">{{ $draftCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['drafts'] }}</div>
                 <div class="df-summary__note">Editable working copies</div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Previous Published</div>
-                <div class="df-summary__value">{{ $previousPublishedCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['previous'] }}</div>
                 <div class="df-summary__note">Retained for history</div>
             </div>
             <div class="df-summary__item">
                 <div class="df-label">Archived</div>
-                <div class="df-summary__value">{{ $archivedCount }}</div>
+                <div class="df-summary__value">{{ $historySummary['archived'] }}</div>
                 <div class="df-summary__note">No longer in use</div>
             </div>
         </section>
@@ -619,7 +607,7 @@
                             @if ($currentTemplateGroup !== $version['row_group'])
                                 @php $currentTemplateGroup = $version['row_group']; @endphp
                                 <tr>
-                                    <td colspan="5" style="padding:10px 16px;background:#fbfdff;color:#64748b;font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
+                                    <td colspan="5" style="padding:10px 16px;background:var(--pwdl-surface-muted);color:var(--pwdl-text-muted);font-size:11px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;">
                                         {{ $templateGroupLabels[$version['row_group']] ?? 'Templates' }}
                                     </td>
                                 </tr>
@@ -689,6 +677,11 @@
                     </tbody>
                 </table>
             </div>
+            @if ($templateVersionHistory->hasPages())
+                <div class="df-panel-header">
+                    {{ $templateVersionHistory->links() }}
+                </div>
+            @endif
         </section>
 
         @endif
@@ -697,97 +690,81 @@
         @endif
 
         @if ($showTemplateSectionModal)
-            <div class="df-modal-backdrop" wire:key="template-section-modal">
-                <div class="df-modal">
-                    <div class="df-panel-header">
-                        <div>
-                            <div class="df-badge df-badge--teal">{{ filled($templateSectionParentKey) ? 'Add Sub-section' : 'Add Section' }}</div>
-                            <h2 class="df-panel-title" style="margin-top:10px;">
-                                {{ filled($templateSectionParentLabel) ? $templateSectionParentLabel : 'Master Template Draft' }}
-                            </h2>
-                            <div class="df-panel-meta">
-                                {{ filled($templateSectionParentLabel) ? 'This sub-section will be added under the selected parent section.' : 'This section will be added to the open draft template.' }}
-                            </div>
-                        </div>
-                        <button type="button" class="df-button" wire:click="closeTemplateSectionModal">Close</button>
-                    </div>
-                    <div class="df-modal-body">
-                        <div class="df-form-grid">
-                            <div class="df-field df-field--full">
-                                <label for="new-template-section-label">{{ filled($templateSectionParentKey) ? 'Sub-section Name' : 'Section Name' }}</label>
-                                <input id="new-template-section-label" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newTemplateSectionData.label" placeholder="Example: Implant Coverage">
-                                @error('newTemplateSectionData.label') <span class="df-small" style="color:#dc2626;">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-                        <div class="df-actions" style="margin-top:18px;">
-                            <button type="button" class="df-button" wire:click="closeTemplateSectionModal">Cancel</button>
-                            <button type="button" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;" wire:click="createSelectedTemplateSection" wire:loading.attr="disabled" wire:target="createSelectedTemplateSection">
-                                <span wire:loading.remove wire:target="createSelectedTemplateSection">Save</span>
-                                <span wire:loading wire:target="createSelectedTemplateSection">Saving...</span>
-                            </button>
-                        </div>
+            <x-pds.confirmation-dialog :title="filled($templateSectionParentKey) ? 'Add Sub-section' : 'Add Section'" :open="true" dismiss="$wire.closeTemplateSectionModal()" wire:key="template-section-modal">
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeTemplateSectionModal" label="Close" />
+                </x-slot:headerAction>
+                <p><strong>{{ filled($templateSectionParentLabel) ? $templateSectionParentLabel : 'Master Template Draft' }}</strong></p>
+                <p>{{ filled($templateSectionParentLabel) ? 'This sub-section will be added under the selected parent section.' : 'This section will be added to the open draft template.' }}</p>
+                <div class="df-form-grid">
+                    <div class="df-field df-field--full">
+                        <label for="new-template-section-label">{{ filled($templateSectionParentKey) ? 'Sub-section Name' : 'Section Name' }}</label>
+                        <input id="new-template-section-label" autofocus class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newTemplateSectionData.label" placeholder="Example: Implant Coverage">
+                        @error('newTemplateSectionData.label') <span class="df-small" role="alert" style="color:#dc2626;">{{ $message }}</span> @enderror
                     </div>
                 </div>
-            </div>
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeTemplateSectionModal">Cancel</x-filament::button>
+                    <x-filament::button wire:click="createSelectedTemplateSection" wire:loading.attr="disabled" wire:target="createSelectedTemplateSection">
+                        <span wire:loading.remove wire:target="createSelectedTemplateSection">Save</span>
+                        <span wire:loading wire:target="createSelectedTemplateSection">Saving...</span>
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
 
         @if ($showSectionQuestionModal)
-            <div class="df-modal-backdrop" wire:key="section-question-modal">
-                <div class="df-modal">
-                    <div class="df-panel-header">
-                        <div>
-                            <div class="df-badge df-badge--teal">Add Question</div>
-                            <h2 class="df-panel-title" style="margin-top:10px;">{{ $questionSectionLabel }}</h2>
-                            <div class="df-panel-meta">This question will be added to the open draft template.</div>
-                        </div>
-                        <button type="button" class="df-button" wire:click="closeSectionQuestionModal">Close</button>
+            <x-pds.confirmation-dialog :title="'Add Question'" :open="true" dismiss="$wire.closeSectionQuestionModal()" wire:key="section-question-modal">
+                <x-slot:headerAction>
+                    <x-filament::icon-button icon="heroicon-m-x-mark" color="gray" wire:click="closeSectionQuestionModal" label="Close" />
+                </x-slot:headerAction>
+                <p><strong>{{ $questionSectionLabel }}</strong></p>
+                <p>This question will be added to the open draft template.</p>
+                <div class="df-form-grid">
+                    <div class="df-field df-field--full">
+                        <label for="new-question-prompt">Question</label>
+                        <input id="new-question-prompt" autofocus class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.prompt" placeholder="Example: Is there any waiting period on this plan?">
+                        @error('newQuestionData.prompt') <span class="df-small" role="alert" style="color:#dc2626;">{{ $message }}</span> @enderror
                     </div>
-                    <div class="df-modal-body">
-                        <div class="df-form-grid">
-                            <div class="df-field df-field--full">
-                                <label for="new-question-prompt">Question</label>
-                                <input id="new-question-prompt" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.prompt" placeholder="Example: Is there any waiting period on this plan?">
-                                @error('newQuestionData.prompt') <span class="df-small" style="color:#dc2626;">{{ $message }}</span> @enderror
-                            </div>
-                            <div class="df-field">
-                                <label for="new-question-input">Answer Type</label>
-                                <select id="new-question-input" class="df-select" wire:model.defer="newQuestionData.input_type">
-                                    @foreach (\App\Models\VerificationFormQuestion::INPUT_TYPE_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="df-field">
-                                <label for="new-question-form">Form Type</label>
-                                <select id="new-question-form" class="df-select" wire:model.defer="newQuestionData.form_type">
-                                    @foreach (\App\Models\VerificationFormQuestion::FORM_TYPE_OPTIONS as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="df-field">
-                                <label for="new-question-placeholder">Placeholder</label>
-                                <input id="new-question-placeholder" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.placeholder" placeholder="Optional answer placeholder">
-                            </div>
-                            <div class="df-field">
-                                <label for="new-question-help">Instruction</label>
-                                <input id="new-question-help" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.help_text" placeholder="Optional helper text">
-                            </div>
-                            <div class="df-field df-field--full">
-                                <label for="new-question-options">Dropdown Options</label>
-                                <textarea id="new-question-options" class="df-input df-textarea" wire:model.defer="newQuestionData.select_options" placeholder="Only for Dropdown or Multi Response. Add one option per line."></textarea>
-                            </div>
-                        </div>
-                        <div class="df-actions" style="margin-top:18px;">
-                            <button type="button" class="df-button" wire:click="closeSectionQuestionModal">Cancel</button>
-                            <button type="button" class="df-button" style="background:#0f766e;color:#ffffff;border-color:#0f766e;" wire:click="createSectionQuestion" wire:loading.attr="disabled" wire:target="createSectionQuestion">
-                                <span wire:loading.remove wire:target="createSectionQuestion">Save Question</span>
-                                <span wire:loading wire:target="createSectionQuestion">Saving...</span>
-                            </button>
-                        </div>
+                    <div class="df-field">
+                        <label for="new-question-input">Answer Type</label>
+                        <select id="new-question-input" class="df-select" wire:model.defer="newQuestionData.input_type">
+                            @foreach (\App\Models\VerificationFormQuestion::INPUT_TYPE_OPTIONS as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="df-field">
+                        <label for="new-question-form">Form Type</label>
+                        <select id="new-question-form" class="df-select" wire:model.defer="newQuestionData.form_type">
+                            @foreach (\App\Models\VerificationFormQuestion::FORM_TYPE_OPTIONS as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="df-field">
+                        <label for="new-question-placeholder">Placeholder</label>
+                        <input id="new-question-placeholder" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.placeholder" placeholder="Optional answer placeholder">
+                    </div>
+                    <div class="df-field">
+                        <label for="new-question-help">Instruction</label>
+                        <input id="new-question-help" class="df-input" style="width:100%;flex:auto;" type="text" wire:model.defer="newQuestionData.help_text" placeholder="Optional helper text">
+                    </div>
+                    <div class="df-field df-field--full">
+                        <label for="new-question-options">Dropdown Options</label>
+                        <textarea id="new-question-options" class="df-input df-textarea" wire:model.defer="newQuestionData.select_options" placeholder="Only for Dropdown or Multi Response. Add one option per line."></textarea>
                     </div>
                 </div>
-            </div>
+
+                <x-slot:actions>
+                    <x-filament::button color="gray" wire:click="closeSectionQuestionModal">Cancel</x-filament::button>
+                    <x-filament::button wire:click="createSectionQuestion" wire:loading.attr="disabled" wire:target="createSectionQuestion">
+                        <span wire:loading.remove wire:target="createSectionQuestion">Save Question</span>
+                        <span wire:loading wire:target="createSectionQuestion">Saving...</span>
+                    </x-filament::button>
+                </x-slot:actions>
+            </x-pds.confirmation-dialog>
         @endif
     </div>
 

@@ -4,8 +4,11 @@ namespace App\Support;
 
 use App\Models\BillingWorkItem;
 use App\Models\Clinic;
+use App\Models\VerificationCoverageCode;
 use App\Models\VerificationFormQuestion;
 use App\Models\VerificationFormSubmission;
+use App\Models\VerificationProfile;
+use App\Models\VerificationTemplateVersion;
 use App\Services\Verification\VerificationAuditService;
 use App\Services\Verification\VerificationResultService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -13,6 +16,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class VerificationResultPdf
 {
@@ -95,6 +99,15 @@ class VerificationResultPdf
         $resultService = app(VerificationResultService::class);
         $recordedData = $resultService->recordedData($workItem, $submission);
         $recordedSubmission = $recordedData['submission'];
+        $coverageAssessment = data_get($recordedData, 'work_item.coverage_assessment', []);
+        if (data_get($coverageAssessment, 'outcome') === 'inactive') {
+            return Pdf::loadView('pdf.verifications.inactive-coverage', [
+                'assessment' => $coverageAssessment,
+                'reference' => $workItem->reference_number,
+                'status' => data_get($recordedData, 'work_item.status', $workItem->normalized_status),
+                'clinic' => $workItem->clinic?->clinic_name,
+            ])->setPaper('a4', $mode === 'custom_landscape' ? 'landscape' : 'portrait')->output();
+        }
         $state = $resultService->applyRecordedDataToPdfState($workItem, static::buildState($workItem), $recordedSubmission);
         $sections = static::buildSections($workItem, $state, $showBlankRows, $recordedSubmission);
         $selectedSections = collect($selectedSections)
@@ -119,6 +132,7 @@ class VerificationResultPdf
         };
 
         $pdf = Pdf::loadView($view, [
+            'coverageAssessment' => $coverageAssessment,
             'workItem' => $workItem,
             'state' => $state,
             'summary' => static::buildSummary($workItem, $state, $resultService, $submission),
@@ -143,7 +157,7 @@ class VerificationResultPdf
 
         $pdf->render();
         if ($mode === 'custom_landscape' && $pdf->getDomPDF()->getCanvas()->get_page_count() !== 1) {
-            $exception = \Illuminate\Validation\ValidationException::withMessages([
+            $exception = ValidationException::withMessages([
                 'pdf_layout' => 'The selected content exceeds one landscape page. Select fewer sections or questions, or use Standard output for the complete report. No answers have been removed.',
             ]);
             $exception->response = response($exception->getMessage(), 422, [
@@ -164,7 +178,7 @@ class VerificationResultPdf
         return array_key_exists($mode, self::OUTPUT_MODE_OPTIONS) ? $mode : 'standard';
     }
 
-    public static function templatePreview(\App\Models\VerificationTemplateVersion $version, string $formType, array $state, array $coverage, string $mode = 'standard'): string
+    public static function templatePreview(VerificationTemplateVersion $version, string $formType, array $state, array $coverage, string $mode = 'standard'): string
     {
         abort_unless(in_array($formType, ['short_form', 'full_form'], true)
             && in_array($version->form_type, ['both', $formType], true)
@@ -177,15 +191,18 @@ class VerificationResultPdf
             'verification_template_version_id' => $version->id,
             'verification_template_snapshot' => app(VerificationTemplateVersionService::class)->snapshot($version),
         ]);
-        $request->setRelation('verificationProfile', new \App\Models\VerificationProfile(['form_type' => $formType]));
-        foreach (['clinic', 'provider', 'assignedTo'] as $relation) $request->setRelation($relation, null);
+        $request->setRelation('verificationProfile', new VerificationProfile(['form_type' => $formType]));
+        foreach (['clinic', 'provider', 'assignedTo'] as $relation) {
+            $request->setRelation($relation, null);
+        }
         $questions = app(VerificationAuditService::class)->applicableQuestions($request, VerificationFormQuestion::DEFAULT_TEMPLATE_KEY, $formType);
         $rows = $questions->where('input_type', 'frequency_row')->map(function ($question) use ($coverage) {
             $values = array_intersect_key($coverage[$question->id] ?? [], array_flip([
                 'coverage_percent', 'frequency', 'coverage_status', 'age_limit', 'waiting_period', 'service_history',
                 'pre_auth_required', 'pre_auth_details', 'downgrade_applies', 'downgrade_to', 'payment_guideline', 'notes',
             ]));
-            return new \App\Models\VerificationCoverageCode([...$values,
+
+            return new VerificationCoverageCode([...$values,
                 'code' => $question->code, 'description' => $question->prompt,
                 'category' => $question->frequencyCategory(), 'sort_order' => $question->sort_order,
             ]);
@@ -213,7 +230,7 @@ class VerificationResultPdf
         ])->setPaper('a4', $mode === 'custom_landscape' ? 'landscape' : 'portrait');
         $pdf->render();
         if ($mode === 'custom_landscape' && $pdf->getDomPDF()->getCanvas()->get_page_count() !== 1) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'pdf_layout' => 'This template exceeds one landscape page. Use Standard output or review its content. No answers have been removed.',
             ]);
         }
@@ -363,6 +380,7 @@ class VerificationResultPdf
                 $section = $definitions->get($key);
                 $parent = $definitions->get(data_get($section, 'parent_section_key'));
                 $order = (int) data_get($section, 'sort_order', (array_search($key, self::SECTION_ORDER, true) === false ? 10000 : array_search($key, self::SECTION_ORDER, true) * 10));
+
                 return [(int) data_get($parent, 'sort_order', $order), $parent ? $order : -1];
             });
         foreach ($sectionOrder as $sectionKey) {

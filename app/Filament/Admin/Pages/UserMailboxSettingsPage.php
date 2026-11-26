@@ -61,7 +61,6 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->mailboxRecord = $this->getMailboxRecord();
         $this->form->fill($this->formDefaults());
     }
 
@@ -274,8 +273,19 @@ class UserMailboxSettingsPage extends Page implements HasForms
             unset($state['smtp_password']);
         }
 
-        $existing->update($state);
-        $this->mailboxRecord = $existing->fresh();
+        if (! $existing->exists) {
+            $user = auth()->user();
+            $existing = $user->mailbox()->createOrFirst([], array_replace(
+                UserMailbox::defaultState($user->getKey(), $user->name, $user->email),
+                $state,
+            ));
+        }
+
+        if (! $existing->wasRecentlyCreated) {
+            $existing->update($state);
+        }
+
+        $this->mailboxRecord = $existing;
         $this->form->fill($this->formDefaults());
 
         Notification::make()
@@ -364,7 +374,10 @@ class UserMailboxSettingsPage extends Page implements HasForms
 
     protected function getMailboxRecord(): UserMailbox
     {
-        return $this->mailboxRecord ??= app(UserMailboxService::class)->mailbox(auth()->user(), createIfMissing: true);
+        $user = auth()->user();
+
+        return $this->mailboxRecord ??= app(UserMailboxService::class)->mailbox($user)
+            ?? new UserMailbox(UserMailbox::defaultState($user->getKey(), $user->name, $user->email));
     }
 
     protected function formDefaults(): array

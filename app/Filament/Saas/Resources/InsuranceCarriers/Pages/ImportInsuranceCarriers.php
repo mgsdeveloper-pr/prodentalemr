@@ -4,6 +4,7 @@ namespace App\Filament\Saas\Resources\InsuranceCarriers\Pages;
 
 use App\Filament\Saas\Resources\InsuranceCarriers\InsuranceCarrierResource;
 use App\Support\InsuranceCarrierImportService;
+use App\Support\SaasNotifications;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -13,7 +14,6 @@ use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -142,16 +142,13 @@ class ImportInsuranceCarriers extends Page implements HasForms
                 $this->form->fill();
             }
         } catch (\Throwable $throwable) {
-            Log::warning('Insurance directory import failed.', [
-                'user_id' => auth()->id(),
-                'message' => $throwable->getMessage(),
-            ]);
+            $this->previewResult = null;
 
-            Notification::make()
-                ->title('Insurance import failed')
-                ->body($throwable->getMessage())
-                ->danger()
-                ->send();
+            SaasNotifications::importFailed(
+                $persist ? 'Insurance import failed' : 'Insurance preview failed',
+                $throwable,
+                'Try the downloaded insurance directory sample. If a valid file still fails, ask your administrator to check the server logs.',
+            );
         } finally {
             if (is_string($storedPath) && Storage::disk('local')->exists($storedPath)) {
                 Storage::disk('local')->delete($storedPath);

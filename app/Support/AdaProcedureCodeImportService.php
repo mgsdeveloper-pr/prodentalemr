@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Models\AdaProcedureCode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use RuntimeException;
 use ZipArchive;
 
 class AdaProcedureCodeImportService
@@ -20,7 +19,7 @@ class AdaProcedureCodeImportService
         $rows = $this->readRows($path, $originalName);
 
         if ($rows === []) {
-            throw new RuntimeException('The uploaded file does not contain ADA/CDT rows.');
+            throw new ImportValidationException('The uploaded file does not contain ADA/CDT rows.');
         }
 
         $existingCodes = AdaProcedureCode::query()
@@ -70,7 +69,7 @@ class AdaProcedureCodeImportService
         $rows = $this->readRows($path, $originalName);
 
         if ($rows === []) {
-            throw new RuntimeException('The uploaded file does not contain ADA/CDT rows.');
+            throw new ImportValidationException('The uploaded file does not contain ADA/CDT rows.');
         }
 
         $existingCodes = AdaProcedureCode::query()
@@ -208,7 +207,7 @@ class AdaProcedureCodeImportService
             return $this->readCsvRows($path);
         }
 
-        throw new RuntimeException('Unsupported file type. Please upload a CSV or Excel file.');
+        throw new ImportValidationException('Unsupported file type. Please upload a CSV or Excel file.');
     }
 
     protected function readCsvRows(string $path): array
@@ -216,7 +215,7 @@ class AdaProcedureCodeImportService
         $handle = fopen($path, 'rb');
 
         if (! $handle) {
-            throw new RuntimeException('Unable to read the uploaded CSV file.');
+            throw new ImportValidationException('Unable to read the uploaded CSV file.');
         }
 
         $headers = null;
@@ -246,7 +245,7 @@ class AdaProcedureCodeImportService
         $zip = new ZipArchive();
 
         if ($zip->open($path) !== true) {
-            throw new RuntimeException('Unable to open the uploaded Excel file.');
+            throw new ImportValidationException('Unable to open the uploaded Excel file.');
         }
 
         $sharedStrings = [];
@@ -266,7 +265,7 @@ class AdaProcedureCodeImportService
         $zip->close();
 
         if ($sheetXml === false) {
-            throw new RuntimeException('The uploaded Excel file does not contain the first worksheet.');
+            throw new ImportValidationException('The uploaded Excel file does not contain the first worksheet.');
         }
 
         $xml = simplexml_load_string($sheetXml);
