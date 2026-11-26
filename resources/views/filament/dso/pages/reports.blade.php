@@ -6,18 +6,18 @@
 <x-filament-panels::page>
     <style>
         .dso-report { display: grid; gap: 24px; max-width: none; }
-        .dso-report-card { border: 1px solid #dbe4ee; border-radius: 24px; background: #fff; box-shadow: 0 18px 42px rgba(15,23,42,.06); overflow: hidden; }
-        .dso-select { border:1px solid #cbd5e1; border-radius:16px; background:#fff; color:#0f172a; font-weight:750; padding:12px 14px; min-width:220px; }
+        .dso-report-card { border: 1px solid var(--pd-border); border-radius: 24px; background: var(--pd-card); box-shadow: 0 18px 42px rgba(15,23,42,.06); overflow: hidden; }
+        .dso-select { border:1px solid var(--pwdl-border-strong); border-radius:16px; background:var(--pd-card); color:var(--pd-text); font-weight:750; padding:12px 14px; min-width:220px; }
         .dso-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
-        .dso-stat { border:1px solid var(--border,#dbe4ee); border-radius:22px; background:var(--bg,#fff); padding:20px; }
-        .dso-stat-label { color:var(--accent,#64748b); font-size:12px; font-weight:850; letter-spacing:.12em; text-transform:uppercase; }
-        .dso-stat-value { margin-top:12px; color:#020617; font-size:36px; font-weight:900; line-height:1; }
+        .dso-stat { border:1px solid var(--border,var(--pd-border)); border-radius:22px; background:var(--bg,var(--pd-card)); padding:20px; }
+        .dso-stat-label { color:var(--accent,var(--pd-muted)); font-size:12px; font-weight:850; letter-spacing:.12em; text-transform:uppercase; }
+        .dso-stat-value { margin-top:12px; color:var(--pd-text); font-size:36px; font-weight:900; line-height:1; }
         .dso-table { width:100%; border-collapse:collapse; }
-        .dso-table th { background:#f8fafc; color:#64748b; font-size:12px; font-weight:850; letter-spacing:.12em; padding:16px 20px; text-align:left; text-transform:uppercase; }
-        .dso-table td { border-top:1px solid #edf2f7; color:#334155; font-size:14px; padding:18px 20px; }
-        .dso-name { color:#0f172a; font-weight:850; }
-        .dso-muted { margin-top:4px; color:#64748b; font-size:13px; }
-        .dso-empty { padding:42px 24px; color:#64748b; text-align:center; }
+        .dso-table th { background:var(--pd-bg); color:var(--pd-muted); font-size:12px; font-weight:850; letter-spacing:.12em; padding:16px 20px; text-align:left; text-transform:uppercase; }
+        .dso-table td { border-top:1px solid var(--pwdl-border-subtle); color:var(--pwdl-text-secondary); font-size:14px; padding:18px 20px; }
+        .dso-name { color:var(--pd-text); font-weight:850; }
+        .dso-muted { margin-top:4px; color:var(--pd-muted); font-size:13px; }
+        .dso-empty { padding:42px 24px; color:var(--pd-muted); text-align:center; }
         @media (max-width:1000px){ .dso-stats{grid-template-columns:1fr;} .dso-report-card{overflow-x:auto;} .dso-table{min-width:760px;} }
     </style>
 
@@ -38,19 +38,19 @@
 
     <div class="dso-report" style="margin-top: 24px;">
         <section class="dso-stats">
-            <div class="dso-stat" style="--bg:#eff6ff;--border:#bfdbfe;--accent:#1d4ed8;">
+            <div class="dso-stat" style="--bg:var(--pwdl-status-info-soft);--border:var(--pwdl-border-subtle);--accent:var(--pwdl-status-info-text);">
                 <div class="dso-stat-label">Clinic Operations</div>
                 <div class="dso-stat-value">{{ $services['clinic_operations'] }}</div>
             </div>
-            <div class="dso-stat" style="--bg:#f0fdf4;--border:#bbf7d0;--accent:#047857;">
+            <div class="dso-stat" style="--bg:var(--pwdl-status-success-soft);--border:var(--pwdl-border-subtle);--accent:var(--pwdl-status-success-text);">
                 <div class="dso-stat-label">Verification</div>
                 <div class="dso-stat-value">{{ $services['verification'] }}</div>
             </div>
-            <div class="dso-stat" style="--bg:#fff7ed;--border:#fed7aa;--accent:#c2410c;">
+            <div class="dso-stat" style="--bg:var(--pwdl-status-warning-soft);--border:var(--pwdl-border-subtle);--accent:var(--pwdl-status-warning-text);">
                 <div class="dso-stat-label">Both Modules</div>
                 <div class="dso-stat-value">{{ $services['both'] }}</div>
             </div>
-            <div class="dso-stat" style="--bg:#f8fafc;--border:#cbd5e1;--accent:#475569;">
+            <div class="dso-stat" style="--bg:var(--pd-bg);--border:var(--pwdl-border-strong);--accent:var(--pwdl-text-secondary);">
                 <div class="dso-stat-label">Managed Services</div>
                 <div class="dso-stat-value">{{ $services['managed_services'] }}</div>
             </div>

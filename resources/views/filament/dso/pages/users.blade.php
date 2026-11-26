@@ -5,23 +5,23 @@
 <x-filament-panels::page>
     <style>
         .dso-users { display:grid; gap:24px; max-width:none; }
-        .dso-users-card { border:1px solid #dbe4ee; border-radius:26px; background:#fff; box-shadow:0 16px 34px rgba(15,23,42,.06); overflow:hidden; }
-        .dso-users-hero { padding:28px 32px; background:linear-gradient(135deg,#fff,#f8fbff); }
-        .dso-pill { display:inline-flex; border:1px solid #bfdbfe; border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:12px; font-weight:850; letter-spacing:.14em; padding:8px 14px; text-transform:uppercase; }
-        .dso-title { margin:16px 0 8px; color:#020617; font-size:36px; line-height:1; font-weight:900; letter-spacing:-.04em; }
-        .dso-copy { margin:0; color:#52637a; font-size:15px; line-height:1.7; }
+        .dso-users-card { border:1px solid var(--pd-border); border-radius:26px; background:var(--pd-card); box-shadow:0 16px 34px rgba(15,23,42,.06); overflow:hidden; }
+        .dso-users-hero { padding:28px 32px; background:linear-gradient(135deg,var(--pd-card),var(--pd-bg)); }
+        .dso-pill { display:inline-flex; border:1px solid var(--pwdl-border-subtle); border-radius:999px; background:var(--pwdl-status-info-soft); color:var(--pwdl-status-info-text); font-size:12px; font-weight:850; letter-spacing:.14em; padding:8px 14px; text-transform:uppercase; }
+        .dso-title { margin:16px 0 8px; color:var(--pd-text); font-size:36px; line-height:1; font-weight:900; letter-spacing:-.04em; }
+        .dso-copy { margin:0; color:var(--pwdl-text-secondary); font-size:15px; line-height:1.7; }
         .dso-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:24px; }
         .dso-table { width:100%; border-collapse:collapse; }
-        .dso-table th { background:#f8fafc; color:#64748b; font-size:12px; font-weight:850; letter-spacing:.12em; padding:16px 20px; text-align:left; text-transform:uppercase; }
-        .dso-table td { border-top:1px solid #edf2f7; color:#334155; font-size:14px; padding:18px 20px; }
-        .dso-name { color:#0f172a; font-weight:850; }
-        .dso-muted { margin-top:4px; color:#64748b; font-size:13px; }
+        .dso-table th { background:var(--pd-bg); color:var(--pd-muted); font-size:12px; font-weight:850; letter-spacing:.12em; padding:16px 20px; text-align:left; text-transform:uppercase; }
+        .dso-table td { border-top:1px solid var(--pwdl-border-subtle); color:var(--pwdl-text-secondary); font-size:14px; padding:18px 20px; }
+        .dso-name { color:var(--pd-text); font-weight:850; }
+        .dso-muted { margin-top:4px; color:var(--pd-muted); font-size:13px; }
         .dso-form { padding:22px; }
         .dso-field { margin-bottom:16px; }
-        .dso-label { display:block; margin-bottom:7px; color:#64748b; font-size:12px; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
-        .dso-input { width:100%; border:1px solid #cbd5e1; border-radius:14px; padding:12px 14px; color:#0f172a; }
+        .dso-label { display:block; margin-bottom:7px; color:var(--pd-muted); font-size:12px; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
+        .dso-input { width:100%; background:var(--pd-card); border:1px solid var(--pwdl-border-strong); border-radius:14px; padding:12px 14px; color:var(--pd-text); }
         .dso-button { display:inline-flex; justify-content:center; border:0; border-radius:16px; background:#0f766e; color:#fff; font-weight:850; padding:13px 18px; cursor:pointer; }
-        .dso-empty { padding:42px 24px; color:#64748b; text-align:center; }
+        .dso-empty { padding:42px 24px; color:var(--pd-muted); text-align:center; }
         @media (max-width:1100px){ .dso-grid{grid-template-columns:1fr;} .dso-users-card{overflow-x:auto;} .dso-table{min-width:720px;} }
     </style>
 

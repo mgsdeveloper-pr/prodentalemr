@@ -15,9 +15,9 @@
     }
 
     .verification-shell__aside {
-        border: 1px solid #dbe4ee;
+        border: 1px solid var(--pd-border);
         border-radius: 8px;
-        background: #ffffff;
+        background: var(--pd-card);
         box-shadow: none;
         overflow: hidden;
         position: sticky;
@@ -33,20 +33,20 @@
         border-radius: 0;
         border: 0;
         border-left: 3px solid transparent;
-        background: #ffffff;
-        color: #344054;
+        background: var(--pd-card);
+        color: var(--pwdl-text-secondary);
         text-decoration: none;
         transition: all 140ms ease;
     }
 
     .verification-shell__menu-link:hover {
-        background: #f8fafc;
+        background: var(--pd-bg);
     }
 
     .verification-shell__menu-link.is-active {
-        border-left-color: #0f8a83;
-        background: #eaf7f5;
-        color: #08756f;
+        border-left-color: var(--pd-primary);
+        background: var(--pwdl-brand-primary-soft);
+        color: var(--pd-primary);
     }
 
     .verification-shell__menu-icon {
@@ -55,12 +55,12 @@
         justify-content: center;
         width: 20px;
         height: 20px;
-        color: #475569;
+        color: var(--pwdl-text-secondary);
         flex-shrink: 0;
     }
 
     .verification-shell__menu-link.is-active .verification-shell__menu-icon {
-        color: #0f8a83;
+        color: var(--pd-primary);
     }
 
     .verification-shell__menu-icon svg {
@@ -72,12 +72,12 @@
         display: flex;
         flex-direction: column;
         margin: 2px 0 4px 31px;
-        border-left: 1px solid #dbe4ee;
+        border-left: 1px solid var(--pd-border);
     }
 
     .verification-shell__submenu-link {
         padding: 8px 12px 8px 18px;
-        color: #667085;
+        color: var(--pd-muted);
         font-size: 13px;
         font-weight: 600;
         text-decoration: none;
@@ -85,8 +85,8 @@
 
     .verification-shell__submenu-link:hover,
     .verification-shell__submenu-link.is-active {
-        color: #08756f;
-        background: #f4fbfa;
+        color: var(--pd-primary);
+        background: var(--pwdl-brand-primary-soft);
     }
 
     .verification-shell__content {
@@ -115,14 +115,14 @@
 
 <div class="verification-shell">
     <aside class="verification-shell__aside">
-        <div style="padding: 16px 18px; border-bottom: 1px solid #edf2f7; background: #ffffff;">
-            <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: #0f766e;">
+        <div style="padding: 16px 18px; border-bottom: 1px solid var(--pwdl-border-subtle); background: var(--pd-card);">
+            <div style="margin-bottom: 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--pd-primary);">
                 {{ $menuEyebrow }}
             </div>
-            <div style="font-size: 18px; line-height: 1.2; font-weight: 800; color: #101828;">
+            <div style="font-size: 18px; line-height: 1.2; font-weight: 800; color: var(--pd-text);">
                 {{ $menuTitle }}
             </div>
-            <div style="margin-top: 7px; font-size: 12px; line-height: 1.55; color: #667085;">
+            <div style="margin-top: 7px; font-size: 12px; line-height: 1.55; color: var(--pd-muted);">
                 {{ $menuDescription }}
             </div>
         </div>

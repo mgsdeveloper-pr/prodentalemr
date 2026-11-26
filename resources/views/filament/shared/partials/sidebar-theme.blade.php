@@ -432,7 +432,6 @@
         gap: 0.55rem !important;
     }
 
-    .pd-appshell-user-menu__panel,
     .pd-appshell-workspace-switcher__menu {
         border-color: var(--pwdl-border-default) !important;
         border-radius: 0.85rem !important;
@@ -739,7 +738,6 @@
         line-height: 1.15 !important;
     }
 
-    .pd-appshell-user-menu__panel,
     .pd-appshell-workspace-switcher__menu {
         border: 1px solid var(--pwdl-border-default) !important;
         border-radius: 0.8rem !important;
@@ -1275,8 +1273,7 @@
         color: var(--pwdl-text-muted) !important;
     }
 
-    .pd-appshell-workspace-switcher__menu,
-    .pd-appshell-user-menu__panel {
+    .pd-appshell-workspace-switcher__menu {
         margin-top: 0.6rem !important;
         border: 1px solid var(--pwdl-border-default) !important;
         border-radius: 0.75rem !important;

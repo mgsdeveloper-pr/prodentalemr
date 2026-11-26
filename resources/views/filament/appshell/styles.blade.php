@@ -406,52 +406,45 @@
     .pd-appshell-user-menu__panel {
         position: absolute;
         top: calc(100% + 0.45rem);
-        right: 0;
+        inset-inline-end: 0;
         z-index: 60;
         display: grid;
-        min-width: 13rem;
-        gap: var(--pwdl-space-sm);
+        width: min(12rem, calc(100vw - 1.5rem));
+        gap: 0.125rem;
         border: 1px solid var(--pwdl-border-subtle);
         border-radius: var(--pwdl-radius-lg);
         background: var(--pwdl-surface-card);
         box-shadow: var(--pwdl-shadow-floating);
-        padding: var(--pwdl-space-md);
+        padding: 0.375rem;
     }
 
     .pd-appshell-user-menu:not([open]) .pd-appshell-user-menu__panel {
         display: none;
     }
 
-    .pd-appshell-user-menu__identity {
-        display: grid;
-        gap: 0.15rem;
-        padding-bottom: var(--pwdl-space-sm);
-        border-bottom: 1px solid var(--pwdl-border-subtle);
-    }
-
-    .pd-appshell-user-menu__name {
-        color: var(--pwdl-text-primary);
-        font-size: 0.82rem;
-        font-weight: 850;
-    }
-
-    .pd-appshell-user-menu__email {
-        overflow: hidden;
-        color: var(--pwdl-text-muted);
-        font-size: 0.72rem;
-        font-weight: 650;
-        text-overflow: ellipsis;
+    .pd-appshell-theme-toggle:focus-visible,
+    .pd-appshell-user-menu__link:focus-visible,
+    .pd-appshell-user-menu__summary:focus-visible {
+        outline: 2px solid var(--pwdl-brand-accent);
+        outline-offset: 2px;
     }
 
     .pd-appshell-user-menu__link {
         display: inline-flex;
-        width: 100%;
-        min-height: 2rem;
+        min-height: 2.25rem;
         align-items: center;
+        gap: var(--pwdl-space-sm);
         border-radius: var(--pwdl-control-radius);
         padding-inline: var(--pwdl-space-sm);
         color: var(--pwdl-text-secondary);
+        font-size: var(--pwdl-font-size-body);
         text-decoration: none;
+    }
+
+    .pd-appshell-user-menu__link svg {
+        width: 1rem;
+        height: 1rem;
+        flex: 0 0 auto;
     }
 
     .pd-appshell-user-menu__button {
@@ -1486,6 +1479,21 @@
     .pd-appshell-user-menu__summary:hover {
         border-color: #bfdbfe !important;
         background: var(--pwdl-surface-background) !important;
+    }
+
+    .pd-appshell-icon-button.pd-appshell-theme-toggle {
+        border-color: var(--pwdl-brand-outline) !important;
+        background: var(--pwdl-brand-primary-soft) !important;
+        color: var(--pwdl-brand-accent) !important;
+    }
+
+    .pd-appshell-icon-button.pd-appshell-theme-toggle:hover {
+        border-color: var(--pwdl-brand-accent) !important;
+    }
+
+    html:not(.dark) .pd-appshell-theme-toggle__sun,
+    html.dark .pd-appshell-theme-toggle__moon {
+        display: none;
     }
 
     .pd-appshell-icon-button__icon,

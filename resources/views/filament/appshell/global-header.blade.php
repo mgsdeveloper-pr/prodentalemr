@@ -18,7 +18,6 @@
         ->filter(fn (array $item): bool => $user?->canAccessPanel($panelRegistry->get($item['panel'])) ?? false)
         ->all();
     $userName = $user?->name ?: 'Profile';
-    $userEmail = $user?->email;
     $userRole = trim((string) ($user?->getPrimaryRoleLabel() ?? 'User'));
     $userInitials = collect(explode(' ', trim($userName)))
         ->filter()
@@ -112,11 +111,30 @@
         <button type="button" class="pd-appshell-icon-button" data-appshell-slot="notifications" aria-label="Alerts">
             @svg('heroicon-o-bell', 'pd-appshell-icon-button__icon', ['aria-hidden' => 'true'])
         </button>
+        @if (filament()->hasDarkMode() && ! filament()->hasDarkModeForced() && filament()->hasThemeSwitcher())
+            <button
+                type="button"
+                class="pd-appshell-icon-button pd-appshell-theme-toggle"
+                data-appshell-slot="theme-toggle"
+                aria-label="Toggle color theme"
+                :aria-label="$store.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+                :title="$store.theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+                @click="$dispatch('theme-changed', $store.theme === 'dark' ? 'light' : 'dark')"
+            >
+                @svg('heroicon-o-moon', 'pd-appshell-icon-button__icon pd-appshell-theme-toggle__moon', ['aria-hidden' => 'true'])
+                @svg('heroicon-o-sun', 'pd-appshell-icon-button__icon pd-appshell-theme-toggle__sun', ['aria-hidden' => 'true'])
+            </button>
+        @endif
         <button type="button" class="pd-appshell-icon-button" data-appshell-slot="help" aria-label="Help">
             @svg('heroicon-o-question-mark-circle', 'pd-appshell-icon-button__icon', ['aria-hidden' => 'true'])
         </button>
-        <details class="pd-appshell-user-menu" data-appshell-slot="user-menu">
-            <summary class="pd-appshell-user-menu__summary" aria-label="User menu">
+        <details
+            class="pd-appshell-user-menu"
+            data-appshell-slot="user-menu"
+            @click.outside="$el.open = false"
+            @keydown.escape="if ($el.open) { $event.preventDefault(); $event.stopPropagation(); $el.open = false; $refs.userMenuTrigger.focus() }"
+        >
+            <summary class="pd-appshell-user-menu__summary" aria-label="User menu" x-ref="userMenuTrigger">
                 <span class="pd-appshell-user-menu__avatar" aria-hidden="true">{{ $userInitials }}</span>
                 <span class="pd-appshell-user-menu__summary-text">
                     <span class="pd-appshell-user-menu__summary-name">{{ $userName }}</span>
@@ -125,14 +143,14 @@
                 @svg('heroicon-o-chevron-down', 'pd-appshell-user-menu__chevron', ['aria-hidden' => 'true'])
             </summary>
             <div class="pd-appshell-user-menu__panel">
-                <div class="pd-appshell-user-menu__identity">
-                    <span class="pd-appshell-user-menu__name">{{ $userName }}</span>
-                    @if ($userEmail)
-                        <span class="pd-appshell-user-menu__email">{{ $userEmail }}</span>
-                    @endif
-                </div>
-                <a class="pd-appshell-user-menu__link" href="{{ route('profile.edit') }}">Profile settings</a>
-                <a class="pd-appshell-user-menu__link" href="{{ $signOutUrl ?? url('/logout') }}">Sign out</a>
+                <a class="pd-appshell-user-menu__link" href="{{ route('profile.edit') }}">
+                    @svg('heroicon-o-cog-6-tooth', '', ['aria-hidden' => 'true'])
+                    Profile settings
+                </a>
+                <a class="pd-appshell-user-menu__link" href="{{ $signOutUrl ?? url('/logout') }}">
+                    @svg('heroicon-o-arrow-right-start-on-rectangle', '', ['aria-hidden' => 'true'])
+                    Sign out
+                </a>
             </div>
         </details>
     </div>

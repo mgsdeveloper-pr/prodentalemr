@@ -18,9 +18,9 @@
                     'Last Sync' => $summary['last_sync'],
                     'Last Cleanup' => $summary['last_cleanup'],
                 ] as $label => $value)
-                    <div style="padding: 14px 16px; border-radius: 8px; border: 1px solid #dbe4ee; background: #ffffff;">
-                        <div style="margin-bottom: 5px; color: #667085; font-size: 14px; font-weight: 600;">{{ $label }}</div>
-                        <div style="color: #101828; font-size: 13px; font-weight: 800;">{{ $value }}</div>
+                    <div style="padding: 14px 16px; border-radius: 8px; border: 1px solid var(--pd-border); background: var(--pd-card);">
+                        <div style="margin-bottom: 5px; color: var(--pd-muted); font-size: 14px; font-weight: 600;">{{ $label }}</div>
+                        <div style="color: var(--pd-text); font-size: 13px; font-weight: 800;">{{ $value }}</div>
                     </div>
                 @endforeach
             </section>

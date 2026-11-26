@@ -44,27 +44,27 @@
     }
 </style>
 
-<section class="pd-page-hero" style="border: 1px solid #dbe4ee; border-radius: 26px; background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden;">
+<section class="pd-page-hero" style="border: 1px solid var(--pd-border); border-radius: 26px; background: linear-gradient(180deg, var(--pd-card) 0%, var(--pd-bg) 100%); box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08); overflow: hidden;">
     <div style="padding: 24px;">
         <div>
             <div class="pd-page-hero__content" style="display: flex; flex-direction: column; gap: 12px;">
                 @if (filled($eyebrow))
-                    <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
+                    <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 11px; border-radius: 999px; background: var(--pwdl-status-info-soft); border: 1px solid var(--pwdl-border-subtle); color: var(--pwdl-status-info-text); font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; width: fit-content;">
                         {{ $eyebrow }}
                     </div>
                 @endif
 
                 <div>
-                    <h2 style="margin: 0; font-size: 32px; font-weight: 800; color: #0f172a;">{{ $title }}</h2>
+                    <h2 style="margin: 0; font-size: 32px; font-weight: 800; color: var(--pd-text);">{{ $title }}</h2>
 
                     @if (filled($description))
-                        <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.75; color: #64748b;">
+                        <p style="margin: 10px 0 0; max-width: 980px; font-size: 15px; line-height: 1.75; color: var(--pd-muted);">
                             {{ $description }}
                         </p>
                     @endif
 
                     @if (filled($scopeLabel) || filled($scopeValue))
-                        <p style="margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #0f172a;">
+                        <p style="margin: 8px 0 0; font-size: 13px; font-weight: 700; color: var(--pd-text);">
                             @if (filled($scopeLabel))
                                 {{ $scopeLabel }}:
                             @endif
