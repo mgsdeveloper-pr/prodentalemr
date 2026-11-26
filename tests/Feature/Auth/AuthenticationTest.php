@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Dso;
 use App\Models\SaasSetting;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -45,6 +46,34 @@ test('users can authenticate using the login screen', function () {
     $this->assertAuthenticated();
     $response->assertRedirect('/saas');
 });
+
+test('DSO sign-in redirects according to access to the requested workspace', function (string $requestedUrl, string $expectedUrl, bool $hasSaasAccess) {
+    $this->seed(RoleSeeder::class);
+    $dso = Dso::create(['name' => 'QA Network', 'status' => true]);
+    $user = User::factory()->create([
+        'dso_id' => $dso->id,
+        'email_verified_at' => now(),
+        'status' => true,
+    ]);
+    $user->assignRole('dso_admin');
+    if ($hasSaasAccess) {
+        $user->assignRole('saas_admin');
+    }
+
+    $this->get($requestedUrl)->assertRedirect('/login');
+
+    $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect($expectedUrl)->assertSessionMissing('url.intended');
+
+    $this->assertAuthenticatedAs($user);
+})->with([
+    'SaaS home without access' => ['/saas', '/dso', false],
+    'SaaS deep link without access' => ['/saas/client-management?search=demo', '/dso', false],
+    'DSO deep link' => ['/dso/clinics', '/dso/clinics', false],
+    'SaaS deep link with access' => ['/saas/client-management', '/saas/client-management', true],
+]);
 
 test('users can not authenticate with invalid password', function () {
     $user = User::factory()->create();

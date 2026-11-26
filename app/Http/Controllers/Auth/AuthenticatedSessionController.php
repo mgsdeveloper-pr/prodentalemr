@@ -28,7 +28,20 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
         $request->session()->regenerate();
 
-        return redirect()->intended(AuthenticatedUserHome::url($request->user()));
+        $user = $request->user();
+        $intendedUrl = $request->session()->get('url.intended');
+        $intendedPath = is_string($intendedUrl) ? parse_url($intendedUrl, PHP_URL_PATH) : null;
+
+        if (is_string($intendedPath)
+            && preg_match('~^/saas(?:/|$)~', rawurldecode($intendedPath))
+            && $user->canAccessDsoWorkspace()
+            && ! $user->canSwitchToSaasWorkspace()) {
+            $request->session()->forget('url.intended');
+
+            return redirect('/dso');
+        }
+
+        return redirect()->intended(AuthenticatedUserHome::url($user));
     }
 
     /**
